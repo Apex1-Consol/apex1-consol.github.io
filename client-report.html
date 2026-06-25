@@ -1,0 +1,1610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Apex Academy — Client Monthly Report</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800;1,9..40,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{
+  --navy:#1A365D;--navy2:#2D4A7A;--navy3:#10223B;
+  --red:#E03E15;--red2:#C2320E;
+  --gold:#D4A017;--gold2:#F0C040;
+  --success:#1B7A4A;--success-bg:#EDFBF3;
+  --warn:#CC6B00;--warn-bg:#FFF8EC;
+  --danger:#C8272C;--danger-bg:#FFF0F0;
+  --muted:#718096;--body:#4A5568;--dark:#1E2533;
+  --border:#DEE5EF;--surface:#F8FAFC;--white:#FFFFFF;
+  --m1:#1A365D;--m2:#0F6B6B;--m3:#5B3A8C;--m4:#B84E0A;
+  --font:'DM Sans',system-ui,sans-serif;
+  --mono:'DM Mono',monospace;
+  --r:8px;--r2:12px;
+  --shadow:0 2px 8px rgba(0,0,0,.08);
+  --shadow2:0 4px 20px rgba(0,0,0,.12);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100vh}
+
+/* ── APP SHELL ── */
+#app-shell{display:flex;flex-direction:column;min-height:100vh}
+
+/* ── TOP BAR ── */
+#topbar{
+  background:linear-gradient(135deg,var(--navy3) 0%,var(--navy) 100%);
+  border-bottom:3px solid var(--red);
+  padding:0 32px;height:64px;
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;z-index:100;
+}
+.topbar-brand{display:flex;align-items:center;gap:14px}
+.shield{width:36px;height:40px;position:relative;flex-shrink:0}
+.shield svg{width:100%;height:100%}
+.brand-text h1{font-size:15pt;font-weight:800;color:#fff;letter-spacing:.12em;text-transform:uppercase;line-height:1}
+.brand-text span{font-size:8pt;color:rgba(255,255,255,.55);letter-spacing:.22em;text-transform:uppercase}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.btn{border:none;border-radius:999px;cursor:pointer;font-family:var(--font);font-weight:700;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn-primary{background:var(--red);color:#fff;padding:9px 20px;font-size:9pt}
+.btn-primary:hover{background:var(--red2)}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff;padding:9px 16px;font-size:9pt;border:1px solid rgba(255,255,255,.2)}
+.btn-ghost:hover{background:rgba(255,255,255,.18)}
+.btn-success{background:var(--success);color:#fff;padding:9px 20px;font-size:9pt}
+.btn-success:hover{background:#156339}
+#status-dot{width:8px;height:8px;border-radius:50%;background:#ef4444;box-shadow:0 0 0 3px rgba(239,68,68,.3);flex-shrink:0}
+#status-dot.ok{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.3)}
+#status-txt{font-size:8.5pt;color:rgba(255,255,255,.6);font-weight:500}
+
+/* ── CONTROLS PANEL ── */
+#controls{
+  background:linear-gradient(180deg,#111827 0%,#0d1525 100%);
+  padding:24px 32px;border-bottom:1px solid rgba(255,255,255,.07);
+}
+.controls-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;align-items:end}
+.field-wrap{display:flex;flex-direction:column;gap:6px}
+.field-label{font-size:8pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.45)}
+.field-select,.field-input{
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r);padding:10px 14px;color:#fff;font-family:var(--font);font-size:10pt;
+  outline:none;transition:.15s;appearance:none;
+}
+.field-select:focus,.field-input:focus{border-color:var(--gold2);background:rgba(255,255,255,.1)}
+.field-select option{background:#1A2744;color:#fff}
+.controls-actions{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap}
+
+/* ── LOADING / EMPTY ── */
+#loading-state{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  padding:80px 20px;gap:16px;color:rgba(255,255,255,.4);font-size:11pt;
+}
+.spinner{width:36px;height:36px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--gold2);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── REPORT PREVIEW ── */
+#report-preview{
+  background:#e8ecf0;padding:32px;flex:1;
+  display:none;
+}
+#report-preview.show{display:block}
+.preview-actions{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-bottom:24px;flex-wrap:wrap;gap:12px;
+}
+.preview-actions h2{font-size:12pt;font-weight:700;color:#fff;letter-spacing:.06em}
+.print-hint{font-size:8.5pt;color:rgba(255,255,255,.5);background:rgba(255,255,255,.06);padding:8px 14px;border-radius:6px;border:1px solid rgba(255,255,255,.1)}
+
+/* ── THE REPORT PAGES ── */
+.report-page{
+  background:#fff;width:210mm;margin:0 auto 24px;
+  box-shadow:0 8px 40px rgba(0,0,0,.25);
+  border-radius:2px;
+  position:relative;overflow:hidden;
+}
+
+/* COVER PAGE */
+.cover-page{
+  height:297mm;
+  display:flex;flex-direction:column;
+}
+.cover-hero{
+  background:linear-gradient(145deg,var(--navy3) 0%,var(--navy) 55%,var(--navy2) 100%);
+  padding:52px 48px 44px;flex:1;
+  position:relative;overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.cover-hero::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(circle at 85% 20%,rgba(212,160,23,.18) 0,transparent 55%),
+             radial-gradient(circle at 10% 80%,rgba(224,62,21,.14) 0,transparent 45%);
+  pointer-events:none;
+}
+.cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:space-between;}
+.cover-title-block{flex:1}
+.cover-logo-row{display:flex;align-items:center;gap:16px;margin-bottom:48px}
+.cover-shield{width:52px;height:58px}
+.cover-brand-text h1{font-size:22pt;font-weight:800;color:#fff;letter-spacing:.14em;text-transform:uppercase;line-height:1}
+.cover-brand-text span{font-size:9pt;color:rgba(255,255,255,.5);letter-spacing:.28em;text-transform:uppercase}
+.cover-divider{width:60px;height:4px;background:linear-gradient(90deg,var(--red),var(--gold));border-radius:2px;margin:32px 0}
+.cover-doc-type{font-size:9pt;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:10px}
+.cover-title{font-size:28pt;font-weight:800;color:#fff;line-height:1.1;margin-bottom:8px}
+.cover-subtitle{font-size:13pt;color:rgba(255,255,255,.65);font-weight:400}
+.cover-client-block{
+  margin-top:auto;
+  background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r2);padding:24px 28px;
+  display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;
+}
+.cover-field label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.4);display:block;margin-bottom:4px}
+.cover-field span{font-size:10.5pt;font-weight:600;color:#fff}
+.cover-footer{
+  background:var(--navy3);padding:20px 48px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-top:3px solid var(--red);
+}
+.cover-footer-left{font-size:8pt;color:rgba(255,255,255,.4);letter-spacing:.1em;text-transform:uppercase}
+.cover-footer-right{font-size:8pt;color:rgba(255,255,255,.5)}
+.cover-period-pill{
+  display:inline-flex;align-items:center;gap:8px;
+  background:rgba(212,160,23,.2);border:1px solid rgba(212,160,23,.4);
+  border-radius:999px;padding:6px 16px;margin-top:24px;
+}
+.cover-period-pill span{font-size:8.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--gold2)}
+
+/* CONTENT PAGES */
+.content-page{padding:0;min-height:297mm;display:flex;flex-direction:column}
+.page-header{
+  background:var(--navy);padding:16px 40px;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.page-header-left{display:flex;align-items:center;gap:10px}
+.page-header-brand{font-size:8pt;font-weight:800;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.6)}
+.page-header-title{font-size:8pt;font-weight:600;color:rgba(255,255,255,.35);margin-left:6px}
+.page-header-right{font-size:7.5pt;color:rgba(255,255,255,.35);font-family:var(--mono)}
+.page-body{padding:28px 40px;flex:1}
+.page-footer{
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:10px 40px;display:flex;align-items:center;justify-content:space-between;
+}
+.page-footer-text{font-size:7pt;color:var(--muted);letter-spacing:.08em;text-transform:uppercase}
+.page-num{font-size:7pt;color:var(--muted);font-family:var(--mono)}
+
+/* SECTION HEADERS */
+.sec-header{
+  display:flex;align-items:center;gap:12px;margin-bottom:20px;margin-top:8px;
+}
+.sec-accent{width:4px;border-radius:2px;align-self:stretch;min-height:28px;flex-shrink:0}
+.sec-title{font-size:12pt;font-weight:800;color:var(--navy);letter-spacing:.04em;text-transform:uppercase}
+.sec-subtitle{font-size:8.5pt;color:var(--muted);margin-top:2px}
+
+/* INFO CARD GRID */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:28px}
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;border-left:3px solid var(--navy)}
+.info-card.full{grid-column:1/-1}
+.info-card label{font-size:7.5pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
+.info-card span{font-size:10pt;font-weight:600;color:var(--dark)}
+
+/* MODULE TIMELINE */
+.module-timeline{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:28px}
+.mod-card{border-radius:var(--r);padding:14px;border:1px solid var(--border);position:relative;overflow:hidden}
+.mod-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px}
+.mod-card.m1::before{background:var(--m1)}
+.mod-card.m2::before{background:var(--m2)}
+.mod-card.m3::before{background:var(--m3)}
+.mod-card.m4::before{background:var(--m4)}
+.mod-num{font-size:7.5pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;margin-bottom:4px}
+.mod-card.m1 .mod-num{color:var(--m1)}
+.mod-card.m2 .mod-num{color:var(--m2)}
+.mod-card.m3 .mod-num{color:var(--m3)}
+.mod-card.m4 .mod-num{color:var(--m4)}
+.mod-dates{font-size:8pt;color:var(--body);font-weight:500;line-height:1.4}
+.mod-units{font-size:7.5pt;color:var(--muted);margin-top:6px;line-height:1.5}
+
+/* NARRATIVE BLOCKS */
+.narrative-block{margin-bottom:20px}
+.narrative-label{font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px}
+.narrative-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.narrative-textarea{
+  width:100%;border:1px solid var(--border);border-radius:var(--r);
+  padding:12px 14px;font-family:var(--font);font-size:9.5pt;color:var(--dark);
+  line-height:1.6;resize:vertical;min-height:72px;background:#fff;outline:none;
+  transition:.15s;overflow:hidden;
+}
+.narrative-textarea:focus{border-color:var(--navy2);box-shadow:0 0 0 3px rgba(26,54,93,.08)}
+.narrative-static{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--r);
+  padding:12px 14px;font-size:9.5pt;color:var(--body);line-height:1.6;min-height:40px;
+}
+
+/* DUAL RENDER — screen shows textarea/select, print shows plain div/span */
+.nar-wrap{position:relative;margin-bottom:20px}
+.nar-screen{display:block}
+.nar-print{display:none;font-size:9.5pt;color:var(--body);line-height:1.6;padding:4px 0;white-space:pre-wrap;min-height:1em}
+.exam-print{display:none}
+.result-print{display:none}
+
+/* DATA TABLES */
+.data-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:24px}
+.data-table th{
+  background:var(--navy);color:#fff;padding:9px 11px;text-align:left;
+  font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+}
+.data-table th:first-child{border-radius:var(--r) 0 0 0}
+.data-table th:last-child{border-radius:0 var(--r) 0 0}
+.data-table td{padding:8px 11px;border-bottom:1px solid var(--border);color:var(--body);vertical-align:top}
+.data-table tr:last-child td{border-bottom:none}
+.data-table tr:nth-child(even) td{background:#FAFBFD}
+.data-table .comment-cell{font-size:8pt;color:var(--muted);line-height:1.5}
+
+/* MODULE SECTION BADGE */
+.mod-section-header{
+  display:flex;align-items:center;gap:10px;padding:10px 14px;
+  border-radius:var(--r);margin-bottom:12px;font-size:8pt;font-weight:700;
+  letter-spacing:.12em;text-transform:uppercase;color:#fff;
+}
+.mod-section-header.m1{background:var(--m1)}
+.mod-section-header.m2{background:var(--m2)}
+.mod-section-header.m3{background:var(--m3)}
+.mod-section-header.m4{background:var(--m4)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;justify-content:center;border-radius:999px;font-size:7pt;font-weight:700;padding:3px 9px;letter-spacing:.06em;text-transform:uppercase;white-space:nowrap}
+.badge-c{background:var(--success-bg);color:var(--success);border:1px solid #9FE1CB}
+.badge-nyc{background:var(--warn-bg);color:var(--warn);border:1px solid #FAC775}
+.badge-na{background:var(--surface);color:var(--muted);border:1px solid var(--border)}
+.badge-pending{background:#EEF2FF;color:#4F46E5;border:1px solid #C7D2FE}
+
+/* ATTENDANCE PILLS */
+.att-p{display:inline-block;width:28px;text-align:center;background:var(--success-bg);color:var(--success);border:1px solid #9FE1CB;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
+.att-a{display:inline-block;width:28px;text-align:center;background:var(--danger-bg);color:var(--danger);border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
+.att-r{display:inline-block;width:28px;text-align:center;background:#FFF0F0;color:#9B1C1C;border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
+.att-na{display:inline-block;width:28px;text-align:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:4px;font-size:7.5pt;font-weight:500;padding:2px 0;cursor:pointer}
+td.att-cell{text-align:center;padding:6px 4px}
+
+/* ASSESSMENT INLINE EDIT */
+.result-select{
+  border:1px solid var(--border);border-radius:4px;padding:3px 6px;
+  font-family:var(--font);font-size:8pt;background:#fff;cursor:pointer;
+  color:var(--dark);outline:none;
+}
+.result-select:focus{border-color:var(--navy2)}
+.exam-input{
+  width:54px;border:1px solid var(--border);border-radius:4px;padding:3px 6px;
+  font-family:var(--mono);font-size:8pt;text-align:center;outline:none;background:#fff;
+}
+.exam-input:focus{border-color:var(--navy2)}
+
+/* SURVEY */
+.survey-section-row td{background:#EEF2FF;color:#3730A3;font-weight:700;font-size:8pt;letter-spacing:.1em;text-transform:uppercase;padding:8px 11px}
+.survey-check{width:28px;text-align:center;cursor:pointer;user-select:none;font-size:13pt;color:#DDE3ED;display:inline-block}
+.survey-check.checked{color:var(--success)}
+.survey-comment-row td{background:#FAFBFD;padding:8px 11px}
+.survey-comment-input{width:100%;border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--font);font-size:8.5pt;color:var(--body);resize:vertical;min-height:48px;outline:none}
+.survey-comment-input:focus{border-color:var(--navy2)}
+
+/* UNITS TABLE */
+.unit-status{font-size:7.5pt;font-weight:700;padding:3px 8px;border-radius:4px;letter-spacing:.06em;text-transform:uppercase}
+.unit-complete{background:var(--success-bg);color:var(--success)}
+.unit-pending{background:var(--warn-bg);color:var(--warn)}
+.unit-nyt{background:var(--surface);color:var(--muted)}
+
+/* SIGN-OFF */
+.signoff-block{
+  margin-top:32px;
+  display:grid;grid-template-columns:1fr 1fr;gap:32px 40px;
+  border-top:2px solid var(--border);padding-top:28px;
+  page-break-inside:avoid;break-inside:avoid;
+}
+.signoff-field{display:flex;flex-direction:column;gap:8px;min-height:80px}
+.signoff-field label{font-size:7.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.signoff-input{
+  border:none;border-bottom:2px solid var(--border);padding:10px 0;
+  font-family:var(--font);font-size:10.5pt;color:var(--dark);outline:none;
+  background:transparent;transition:.15s;width:100%;
+}
+.signoff-input:focus{border-bottom-color:var(--navy)}
+.signoff-role{font-size:8pt;color:var(--muted);font-style:italic;margin-top:2px}
+.signoff-sig-line{height:48px;border-bottom:2px solid var(--border);margin-top:8px}
+.general-feedback-block{
+  background:linear-gradient(135deg,var(--surface) 0%,#EEF4FF 100%);
+  border:1px solid var(--border);border-left:4px solid var(--navy);
+  border-radius:var(--r);padding:16px 18px;margin:20px 0;
+}
+.general-feedback-block label{font-size:7.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);display:block;margin-bottom:8px}
+
+/* SAVE INDICATOR */
+#save-indicator{
+  position:fixed;bottom:24px;right:24px;
+  background:var(--navy);color:#fff;border-radius:999px;
+  padding:8px 18px;font-size:8.5pt;font-weight:600;
+  box-shadow:var(--shadow2);opacity:0;transition:.3s;pointer-events:none;
+  z-index:200;
+}
+#save-indicator.show{opacity:1}
+
+/* ── PRINT STYLES ── */
+@media print{
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+  html,body{background:#fff!important;margin:0!important;padding:0!important}
+  #app-shell{display:block!important}
+  #topbar,#controls,#loading-state,.preview-actions,#save-indicator{display:none!important}
+  #report-preview{display:block!important;background:#fff!important;padding:0!important;width:100%!important}
+  .report-page{
+    box-shadow:none!important;margin:0!important;border-radius:0!important;
+    page-break-after:always;break-after:page;
+    width:210mm!important;min-height:297mm!important;
+    height:auto!important;overflow:visible!important;
+    display:flex!important;flex-direction:column!important;
+  }
+  .report-page:last-child{page-break-after:avoid;break-after:avoid}
+  .page-body{flex:1!important;overflow:visible!important;height:auto!important}
+  .cover-hero{height:auto!important;min-height:240mm!important}
+  .cover-page{height:auto!important;min-height:297mm!important}
+  .cover-hero-inner{min-height:232mm!important}
+  /* Dual-render: hide screen elements, show print elements */
+  .nar-screen{display:none!important}
+  .nar-print{display:block!important}
+  .exam-screen{display:none!important}
+  .exam-print{display:inline!important}
+  .result-screen{display:none!important}
+  .result-print{display:inline!important}
+  /* Hide all form elements in print */
+  .narrative-textarea,.field-select,.result-select,.survey-comment-input,.exam-input{
+    display:none!important;
+  }
+  /* Survey */
+  .survey-check:not(.checked){visibility:hidden!important;color:transparent!important}
+  .survey-check.checked{color:var(--success)!important}
+  .att-p,.att-a,.att-r,.att-na{cursor:default!important}
+  .signoff-block{page-break-inside:avoid!important;break-inside:avoid!important}
+  /* Fix Chrome print grid reflow — use flex so column order is stable */
+  .info-grid{display:flex!important;flex-wrap:wrap!important;gap:12px!important}
+  .info-grid .info-card{flex:1 1 45%!important}
+  .info-grid .info-card.full{flex:1 1 100%!important}
+  .module-timeline{display:flex!important;flex-wrap:nowrap!important;gap:8px!important}
+  .module-timeline .mod-card{flex:1 1 0!important;min-width:0!important}
+  /* Survey — keep General Feedback row attached to the table above it */
+  .survey-comment-row{break-inside:avoid!important;page-break-inside:avoid!important;break-before:avoid!important;page-break-before:avoid!important}
+  .survey-comment-last{break-before:avoid!important;page-break-before:avoid!important}
+  .survey-section-last-group{break-inside:avoid!important;page-break-inside:avoid!important}
+  @page{size:A4;margin:0}
+}
+
+/* scrollbar */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:rgba(255,255,255,.04)}
+::-webkit-scrollbar-thumb{background:rgba(255,255,255,.15);border-radius:3px}
+
+/* ── FIELD ROW (select + action buttons) ── */
+.field-row{display:flex;gap:6px;align-items:center}
+.field-row .field-select{flex:1;min-width:0}
+.btn-icon{
+  background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);
+  color:#fff;border-radius:var(--r);padding:0;width:34px;height:38px;
+  cursor:pointer;font-size:13pt;display:inline-flex;align-items:center;justify-content:center;
+  flex-shrink:0;transition:.15s;line-height:1;
+}
+.btn-icon:hover{background:rgba(255,255,255,.22)}
+.btn-icon:disabled{opacity:.3;cursor:not-allowed}
+
+/* ── MODAL ── */
+#modal-overlay{
+  display:none;position:fixed;inset:0;z-index:500;
+  background:rgba(0,0,0,.7);backdrop-filter:blur(4px);
+  align-items:center;justify-content:center;padding:20px;
+}
+#modal-overlay.open{display:flex}
+.modal{
+  background:#1A2744;border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r2);width:100%;max-width:560px;max-height:90vh;
+  overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);
+}
+.modal-header{
+  padding:22px 28px 16px;border-bottom:1px solid rgba(255,255,255,.1);
+  display:flex;align-items:center;justify-content:space-between;
+  position:sticky;top:0;background:#1A2744;z-index:1;
+}
+.modal-title{font-size:12pt;font-weight:800;color:#fff;letter-spacing:.04em}
+.modal-close{background:none;border:none;color:rgba(255,255,255,.5);font-size:18pt;cursor:pointer;line-height:1;padding:0 4px;transition:.15s}
+.modal-close:hover{color:#fff}
+.modal-body{padding:22px 28px}
+.modal-footer{padding:16px 28px 22px;border-top:1px solid rgba(255,255,255,.1);display:flex;gap:10px;justify-content:flex-end}
+.modal-field{margin-bottom:16px}
+.modal-field label{display:block;font-size:7.5pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-bottom:6px}
+.modal-input,.modal-select{
+  width:100%;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);
+  border-radius:var(--r);padding:10px 14px;color:#fff;font-family:var(--font);font-size:10pt;
+  outline:none;transition:.15s;appearance:none;
+}
+.modal-input:focus,.modal-select:focus{border-color:var(--gold2);background:rgba(255,255,255,.12)}
+.modal-input::placeholder{color:rgba(255,255,255,.25)}
+.modal-select option{background:#1A2744;color:#fff}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px}
+.modal-section{font-size:7.5pt;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--gold2);margin:20px 0 12px;padding-bottom:6px;border-bottom:1px solid rgba(255,255,255,.1)}
+.modal-error{background:rgba(200,39,44,.15);border:1px solid rgba(200,39,44,.4);border-radius:var(--r);padding:10px 14px;font-size:8.5pt;color:#f87171;margin-bottom:16px;display:none}
+.modal-error.show{display:block}
+@media print{#modal-overlay{display:none!important}}
+</style>
+</head>
+<body>
+<div id="app-shell">
+
+<!-- TOP BAR -->
+<div id="topbar">
+  <div class="topbar-brand">
+    <div class="shield">
+      <svg viewBox="0 0 52 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M26 2L4 12v18c0 12 9.5 22.5 22 26 12.5-3.5 22-14 22-26V12L26 2z" fill="url(#sg)" stroke="rgba(255,255,255,.2)" stroke-width="1"/>
+        <text x="26" y="36" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="900" font-size="20" fill="#111827">A</text>
+        <defs>
+          <linearGradient id="sg" x1="4" y1="2" x2="48" y2="58" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#FACC15"/>
+            <stop offset="100%" stop-color="#CA8A04"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    </div>
+    <div class="brand-text">
+      <h1>Apex Academy</h1>
+      <span>Client Report Generator</span>
+    </div>
+  </div>
+  <div class="topbar-right">
+    <div id="status-dot"></div>
+    <span id="status-txt">Connecting…</span>
+    <button class="btn btn-ghost" onclick="saveNarratives(true)">💾 Save Draft</button>
+    <button class="btn btn-primary" onclick="triggerPrint()">🖨 Print PDF</button>
+  </div>
+</div>
+
+<!-- CONTROLS -->
+<div id="controls">
+  <div class="controls-grid">
+    <div class="field-wrap">
+      <label class="field-label">Client</label>
+      <div class="field-row">
+        <select class="field-select" id="sel-client" onchange="onClientChange()">
+          <option value="">— Select client —</option>
+        </select>
+        <button class="btn-icon" title="Add client" onclick="openModal('client','add')">＋</button>
+        <button class="btn-icon" id="btn-edit-client" title="Edit client" onclick="openModal('client','edit')" disabled>✏</button>
+      </div>
+    </div>
+    <div class="field-wrap">
+      <label class="field-label">Programme</label>
+      <div class="field-row">
+        <select class="field-select" id="sel-programme" onchange="onProgrammeChange()">
+          <option value="">— Select programme —</option>
+        </select>
+        <button class="btn-icon" id="btn-add-prog" title="Add programme" onclick="openModal('programme','add')" disabled>＋</button>
+        <button class="btn-icon" id="btn-edit-prog" title="Edit programme" onclick="openModal('programme','edit')" disabled>✏</button>
+      </div>
+    </div>
+    <div class="field-wrap">
+      <label class="field-label">Reporting Month</label>
+      <select class="field-select" id="sel-month"></select>
+    </div>
+    <div class="controls-actions">
+      <button class="btn btn-success" onclick="generateReport()" id="gen-btn" disabled>▶ Generate Report</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div id="modal-overlay" onclick="onOverlayClick(event)">
+  <div class="modal" id="modal-box">
+    <div class="modal-header">
+      <span class="modal-title" id="modal-title">—</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-success" id="modal-save-btn" onclick="saveModal()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loading-state">
+  <div class="spinner"></div>
+  <span>Loading data from Supabase…</span>
+</div>
+
+<!-- REPORT PREVIEW -->
+<div id="report-preview">
+  <div class="preview-actions" style="padding:0 32px 0">
+    <h2>📄 Report Preview — <span id="preview-title">—</span></h2>
+    <span class="print-hint">In print dialog → <strong>Save as PDF</strong> · A4 · No margins</span>
+  </div>
+  <div id="report-pages"></div>
+</div>
+
+</div><!-- /app-shell -->
+
+<div id="save-indicator">✓ Draft saved</div>
+
+<script>
+// ── Service Worker registration ──
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+</script>
+
+<script>
+const SB_URL='https://nducwhlmudksgxggjrbo.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kdWN3aGxtdWRrc2d4Z2dqcmJvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIzMjU3NzUsImV4cCI6MjA5NzkwMTc3NX0.1LvHz2G961t644PFjlO6dt8D5aK0JQC4Y-AQK8IVm0w';
+const HEADERS={'apikey':SB_KEY,'Authorization':'Bearer '+SB_KEY,'Content-Type':'application/json'};
+
+// ── Offline / cache keys ──
+const CACHE_KEY='apex_sb_snapshot';
+let isOnline=navigator.onLine;
+
+window.addEventListener('online', ()=>{ isOnline=true; setStatus(true,'Reconnected — refreshing…'); init(); });
+window.addEventListener('offline',()=>{ isOnline=false; setStatus(false,'Offline — using cached data'); });
+
+// ── State ──
+let clients=[],programmes=[],learners=[],enrolments=[],attendance=[],eisa=[],assessors=[];
+let activeClient=null,activeProgramme=null;
+let narratives={};  // keyed by prog_id+month
+let surveyState={};
+let attState={};    // {learner_id: {date: status}}
+let eisaState={};   // {learner_id: {module: {km,pm,wm,examv1,examv2}}}
+let learnerComments={}; // {learner_id: comment}
+
+// ── Populate month dropdown dynamically ──
+(function(){
+  const sel=document.getElementById('sel-month');
+  const now=new Date();
+  const curYear=now.getFullYear();
+  const months=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  // Show current year + next year
+  [curYear, curYear+1].forEach(yr=>{
+    months.forEach((m,mi)=>{
+      const o=document.createElement('option');
+      o.value=`${m} ${yr}`;
+      o.textContent=`${m} ${yr}`;
+      if(yr===curYear&&mi===now.getMonth())o.selected=true;
+      sel.appendChild(o);
+    });
+  });
+})();
+
+// ── Supabase fetch ──
+async function sb(table,params=''){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}?${params}`,{headers:{...HEADERS,'Prefer':'return=representation'}});
+  if(!r.ok)throw new Error(await r.text());
+  return r.json();
+}
+
+// ── Init ──
+async function init(){
+  // Try cache first for instant load
+  const cached=loadSnapshot();
+  if(cached){
+    applySnapshot(cached);
+    setStatus(true,'Loaded from cache');
+    document.getElementById('loading-state').style.display='none';
+    populateClients();
+  }else{
+    setStatus(false,'Connecting…');
+  }
+
+  if(!isOnline){
+    if(!cached){
+      setStatus(false,'Offline — no cached data');
+      document.getElementById('loading-state').innerHTML=
+        `<div style="color:#f87171;font-size:11pt">📡 Offline &amp; no cached data yet.<br><small style="opacity:.6">Open once while online to enable offline use.</small></div>`;
+    }else{
+      setStatus(false,'Offline — using cached data');
+    }
+    return;
+  }
+
+  try{
+    const [c,p,a]=await Promise.all([
+      sb('clients','select=*&order=client_name'),
+      sb('programmes','select=*&order=programme_name'),
+      sb('assessors','select=*')
+    ]);
+    clients=c; programmes=p; assessors=a;
+    saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+    setStatus(true,'Connected');
+    document.getElementById('loading-state').style.display='none';
+    populateClients();
+  }catch(e){
+    if(!cached){
+      setStatus(false,'Connection failed — loading demo data');
+      document.getElementById('loading-state').style.display='none';
+      loadDemoData();
+    }else{
+      setStatus(false,'Offline — using cached data');
+    }
+  }
+}
+
+function saveSnapshot(data){
+  try{localStorage.setItem(CACHE_KEY,JSON.stringify(data));}catch{}
+}
+function loadSnapshot(){
+  try{const d=localStorage.getItem(CACHE_KEY);return d?JSON.parse(d):null;}catch{return null;}
+}
+function applySnapshot(snap){
+  if(snap.clients)clients=snap.clients;
+  if(snap.programmes)programmes=snap.programmes;
+  if(snap.assessors)assessors=snap.assessors;
+  if(snap.learners)learners=snap.learners;
+  if(snap.enrolments)enrolments=snap.enrolments;
+  if(snap.attendance)attendance=snap.attendance;
+  if(snap.eisa)eisa=snap.eisa;
+}
+
+function setStatus(ok,txt){
+  const dot=document.getElementById('status-dot');
+  const span=document.getElementById('status-txt');
+  dot.className=ok?'ok':'';
+  span.textContent=txt;
+}
+
+// ── Demo data (fallback) ──
+function loadDemoData(){
+  clients=[{id:1,client_name:'OMI – Old Mutual Insure Limited',contact_person:'Bianca Jordaan',contact_number:'079 112 1640',contact_email:'bjordaan@omi.co.za'}];
+  programmes=[{
+    id:1,client_id:1,
+    programme_name:'OC: Insurance Underwriter NQF Level 5',
+    saqa_id:'117329',qualification_code:'91784',
+    facilitator_id:1,
+    group_size:16,group_name:'One Group',
+    module_1_dates:'09 Feb 2026 – 04 May 2026',
+    module_2_dates:'11 May 2026 – 31 Jul 2026',
+    module_3_dates:'11 Aug 2026 – 12 Oct 2026',
+    module_4_dates:'13 Oct 2026 – 14 Dec 2026',
+  }];
+  assessors=[{id:1,full_name:'Knowledge Dube',role:'Facilitator'}];
+  learners=[
+    {id:1,first_name:'Alicia',last_name:'Singleton',id_number:'8609220120083'},
+    {id:2,first_name:'Keamogetse',last_name:'Tshamano',id_number:'9103160520089'},
+    {id:3,first_name:'Eric',last_name:'Genade',id_number:'8102215228087'},
+    {id:4,first_name:'Jacqueline',last_name:'Gounden',id_number:'7901190143083'},
+    {id:5,first_name:'Keshia',last_name:'Moldrum',id_number:'8603160203082'},
+    {id:6,first_name:'Lucky',last_name:'Dhladhla',id_number:'8903145979081'},
+    {id:7,first_name:'Marinda',last_name:'Potgieter',id_number:'7611100106084'},
+    {id:8,first_name:'Michalis',last_name:'Prokopis',id_number:'9410015112081'},
+    {id:9,first_name:'Nhlakanipho',last_name:'Mahlaba',id_number:'9210085880082'},
+    {id:10,first_name:'Nokuthula',last_name:'Mlangeni',id_number:'8411120270088'},
+    {id:11,first_name:'Owen',last_name:'Mabuza',id_number:'9310175407083'},
+    {id:12,first_name:'Selina',last_name:'Mabe',id_number:'9010110148087'},
+    {id:13,first_name:'Sivulele',last_name:'Mkhize',id_number:'8507180858082'},
+    {id:14,first_name:'Yandelwa',last_name:'Sogiba',id_number:'9703100497080'},
+    {id:15,first_name:'Zukolukona',last_name:'Nkopo',id_number:'9205270623081'},
+    {id:16,first_name:'Nomfundo',last_name:'Sukazi',id_number:'9102100256085'},
+  ];
+  enrolments=learners.map(l=>({id:l.id,programme_id:1,learner_id:l.id,status:'active'}));
+  // Pre-fill demo assessment results
+  eisaState={};
+  learners.forEach(l=>{
+    eisaState[l.id]={
+      1:{km:'C',pm:'C',wm:'',examv1: l.last_name==='Dhladhla'?'NYC':'C',examv2: l.last_name==='Dhladhla'?'C':''},
+      2:{km:'',pm:'',wm:'',examv1:'',examv2:''},
+      3:{km:'',pm:'',wm:'',examv1:'',examv2:''},
+      4:{km:'',pm:'',wm:'',examv1:'',examv2:''},
+    };
+  });
+  // Pre-fill demo exam percentages
+  const examScores={1:'76',2:'80',3:'91',4:'75',5:'71',6:'86',7:'75',8:'93',9:'81',10:'80',11:'84',12:'71',13:'85',14:'80',15:'86',16:'89'};
+  learners.forEach(l=>{
+    if(!eisaState[l.id])eisaState[l.id]={};
+    if(!eisaState[l.id][1])eisaState[l.id][1]={km:'C',pm:'C',wm:'',examv1:'C',examv2:'',examv1_pct:examScores[l.id]||'',examv2_pct:''};
+    else{eisaState[l.id][1].examv1_pct=examScores[l.id]||'';eisaState[l.id][1].examv2_pct=l.last_name==='Dhladhla'?'86':'';}
+  });
+  // Demo attendance
+  attState={};
+  learners.forEach(l=>{
+    attState[l.id]={'2026-05-11':'P','2026-05-12': l.last_name==='Dhladhla'?'P':'N/A'};
+  });
+  setStatus(true,'Demo mode');
+  document.getElementById('loading-state').style.display='none';
+  populateClients();
+}
+
+// ── Selectors ──
+function populateClients(){
+  const sel=document.getElementById('sel-client');
+  clients.forEach(c=>{
+    const o=document.createElement('option');
+    o.value=c.id;o.textContent=c.client_name;
+    sel.appendChild(o);
+  });
+  if(clients.length===1){sel.value=clients[0].id;onClientChange();}
+}
+
+function onClientChange(){
+  const cid=+document.getElementById('sel-client').value;
+  activeClient=clients.find(c=>c.id===cid)||null;
+  const sel=document.getElementById('sel-programme');
+  sel.innerHTML='<option value="">— Select programme —</option>';
+  document.getElementById('btn-edit-client').disabled=!activeClient;
+  document.getElementById('btn-add-prog').disabled=!activeClient;
+  document.getElementById('btn-edit-prog').disabled=true;
+  document.getElementById('gen-btn').disabled=true;
+  if(!cid)return;
+  programmes.filter(p=>p.client_id===cid).forEach(p=>{
+    const o=document.createElement('option');
+    o.value=p.id;o.textContent=p.programme_name;
+    sel.appendChild(o);
+  });
+  const filtered=programmes.filter(p=>p.client_id===cid);
+  if(filtered.length===1){sel.value=filtered[0].id;onProgrammeChange();}
+}
+
+async function onProgrammeChange(){
+  const pid=+document.getElementById('sel-programme').value;
+  activeProgramme=programmes.find(p=>p.id===pid)||null;
+  document.getElementById('gen-btn').disabled=!activeProgramme;
+  document.getElementById('btn-edit-prog').disabled=!activeProgramme;
+  if(!activeProgramme)return;
+  // Load learners if not demo
+  if(learners.length===0||learners[0].programme_id){
+    try{
+      [learners,enrolments,attendance,eisa]=await Promise.all([
+        sb('learners','select=*&order=last_name'),
+        sb('enrolments',`select=*&programme_id=eq.${pid}`),
+        sb('attendance',`select=*&programme_id=eq.${pid}`),
+        sb('eisa',`select=*&programme_id=eq.${pid}`)
+      ]);
+      saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+      buildEisaState();
+      buildAttState();
+    }catch(e){/* use existing demo state */}
+  }
+}
+
+// Normalise any date string to YYYY-MM-DD for consistent key matching
+function normDateKey(d){
+  if(!d)return d;
+  // Already ISO
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d))return d;
+  // DD-Mon-YYYY e.g. "11-May-2026"
+  const months={Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12'};
+  const m=d.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if(m)return`${m[3]}-${months[m[2]]||'00'}-${m[1].padStart(2,'0')}`;
+  return d;
+}
+
+function buildEisaState(){
+  eisaState={};
+  eisa.forEach(r=>{
+    if(!eisaState[r.learner_id])eisaState[r.learner_id]={};
+    eisaState[r.learner_id][r.module_number||1]={
+      km:r.km_result||'',pm:r.pm_result||'',wm:r.wm_result||'',
+      examv1:r.exam_v1_result||'',examv2:r.exam_v2_result||'',
+      examv1_pct:r.exam_v1_pct||'',examv2_pct:r.exam_v2_pct||''
+    };
+  });
+}
+
+function buildAttState(){
+  attState={};
+  attendance.forEach(r=>{
+    if(!attState[r.learner_id])attState[r.learner_id]={};
+    attState[r.learner_id][normDateKey(r.session_date)]=r.status||'P';
+  });
+}
+
+// ── Narrative persistence ──
+function narrativeKey(){return`apex_report_${activeProgramme?.id}_${document.getElementById('sel-month').value}`;}
+function loadNarratives(){
+  try{const d=localStorage.getItem(narrativeKey());return d?JSON.parse(d):{};}catch{return{};}
+}
+function saveNarratives(toast=false){
+  if(!activeProgramme)return;
+  const key=narrativeKey();
+  const data={};
+  document.querySelectorAll('[data-nar]').forEach(el=>{data[el.dataset.nar]=el.value;});
+  // survey
+  const sv={};
+  document.querySelectorAll('[data-survey-idx]').forEach(el=>{sv[el.dataset.surveyIdx]=el.dataset.checked==='true';});
+  data._survey=sv;
+  document.querySelectorAll('[data-survey-comment]').forEach(el=>{data['_sc_'+el.dataset.surveyComment]=el.value;});
+  // comments
+  const cc={};
+  document.querySelectorAll('[data-comment-lid]').forEach(el=>{cc[el.dataset.commentLid]=el.value;});
+  data._comments=cc;
+  // eisa overrides
+  const ea={};
+  document.querySelectorAll('[data-eisa]').forEach(el=>{ea[el.dataset.eisa]=el.value;});
+  data._eisa=ea;
+  // att overrides
+  const ao={};
+  document.querySelectorAll('[data-att]').forEach(el=>{ao[el.dataset.att]=el.textContent;});
+  data._att=ao;
+  localStorage.setItem(key,JSON.stringify(data));
+  if(toast)showSaved();
+}
+function showSaved(){
+  const el=document.getElementById('save-indicator');
+  el.classList.add('show');
+  setTimeout(()=>el.classList.remove('show'),2000);
+}
+
+// Auto-save is debounced per-keystroke via autoSave(); interval removed as redundant.
+
+// ── Helpers ──
+function esc(s){const d=document.createElement('div');d.textContent=s||'';return d.innerHTML;}
+function getAssessor(id){return assessors.find(a=>a.id===id)?.full_name||'—';}
+function getProgrammeLearners(){
+  const enrolled=new Set(enrolments.map(e=>e.learner_id));
+  return learners.filter(l=>enrolled.has(l.id));
+}
+function getAttDates(){
+  const dates=new Set();
+  Object.values(attState).forEach(d=>Object.keys(d).forEach(k=>dates.add(normDateKey(k))));
+  return [...dates].sort();
+}
+
+// ── Shield SVG (inline for print) ──
+function shieldSVG(size=36){
+  return`<svg width="${size}" height="${Math.round(size*1.1)}" viewBox="0 0 52 58" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M26 2L4 12v18c0 12 9.5 22.5 22 26 12.5-3.5 22-14 22-26V12L26 2z" fill="url(#sg${size})" stroke="rgba(0,0,0,.1)" stroke-width="1"/>
+    <text x="26" y="36" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="900" font-size="20" fill="#111827">A</text>
+    <defs><linearGradient id="sg${size}" x1="4" y1="2" x2="48" y2="58" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FACC15"/><stop offset="100%" stop-color="#CA8A04"/>
+    </linearGradient></defs>
+  </svg>`;
+}
+
+// ── REPORT GENERATION ──
+function generateReport(){
+  const month=document.getElementById('sel-month').value;
+  const prog=activeProgramme;
+  const client=activeClient;
+  if(!prog||!client)return;
+
+  narratives=loadNarratives();
+  const pLearners=getProgrammeLearners();
+  const attDates=getAttDates();
+
+  document.getElementById('preview-title').textContent=`${client.client_name} · ${month}`;
+  document.getElementById('report-preview').classList.add('show');
+  document.getElementById('loading-state').style.display='none';
+
+  const pages=document.getElementById('report-pages');
+  pages.innerHTML='';
+
+  pages.appendChild(buildCoverPage(prog,client,month));
+  pages.appendChild(buildOverviewPage(prog,client,pLearners));
+  pages.appendChild(buildParticipationPage(pLearners,narratives));
+  pages.appendChild(buildAttendancePage(pLearners,attDates,narratives));
+  pages.appendChild(buildAssessmentPage(pLearners,1,narratives));
+  pages.appendChild(buildAssessmentPage(pLearners,2,narratives));
+  pages.appendChild(buildAssessmentPage(pLearners,3,narratives));
+  pages.appendChild(buildAssessmentPage(pLearners,4,narratives));
+  pages.appendChild(buildSurveyPage(narratives));
+  pages.appendChild(buildSignoffPage(prog,client,month,narratives));
+
+  // Restore saved values
+  if(narratives._survey){
+    Object.entries(narratives._survey).forEach(([idx,checked])=>{
+      const el=document.querySelector(`[data-survey-idx="${idx}"]`);
+      if(el){el.dataset.checked=checked;el.textContent=checked?'●':'○';}
+    });
+  }
+  if(narratives._comments){
+    Object.entries(narratives._comments).forEach(([lid,val])=>{
+      const el=document.querySelector(`[data-comment-lid="${lid}"]`);
+      if(el)el.value=val;
+    });
+  }
+  if(narratives._eisa){
+    Object.entries(narratives._eisa).forEach(([key,val])=>{
+      const el=document.querySelector(`[data-eisa="${key}"]`);
+      if(el)el.value=val;
+    });
+  }
+  if(narratives._att){
+    Object.entries(narratives._att).forEach(([key,val])=>{
+      const el=document.querySelector(`[data-att="${key}"]`);
+      if(el){el.textContent=val;applyAttStyle(el,val);}
+    });
+  }
+
+  // Scroll to preview
+  document.getElementById('report-preview').scrollIntoView({behavior:'smooth'});
+}
+
+// ── PAGE BUILDERS ──
+function pageShell(pageNum,totalPages,clientName,sectionTitle,bodyHTML){
+  const div=document.createElement('div');
+  div.className='report-page content-page';
+  div.innerHTML=`
+    <div class="page-header">
+      <div class="page-header-left">
+        ${shieldSVG(22)}
+        <span class="page-header-brand">APEX ACADEMY</span>
+        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>
+        <span class="page-header-title">${esc(clientName)}</span>
+      </div>
+      <span class="page-header-right">${esc(sectionTitle)}</span>
+    </div>
+    <div class="page-body">${bodyHTML}</div>
+    <div class="page-footer">
+      <span class="page-footer-text">Confidential — For authorised recipient only</span>
+      <span class="page-num">${pageNum} / ${totalPages}</span>
+    </div>`;
+  return div;
+}
+
+function buildCoverPage(prog,client,month){
+  const facilitator=getAssessor(prog.facilitator_id);
+  const div=document.createElement('div');
+  div.className='report-page cover-page';
+  div.innerHTML=`
+    <div class="cover-hero">
+      <div class="cover-hero-inner">
+        <div class="cover-title-block">
+          <div class="cover-logo-row">
+            <div class="cover-shield">${shieldSVG(52)}</div>
+            <div class="cover-brand-text">
+              <h1>Apex Academy</h1>
+              <span>Training &amp; Development</span>
+            </div>
+          </div>
+          <div class="cover-divider"></div>
+          <div class="cover-doc-type">Monthly Client Progress Report</div>
+          <div class="cover-title">${esc(prog.programme_name)}</div>
+          <div class="cover-subtitle">SAQA ID: ${esc(prog.saqa_id||'—')} &nbsp;·&nbsp; Qualification: ${esc(prog.qualification_code||'—')}</div>
+          <div class="cover-period-pill">
+            <span>📅 &nbsp;Reporting Period: ${esc(month)}</span>
+          </div>
+        </div>
+        <div class="cover-client-block">
+          <div class="cover-field"><label>Client</label><span>${esc(client.client_name)}</span></div>
+          <div class="cover-field"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
+          <div class="cover-field"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
+          <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
+          <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${getProgrammeLearners().length} Learners</span></div>
+        </div>
+      </div>
+    </div>
+    <div class="cover-footer">
+      <span class="cover-footer-left">Apex Academy · Proprietary &amp; Confidential</span>
+      <span class="cover-footer-right">Generated ${new Date().toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}</span>
+    </div>`;
+  return div;
+}
+
+// Dual-render narrative: textarea for screen, div for print (synced)
+function narField(key,placeholder,val,minH='72px',style=''){
+  const v=val||'';
+  return`<div class="nar-wrap">
+    <textarea class="narrative-textarea nar-screen" data-nar="${key}" oninput="syncNar(this)" placeholder="${placeholder}" style="min-height:${minH};${style}">${esc(v)}</textarea>
+    <div class="nar-print" data-nar-print="${key}">${esc(v)||`<span style="color:#aaa;font-style:italic">${placeholder}</span>`}</div>
+  </div>`;
+}
+
+function buildOverviewPage(prog,client,pLearners){
+  const nar=narratives;
+  const mods=[
+    {cls:'m1',label:'Module 1',dates:prog.module_1_dates||'—',units:'KM-01 · PM-01 · WM-01'},
+    {cls:'m2',label:'Module 2',dates:prog.module_2_dates||'—',units:'KM-02 · PM-02 · WM-02'},
+    {cls:'m3',label:'Module 3',dates:prog.module_3_dates||'—',units:'KM-03 · PM-03 · WM-03'},
+    {cls:'m4',label:'Module 4',dates:prog.module_4_dates||'—',units:'KM-04 · PM-04 · WM-04'},
+  ];
+  let body=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--navy)"></div>
+      <div><div class="sec-title">Programme Overview</div><div class="sec-subtitle">Client details, module schedule and overall feedback</div></div>
+    </div>
+    <div class="info-grid">
+      <div class="info-card"><label>Client Name</label><span>${esc(client.client_name)}</span></div>
+      <div class="info-card"><label>Contact Person</label><span>${esc(client.contact_person||'—')} &nbsp;·&nbsp; ${esc(client.contact_number||'—')}</span></div>
+      <div class="info-card full"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name)}</span></div>
+    </div>
+    <div class="module-timeline">${mods.map(m=>`
+      <div class="mod-card ${m.cls}">
+        <div class="mod-num">${m.label}</div>
+        <div class="mod-dates">${esc(m.dates)}</div>
+        <div class="mod-units">${m.units}</div>
+      </div>`).join('')}
+    </div>
+    <div class="sec-header" style="margin-top:12px"><div class="sec-accent" style="background:var(--red)"></div>
+      <div><div class="sec-title">Overall Feedback</div></div>
+    </div>`;
+
+  ['Module 1','Module 2','Module 3','Module 4'].forEach((m,i)=>{
+    const key=`feedback_m${i+1}`;
+    const modCls=['m1','m2','m3','m4'][i];
+    body+=`<div class="narrative-block">
+      <div class="narrative-label" style="color:var(--${modCls})">${m} — Submissions &amp; Competencies</div>
+      ${narField(key,`Describe submission status, assessor progress, exam results for ${m}…`,nar[key],'64px')}
+    </div>`;
+  });
+
+  body+=`
+    <div class="narrative-block">
+      <div class="narrative-label">Attendance</div>
+      ${narField('att_summary','Summary of attendance…',nar.att_summary||'Very good attendance from all delegates.','48px')}
+    </div>
+    <div class="narrative-block">
+      <div class="narrative-label">Interaction &amp; Participation</div>
+      ${narField('interaction','Notes on learner interaction and participation…',nar.interaction,'48px')}
+    </div>
+    <div class="narrative-block">
+      <div class="narrative-label">Concerns</div>
+      ${narField('concerns','Any concerns to report…',nar.concerns||'No major concerns to report on.','48px')}
+    </div>`;
+
+  return pageShell(2,11,client.client_name,'Programme Overview',body);
+}
+
+function buildParticipationPage(pLearners,nar){
+  const defaultComment=`The delegate attended on time and their participation during the sessions was great: they complete their work on time and answer the oral questions very well.`;
+  const SPLIT=8;
+  const thead=`<thead><tr><th>First Name</th><th>Surname</th><th>ID Number</th><th>Comments &amp; Observations</th></tr></thead>`;
+  const makeRow=l=>{
+    const val=(nar._comments||{})[l.id]||defaultComment;
+    return`<tr>
+      <td>${esc(l.first_name)}</td>
+      <td>${esc(l.last_name)}</td>
+      <td style="font-family:var(--mono);font-size:8pt">${esc(l.id_number)}</td>
+      <td class="comment-cell">
+        <textarea class="narrative-textarea nar-screen" data-comment-lid="${l.id}" oninput="syncComment(this)" style="min-height:52px;font-size:8pt">${esc(val)}</textarea>
+        <div class="nar-print" data-comment-print="${l.id}" style="font-size:8pt">${esc(val)}</div>
+      </td>
+    </tr>`;
+  };
+  const rows1=pLearners.slice(0,SPLIT).map(makeRow).join('');
+  const rows2=pLearners.slice(SPLIT).map(makeRow).join('');
+
+  const body=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--navy2)"></div>
+      <div><div class="sec-title">Individual Learner Participation</div><div class="sec-subtitle">Facilitator observations per delegate</div></div>
+    </div>
+    <table class="data-table" style="break-inside:avoid;page-break-inside:avoid">
+      ${thead}<tbody>${rows1}</tbody>
+    </table>
+    ${rows2?`<table class="data-table" style="break-inside:avoid;page-break-inside:avoid;margin-top:0;border-top:none">
+      <tbody>${rows2}</tbody>
+    </table>`:''}`;
+  return pageShell(3,11,activeClient.client_name,'Learner Participation',body);
+}
+
+function buildAttendancePage(pLearners,attDates,nar){
+  // Determine columns — use existing dates or show placeholders
+  const dates=attDates.length>0?attDates.map(normDateKey):['Date 1','Date 2'];
+
+  const headerCols=dates.map(d=>`<th style="text-align:center;width:70px">${esc(d)}</th>`).join('');
+  const cycleStatus=s=>{const map={'P':'A','A':'N/A','N/A':'R','R':'P'};return map[s]||'P';};
+
+  const rows=pLearners.map(l=>{
+    const cells=dates.map(d=>{
+      const key=`${l.id}_${d}`;
+      const savedAtt=(narratives._att||{})[key];
+      const status=savedAtt||(attState[l.id]?.[d])||'';
+      const cls=status==='P'?'att-p':status==='A'?'att-a':status==='R'?'att-r':'att-na';
+      return`<td class="att-cell"><span class="${cls}" data-att="${key}" onclick="cycleAtt(this)">${status||'—'}</span></td>`;
+    }).join('');
+    return`<tr><td>${esc(l.first_name)}</td><td>${esc(l.last_name)}</td><td style="font-family:var(--mono);font-size:8pt">${esc(l.id_number)}</td>${cells}</tr>`;
+  }).join('');
+
+  const body=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--m2)"></div>
+      <div><div class="sec-title">Attendance Register</div><div class="sec-subtitle">Click any cell to cycle: P → A → N/A → R · Legend: P=Present, A=Absent, N/A=Not Applicable, R=Resigned</div></div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>First Name</th><th>Surname</th><th>ID Number</th>${headerCols}</tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:8px">
+      <span class="att-p">P</span><span style="font-size:8pt;color:var(--muted);align-self:center">Present</span>
+      <span class="att-a">A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Absent</span>
+      <span class="att-na">N/A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Not Applicable</span>
+      <span class="att-r">R</span><span style="font-size:8pt;color:var(--muted);align-self:center">Resigned</span>
+    </div>`;
+  return pageShell(4,11,activeClient.client_name,'Attendance Register',body);
+}
+
+function buildAssessmentPage(pLearners,modNum,nar){
+  const mColors=['','m1','m2','m3','m4'];
+  const mColor=mColors[modNum];
+  const units=[,['KM-01','PM-01','WM-01'],['KM-02','PM-02','WM-02'],['KM-03','PM-03','WM-03'],['KM-04','PM-04','WM-04']][modNum];
+  const rows=pLearners.map(l=>{
+    const res=(eisaState[l.id]||{})[modNum]||{};
+    const ek=`${l.id}_m${modNum}`;
+    const mkVal=(field,val)=>{const saved=(nar._eisa||{})[`${ek}_${field}`];return saved!==undefined?saved:val||'';};
+    const mkResult=(field,val)=>{
+      const v=mkVal(field,val);
+      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option></select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
+    };
+    const mkExam=(field,pctField,val,pct)=>{
+      const v=mkVal(field,val);const p=mkVal(pctField,pct);
+      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      const pt=v?(p?v+' / '+p+'%':v):'&#8212;';
+      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option><option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
+    };
+    const km=mkVal('km',res.km),pm=mkVal('pm',res.pm),wm=mkVal('wm',res.wm),ev1=mkVal('examv1',res.examv1);
+    const allC=[km,pm,wm,ev1].every(v=>v==='C');
+    const anyNYC=[km,pm,wm,ev1].some(v=>v==='NYC');
+    const overall=allC?'<span class="badge badge-c">Complete</span>':anyNYC?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+    return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td><td style="font-family:var(--mono);font-size:7.5pt">${esc(l.id_number)}</td><td>${mkResult('km',res.km)}</td><td>${mkResult('pm',res.pm)}</td><td>${mkResult('wm',res.wm)}</td><td>${mkExam('examv1','examv1_pct',res.examv1,res.examv1_pct)}</td><td>${mkExam('examv2','examv2_pct',res.examv2,res.examv2_pct)}</td><td style="text-align:center">${overall}</td></tr>`;
+  }).join('');
+  const body=`<div class="mod-section-header ${mColor}">Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.join(' &middot; ')}</div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr><th>Learner Name</th><th>ID Number</th><th style="text-align:center">${units[0]}</th><th style="text-align:center">${units[1]}</th><th style="text-align:center">${units[2]}</th><th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  return pageShell(4+modNum,11,activeClient.client_name,'Assessment &#8212; Module '+modNum,body);
+}
+
+
+const SURVEY_ITEMS=[
+  {section:'A. Logistics and Support'},
+  {q:'Communication regarding attendance of the programme was efficient and effective'},
+  {q:'The Programme Coordinator was helpful and efficient'},
+  {q:'The training equipment and material used were effective and prepared'},
+  {section:'B. Learner Evaluation'},
+  {q:'Learners were prepared and motivated to attend the programme'},
+  {q:'Learners participated well and provided constructive input'},
+  {q:'The programme allows for the use of a variety of methods, activities and discussions'},
+  {q:'Learners were punctual and kept to the schedule'},
+  {comment:'specific_learner',label:'Specific comments about learners on this learning programme:'},
+  {section:'C. Learning Programme Evaluation'},
+  {q:'The learning outcomes of the programme are relevant and suitable'},
+  {q:'The content of the programme was relevant and suitable for the target group'},
+  {q:'The length of the facilitation was suitable for the programme'},
+  {q:'The learning material assisted in learning new knowledge and skills to apply practically'},
+  {q:'Activities and handouts are clear, concise and relevant to the outcomes and content'},
+  {q:'Learning material is generally of a high standard and user friendly'},
+  {section:'D. Assessment'},
+  {q:'A clear overview was provided of the assessment requirements of the programme'},
+  {q:'The assessment process and timelines were clearly explained'},
+  {q:'All assessment activities were discussed'},
+  {comment:'general_feedback',label:'General Feedback:'},
+];
+
+function buildSurveyPage(nar){
+  const cols=['Poor','Sufficient','Above Standard','Excellent'];
+  let qi=0;
+  // Separate out the general_feedback comment — it will render outside the table
+  const tableItems=SURVEY_ITEMS.filter(item=>!item.comment||item.comment!=='general_feedback');
+  const gfVal=(nar['_sc_general_feedback'])||'';
+
+  let rows=tableItems.map((item,idx)=>{
+    if(item.section){
+      return`<tr class="survey-section-row"><td colspan="5">${esc(item.section)}</td></tr>`;
+    }
+    if(item.comment){
+      const savedVal=(nar['_sc_'+item.comment])||'';
+      return`<tr class="survey-comment-row"><td colspan="5">
+        <div style="font-size:8pt;font-weight:700;color:var(--navy);margin-bottom:6px">${esc(item.label)}</div>
+        <textarea class="survey-comment-input nar-screen" data-survey-comment="${item.comment}" oninput="syncSurveyComment(this)">${esc(savedVal)}</textarea>
+        <div class="nar-print" data-survey-comment-print="${item.comment}" style="font-size:8.5pt;color:var(--body);line-height:1.6;padding:4px 0;white-space:pre-wrap">${esc(savedVal)}</div>
+      </td></tr>`;
+    }
+    const qIdx=qi++;
+    const savedChecked=(nar._survey||{})[qIdx];
+    return`<tr>
+      <td style="font-size:8.5pt">${esc(item.q)}</td>
+      ${cols.map((c,ci)=>{
+        const isChecked=savedChecked!==undefined?savedChecked:false;
+        return`<td style="text-align:center;width:80px">
+          <span class="survey-check ${isChecked?'checked':''}" data-survey-idx="${qIdx}" data-col="${c}" data-checked="${isChecked}" onclick="toggleSurvey(this)">${isChecked?'●':'○'}</span>
+        </td>`;
+      }).join('')}
+    </tr>`;
+  }).join('');
+
+  const body=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--m3)"></div>
+      <div><div class="sec-title">Training Evaluation Survey</div><div class="sec-subtitle">Click circles to toggle rating selections</div></div>
+    </div>
+    <table class="data-table">
+      <thead><tr><th>Criteria / Question</th><th style="text-align:center">Poor</th><th style="text-align:center">Sufficient</th><th style="text-align:center">Above Standard</th><th style="text-align:center;background:#156339">Excellent</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div style="margin-top:12px;break-before:avoid;page-break-before:avoid;break-inside:avoid;page-break-inside:avoid;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;background:#FAFBFD">
+      <div style="font-size:8pt;font-weight:700;color:var(--navy);letter-spacing:.1em;text-transform:uppercase;margin-bottom:8px">General Feedback</div>
+      <textarea class="survey-comment-input nar-screen" data-survey-comment="general_feedback" oninput="syncSurveyComment(this)" style="min-height:56px">${esc(gfVal)}</textarea>
+      <div class="nar-print" data-survey-comment-print="general_feedback" style="font-size:8.5pt;color:var(--body);line-height:1.6;padding:4px 0;white-space:pre-wrap;min-height:1.5em">${esc(gfVal)}</div>
+    </div>`;
+  return pageShell(9,11,activeClient.client_name,'Training Evaluation Survey',body);
+}
+
+function buildSignoffPage(prog,client,month,nar){
+  const name=nar.signoff_name||'Johannes Myburgh';
+  const date=nar.signoff_date||new Date().toLocaleDateString('en-ZA');
+
+  // Page 10 — Unit Standards table
+  const unitsBody=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--navy)"></div>
+      <div><div class="sec-title">Qualification Trained — Unit Standards</div></div>
+    </div>
+    ${buildUnitsTable(prog)}`;
+  const unitsPage=pageShell(10,11,client.client_name,'Sign-off',unitsBody);
+
+  // Page 11 — Sign-off block
+  const signoffBody=`
+    <div class="sec-header"><div class="sec-accent" style="background:var(--gold)"></div>
+      <div><div class="sec-title">Sign-off &amp; Authorisation</div><div class="sec-subtitle">Report prepared and authorised by:</div></div>
+    </div>
+    <div class="signoff-block">
+      <div class="signoff-field">
+        <label>Authorised By</label>
+        <input class="signoff-input nar-screen" type="text" data-nar="signoff_name" value="${esc(name)}" oninput="syncNar(this)" placeholder="Full name">
+        <div class="nar-print" data-nar-print="signoff_name" style="font-size:10.5pt;font-weight:600;padding:4px 0">${esc(name)}</div>
+        <div class="signoff-role">Project Manager</div>
+      </div>
+      <div class="signoff-field">
+        <label>Date</label>
+        <input class="signoff-input nar-screen" type="text" data-nar="signoff_date" value="${esc(date)}" oninput="syncNar(this)" placeholder="DD/MM/YYYY">
+        <div class="nar-print" data-nar-print="signoff_date" style="font-size:10.5pt;font-weight:600;padding:4px 0">${esc(date)}</div>
+      </div>
+      <div class="signoff-field">
+        <label>Signature</label>
+        <div class="signoff-sig-line"></div>
+      </div>
+      <div class="signoff-field">
+        <label>Report Period</label>
+        <div style="margin-top:8px;font-size:10pt;font-weight:600;color:var(--dark)">${esc(month)}</div>
+      </div>
+    </div>`;
+  const signoffPage=pageShell(11,11,client.client_name,'Sign-off',signoffBody);
+
+  const frag=document.createDocumentFragment();
+  frag.appendChild(unitsPage);
+  frag.appendChild(signoffPage);
+  return frag;
+}
+
+function buildUnitsTable(prog){
+  const allUnits=[
+    {mod:1,cls:'m1',id:'KM-01',title:'Administration and record keeping in Insurance',level:5,credits:16},
+    {mod:1,cls:'m1',id:'PM-01',title:'Apply and adhere to operational and administrative procedures',level:5,credits:13},
+    {mod:1,cls:'m1',id:'WM-01',title:'Exposure to operational and administrative underwriting procedures',level:5,credits:17},
+    {mod:2,cls:'m2',id:'KM-02',title:'Insurance Risk management for Underwriters',level:5,credits:16},
+    {mod:2,cls:'m2',id:'PM-02',title:'Evaluate risk information to determine risk profile and manage risk exposure',level:5,credits:8},
+    {mod:2,cls:'m2',id:'WM-02',title:'Evaluation and management of risk profile and/or exposure',level:5,credits:12},
+    {mod:3,cls:'m3',id:'KM-03',title:'Application of legal and Insurance principles',level:5,credits:8},
+    {mod:3,cls:'m3',id:'PM-03',title:'Apply basic legal and insurance principles to underwriting recommendations',level:5,credits:6},
+    {mod:3,cls:'m3',id:'WM-03',title:'Application of legal and insurance principles to underwriting processes',level:5,credits:12},
+    {mod:4,cls:'m4',id:'KM-04',title:'Rating and Pricing of insurance risks and products',level:5,credits:8},
+    {mod:4,cls:'m4',id:'PM-04',title:'Apply knowledge of product and pricing to underwrite profitable risks',level:5,credits:13},
+    {mod:4,cls:'m4',id:'WM-04',title:'Exposure to processes and factors leading up to final underwriting decision',level:5,credits:27},
+  ];
+  const totalCredits=allUnits.reduce((s,u)=>s+u.credits,0);
+  const modLabels=['Module 1','Module 2','Module 3','Module 4'];
+  let lastMod=0;
+  const rows=allUnits.map(u=>{
+    let modHeader='';
+    if(u.mod!==lastMod){
+      lastMod=u.mod;
+      const colors=['#1A365D','#0F6B6B','#5B3A8C','#B84E0A'];
+      modHeader=`<tr><td colspan="5" style="background:${colors[u.mod-1]};color:#fff;font-weight:700;font-size:7.5pt;letter-spacing:.12em;text-transform:uppercase;padding:7px 11px">Module ${u.mod}</td></tr>`;
+    }
+    const status=u.mod===1?`<span class="unit-status unit-complete">Trained</span>`:`<span class="unit-status unit-nyt">Not Yet Trained</span>`;
+    return modHeader+`<tr><td style="font-family:var(--mono);font-size:8pt">${esc(u.id)}</td><td>${esc(u.title)}</td><td style="text-align:center">${u.level}</td><td style="text-align:center">${u.credits}</td><td style="text-align:center">${status}</td></tr>`;
+  }).join('');
+  return`<table class="data-table">
+    <thead><tr><th style="width:70px">US ID</th><th>Unit Standard Title</th><th style="text-align:center;width:55px">Level</th><th style="text-align:center;width:60px">Credits</th><th style="text-align:center;width:100px">Status</th></tr></thead>
+    <tbody>${rows}</tbody>
+    <tfoot><tr><td colspan="3" style="text-align:right;padding:8px 11px;font-weight:700;font-size:8.5pt;color:var(--navy)">Total Credits:</td><td style="text-align:center;font-weight:800;font-size:10pt;color:var(--navy)">${totalCredits}</td><td></td></tr></tfoot>
+  </table>`;
+}
+
+// ── Interactivity ──
+function cycleAtt(el){
+  const map={'P':'A','A':'N/A','N/A':'R','R':'P','—':'P','':'P'};
+  const cur=el.textContent.trim();
+  const next=map[cur]||'P';
+  el.textContent=next;
+  applyAttStyle(el,next);
+  autoSave();
+}
+function applyAttStyle(el,status){
+  el.className='';
+  el.classList.add(status==='P'?'att-p':status==='A'?'att-a':status==='R'?'att-r':'att-na');
+}
+
+function toggleSurvey(el){
+  const row=el.closest('tr');
+  // Uncheck all in row
+  row.querySelectorAll('.survey-check').forEach(s=>{s.dataset.checked='false';s.textContent='○';s.classList.remove('checked');});
+  // Check this one
+  el.dataset.checked='true';el.textContent='●';el.classList.add('checked');
+  autoSave();
+}
+
+function eisaChanged(el){autoSave();}
+function updateExamDisplay(el){autoSave();}
+
+// Dual-render sync functions
+function syncNar(ta){
+  const key=ta.dataset.nar;
+  const printEl=document.querySelector(`[data-nar-print="${key}"]`);
+  if(printEl)printEl.textContent=ta.value;
+  autoSave();
+}
+function syncComment(ta){
+  const lid=ta.dataset.commentLid;
+  const printEl=document.querySelector(`[data-comment-print="${lid}"]`);
+  if(printEl)printEl.textContent=ta.value;
+  autoSave();
+}
+function syncResult(sel){
+  // Update print span sibling
+  const printSpan=sel.nextElementSibling;
+  if(printSpan&&printSpan.classList.contains('result-print')){
+    const v=sel.value;
+    printSpan.className='result-print badge '+(v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na');
+    printSpan.textContent=v||'—';
+  }
+  autoSave();
+}
+function syncSurveyComment(ta){
+  const key=ta.dataset.surveyComment;
+  const el=document.querySelector(`[data-survey-comment-print="${key}"]`);
+  if(el)el.textContent=ta.value;
+  autoSave();
+}
+function syncExamPct(inp){
+  // Resolve the matching print span via data-eisa-print (same key as the select's data-eisa)
+  const screenWrap=inp.closest('.exam-screen');
+  const sel=screenWrap?.querySelector('select');
+  if(sel){
+    const key=sel.dataset.eisa;
+    const printSpan=document.querySelector(`[data-eisa-print="${key}"]`);
+    if(printSpan){
+      const v=sel.value;
+      const p=inp.value;
+      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      printSpan.className='result-print badge '+(v?bc:'badge-na');
+      printSpan.textContent=v?(p?v+' / '+p+'%':v):'—';
+    }
+  }
+  autoSave();
+}
+
+let autoSaveTimer=null;
+function autoSave(){
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer=setTimeout(()=>saveNarratives(),1500);
+}
+
+// ── Print guard ──
+function triggerPrint(){
+  const pages=document.getElementById('report-pages');
+  if(!pages||!pages.children.length){
+    alert('Please generate the report first before printing.');
+    return;
+  }
+  // Ensure preview is visible before print
+  document.getElementById('report-preview').classList.add('show');
+  // Small delay so fonts and layout fully settle
+  setTimeout(()=>window.print(), 400);
+}
+
+// ── Supabase write helpers ──
+async function sbPost(table,body){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}`,{
+    method:'POST',
+    headers:{...HEADERS,'Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok)throw new Error(await r.text());
+  const d=await r.json();
+  return Array.isArray(d)?d[0]:d;
+}
+async function sbPatch(table,id,body){
+  const r=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{
+    method:'PATCH',
+    headers:{...HEADERS,'Prefer':'return=representation'},
+    body:JSON.stringify(body)
+  });
+  if(!r.ok)throw new Error(await r.text());
+  const d=await r.json();
+  return Array.isArray(d)?d[0]:d;
+}
+
+// ── Modal state ──
+let modalType=null; // 'client' | 'programme'
+let modalMode=null; // 'add' | 'edit'
+
+function openModal(type,mode){
+  modalType=type;modalMode=mode;
+  const isEdit=mode==='edit';
+  const src=type==='client'?activeClient:activeProgramme;
+  const v=s=>esc(isEdit&&src?src[s]||'':'');
+
+  document.getElementById('modal-title').textContent=
+    (isEdit?'Edit ':'Add ')+( type==='client'?'Client':'Programme');
+  document.getElementById('modal-save-btn').textContent=isEdit?'Save Changes':'Add';
+
+  let html=`<div class="modal-error" id="modal-err"></div>`;
+
+  if(type==='client'){
+    html+=`
+      <div class="modal-field"><label>Client Name *</label>
+        <input class="modal-input" id="mf-client_name" placeholder="e.g. OMI – Old Mutual Insure Limited" value="${v('client_name')}">
+      </div>
+      <div class="modal-grid">
+        <div class="modal-field"><label>Contact Person</label>
+          <input class="modal-input" id="mf-contact_person" placeholder="Full name" value="${v('contact_person')}">
+        </div>
+        <div class="modal-field"><label>Contact Number</label>
+          <input class="modal-input" id="mf-contact_number" placeholder="e.g. 079 000 0000" value="${v('contact_number')}">
+        </div>
+      </div>
+      <div class="modal-field"><label>Contact Email</label>
+        <input class="modal-input" id="mf-contact_email" type="email" placeholder="email@company.co.za" value="${v('contact_email')}">
+      </div>`;
+  } else {
+    // Build assessor options
+    const aOpts=assessors.map(a=>`<option value="${a.id}" ${isEdit&&src&&src.facilitator_id===a.id?'selected':''}>${esc(a.full_name)}</option>`).join('');
+    html+=`
+      <div class="modal-field"><label>Programme Name *</label>
+        <input class="modal-input" id="mf-programme_name" placeholder="e.g. OC: Insurance Underwriter NQF Level 5" value="${v('programme_name')}">
+      </div>
+      <div class="modal-grid">
+        <div class="modal-field"><label>SAQA ID *</label>
+          <input class="modal-input" id="mf-saqa_id" placeholder="e.g. 117329" value="${v('saqa_id')}">
+        </div>
+        <div class="modal-field"><label>Qualification Code</label>
+          <input class="modal-input" id="mf-qualification_code" placeholder="e.g. 91784" value="${v('qualification_code')}">
+        </div>
+      </div>
+      <div class="modal-grid">
+        <div class="modal-field"><label>Facilitator</label>
+          <select class="modal-select" id="mf-facilitator_id">
+            <option value="">— Select —</option>${aOpts}
+          </select>
+        </div>
+        <div class="modal-field"><label>Group Name</label>
+          <input class="modal-input" id="mf-group_name" placeholder="e.g. One Group" value="${v('group_name')}">
+        </div>
+      </div>
+      <div class="modal-field" style="max-width:160px"><label>Group Size</label>
+        <input class="modal-input" id="mf-group_size" type="number" min="1" placeholder="e.g. 16" value="${isEdit&&src?src.group_size||'':''}">
+      </div>
+      <div class="modal-section">Module Dates</div>
+      <div class="modal-field"><label>Module 1 Dates</label>
+        <input class="modal-input" id="mf-module_1_dates" placeholder="e.g. 09 Feb 2026 – 04 May 2026" value="${v('module_1_dates')}">
+      </div>
+      <div class="modal-field"><label>Module 2 Dates</label>
+        <input class="modal-input" id="mf-module_2_dates" placeholder="e.g. 11 May 2026 – 31 Jul 2026" value="${v('module_2_dates')}">
+      </div>
+      <div class="modal-field"><label>Module 3 Dates</label>
+        <input class="modal-input" id="mf-module_3_dates" placeholder="e.g. 11 Aug 2026 – 12 Oct 2026" value="${v('module_3_dates')}">
+      </div>
+      <div class="modal-field"><label>Module 4 Dates</label>
+        <input class="modal-input" id="mf-module_4_dates" placeholder="e.g. 13 Oct 2026 – 14 Dec 2026" value="${v('module_4_dates')}">
+      </div>`;
+  }
+
+  document.getElementById('modal-body').innerHTML=html;
+  document.getElementById('modal-overlay').classList.add('open');
+  // Focus first input
+  setTimeout(()=>document.querySelector('#modal-body .modal-input')?.focus(),50);
+}
+
+function closeModal(){
+  document.getElementById('modal-overlay').classList.remove('open');
+  modalType=null;modalMode=null;
+}
+function onOverlayClick(e){if(e.target===document.getElementById('modal-overlay'))closeModal();}
+
+function modalErr(msg){
+  const el=document.getElementById('modal-err');
+  el.textContent=msg;el.classList.add('show');
+}
+function mval(id){return(document.getElementById(id)?.value||'').trim();}
+
+async function saveModal(){
+  const btn=document.getElementById('modal-save-btn');
+  btn.disabled=true;btn.textContent='Saving…';
+  const errEl=document.getElementById('modal-err');
+  errEl.classList.remove('show');
+
+  try{
+    if(modalType==='client'){
+      const name=mval('mf-client_name');
+      if(!name){modalErr('Client Name is required.');btn.disabled=false;btn.textContent=modalMode==='edit'?'Save Changes':'Add';return;}
+      const payload={
+        client_name:name,
+        contact_person:mval('mf-contact_person')||null,
+        contact_number:mval('mf-contact_number')||null,
+        contact_email:mval('mf-contact_email')||null,
+      };
+      let saved;
+      if(isOnline){
+        saved=modalMode==='edit'
+          ?await sbPatch('clients',activeClient.id,payload)
+          :await sbPost('clients',payload);
+      } else {
+        // Offline: mutate local array
+        if(modalMode==='edit'){
+          Object.assign(activeClient,payload);saved=activeClient;
+        } else {
+          saved={...payload,id:Date.now()};clients.push(saved);
+        }
+      }
+      // Refresh local array
+      if(modalMode==='edit'){
+        const idx=clients.findIndex(c=>c.id===saved.id);
+        if(idx>-1)clients[idx]=saved;
+        activeClient=saved;
+      } else {
+        if(!clients.find(c=>c.id===saved.id))clients.push(saved);
+      }
+      // Rebuild dropdown, select new record
+      const sel=document.getElementById('sel-client');
+      sel.innerHTML='<option value="">— Select client —</option>';
+      clients.forEach(c=>{
+        const o=document.createElement('option');
+        o.value=c.id;o.textContent=c.client_name;
+        sel.appendChild(o);
+      });
+      sel.value=saved.id;
+      onClientChange();
+
+    } else {
+      // Programme
+      const name=mval('mf-programme_name');
+      const saqa=mval('mf-saqa_id');
+      if(!name||!saqa){modalErr('Programme Name and SAQA ID are required.');btn.disabled=false;btn.textContent=modalMode==='edit'?'Save Changes':'Add';return;}
+      const fid=document.getElementById('mf-facilitator_id')?.value;
+      const gs=document.getElementById('mf-group_size')?.value;
+      const payload={
+        client_id:activeClient.id,
+        programme_name:name,
+        saqa_id:saqa,
+        qualification_code:mval('mf-qualification_code')||null,
+        facilitator_id:fid?+fid:null,
+        group_name:mval('mf-group_name')||null,
+        group_size:gs?+gs:null,
+        module_1_dates:mval('mf-module_1_dates')||null,
+        module_2_dates:mval('mf-module_2_dates')||null,
+        module_3_dates:mval('mf-module_3_dates')||null,
+        module_4_dates:mval('mf-module_4_dates')||null,
+      };
+      let saved;
+      if(isOnline){
+        saved=modalMode==='edit'
+          ?await sbPatch('programmes',activeProgramme.id,payload)
+          :await sbPost('programmes',payload);
+      } else {
+        if(modalMode==='edit'){
+          Object.assign(activeProgramme,payload);saved=activeProgramme;
+        } else {
+          saved={...payload,id:Date.now()};programmes.push(saved);
+        }
+      }
+      if(modalMode==='edit'){
+        const idx=programmes.findIndex(p=>p.id===saved.id);
+        if(idx>-1)programmes[idx]=saved;
+        activeProgramme=saved;
+      } else {
+        if(!programmes.find(p=>p.id===saved.id))programmes.push(saved);
+      }
+      // Rebuild programme dropdown for current client
+      const sel=document.getElementById('sel-programme');
+      sel.innerHTML='<option value="">— Select programme —</option>';
+      programmes.filter(p=>p.client_id===activeClient.id).forEach(p=>{
+        const o=document.createElement('option');
+        o.value=p.id;o.textContent=p.programme_name;
+        sel.appendChild(o);
+      });
+      sel.value=saved.id;
+      onProgrammeChange();
+    }
+
+    saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+    closeModal();
+    showSaved();
+
+  }catch(err){
+    modalErr('Save failed: '+err.message);
+    btn.disabled=false;
+    btn.textContent=modalMode==='edit'?'Save Changes':'Add';
+  }
+}
+
+// ── Boot ──
+init();
+</script>
+</body>
+</html>
