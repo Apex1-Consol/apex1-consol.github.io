@@ -637,7 +637,7 @@ tr.att-below-threshold td:first-child{border-left:3px solid #C8272C}
 .notes-date{font-size:7.5pt;color:var(--muted);margin-bottom:2px}
 .notes-text{font-size:9pt;color:var(--dark);line-height:1.45}
 .notes-author{font-size:7.5pt;color:var(--muted);margin-top:3px;font-style:italic}
-.notes-empty{font-size:9pt;color:var(--muted);font-style:italic}
+.notes-empty{font-size:9pt;color:var(--muted);font-style:italic;text-align:center;padding:18px 12px;border:1px dashed var(--border,#d8dce3);border-radius:6px;background:#fafafb}
 
 /* SIGN-OFF */
 .signoff-block{
@@ -3456,6 +3456,10 @@ function saveNarratives(showToast=false){
   if(!activeProgramme)return;
   const key=narrativeKey();
   const data={};
+  // Start from the in-memory narratives store so fields accepted while their
+  // textarea wasn't mounted in the DOM (e.g. via the Draft-all wizard) are
+  // still persisted, then let any live DOM values override with the freshest edits.
+  DA_KEYS.forEach(k=>{if(narratives[k]!==undefined)data[k]=narratives[k];});
   document.querySelectorAll('[data-nar]').forEach(el=>{data[el.dataset.nar]=el.value;});
   // survey
   const sv={};
@@ -5286,12 +5290,38 @@ function cycleAtt(el){
       });
     }
   }
+  recalcAttPctRow(el.dataset.att?.split(/_(.+)/)[0]);
   autoSave();
   updateProgressPanel();
 }
 function applyAttStyle(el,status){
   el.className='';
   el.classList.add(status==='P'?'att-p':status==='A'?'att-a':status==='R'?'att-r':'att-na');
+}
+
+// Recompute and repaint the "% Att" cell for a single learner's row after any
+// attendance edit (single click, bulk column set, or copy-previous-session).
+// Without this, the % column only reflected whatever it was at the last full
+// buildAttendancePage() render and silently went stale on every subsequent edit.
+function recalcAttPctRow(learnerId){
+  if(!learnerId)return;
+  const anyCell=document.querySelector(`[data-att^="${learnerId}_"]`);
+  const row=anyCell?anyCell.closest('tr'):null;
+  if(!row)return;
+  let present=0,total=0;
+  row.querySelectorAll('[data-att]').forEach(el=>{
+    const status=el.textContent.trim();
+    if(status==='P'){present++;total++;}
+    else if(status==='A'||status==='R'){total++;}
+  });
+  const pct=total>0?Math.round(present/total*100):null;
+  const pctCls=pct===null?'pct-none':pct>=ATT_THRESHOLD?'pct-ok':pct>=60?'pct-warn':'pct-low';
+  const pctCell=row.querySelector('.att-pct-cell');
+  if(pctCell){
+    pctCell.textContent=pct!==null?pct+'%':'—';
+    pctCell.className=`att-pct-cell ${pctCls}`;
+  }
+  row.classList.toggle('att-below-threshold',pct!==null&&pct<ATT_THRESHOLD);
 }
 
 // ── BULK ATTENDANCE HELPERS ─────────────────────────────────────────────────
@@ -5306,6 +5336,7 @@ function bulkSetColumn(dateKey,status){
     // Update DOM pill
     const el=document.querySelector(`[data-att="${l.id}_${dateKey}"]`);
     if(el){el.textContent=status;applyAttStyle(el,status);}
+    recalcAttPctRow(l.id);
     if(activeProgramme&&!isNaN(+l.id)){
       upserts.push({
         tenant_id:TENANT_DB_ID,
@@ -5317,6 +5348,7 @@ function bulkSetColumn(dateKey,status){
     }
   });
   autoSave();
+  updateProgressPanel();
   // Batch upsert — fire & forget with one toast
   if(upserts.length&&isOnline){
     Promise.all(upserts.map(p=>sbUpsert('attendance',p)))
@@ -5338,6 +5370,7 @@ function copyPrevSession(fromDate,toDate){
     attState[l.id][toDate]=src;
     const el=document.querySelector(`[data-att="${l.id}_${toDate}"]`);
     if(el){el.textContent=src;applyAttStyle(el,src);}
+    recalcAttPctRow(l.id);
     if(activeProgramme&&!isNaN(+l.id)){
       upserts.push({
         tenant_id:TENANT_DB_ID,
@@ -5349,6 +5382,7 @@ function copyPrevSession(fromDate,toDate){
     }
   });
   autoSave();
+  updateProgressPanel();
   if(!upserts.length){toast('Previous session has no data to copy','warn');return;}
   if(isOnline){
     Promise.all(upserts.map(p=>sbUpsert('attendance',p)))
@@ -5665,8 +5699,7 @@ function draftNarrative(key, btn){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
     draft=`Learner participation has been ${compAll>total*2?'strong':'developing'} across the programme. `
-         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review. `
-         +'[Add notes on engagement, class discussion, facilitation observations.]';
+         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review.`;
   } else if(key==='eisa_summary'){
     const pct=total>0?Math.round(eisaCompletedCount/total*100):null;
     draft=pct===null
@@ -5680,7 +5713,7 @@ function draftNarrative(key, btn){
     if(avgAtt!==null&&avgAtt<ATT_THRESHOLD)concerns.push(`cohort attendance is below the ${ATT_THRESHOLD}% threshold (currently ${avgAtt}%)`);
     modStats.forEach(s=>{if(s.nyc>0)concerns.push(`${s.nyc} NYC result${s.nyc>1?'s':''} in Module ${s.m}`);});
     draft=concerns.length
-      ?`Areas requiring attention: ${concerns.join('; ')}. [Add any additional context or escalation notes.]`
+      ?`Areas requiring attention: ${concerns.join('; ')}.`
       :'No significant concerns to report at this time. Cohort attendance and competency results are on track.';
   }
 
@@ -5799,14 +5832,13 @@ function _computeDraft(key){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
     draft=`Learner participation has been ${compAll>total*2?'strong':'developing'} across the programme. `
-         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review. `
-         +'[Add notes on engagement, class discussion, facilitation observations.]';
+         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review.`;
   } else if(key==='concerns'){
     const concerns=[];
     if(avgAtt!==null&&avgAtt<ATT_THRESHOLD)concerns.push(`cohort attendance is below the ${ATT_THRESHOLD}% threshold (currently ${avgAtt}%)`);
     modStats.forEach(s=>{if(s.nyc>0)concerns.push(`${s.nyc} NYC result${s.nyc>1?'s':''} in Module ${s.m}`);});
     draft=concerns.length
-      ?`Areas requiring attention: ${concerns.join('; ')}. [Add any additional context or escalation notes.]`
+      ?`Areas requiring attention: ${concerns.join('; ')}.`
       :'No significant concerns to report at this time. Cohort attendance and competency results are on track.';
   }
 
@@ -5834,6 +5866,7 @@ function openDraftAllPanel(){
 function closeDraftAllPanel(){
   const panel=document.getElementById('da-panel');
   panel.classList.remove('open');
+  updateProgressPanel(); // safety net so the checklist can't be left stale
   setTimeout(()=>{
     panel.style.display='none';
     document.getElementById('da-overlay').style.display='none';
@@ -5899,15 +5932,26 @@ function _daShowDone(){
 
 function daAccept(){
   const key=DA_KEYS[_daState.idx];
+  const draft=_daState.editMode
+    ?document.getElementById('da-edit-area').value
+    :_daState.drafts[key];
   const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
   if(ta){
-    const draft=_daState.editMode
-      ?document.getElementById('da-edit-area').value
-      :_daState.drafts[key];
     _daState.undoMap[key]=ta.value; // store for potential undo
     ta.value=draft;
-    syncNar(ta);
+    syncNar(ta); // updates narratives[key], the print element, and autosaves
+  } else {
+    // This field's textarea isn't currently mounted in the DOM (e.g. the
+    // report pages haven't been built yet, or the user scrolled elsewhere).
+    // Without this, Accept silently discarded the draft and the readiness
+    // checklist stayed stuck at 0/9 even though the wizard reported success.
+    _daState.undoMap[key]=narratives[key]||'';
+    narratives[key]=draft;
+    const printEl=document.querySelector(`[data-nar-print="${key}"]`);
+    if(printEl)printEl.textContent=draft;
+    autoSave();
   }
+  updateProgressPanel();
   _daState.idx++;
   _daState.editMode=false;
   _daRender();
