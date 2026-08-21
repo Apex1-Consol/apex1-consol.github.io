@@ -156,75 +156,19 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 #pp-score.partial{background:rgba(212,160,23,.15);border-color:rgba(212,160,23,.3);color:var(--gold2)}
 .pp-grid{display:flex;flex-wrap:wrap;gap:8px}
 .pp-item{
-  display:flex;flex-direction:column;align-items:flex-start;gap:3px;
+  display:flex;align-items:center;gap:7px;
   background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);
   border-radius:var(--r);padding:7px 12px;
   font-size:8.5pt;color:rgba(255,255,255,.5);
   cursor:pointer;transition:.15s;user-select:none;
-  max-width:240px;
 }
 .pp-item:hover{background:rgba(255,255,255,.08)}
 .pp-item.done{background:rgba(27,122,74,.15);border-color:rgba(27,122,74,.35);color:#86efac}
 .pp-item.partial{background:rgba(212,160,23,.1);border-color:rgba(212,160,23,.25);color:var(--gold2)}
-.pp-item-row{display:flex;align-items:center;gap:7px;width:100%}
-.pp-item-sub{font-size:7pt;font-weight:500;line-height:1.35;color:rgba(255,255,255,.35);padding-left:23px;white-space:normal}
-.pp-item.done .pp-item-sub{color:rgba(134,239,172,.6)}
-.pp-item.partial .pp-item-sub{color:rgba(212,160,23,.6)}
 .pp-check{width:16px;height:16px;border-radius:50%;border:2px solid rgba(255,255,255,.2);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;transition:.2s}
 .pp-item.done .pp-check{background:#1B7A4A;border-color:#1B7A4A;color:#fff}
 .pp-item.partial .pp-check{background:rgba(212,160,23,.4);border-color:var(--gold);color:#fff}
 @media print{#progress-panel,#progress-panel-toggle{display:none!important}}
-
-/* ── PLAIN-LANGUAGE HELP TOOLTIPS ── */
-.help-tip{
-  display:inline-flex;align-items:center;justify-content:center;
-  width:14px;height:14px;border-radius:50%;
-  background:rgba(255,255,255,.15);color:rgba(255,255,255,.8);
-  font-size:8px;font-weight:800;font-style:normal;
-  cursor:help;margin-left:5px;position:relative;vertical-align:middle;
-}
-.help-tip::before{content:"?"}
-.help-tip:hover,.help-tip:focus{background:rgba(255,255,255,.3);outline:none}
-.help-tip:hover::after,.help-tip:focus::after{
-  content:attr(data-tip);position:absolute;left:50%;bottom:calc(100% + 7px);
-  transform:translateX(-50%);background:#0B1220;color:#fff;
-  border:1px solid rgba(255,255,255,.15);padding:8px 10px;border-radius:8px;
-  font-size:7.5pt;font-weight:500;line-height:1.4;white-space:normal;
-  width:230px;box-shadow:0 8px 24px rgba(0,0,0,.45);z-index:2000;text-align:left;
-}
-.help-tip:hover::before{content:"";position:absolute;left:50%;bottom:100%;transform:translateX(-50%);
-  border:5px solid transparent;border-top-color:#0B1220;z-index:2000;}
-.field-hint-text{font-size:7.5pt;color:var(--muted,rgba(255,255,255,.45));margin-top:4px;line-height:1.4}
-@media print{.help-tip,.field-hint-text,.da-review-reminder{display:none!important}}
-/* ── DRAFT REVIEW REMINDER ── */
-.da-review-reminder{
-  display:flex;gap:8px;align-items:flex-start;
-  background:rgba(212,160,23,.1);border:1px solid rgba(212,160,23,.3);
-  border-radius:8px;padding:9px 12px;margin:0 0 12px;
-  font-size:7.5pt;line-height:1.4;color:var(--gold2,#d4a017);
-}
-/* ── SUBMIT CONFIRMATION MODAL ── */
-#submit-confirm-overlay{
-  display:none;position:fixed;inset:0;z-index:600;
-  background:rgba(0,0,0,.75);backdrop-filter:blur(4px);
-  align-items:center;justify-content:center;padding:20px;
-}
-#submit-confirm-overlay.open{display:flex}
-.sc-modal{
-  background:#1A2744;border:1px solid rgba(255,255,255,.15);
-  border-radius:var(--r2);width:100%;max-width:480px;max-height:90vh;
-  overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.5);
-}
-.sc-header{padding:20px 26px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
-.sc-header h3{font-size:12pt;font-weight:800;color:#fff;margin:0 0 4px}
-.sc-header p{font-size:8pt;color:rgba(255,255,255,.55);margin:0;line-height:1.5}
-.sc-body{padding:16px 26px}
-.sc-row{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:8.5pt}
-.sc-row:last-child{border-bottom:none}
-.sc-row-label{color:rgba(255,255,255,.5)}
-.sc-row-val{color:#fff;font-weight:700;text-align:right}
-.sc-warn{margin-top:12px;background:rgba(212,160,23,.12);border:1px solid rgba(212,160,23,.3);border-radius:8px;padding:10px 12px;font-size:7.8pt;color:var(--gold2,#d4a017);line-height:1.45}
-.sc-footer{padding:14px 26px 22px;border-top:1px solid rgba(255,255,255,.1);display:flex;gap:10px;justify-content:flex-end}
 
 /* ── THE REPORT PAGES ── */
 .report-page{
@@ -392,12 +336,6 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .info-card.needs-input{border-left-color:var(--gold)!important;cursor:pointer}
 .info-card.needs-input:hover{background:var(--warn-bg)}
 .info-card.needs-input span::after{content:' — click ✏ to fill in';font-size:7.5pt;color:var(--gold);font-style:italic;font-weight:400}
-
-/* TREND CHIPS — month-over-month deltas on the Exec Summary donuts */
-.trend-chip{display:inline-block;font-size:7.5px;font-weight:700;letter-spacing:.02em;padding:2px 7px;border-radius:20px;white-space:nowrap}
-.trend-up-good{color:#1B7A4A;background:rgba(27,122,74,.1)}
-.trend-down-bad{color:#C8272C;background:rgba(200,39,44,.1)}
-.trend-flat{color:#94A3B8;background:rgba(148,163,184,.1)}
 
 /* NARRATIVE BLOCKS */
 .narrative-block{margin-bottom:20px}
@@ -2060,11 +1998,11 @@ body.compact-density .progress-bar-wrap{height:6px}
     </div>
   </div>
     <div class="controls-actions" style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-ghost" id="btn-learners" onclick="openModal('learners','list')" disabled style="font-size:8.5pt;padding:9px 14px" title="Add or view the learners in this training group">👥 Learners</button>
-      <button class="btn btn-ghost" onclick="openAssessorPanel()" style="font-size:8.5pt;padding:9px 14px" title="Add or view the assessors/facilitators who sign off on this programme">👤 Assessors</button>
-      <button class="btn btn-ghost" onclick="openUsPanel()" style="font-size:8.5pt;padding:9px 14px" title="Unit Standards are the individual skills/topics a SETA qualification is built from — add them here if this programme uses the Legacy (SETA) qualification type">📐 Unit Standards<span id="us-count-badge" class="us-count-badge" style="display:none">0</span></button>
-      <button class="btn btn-ghost" id="btn-notes" onclick="openNotesPanel()" disabled style="font-size:8.5pt;padding:9px 14px" title="Add Monitoring & Recommendations notes for this programme">📝 Notes</button>
-      <button class="btn btn-success" onclick="generateReport()" id="gen-btn" disabled title="Builds the printable report from everything entered above. Do this once your Report Content checklist below is complete.">▶ Generate Report</button>
+      <button class="btn btn-ghost" id="btn-learners" onclick="openModal('learners','list')" disabled style="font-size:8.5pt;padding:9px 14px">👥 Learners</button>
+      <button class="btn btn-ghost" onclick="openAssessorPanel()" style="font-size:8.5pt;padding:9px 14px">👤 Assessors</button>
+      <button class="btn btn-ghost" onclick="openUsPanel()" style="font-size:8.5pt;padding:9px 14px">📐 Unit Standards<span id="us-count-badge" class="us-count-badge" style="display:none">0</span></button>
+      <button class="btn btn-ghost" id="btn-notes" onclick="openNotesPanel()" disabled style="font-size:8.5pt;padding:9px 14px">📝 Notes</button>
+      <button class="btn btn-success" onclick="generateReport()" id="gen-btn" disabled>▶ Generate Report</button>
     </div>
   </div><!-- /controls-inner -->
 </div>
@@ -2103,21 +2041,6 @@ body.compact-density .progress-bar-wrap{height:6px}
   </div>
 </div>
 
-<!-- SUBMIT FOR REVIEW — CONFIRMATION MODAL -->
-<div id="submit-confirm-overlay" onclick="if(event.target===this)closeSubmitConfirm()">
-  <div class="sc-modal">
-    <div class="sc-header">
-      <h3>📩 Ready to send for review?</h3>
-      <p>Double-check the details below. Once you confirm, this report is locked and the admin is notified — you won't be able to edit it again until they review it.</p>
-    </div>
-    <div class="sc-body" id="sc-body"></div>
-    <div class="sc-footer">
-      <button class="btn btn-ghost" onclick="closeSubmitConfirm()">Cancel — let me check again</button>
-      <button class="btn btn-success" onclick="confirmSubmitForReview()">✅ Yes, submit for review</button>
-    </div>
-  </div>
-</div>
-
 <!-- DRAFTS PANEL -->
 <div id="drafts-overlay" onclick="closeDraftsPanel()" style="display:none;position:fixed;inset:0;z-index:400;background:rgba(0,0,0,.5)"></div>
 
@@ -2131,10 +2054,6 @@ body.compact-density .progress-bar-wrap{height:6px}
   </div>
   <div id="da-progress-bar"><div id="da-progress-fill" style="width:0%"></div></div>
   <div id="da-body">
-    <div class="da-review-reminder">
-      <span style="font-size:12pt;line-height:1">⚠️</span>
-      <span><strong>These drafts are auto-generated from your attendance and assessment data — they are not final.</strong> Read each one carefully before you press Accept. You are responsible for confirming it's accurate; unreviewed auto-drafted text must never go into a submitted report.</span>
-    </div>
     <div id="da-field-label" class="da-field-label"></div>
     <div id="da-existing" class="da-existing">
       <div class="da-existing-label">⚠ Existing content (will be replaced on Accept)</div>
@@ -2242,7 +2161,6 @@ body.compact-density .progress-bar-wrap{height:6px}
       <button type="button" class="note-type-tab monitoring active" id="note-tab-monitoring" onclick="setNoteType('monitoring')">● <span id="note-tab-monitoring-label">Monitoring</span></button>
       <button type="button" class="note-type-tab recommendation" id="note-tab-recommendation" onclick="setNoteType('recommendation')">● Recommendation</button>
     </div>
-    <div class="field-hint-text" style="margin-top:4px">Use <strong>Monitoring</strong> for what you observed while visiting or checking on the training (e.g. site conditions, learner progress). Use <strong>Recommendation</strong> for an action you think should be taken as a result.</div>
     <div class="assessor-input-row" style="margin-top:8px">
       <input class="assessor-input" type="date" id="note-new-date" style="max-width:140px" />
       <input class="assessor-input" id="note-new-author" placeholder="Author (optional)" style="max-width:130px" />
@@ -3563,15 +3481,6 @@ function saveNarratives(showToast=false){
   data._att=ao;
   // persist attState (dates) so columns survive refresh without Supabase
   data._attState=attState;
-  // Snapshot the same headline figures the Exec Summary page shows (attendance,
-  // flags, EISA %) so next month's report can show a ▲/▼ trend against this one.
-  // Wrapped defensively — a failure here must never block the draft save itself.
-  let execSnapshot=null;
-  try{
-    const pLearners=getProgrammeLearners();
-    const stats=computeExecStats(activeProgramme,pLearners);
-    execSnapshot={avgAtt:stats.avgAtt,totalFlags:stats.totalFlags,eisaCompletedPct:stats.eisaCompletedPct};
-  }catch(e){console.warn('execSnapshot skipped:',e.message);}
   // meta — enables draft listing and resume
   data._meta={
     clientId:activeClient?.id,
@@ -3581,7 +3490,6 @@ function saveNarratives(showToast=false){
     month:document.getElementById('sel-month').value,
     providerId:document.getElementById('sel-provider')?.value||'',
     savedAt:Date.now(),
-    execSnapshot,
   };
   // If client/programme are local-only (never synced to server, temp id), embed a full
   // copy in the draft itself — otherwise resuming this draft from a different browser
@@ -4209,12 +4117,7 @@ function buildCoverPage(prog,client,month){
   return div;
 }
 
-// Pulls together every headline number the Executive Summary page shows
-// (attendance, risk flags, EISA progress). Factored out of buildExecSummaryPage
-// so the exact same figures can be snapshotted at save-time (see saveNarratives)
-// for month-over-month trend comparison — one calculation, two consumers, so the
-// trend arrows can never disagree with what the page itself displays.
-function computeExecStats(prog,pLearners){
+function buildExecSummaryPage(prog,client,pLearners,pn){
   const p=activeProvider||PROVIDERS.apex;
   const attDates=getAttDates().map(normDateKey);
   let attSum=0,attCount=0,belowThresholdCount=0;
@@ -4246,6 +4149,9 @@ function computeExecStats(prog,pLearners){
     const st=dates?modStatus(dates):null;
     return{n,dates,status:st};
   }).filter(m=>m.dates);
+  // Donut geometry helper (r=50, circumference≈314.16)
+  const CIRC=2*Math.PI*50;
+  function arcSeg(offset,count,total){return total>0?(count/total*CIRC):0;}
   let flaggedModules=0;
   allModuleNums(activeProgramme).forEach(m=>{
     let anyNYC=false;
@@ -4283,61 +4189,6 @@ function computeExecStats(prog,pLearners){
   const headline=avgAtt!==null
     ?`${nCount} learner${nCount!==1?'s':''} enrolled, averaging ${avgAtt}% attendance across the reporting period.${flaggedModules?` ${flaggedModules} module${flaggedModules!==1?'s':''} flagged with outstanding "Not Yet Competent" results requiring follow-up.`:' No outstanding competency concerns at this time.'}`
     :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period.`;
-  return{p,avgAtt,highRiskCount,medRiskCount,belowThresholdCount,totalFlags,timelineMods,flaggedModules,nCount,
-    eisaCompletedCount,eisaBookedCount,eisaCompletedPct,eisaBookedPct,headline};
-}
-
-// ── Month-over-month trend snapshot ──
-// Every saved draft stores a tiny snapshot of these same headline numbers
-// (see saveNarratives). Given a programme + month, this walks back one
-// calendar month and returns that prior draft's snapshot, or null if there
-// isn't one (older drafts saved before this feature existed, or no report
-// was ever generated for that month) — callers must handle the null case
-// and simply omit the trend rather than guessing.
-function prevMonthLabel(month){
-  const m=/^([A-Za-z]+)\s+(\d{4})$/.exec((month||'').trim());
-  if(!m)return null;
-  const names=['january','february','march','april','may','june','july','august','september','october','november','december'];
-  const idx=names.indexOf(m[1].toLowerCase());
-  if(idx<0)return null;
-  const year=+m[2];
-  const prevIdx=idx===0?11:idx-1;
-  const prevYear=idx===0?year-1:year;
-  const label=['January','February','March','April','May','June','July','August','September','October','November','December'][prevIdx];
-  return`${label} ${prevYear}`;
-}
-function getPrevMonthSnapshot(progId,month){
-  try{
-    const prev=prevMonthLabel(month);
-    if(!prev||!progId)return null;
-    const raw=localStorage.getItem(`apex_report_${progId}_${prev}`);
-    if(!raw)return null;
-    const parsed=JSON.parse(raw);
-    return(parsed._meta&&parsed._meta.execSnapshot)||null;
-  }catch{return null;}
-}
-// Builds a small ▲/▼ delta chip comparing `curr` to `prev` (both numbers, e.g.
-// percentages or counts). `goodDir` is 'up' or 'down' — whichever direction is
-// the improvement — so the chip colours green/red correctly either way (e.g. a
-// rising attendance % is good, a rising flag count is bad).
-function trendChip(curr,prev,{suffix='',goodDir='up'}={}){
-  if(curr===null||curr===undefined||prev===null||prev===undefined)return'';
-  const delta=curr-prev;
-  if(delta===0)return`<span class="trend-chip trend-flat">— no change vs last month</span>`;
-  const rising=delta>0;
-  const good=goodDir==='up'?rising:!rising;
-  const arrow=rising?'▲':'▼';
-  const cls=good?'trend-up-good':'trend-down-bad';
-  return`<span class="trend-chip ${cls}">${arrow} ${Math.abs(delta)}${suffix} vs last month</span>`;
-}
-
-function buildExecSummaryPage(prog,client,pLearners,pn){
-  const{p,avgAtt,highRiskCount,medRiskCount,belowThresholdCount,totalFlags,timelineMods,flaggedModules,nCount,
-    eisaCompletedCount,eisaBookedCount,eisaCompletedPct,eisaBookedPct,headline}=computeExecStats(prog,pLearners);
-  // Donut geometry helper (r=50, circumference≈314.16)
-  const CIRC=2*Math.PI*50;
-  function arcSeg(offset,count,total){return total>0?(count/total*CIRC):0;}
-  const prevSnap=getPrevMonthSnapshot(prog?.id,document.getElementById('sel-month')?.value||'');
   const div=document.createElement('div');
   div.className='report-page content-page exec-summary-page';
   div.style.borderTop=`5px solid ${p.accentFrom}`;
@@ -4365,7 +4216,6 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">ATTENDANCE</text>
           </svg>
           <div style="font-size:8px;color:#94A3B8;margin-top:6px">threshold ${ATT_THRESHOLD}%</div>
-          ${prevSnap?`<div style="margin-top:4px">${trendChip(avgAtt,prevSnap.avgAtt,{suffix:'%',goodDir:'up'})}</div>`:''}
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
           <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">Programme timeline</div>
@@ -4398,7 +4248,6 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             <span style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#C8272C"></span>High risk &middot; ${highRiskCount}</span>
             <span style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#CC6B00"></span>Med risk &middot; ${medRiskCount}</span>
             <span style="display:flex;align-items:center;gap:4px;font-size:7.5px;color:#94A3B8"><span style="width:6px;height:6px;border-radius:50%;background:#D4A017"></span>Attendance &middot; ${belowThresholdCount}</span>
-            ${prevSnap?`<div style="margin-top:3px">${trendChip(totalFlags,prevSnap.totalFlags,{goodDir:'down'})}</div>`:''}
           </div>
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
@@ -4431,7 +4280,6 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">EISA</text>
           </svg>
           <div style="font-size:8px;color:#94A3B8;margin-top:6px">completed</div>
-          ${prevSnap?`<div style="margin-top:4px">${trendChip(eisaCompletedPct,prevSnap.eisaCompletedPct,{suffix:'%',goodDir:'up'})}</div>`:''}
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
           <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">EISA progress</div>
@@ -4463,37 +4311,6 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
         <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:6px">Headline</div>
         <div style="font-size:10pt;color:#333;line-height:1.6">${esc(headline)}</div>
       </div>
-      ${(()=>{
-        // Recommended Next Steps — auto-derived from the same risk/attendance/EISA
-        // figures already computed above for the donuts. Purely presentational:
-        // no new data source, so it can never disagree with the rest of the page.
-        const notBooked=Math.max(0,nCount-eisaBookedCount);
-        const items=[];
-        if(highRiskCount>0)items.push({sev:'high',txt:`Schedule a one-on-one intervention for the ${highRiskCount} learner${highRiskCount!==1?'s':''} flagged high risk — over half of assessed units are currently Not Yet Competent.`});
-        if(medRiskCount>0)items.push({sev:'med',txt:`Arrange additional support material or re-assessment coaching for the ${medRiskCount} learner${medRiskCount!==1?'s':''} at medium risk.`});
-        if(belowThresholdCount>0)items.push({sev:'att',txt:`Follow up with the ${belowThresholdCount} learner${belowThresholdCount!==1?'s':''} below the ${ATT_THRESHOLD}% attendance threshold — consider contacting their workplace supervisor.`});
-        if(flaggedModules>0)items.push({sev:'med',txt:`${flaggedModules} module${flaggedModules!==1?'s':''} ${flaggedModules!==1?'have':'has'} outstanding NYC results — confirm a re-assessment date with the facilitator.`});
-        if(notBooked>0)items.push({sev:'att',txt:`${notBooked} learner${notBooked!==1?'s':''} still to be booked for EISA — recommend booking ahead of the next reporting period.`});
-        const sevStyle={high:{bg:'#C8272C',label:'Urgent'},med:{bg:'#CC6B00',label:'Follow up'},att:{bg:'#D4A017',label:'Monitor'}};
-        if(!items.length){
-          return`<div style="margin-top:14px;padding:14px 16px;background:rgba(27,122,74,.07);border-left:4px solid #1B7A4A;border-radius:0 8px 8px 0">
-            <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#1B7A4A;margin-bottom:4px">✓ Recommended Next Steps</div>
-            <div style="font-size:9.5pt;color:#4A5568;line-height:1.6">No action items this period — attendance, competency and EISA progress are all on track.</div>
-          </div>`;
-        }
-        return`<div style="margin-top:14px;padding:16px 18px;background:#FBFBFA;border:1px solid var(--border);border-radius:8px">
-          <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:10px">Recommended Next Steps</div>
-          <div style="display:flex;flex-direction:column;gap:9px">
-            ${items.map(it=>{
-              const s=sevStyle[it.sev];
-              return`<div style="display:flex;align-items:flex-start;gap:9px">
-                <span style="flex-shrink:0;margin-top:1px;font-size:6.5pt;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:${s.bg};border-radius:20px;padding:2px 8px;white-space:nowrap">${s.label}</span>
-                <span style="font-size:9.5pt;color:#333;line-height:1.55">${esc(it.txt)}</span>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>`;
-      })()}
       ${(narratives._sc_general_feedback||'').trim()?`<div style="margin-top:14px;padding:2px 0 2px 12px;border-left:2px solid ${p.accentFrom}">
         <div style="font-size:8pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${p.accentFrom};margin-bottom:5px">Project Manager Feedback</div>
         <div style="font-size:9.5pt;color:#4A5568;line-height:1.6;font-style:italic">"${esc(narratives._sc_general_feedback.trim().slice(0,220))}${narratives._sc_general_feedback.trim().length>220?'…':''}"</div>
@@ -4694,8 +4511,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     </div>
     <div id="overview-narratives" class="sec-header" style="margin-top:12px"><div class="sec-accent" style="background:var(--red)"></div>
       <div><div class="sec-title">Overall Feedback</div></div>
-    </div>
-    <div class="no-print field-hint-text" style="margin:-6px 0 10px">Each field below can be pre-filled with "✨ Draft from data" — always read the drafted text and edit it before you move on. Drafts are a starting point, not the finished report.</div>`;
+    </div>`;
 
   ['Module 1','Module 2','Module 3','Module 4'].forEach((m,i)=>{
     const key=`feedback_m${i+1}`;
@@ -4712,7 +4528,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
       ${narField('att_summary','Summary of attendance…',nar.att_summary||'','48px')}
     </div>
     <div class="narrative-block">
-      <div class="narrative-label">EISA<span class="help-tip no-print" tabindex="0" data-tip="EISA = External Integrated Summative Assessment — the final, independently-marked exam a learner must pass to be declared competent on an occupational (QCTO) qualification. Note here whether each learner has been booked and whether they've completed it."></span></div>
+      <div class="narrative-label">EISA</div>
       ${narField('eisa_summary','Notes on EISA booking and completion…',nar.eisa_summary||'','48px')}
     </div>
     <div class="narrative-block">
@@ -6691,39 +6507,7 @@ function sendForReview(){
     return;
   }
   if(_checklistBlocksFinalize())return;
-  openSendReviewConfirm();
-}
-
-// ── Confirmation summary shown before actually submitting to the admin.
-// This is purely an extra "are you sure, here's what's going out" step for
-// the user — the underlying compliance checks (checklist gate above, and
-// the unedited-comment warning in confirmSubmitForReview) are unchanged. ──
-function openSendReviewConfirm(){
-  const pLearners=getProgrammeLearners();
-  const month=document.getElementById('sel-month')?.value||'—';
-  const score=document.getElementById('pp-score')?.textContent||'—';
-  const defaults=document.querySelectorAll('.comment-ta.comment-default').length;
-  const body=document.getElementById('sc-body');
-  if(!body)return;
-  body.innerHTML=`
-    <div class="sc-row"><span class="sc-row-label">Client</span><span class="sc-row-val">${esc(activeClient?.client_name||'—')}</span></div>
-    <div class="sc-row"><span class="sc-row-label">Programme</span><span class="sc-row-val">${esc(activeProgramme?.programme_name||'—')}</span></div>
-    <div class="sc-row"><span class="sc-row-label">Reporting month</span><span class="sc-row-val">${esc(month)}</span></div>
-    <div class="sc-row"><span class="sc-row-label">Learners covered</span><span class="sc-row-val">${pLearners.length}</span></div>
-    <div class="sc-row"><span class="sc-row-label">Report content checklist</span><span class="sc-row-val">${esc(score)}</span></div>
-    ${defaults>0?`<div class="sc-warn">⚠ ${defaults} learner observation comment${defaults===1?'':'s'} still ${defaults===1?'matches':'match'} the default preset text and ${defaults===1?"hasn't":"haven't"} been individually edited. You'll get one more chance to cancel on the next step.</div>`:''}
-  `;
-  document.getElementById('submit-confirm-overlay').classList.add('open');
-}
-
-function closeSubmitConfirm(){
-  const overlay=document.getElementById('submit-confirm-overlay');
-  if(overlay)overlay.classList.remove('open');
-}
-
-function confirmSubmitForReview(){
-  if(!_confirmUneditedComments()){closeSubmitConfirm();return;}
-  closeSubmitConfirm();
+  if(!_confirmUneditedComments())return;
   logReportPrint();
 }
 
@@ -7335,21 +7119,16 @@ function openModal(type,mode,learnerId){
     html+=`
       <div class="modal-field"><label>Programme Name *</label>
         <input class="modal-input" id="mf-programme_name" placeholder="e.g. OC: Insurance Underwriter NQF Level 5" value="${v('programme_name')}">
-        <div class="field-hint-text">The full qualification title, including its NQF (National Qualifications Framework) level — this appears on the printed report exactly as typed here.</div>
       </div>
-      <div class="modal-field"><label>Qualification Type
-        <span class="help-tip" tabindex="0" data-tip="QCTO = Quality Council for Trades and Occupations, who set the rules for occupational qualifications. SETA = Sector Education and Training Authority, who set the rules for older 'unit standard' qualifications. Pick whichever this programme is registered under — it changes how assessments are tracked below."></span>
-      </label>
+      <div class="modal-field"><label>Qualification Type</label>
         <select class="modal-select" id="mf-programme_type">
           <option value="occupational">Occupational (QCTO — Modules + EISA)</option>
           <option value="legacy">Legacy (SETA Unit Standards)</option>
         </select>
-        <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Legacy swaps the report's assessment pages to per-unit-standard Achieved / Not Yet Achieved tracking with credit totals, instead of Module 1–4 KM/PM/WM + EISA. If you're not sure which one applies, check the programme's registration certificate or ask your Project Manager — this can be changed later.</div>
+        <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Legacy swaps the report's assessment pages to per-unit-standard Achieved / Not Yet Achieved tracking with credit totals, instead of Module 1–4 KM/PM/WM + EISA.</div>
       </div>
       <div class="modal-grid">
-        <div class="modal-field"><label>SAQA ID <span style="color:var(--red)">*</span>
-          <span class="help-tip" tabindex="0" data-tip="The official qualification ID number issued by SAQA (South African Qualifications Authority) — the government body that registers every qualification. You'll find it on the qualification's registration certificate. Required because it identifies exactly which qualification this report is for."></span>
-        </label>
+        <div class="modal-field"><label>SAQA ID <span style="color:var(--red)">*</span></label>
           <input class="modal-input" id="mf-saqa_id" placeholder="e.g. 117329" value="${v('saqa_id')}">
         </div>
         <div class="modal-field"><label>Qualification Code</label>
@@ -13413,8 +13192,7 @@ function _updateProgressPanel(){
 
   // 1. Learners enrolled
   const hasLearners=pLearners.length>0;
-  items.push({id:'learners',label:`Learners (${pLearners.length})`,state:hasLearners?'done':'',anchor:null,
-    why:hasLearners?'Learner list loaded for this programme.':'No learners are loaded yet. Import or add the learners on this programme before you can report on them.'});
+  items.push({id:'learners',label:`Learners (${pLearners.length})`,state:hasLearners?'done':'',anchor:null});
 
   // 2. Attendance — any session dates with data
   const attFilled=attDates.length>0&&pLearners.some(l=>{
@@ -13425,10 +13203,7 @@ function _updateProgressPanel(){
     const a=attState[l.id]||{};
     return attDates.every(d=>a[d]&&a[d]!=='');
   });
-  items.push({id:'att',label:'Attendance',state:allAttFilled?'done':attFilled?'partial':'',anchor:'att',
-    why:allAttFilled?'Every learner has an attendance mark (Present/Absent/N-A) for every session date.'
-      :attFilled?'Some session dates are missing a Present/Absent/N-A mark for one or more learners. Click to jump to the attendance grid and fill in the gaps.'
-      :'No attendance has been captured yet. Mark every learner Present, Absent or N/A for each session date — this feeds the attendance % that SETA/QCTO reviewers check.'});
+  items.push({id:'att',label:'Attendance',state:allAttFilled?'done':attFilled?'partial':'',anchor:'att'});
 
   // NOTE: EISA is a single qualification-level assessment, not administered
   // per module — so it's tracked via the "EISA" overview narrative field
@@ -13446,21 +13221,14 @@ function _updateProgressPanel(){
     const lc=(narratives._comments||{})[l.id]||(remoteComments||{})[`${l.id}_${month}`];
     return lc&&lc.trim().length>0;
   });
-  items.push({id:'comments',label:'Facilitator Observations',state:allComments?'done':hasComments?'partial':'',anchor:'comments',
-    why:allComments?'Every learner has a facilitator observation comment for this month.'
-      :hasComments?'Some learners are still missing an observation comment. Click to jump to the Observations section and add one for each learner.'
-      :'No observation comments yet. Add a short note per learner on how they\'re doing — this is the facilitator\'s first-hand record for the client and for compliance.'});
+  items.push({id:'comments',label:'Facilitator Observations',state:allComments?'done':hasComments?'partial':'',anchor:'comments'});
 
   // 8. Narrative fields — Overview page text blocks
   const narKeys=['feedback_m1','feedback_m2','feedback_m3','feedback_m4','att_summary','eisa_summary','interaction','concerns','time_keeping'];
   const narLabels={feedback_m1:'Module 1 Narrative',feedback_m2:'Module 2 Narrative',feedback_m3:'Module 3 Narrative',feedback_m4:'Module 4 Narrative',att_summary:'Attendance Summary',eisa_summary:'EISA',time_keeping:'Time Keeping',interaction:'Interaction & Participation',concerns:'Concerns'};
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
-  const narMissing=narKeys.filter(k=>!(narratives[k]&&narratives[k].trim().length>0)).map(k=>narLabels[k]);
-  items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives',
-    why:narState==='done'?'All overview narrative sections (module feedback, attendance summary, EISA, interaction, concerns, time keeping) have text.'
-      :narMissing.length?`Still blank: ${narMissing.join(', ')}. Use "✨ Draft from data" on each field for a starting point, then read it over and edit before accepting — these sections are read directly by the client and the SETA/QCTO reviewer.`
-      :'Fill in the Overview narrative sections — they summarise the month for the client and compliance reviewer.'});
+  items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
 
   // ── Render ──
   const doneCount=items.filter(i=>i.state==='done').length;
@@ -13477,7 +13245,7 @@ function _updateProgressPanel(){
     if(allComplete){
       genBtn.disabled=false;
       genBtn.classList.remove('incomplete');
-      genBtn.title='Builds the printable report from everything entered above — you can still edit and regenerate afterwards.';
+      genBtn.title='';
       genBtn.textContent='▶ Generate Report';
     }else{
       genBtn.disabled=false; // keep clickable so toast can fire
@@ -13492,13 +13260,9 @@ function _updateProgressPanel(){
     const cls=it.state==='done'?'done':it.state==='partial'?'partial':'';
     const tick=it.state==='done'?'✓':it.state==='partial'?'~':'';
     const colorStyle=it.color&&!cls?`border-left:3px solid ${it.color};padding-left:9px`:'';
-    const subHtml=it.why?`<div class="pp-item-sub">${esc(it.why)}</div>`:'';
-    return`<div class="pp-item ${cls}" style="${colorStyle}" onclick="ppScrollTo('${it.anchor}')" title="${esc(it.why||'')}">
-      <div class="pp-item-row">
-        <div class="pp-check">${tick}</div>
-        <span>${it.label}</span>
-      </div>
-      ${subHtml}
+    return`<div class="pp-item ${cls}" style="${colorStyle}" onclick="ppScrollTo('${it.anchor}')">
+      <div class="pp-check">${tick}</div>
+      <span>${it.label}</span>
     </div>`;
   }).join('');
 }
