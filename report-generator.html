@@ -980,6 +980,9 @@ body.compact-density .progress-bar-wrap{height:6px}
   font-size:8.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
   color:rgba(255,255,255,.4);margin-bottom:12px;
 }
+.dash-cohort-filter-btn{background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.5);font-size:7.5pt;font-weight:700;letter-spacing:.04em;padding:4px 11px;border-radius:20px;cursor:pointer;transition:.15s}
+.dash-cohort-filter-btn:hover{border-color:rgba(255,255,255,.35);color:rgba(255,255,255,.8)}
+.dash-cohort-filter-btn.active{background:rgba(212,160,23,.16);border-color:rgba(212,160,23,.5);color:#F0C040}
 .dash-chart-donut-wrap{position:relative}
 .dash-donut-center{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;pointer-events:none}
 .dash-donut-center .n{font-size:19px;font-weight:800;color:#fff;line-height:1}
@@ -2287,7 +2290,14 @@ body.compact-density .progress-bar-wrap{height:6px}
   <div id="dash-alerts"></div>
   <div class="dash-grid" id="dash-stats"></div>
   <div id="dash-charts-panel" style="display:none;background:#131e35;border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:20px 24px;margin-bottom:20px">
-    <div class="dash-section-title" style="margin-bottom:16px">Cohort Analytics</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <div class="dash-section-title" style="margin-bottom:0">Cohort Analytics</div>
+      <div id="dash-cohort-filter" style="display:flex;gap:6px">
+        <button type="button" class="dash-cohort-filter-btn active" data-type="all" onclick="setDashCohortFilter('all')">All</button>
+        <button type="button" class="dash-cohort-filter-btn" data-type="occupational" onclick="setDashCohortFilter('occupational')">QCTO</button>
+        <button type="button" class="dash-cohort-filter-btn" data-type="legacy" onclick="setDashCohortFilter('legacy')">Legacy</button>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px">
       <div>
         <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
@@ -2296,7 +2306,7 @@ body.compact-density .progress-bar-wrap{height:6px}
         <div style="position:relative;height:180px;padding-top:16px"><canvas id="dash-chart-dist"></canvas></div>
       </div>
       <div>
-        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px">Satisfactory vs Remediation (by WM Milestone)</div>
+        <div style="font-size:7.5pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-bottom:10px" id="dash-donut-title">Satisfactory vs Remediation (by WM Milestone)</div>
         <div class="dash-chart-donut-wrap" style="position:relative;height:180px">
           <canvas id="dash-chart-donut"></canvas>
           <div class="dash-donut-center" id="dash-donut-center"><div class="n">0</div><div class="l">Satisfactory</div></div>
@@ -9220,25 +9230,60 @@ function toggleReportDensity(){
 
 // ── Dashboard Charts ──
 let _dashChartDist=null,_dashChartDonut=null,_dashChartTrend=null;
+let dashCohortFilter='all'; // 'all' | 'occupational' | 'legacy' — which qualification type feeds the three charts below
+let _lastDashChartArgs=null; // cached args from the last renderDashCharts call, so the filter buttons can re-render without refetching
+function setDashCohortFilter(type){
+  dashCohortFilter=type;
+  document.querySelectorAll('.dash-cohort-filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.type===type));
+  if(_lastDashChartArgs)renderDashCharts(_lastDashChartArgs.eisaRows,_lastDashChartArgs.attRows,_lastDashChartArgs.programmes,_lastDashChartArgs.legacyDraftsByProg);
+}
 const _dashBarLabelPlugin={id:'dashBarLabel',afterDatasetsDraw(chart){
   const ctx=chart.ctx;
-  chart.data.datasets[0].data.forEach((v,i)=>{
-    const meta=chart.getDatasetMeta(0).data[i];
-    if(!meta)return;
-    ctx.save();
-    ctx.fillStyle='rgba(255,255,255,.85)';
-    ctx.font="700 10px 'DM Sans', sans-serif";
-    ctx.textAlign='center';
-    ctx.fillText(v,meta.x,meta.y-6);
-    ctx.restore();
+  chart.data.datasets.forEach((ds,di)=>{
+    ds.data.forEach((v,i)=>{
+      if(!v)return;
+      const meta=chart.getDatasetMeta(di).data[i];
+      if(!meta)return;
+      ctx.save();
+      ctx.fillStyle='rgba(255,255,255,.85)';
+      ctx.font="700 10px 'DM Sans', sans-serif";
+      ctx.textAlign='center';
+      ctx.fillText(v,meta.x,meta.y-6);
+      ctx.restore();
+    });
   });
 }};
-function renderDashCharts(eisaRows,attRows,programmes){
-  // Build progress buckets from eisa data (km/pm/wm completions as proxy)
-  const buckets={'0%':0,'KM':0,'PM':0,'WM':0,'Comp':0};
-  const progIds=programmes.map(p=>p.id);
+// Legacy (SETA unit-standard) qualifications don't have km/pm/wm EISA rows at all — their
+// achievement data lives in each programme's latest saved draft (payload._eisa, keyed
+// '<learnerId>_us_<code>_formative'/'_summative'), because there's no per-programme
+// rollup table for it yet (see LEGACY MODE notes above computeLegacyModuleProgress).
+// This reads the fraction of assessed unit-standard instances marked Achieved, as a
+// cohort-level proxy for "on track" — the same Achieved/Not-Yet-Achieved signal the
+// report's own Unit Standards page uses, just aggregated instead of per-learner.
+function _legacyProgProgress(prog,legacyDraftsByProg){
+  const draft=legacyDraftsByProg&&legacyDraftsByProg[prog.id];
+  if(!draft)return null;
+  const eisaObj=(draft.payload&&draft.payload._eisa)||{};
+  let achieved=0,assessed=0;
+  Object.entries(eisaObj).forEach(([k,v])=>{
+    if(!v||!/_us_.+_(formative|summative)$/.test(k))return;
+    assessed++;
+    if(v==='C')achieved++;
+  });
+  if(assessed===0)return null;
+  return Math.round(achieved/assessed*100);
+}
+function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
+  _lastDashChartArgs={eisaRows,attRows,programmes,legacyDraftsByProg};
+  const filterType=dashCohortFilter||'all';
+  const filteredProgrammes=programmes.filter(p=>filterType==='all'?true:filterType==='legacy'?isLegacyProgramme(p):!isLegacyProgramme(p));
+  const occProgs=filteredProgrammes.filter(p=>!isLegacyProgramme(p));
+  const legProgs=filteredProgrammes.filter(isLegacyProgramme);
+
+  // ── QCTO (occupational) buckets from eisa km/pm/wm completions ──
+  const occBuckets={'0%':0,'KM':0,'PM':0,'WM':0,'Comp':0};
   const byProg={};
-  progIds.forEach(id=>{byProg[id]={km:0,pm:0,wm:0,t:0};});
+  occProgs.forEach(p=>{byProg[p.id]={km:0,pm:0,wm:0,t:0};});
   eisaRows.forEach(r=>{
     if(!byProg[r.programme_id])return;
     byProg[r.programme_id].t++;
@@ -9246,54 +9291,111 @@ function renderDashCharts(eisaRows,attRows,programmes){
     else if(r.pm_result)byProg[r.programme_id].pm++;
     else if(r.km_result)byProg[r.programme_id].km++;
   });
-  let satWM=0,satPM=0,rem=0,noData=0;
+  let occSatWM=0,occSatPM=0,occRem=0,occNoData=0;
   Object.values(byProg).forEach(b=>{
-    if(!b.t)return;
+    if(!b.t){occBuckets['0%']++;occNoData++;return;} // FIX: a programme with zero eisa rows used to be silently dropped from every chart instead of counting as No Data
     const pct=b.wm?100:b.pm?67:b.km?33:0;
-    if(pct===0)buckets['0%']++;
-    else if(pct<=33)buckets['KM']++;
-    else if(pct<=67)buckets['PM']++;
-    else{buckets['WM']++;buckets['Comp']++;}
-    if(pct===0)noData++;else if(pct>=67){if(b.wm)satWM++;else satPM++;}else rem++;
+    if(pct===0)occBuckets['0%']++;
+    else if(pct<=33)occBuckets['KM']++;
+    else if(pct<=67)occBuckets['PM']++;
+    else{occBuckets['WM']++;occBuckets['Comp']++;}
+    if(pct===0)occNoData++;else if(pct>=67){if(b.wm)occSatWM++;else occSatPM++;}else occRem++;
   });
-  const sat=satWM+satPM;
-  const total=sat+rem+noData||1;
+  const occSat=occSatWM+occSatPM;
+
+  // ── Legacy buckets from latest-draft unit-standard achievement rate ──
+  const legBuckets={'No Data':0,'<50%':0,'50–99%':0,'Complete':0};
+  let legSat=0,legRem=0,legNoData=0;
+  legProgs.forEach(p=>{
+    const pct=_legacyProgProgress(p,legacyDraftsByProg);
+    if(pct===null){legBuckets['No Data']++;legNoData++;}
+    else if(pct>=100){legBuckets['Complete']++;legSat++;}
+    else if(pct>=50){legBuckets['50–99%']++;legSat++;}
+    else{legBuckets['<50%']++;legRem++;}
+  });
+
   const ctxB=document.getElementById('dash-chart-dist');
   const ctxD=document.getElementById('dash-chart-donut');
   const ctxT=document.getElementById('dash-chart-trend');
   if(!ctxB||!ctxD||!ctxT)return;
-  const chartDefaults={color:'rgba(255,255,255,.55)',borderColor:'rgba(255,255,255,.08)'};
   const distTotalEl=document.getElementById('dash-dist-total');
-  if(distTotalEl)distTotalEl.textContent=`${progIds.length} programme${progIds.length===1?'':'s'}`;
+  if(distTotalEl){
+    const parts=[];
+    if(filterType!=='legacy')parts.push(`${occProgs.length} QCTO`);
+    if(filterType!=='occupational')parts.push(`${legProgs.length} Legacy`);
+    distTotalEl.textContent=parts.join(' · ')||'0 programmes';
+  }
+
+  // ── Progress Distribution bar ──
   if(_dashChartDist)_dashChartDist.destroy();
-  _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','KM','PM','WM','Comp'],datasets:[{label:'Programmes',data:[buckets['0%'],buckets['KM'],buckets['PM'],buckets['WM'],buckets['Comp']],backgroundColor:['#64748b','#fab219','#fab219','#fab219','#22c55e'],borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:false}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
+  if(filterType==='occupational'){
+    _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','KM','PM','WM','Comp'],datasets:[{label:'Programmes',data:[occBuckets['0%'],occBuckets['KM'],occBuckets['PM'],occBuckets['WM'],occBuckets['Comp']],backgroundColor:['#64748b','#fab219','#fab219','#fab219','#22c55e'],borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:false}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
+  }else if(filterType==='legacy'){
+    _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','<50%','50–99%','Complete'],datasets:[{label:'Programmes',data:[legBuckets['No Data'],legBuckets['<50%'],legBuckets['50–99%'],legBuckets['Complete']],backgroundColor:['#64748b','#f97316','#fab219','#14b8a6'],borderRadius:4,borderSkipped:false}]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:false}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
+  }else{
+    // 'all' — grouped bars so QCTO and Legacy stay visually distinct instead of being pooled into one meaningless bucket set
+    _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','In Progress','Satisfactory'],datasets:[
+      {label:'QCTO',data:[occNoData,occRem,occSat],backgroundColor:'#fab219',borderRadius:4,borderSkipped:false},
+      {label:'Legacy',data:[legNoData,legRem,legSat],backgroundColor:'#14b8a6',borderRadius:4,borderSkipped:false},
+    ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:true,position:'bottom',labels:{color:'rgba(255,255,255,.55)',boxWidth:9,font:{size:8.5}}}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
+  }
+
+  // ── Satisfactory vs Remediation donut ──
+  const donutTitleEl=document.getElementById('dash-donut-title');
   if(_dashChartDonut)_dashChartDonut.destroy();
-  _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','Remediation','No Data'],datasets:[{data:[satWM,satPM,rem||0.0001,noData],backgroundColor:['#22c55e','#166534','#fab219','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
   const donutCenterEl=document.getElementById('dash-donut-center');
-  if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${sat}</div><div class="l">Satisfactory</div>`;
   const legendEl=document.getElementById('dash-donut-legend');
-  if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',satWM,'#22c55e'],['Satisfactory (PM)',satPM,'#166534'],['Remediation',rem,'#fab219'],['No Data',noData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
-  // Trend: monthly att rate as proxy for cohort progress over time
-  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  if(filterType==='occupational'){
+    if(donutTitleEl)donutTitleEl.textContent='Satisfactory vs Remediation (by WM Milestone)';
+    _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','Remediation','No Data'],datasets:[{data:[occSatWM,occSatPM,occRem||0.0001,occNoData],backgroundColor:['#22c55e','#166534','#fab219','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
+    if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${occSat}</div><div class="l">Satisfactory</div>`;
+    if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',occSatWM,'#22c55e'],['Satisfactory (PM)',occSatPM,'#166534'],['Remediation',occRem,'#fab219'],['No Data',occNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
+  }else if(filterType==='legacy'){
+    if(donutTitleEl)donutTitleEl.textContent='Satisfactory vs Remediation (by Credit Completion)';
+    _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (≥50% Achieved)','Remediation (<50% Achieved)','No Data'],datasets:[{data:[legSat,legRem||0.0001,legNoData],backgroundColor:['#14b8a6','#f97316','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
+    if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${legSat}</div><div class="l">Satisfactory</div>`;
+    if(legendEl)legendEl.innerHTML=[['Satisfactory',legSat,'#14b8a6'],['Remediation',legRem,'#f97316'],['No Data',legNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
+  }else{
+    if(donutTitleEl)donutTitleEl.textContent='Cohort Satisfactory Rate (QCTO: WM Milestone · Legacy: Credits)';
+    const allSat=occSat+legSat,allRem=occRem+legRem,allNoData=occNoData+legNoData;
+    _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (QCTO)','Satisfactory (Legacy)','Remediation (QCTO)','Remediation (Legacy)','No Data'],datasets:[{data:[occSat,legSat,occRem,legRem,allNoData||0.0001],backgroundColor:['#22c55e','#14b8a6','#fab219','#f97316','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
+    if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${allSat}</div><div class="l">Satisfactory</div>`;
+    if(legendEl)legendEl.innerHTML=[['Satisfactory (QCTO)',occSat,'#22c55e'],['Satisfactory (Legacy)',legSat,'#14b8a6'],['Remediation (QCTO)',occRem,'#fab219'],['Remediation (Legacy)',legRem,'#f97316'],['No Data',allNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
+  }
+
+  // ── Trend: monthly attendance rate as a proxy for cohort progress over time ──
+  // Rolling 12 calendar months ending this month, keyed by year+month (not month-name
+  // alone) — the old version bucketed by month-of-year only, so an attendance record
+  // from a *different year's* November silently merged into this year's November,
+  // which is what produced the stray point and blank Sep–Oct–Nov gap on the old chart.
+  const progIdSet=new Set(filteredProgrammes.map(p=>p.id));
+  const attRowsFiltered=attRows.filter(r=>progIdSet.has(r.programme_id));
+  const now=new Date();
+  const monthKeys=[];
+  for(let i=11;i>=0;i--){
+    const d=new Date(now.getFullYear(),now.getMonth()-i,1);
+    monthKeys.push({key:`${d.getFullYear()}-${d.getMonth()}`,label:d.toLocaleString('en-ZA',{month:'short'})});
+  }
   const attByMonth={};
-  months.forEach(m=>{attByMonth[m]={p:0,t:0};});
-  attRows.forEach(r=>{
+  monthKeys.forEach(mk=>{attByMonth[mk.key]={p:0,t:0};});
+  attRowsFiltered.forEach(r=>{
     if(!r.session_date)return;
     const d=new Date(r.session_date);
-    const m=months[d.getMonth()];
-    if(!attByMonth[m])return;
-    attByMonth[m].t++;
-    if(r.status==='P')attByMonth[m].p++;
+    const key=`${d.getFullYear()}-${d.getMonth()}`;
+    if(!attByMonth[key])return; // outside the rolling 12-month window
+    attByMonth[key].t++;
+    if(r.status==='P')attByMonth[key].p++;
   });
-  const trendDataFull=months.map(m=>attByMonth[m].t>0?Math.round(attByMonth[m].p/attByMonth[m].t*100):null);
-  // Only show the range of months that actually have data — no empty Jan-Dec padding, no bridging gaps
+  const trendDataFull=monthKeys.map(mk=>attByMonth[mk.key].t>0?Math.round(attByMonth[mk.key].p/attByMonth[mk.key].t*100):null);
+  const trendLabelsFull=monthKeys.map(mk=>mk.label);
+  // Only show the range of months that actually have data — no empty padding, no bridging gaps
   const firstIdx=trendDataFull.findIndex(v=>v!==null);
   const lastIdx=trendDataFull.length-1-[...trendDataFull].reverse().findIndex(v=>v!==null);
   if(_dashChartTrend)_dashChartTrend.destroy();
   if(firstIdx===-1){
     ctxT.parentElement.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,.35);font-size:8.5pt">No attendance data yet</div>';
   }else{
-    const trendLabels=months.slice(firstIdx,lastIdx+1);
+    const trendLabels=trendLabelsFull.slice(firstIdx,lastIdx+1);
     const trendData=trendDataFull.slice(firstIdx,lastIdx+1);
     const lastFilledIdx=trendData.length-1-[...trendData].reverse().findIndex(v=>v!==null);
     _dashChartTrend=new Chart(ctxT,{type:'line',data:{labels:trendLabels,datasets:[{label:'Att %',data:trendData,borderColor:'#D4A017',backgroundColor:'rgba(212,160,23,0.1)',borderWidth:2.5,pointRadius:(ctx)=>ctx.dataIndex===lastFilledIdx?5:0,pointBackgroundColor:'#D4A017',pointBorderColor:'#131e35',pointBorderWidth:2,tension:0.35,fill:true,spanGaps:false}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>ctx.parsed.y===null?'No data':ctx.parsed.y+'%'}}},scales:{y:{min:0,max:100,ticks:{stepSize:50,callback:v=>v+'%',color:'rgba(255,255,255,.4)',font:{size:9}},grid:{color:'rgba(255,255,255,.06)'}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}}});
@@ -9366,6 +9468,19 @@ async function renderDashboard(){
     }catch(e){console.warn('Dashboard fetch failed:',e.message);}
   } else {
     enrolCount=enrolments.length||0;
+  }
+
+  // ── Legacy cohort progress: Legacy (SETA unit-standard) quals have no eisa rows at
+  // all — their Achieved/Not-Yet data lives inside each programme's latest saved draft
+  // (payload._eisa). Fetch just the newest draft per Legacy programme for the Cohort
+  // Analytics charts below; see _legacyProgProgress() for how it's read. ──
+  let legacyDraftsByProg={};
+  const _legacyProgIdsForFetch=programmes.filter(isLegacyProgramme).map(p=>p.id);
+  if(isOnline&&_legacyProgIdsForFetch.length){
+    try{
+      const ld=await sb('drafts',`select=programme_id,payload,saved_at&tenant_id=eq.${TENANT_DB_ID}&programme_id=in.(${_legacyProgIdsForFetch.join(',')})&order=saved_at.desc&limit=300`);
+      ld.forEach(d=>{if(!legacyDraftsByProg[d.programme_id])legacyDraftsByProg[d.programme_id]=d;}); // first = latest (ordered desc)
+    }catch(e){console.warn('Legacy draft fetch failed:',e.message);}
   }
 
   // ── Compute per-programme stats ──
@@ -9678,7 +9793,7 @@ async function renderDashboard(){
   // ── Charts ──
   if(typeof Chart!=='undefined'){
     const panel=document.getElementById('dash-charts-panel');
-    if(panel){panel.style.display='block';renderDashCharts(eisaRows,attRows,programmes);}
+    if(panel){panel.style.display='block';renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg);}
   }
 }
 
