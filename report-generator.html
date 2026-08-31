@@ -9283,15 +9283,22 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
   // ── QCTO (occupational) buckets from eisa km/pm/wm completions ──
   const occBuckets={'0%':0,'KM':0,'PM':0,'WM':0,'Comp':0};
   const byProg={};
-  occProgs.forEach(p=>{byProg[p.id]={km:0,pm:0,wm:0,t:0};});
+  occProgs.forEach(p=>{byProg[p.id]={km:0,pm:0,wm:0,wmC:0,pmC:0,t:0};});
   eisaRows.forEach(r=>{
     if(!byProg[r.programme_id])return;
-    byProg[r.programme_id].t++;
-    if(r.wm_result)byProg[r.programme_id].wm++;
-    else if(r.pm_result)byProg[r.programme_id].pm++;
-    else if(r.km_result)byProg[r.programme_id].km++;
+    const b=byProg[r.programme_id];
+    b.t++;
+    // FIX: km/pm/wm_result can be 'C' (Competent) or 'NYC' (Not Yet Competent) — see learnerIsCompetent().
+    // Tier reached (for the bar chart) only needs a result to be present; but counting toward
+    // "Satisfactory" needs the result to actually be 'C', not just present, or an NYC result at the
+    // WM/PM stage would get miscounted as Satisfactory instead of flagging it as Remediation.
+    if(r.wm_result){b.wm++;if(r.wm_result==='C')b.wmC++;}
+    else if(r.pm_result){b.pm++;if(r.pm_result==='C')b.pmC++;}
+    else if(r.km_result)b.km++;
   });
-  let occSatWM=0,occSatPM=0,occRem=0,occNoData=0;
+  // occRem = genuine remediation: cohort has reached WM or PM but has no Competent result there yet (NYC).
+  // occInProgress = KM-only: normal early progress, not yet at a milestone — not a remediation signal.
+  let occSatWM=0,occSatPM=0,occInProgress=0,occRem=0,occNoData=0;
   Object.values(byProg).forEach(b=>{
     if(!b.t){occBuckets['0%']++;occNoData++;return;} // FIX: a programme with zero eisa rows used to be silently dropped from every chart instead of counting as No Data
     const pct=b.wm?100:b.pm?67:b.km?33:0;
@@ -9299,7 +9306,10 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
     else if(pct<=33)occBuckets['KM']++;
     else if(pct<=67)occBuckets['PM']++;
     else{occBuckets['WM']++;occBuckets['Comp']++;}
-    if(pct===0)occNoData++;else if(pct>=67){if(b.wm)occSatWM++;else occSatPM++;}else occRem++;
+    if(pct===0){occNoData++;}
+    else if(b.wm){if(b.wmC)occSatWM++;else occRem++;}
+    else if(b.pm){if(b.pmC)occSatPM++;else occRem++;}
+    else{occInProgress++;}
   });
   const occSat=occSatWM+occSatPM;
 
@@ -9335,7 +9345,7 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
   }else{
     // 'all' — grouped bars so QCTO and Legacy stay visually distinct instead of being pooled into one meaningless bucket set
     _dashChartDist=new Chart(ctxB,{type:'bar',data:{labels:['No Data','In Progress','Satisfactory'],datasets:[
-      {label:'QCTO',data:[occNoData,occRem,occSat],backgroundColor:'#fab219',borderRadius:4,borderSkipped:false},
+      {label:'QCTO',data:[occNoData,occRem+occInProgress,occSat],backgroundColor:'#fab219',borderRadius:4,borderSkipped:false}, // 'In Progress' here folds together genuine Remediation (NYC) and KM-only early progress — the QCTO-only donut below breaks these apart
       {label:'Legacy',data:[legNoData,legRem,legSat],backgroundColor:'#14b8a6',borderRadius:4,borderSkipped:false},
     ]},options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:6}},plugins:{legend:{display:true,position:'bottom',labels:{color:'rgba(255,255,255,.55)',boxWidth:9,font:{size:8.5}}}},scales:{y:{display:false,grid:{display:false}},x:{ticks:{color:'rgba(255,255,255,.4)',font:{size:9}},grid:{display:false}}}},plugins:[_dashBarLabelPlugin]});
   }
@@ -9347,9 +9357,9 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
   const legendEl=document.getElementById('dash-donut-legend');
   if(filterType==='occupational'){
     if(donutTitleEl)donutTitleEl.textContent='Satisfactory vs Remediation (by WM Milestone)';
-    _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','Remediation','No Data'],datasets:[{data:[occSatWM,occSatPM,occRem||0.0001,occNoData],backgroundColor:['#22c55e','#166534','#fab219','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
+    _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (WM)','Satisfactory (PM)','In Progress (KM)','Remediation','No Data'],datasets:[{data:[occSatWM,occSatPM,occInProgress||0.0001,occRem||0.0001,occNoData],backgroundColor:['#22c55e','#166534','#38bdf8','#fab219','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
     if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${occSat}</div><div class="l">Satisfactory</div>`;
-    if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',occSatWM,'#22c55e'],['Satisfactory (PM)',occSatPM,'#166534'],['Remediation',occRem,'#fab219'],['No Data',occNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
+    if(legendEl)legendEl.innerHTML=[['Satisfactory (WM)',occSatWM,'#22c55e'],['Satisfactory (PM)',occSatPM,'#166534'],['In Progress (KM)',occInProgress,'#38bdf8'],['Remediation',occRem,'#fab219'],['No Data',occNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
   }else if(filterType==='legacy'){
     if(donutTitleEl)donutTitleEl.textContent='Satisfactory vs Remediation (by Credit Completion)';
     _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (≥50% Achieved)','Remediation (<50% Achieved)','No Data'],datasets:[{data:[legSat,legRem||0.0001,legNoData],backgroundColor:['#14b8a6','#f97316','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
@@ -9357,7 +9367,7 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
     if(legendEl)legendEl.innerHTML=[['Satisfactory',legSat,'#14b8a6'],['Remediation',legRem,'#f97316'],['No Data',legNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
   }else{
     if(donutTitleEl)donutTitleEl.textContent='Cohort Satisfactory Rate (QCTO: WM Milestone · Legacy: Credits)';
-    const allSat=occSat+legSat,allRem=occRem+legRem,allNoData=occNoData+legNoData;
+    const allSat=occSat+legSat,allRem=occRem+occInProgress+legRem,allNoData=occNoData+legNoData; // FIX: fold occInProgress (KM-only) into the QCTO non-satisfactory count here too, or those programmes vanish from this donut's total the same way the old reconciliation bug used to
     _dashChartDonut=new Chart(ctxD,{type:'doughnut',data:{labels:['Satisfactory (QCTO)','Satisfactory (Legacy)','Remediation (QCTO)','Remediation (Legacy)','No Data'],datasets:[{data:[occSat,legSat,occRem,legRem,allNoData||0.0001],backgroundColor:['#22c55e','#14b8a6','#fab219','#f97316','#64748b'],borderWidth:2,borderColor:'#131e35'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'72%',plugins:{legend:{display:false}}}});
     if(donutCenterEl)donutCenterEl.innerHTML=`<div class="n">${allSat}</div><div class="l">Satisfactory</div>`;
     if(legendEl)legendEl.innerHTML=[['Satisfactory (QCTO)',occSat,'#22c55e'],['Satisfactory (Legacy)',legSat,'#14b8a6'],['Remediation (QCTO)',occRem,'#fab219'],['Remediation (Legacy)',legRem,'#f97316'],['No Data',allNoData,'#64748b']].map(([l,n,c])=>`<div class="dash-legend-item"><span class="lbl-wrap"><span class="dash-legend-dot" style="background:${c}"></span>${l}</span><b>${n}</b></div>`).join('');
