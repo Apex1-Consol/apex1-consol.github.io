@@ -908,7 +908,11 @@
                 <div class="content-container">
                     <div class="container-header">
                         <h2>Project Manager Tracker</h2>
-                        <span style="font-size:11px;color:var(--text-muted);">Caseload rollup, sourced from the Programme Ledger — grouped by Project Manager</span>
+                        <div class="container-actions">
+                            <span style="font-size:11px;color:var(--text-muted);">Caseload rollup, sourced from the Programme Ledger — grouped by Project Manager</span>
+                            <button class="btn btn-secondary btn-sm" onclick="downloadPmTrackerTemplate()" style="background:rgba(29,93,166,0.15);color:var(--accent-primary);border-color:var(--accent-primary);">&#128196; Download Template</button>
+                            <button class="btn btn-secondary btn-sm" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo" onclick="openPmTrackerImport()" style="background:rgba(16,185,129,0.15);color:var(--accent-emerald);border-color:var(--accent-emerald);">&#128229; Import Excel</button>
+                        </div>
                     </div>
                     <div style="padding:16px;">
                         <div class="metrics-grid" id="pmtracker-cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
@@ -1765,7 +1769,7 @@
             <div id="imp-sheet-tabs" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px;"></div>
             <div id="imp-col-mapping" style="max-height:340px;overflow-y:auto;"></div>
             <div style="margin-top:12px;padding:10px 14px;background:rgba(234,209,0,0.08);border-radius:var(--radius-sm);font-size:11px;color:var(--text-secondary);">
-                ⚠️ <strong>Existing data</strong> for imported tables will be <strong>replaced</strong>. Skipped sheets are untouched.
+                ⚠️ Rows are <strong>added</strong> to the existing data for imported tables — nothing is deleted or overwritten. Skipped sheets are untouched.
             </div>
         </div>
 
@@ -8154,6 +8158,62 @@ function downloadImportTemplate() {
 
     XLSX.writeFile(wb, 'QCTO_Import_Template.xlsx');
     showToast('success', 'Template downloaded — fill it in and use Import Excel to load your data.');
+}
+
+// ===================== PM TRACKER: TEMPLATE + IMPORT =====================
+// A focused, single-sheet template matching the PM/SME masterlist column
+// layout (Prog ID, Project Manager, Client, SETA, Mode of Delivery,
+// Employment Status, etc). Headers are written exactly as the app's field
+// names so Smart Import auto-maps every column with no manual mapping step.
+function downloadPmTrackerTemplate() {
+    const wb = XLSX.utils.book_new();
+
+    const headers = ['Prog ID','Entity','Project Manager','Client','Type','Qualification',
+                      'NQF','Cohort','Learners','Employment Status','Mode of Delivery',
+                      'Start Date','End Date','Facilitator','Assessor','SETA','Status'];
+    const sample =   ['wendell-peterson-acme-plant-production-g1','APEXU Training','Wendell Peterson','Acme Manufacturing',
+                       'Learnership','Plant Production NQF 3','3','2026-A','20','Employed','Blended',
+                       '2026-01-15','2026-12-15','John Doe','Mary Jones','MERSETA','Active'];
+
+    const aoa = [headers, sample];
+    const ws  = XLSX.utils.aoa_to_sheet(aoa);
+    ws['!cols'] = headers.map(() => ({wch: 20}));
+    ws['!rows'] = [{hpt:22},{hpt:18}];
+    XLSX.utils.book_append_sheet(wb, ws, 'Programmes');
+    if (!wb.Workbook) wb.Workbook = {Sheets:[]};
+    wb.Workbook.Sheets[0] = {TabColor:{rgb:'1B1F8A'}};
+
+    const instrData = [
+        ['PM TRACKER — IMPORT TEMPLATE'],
+        [''],
+        ['HOW TO USE THIS TEMPLATE'],
+        ['1. Fill in one row per programme. Keep the column headers exactly as they are.'],
+        ['2. Delete the sample row (row 2) before importing.'],
+        ['3. Save as .xlsx, then go to PM Tracker → Import Excel and choose this file.'],
+        ['4. All 17 columns auto-map to the Programme Ledger — new rows are added, nothing existing is deleted or overwritten.'],
+        ['5. Already have your own SME/PM masterlist in a different layout? You can still use Import Excel — it lets you map your own columns on the next screen.'],
+        [''],
+        ['COLUMN GUIDE'],
+        ['Prog ID',            'Unique programme reference. Leave blank and the system will still import the row, but a Prog ID makes it easier to find later.'],
+        ['Employment Status',  'e.g. Employed / Unemployed'],
+        ['Mode of Delivery',   'e.g. Contact / Blended / Distance'],
+        ['SETA',               'e.g. MERSETA, SETASA, W&RSETA'],
+        ['Status',             'Active / Completed / Initiated'],
+    ];
+    const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
+    wsInstr['!cols'] = [{wch:22},{wch:70}];
+    XLSX.utils.book_append_sheet(wb, wsInstr, 'Read me first');
+
+    XLSX.writeFile(wb, 'PM_Tracker_Import_Template.xlsx');
+    showToast('success', 'PM Tracker template downloaded — fill it in and use Import Excel to load it.');
+}
+
+// Opens the existing Smart Import modal, reset to a clean state, so PMs can
+// jump straight to importing a masterlist-format file from the PM Tracker
+// tab without hunting for the generic Import Excel entry point elsewhere.
+function openPmTrackerImport() {
+    resetImportModal();
+    openModal('import-modal');
 }
 
 
