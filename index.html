@@ -677,6 +677,7 @@
                 <li class="nav-section-divider">Records</li>
                 <li class="nav-item" data-view="clients" data-roles="admin,project_manager,operations,demo,pi_specialist" onclick="switchTab('clients')"><span class="nav-icon">&#127970;</span>Client Register</li>
                 <li class="nav-item" data-view="programmes" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('programmes')"><span class="nav-icon">&#9776;</span>Programme Ledger</li>
+                <li class="nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')" title="Caseload per Project Manager — programme counts, learner totals and data completeness, rolled up from the Programme Ledger."><span class="nav-icon">&#128100;</span>PM Tracker</li>
                 <li class="nav-item" data-view="learners" data-roles="admin,etqa,operations,demo" onclick="switchTab('learners')"><span class="nav-icon">&#9829;</span>Learners Registry</li>
                 <li class="nav-item" data-view="enrolment" data-roles="admin,etqa,demo" onclick="switchTab('enrolment')"><span class="nav-icon">&#9744;</span>Enrolment &amp; EISA</li>
                 <li class="nav-section-divider">Compliance Workflow</li>
@@ -756,6 +757,7 @@
             <div class="mobile-nav-item" data-roles="admin,pi_specialist,demo" onclick="openExternalApp('programme-initiation.html')">Prog. Initiation</div>
             <div class="mobile-nav-item" data-view="clients" data-roles="admin,project_manager,operations,demo,pi_specialist" onclick="switchTab('clients')">Clients</div>
             <div class="mobile-nav-item" data-view="programmes" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('programmes')">Programmes</div>
+            <div class="mobile-nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')">PM Tracker</div>
             <div class="mobile-nav-item" data-view="learners" data-roles="admin,etqa,operations,demo" onclick="switchTab('learners')">Learners</div>
             <div class="mobile-nav-item" data-view="enrolment" data-roles="admin,etqa,demo" onclick="switchTab('enrolment')">Enrolment</div>
             <div class="mobile-nav-item" data-view="attendance" data-roles="admin,qa_specialist,project_manager,operations,demo" onclick="switchTab('attendance')">Attendance</div>
@@ -898,6 +900,41 @@
                         <input id="pipeline-search" type="text" class="filter-input" placeholder="Filter by programme name…" style="max-width:320px;" oninput="filterPipelineCards(this.value)">
                     </div>
                     <div id="pipeline-view" style="display:none;"></div>
+                </div>
+            </section>
+
+            <!-- PM TRACKER -->
+            <section id="view-pm-tracker" class="view-panel">
+                <div class="content-container">
+                    <div class="container-header">
+                        <h2>Project Manager Tracker</h2>
+                        <span style="font-size:11px;color:var(--text-muted);">Caseload rollup, sourced from the Programme Ledger — grouped by Project Manager</span>
+                    </div>
+                    <div style="padding:16px;">
+                        <div class="metrics-grid" id="pmtracker-cards" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr));"></div>
+                    </div>
+                </div>
+                <div class="content-container">
+                    <div class="container-header">
+                        <h2 id="pmtracker-detail-title">All Project Managers</h2>
+                        <div class="container-actions">
+                            <span style="font-size:11px;color:var(--text-muted);">Showing <span id="pmtracker-showing">0</span> of <span id="pmtracker-total">0</span></span>
+                            <button class="btn btn-secondary btn-sm" onclick="exportTableCsv('pmtracker')">Export CSV</button>
+                        </div>
+                    </div>
+                    <div class="filter-bar">
+                        <div class="filter-group"><label class="filter-label">Project Manager</label><select id="filter-pmtracker-pm" class="filter-select" onchange="renderPmTrackerTable()"><option value="">All</option></select></div>
+                        <div class="filter-group"><label class="filter-label">Client</label><select id="filter-pmtracker-client" class="filter-select" onchange="renderPmTrackerTable()"><option value="">All</option></select></div>
+                        <div class="filter-group"><label class="filter-label">SETA</label><select id="filter-pmtracker-seta" class="filter-select" onchange="renderPmTrackerTable()"><option value="">All</option></select></div>
+                        <div class="filter-group"><label class="filter-label">Data quality</label><select id="filter-pmtracker-quality" class="filter-select" onchange="renderPmTrackerTable()"><option value="">All</option><option value="incomplete">Missing Qualification or dates</option></select></div>
+                        <div class="filter-group"><span class="filter-label">&nbsp;</span><button class="btn btn-secondary btn-sm" onclick="clearPmTrackerFilters()">Clear</button></div>
+                    </div>
+                    <div class="table-wrapper sticky-col">
+                        <table class="data-table" id="table-pmtracker">
+                            <thead><tr><th>Prog ID</th><th>Project Manager</th><th>Client</th><th>Qualification</th><th>Cohort</th><th>Learners</th><th>Employment</th><th>Mode</th><th>SETA</th><th>NQF</th><th>Start</th><th>End</th><th>Facilitator</th><th>Assessor</th></tr></thead>
+                            <tbody id="tbody-pmtracker"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -2921,6 +2958,7 @@ function switchTab(viewName) {
     const titles = {
         dashboard:{title:'Dashboard / Worklist',subtitle:'Live KPIs and action worklist'},
         programmes:{title:'Programme Ledger',subtitle:'Manage QCTO programmes'},
+        'pm-tracker':{title:'Project Manager Tracker',subtitle:'Caseload, learner counts and data completeness per project manager'},
         learners:{title:'Learners Registry',subtitle:'Master learner registry'},
         enrolment:{title:'Enrolment & EISA',subtitle:'Enrolments and EISA tracking'},
         monitoring:{title:'Monitoring Visits',subtitle:'KMA assessments and visit outcomes'},
@@ -2954,6 +2992,7 @@ function switchTab(viewName) {
     if (viewName === 'poe') { populatePoeProgFilter(); }
     if (viewName === 'reports') { renderReports(); }
     if (viewName === 'programmes' && pipelineActive) { renderPipelineView(); }
+    if (viewName === 'pm-tracker') { renderPmTracker(); }
     if (viewName === 'hoo') { loadHooDashboard(); startHooAutoRefresh(); }
     else { stopHooAutoRefresh(); }
     if (viewName === 'audit') { loadAuditLog(); }
@@ -6200,6 +6239,23 @@ function downloadCsv(filename, csvText) {
 }
 
 function exportTableCsv(key) {
+    if (key === 'pmtracker') {
+        const records = _pmTrackerFiltered.length ? _pmTrackerFiltered : (state.programmes || []);
+        if (!records.length) { showToast('error', 'No data to export.'); return; }
+        const cols = [
+            {header:'Prog ID',get:f=>f['Prog ID']},{header:'Project Manager',get:f=>f['Project Manager']},
+            {header:'Client',get:f=>f['Client']},{header:'Qualification',get:f=>f['Qualification']},
+            {header:'Cohort',get:f=>f['Cohort']},{header:'Learners',get:f=>f['Learners']},
+            {header:'Employment Status',get:f=>f['Employment Status']},{header:'Mode of Delivery',get:f=>f['Mode of Delivery']},
+            {header:'SETA',get:f=>f['SETA']},{header:'NQF',get:f=>f['NQF']},
+            {header:'Start Date',get:f=>f['Start Date']},{header:'End Date',get:f=>f['End Date']},
+            {header:'Facilitator',get:f=>f['Facilitator']},{header:'Assessor',get:f=>f['Assessor']},
+        ];
+        const today = new Date().toISOString().slice(0,10);
+        downloadCsv(`PM_Tracker_${today}.csv`, recordsToCsv(records, cols));
+        showToast('success', 'PM Tracker exported');
+        return;
+    }
     const stateKey = {programmes:'programmes',learners:'learners',enrolments:'enrolments',monitoring:'monitoring'}[key];
     const records = state[stateKey] || [];
     const cols = csvColumnDefs[key];
@@ -7234,6 +7290,151 @@ document.addEventListener('DOMContentLoaded', () => {
     initApp();
 });
 
+// ===================== PM TRACKER =====================
+// Reads state.programmes (already loaded for every role that can see this
+// tab — same source as the Programme Ledger). No separate table or fetch:
+// this is purely a per-Project-Manager rollup + filtered view over the
+// existing Programmes records, grouped by the free-text `fields['Project
+// Manager']` value. Nothing here writes data; it's read-only by design.
+
+let _pmTrackerFiltered = [];
+
+function pmTrackerGroups() {
+    const groups = {};
+    (state.programmes || []).forEach(r => {
+        const f = r.fields || {};
+        const pm = (f['Project Manager'] || '').trim() || 'Unassigned';
+        if (!groups[pm]) groups[pm] = [];
+        groups[pm].push(r);
+    });
+    return groups;
+}
+
+function pmTrackerIsIncomplete(f) {
+    return !f['Qualification'] || !f['Start Date'] || !f['End Date'];
+}
+
+function renderPmTracker() {
+    const groups = pmTrackerGroups();
+    const cardsEl = document.getElementById('pmtracker-cards');
+    if (!cardsEl) return;
+
+    const pmNames = Object.keys(groups).sort((a, b) => groups[b].length - groups[a].length);
+    cardsEl.innerHTML = '';
+
+    if (!pmNames.length) {
+        cardsEl.innerHTML = '<div style="grid-column:1/-1;color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No programmes yet — use Import Excel or the Programme Ledger\'s Add button. Once programmes have a Project Manager set, they\'ll roll up here.</div>';
+    }
+
+    pmNames.forEach(pm => {
+        const rows = groups[pm];
+        const learners = rows.reduce((sum, r) => sum + (parseInt((r.fields || {})['Learners'], 10) || 0), 0);
+        const clients = new Set(rows.map(r => (r.fields || {})['Client'] || '')).size;
+        const incomplete = rows.filter(r => pmTrackerIsIncomplete(r.fields || {})).length;
+        const card = document.createElement('div');
+        card.className = 'metric-card';
+        card.style.cursor = 'pointer';
+        card.setAttribute('data-pm', pm);
+        card.innerHTML = `
+            <div class="metric-header"><div class="metric-title" style="white-space:normal;">${escapeHtml(pm)}</div><div class="metric-icon">&#128100;</div></div>
+            <div class="metric-value">${rows.length}</div>
+            <div class="metric-change positive">${learners} learners · ${clients} client${clients === 1 ? '' : 's'}</div>
+            ${incomplete ? `<div class="metric-formula" style="color:var(--accent-rose);">${incomplete} row${incomplete === 1 ? '' : 's'} missing qualification/dates</div>` : `<div class="metric-formula">Data complete</div>`}
+        `;
+        card.onclick = () => {
+            document.getElementById('filter-pmtracker-pm').value = pm;
+            renderPmTrackerTable();
+            document.getElementById('table-pmtracker').scrollIntoView({behavior:'smooth', block:'start'});
+        };
+        cardsEl.appendChild(card);
+    });
+
+    // populate filter dropdowns
+    const pmSel = document.getElementById('filter-pmtracker-pm');
+    const clientSel = document.getElementById('filter-pmtracker-client');
+    const setaSel = document.getElementById('filter-pmtracker-seta');
+    const keepValue = (sel) => sel ? sel.value : '';
+    const pmKeep = keepValue(pmSel), clientKeep = keepValue(clientSel), setaKeep = keepValue(setaSel);
+    if (pmSel) {
+        pmSel.innerHTML = '<option value="">All</option>' + pmNames.map(pm => `<option value="${escapeHtml(pm)}">${escapeHtml(pm)}</option>`).join('');
+        pmSel.value = pmKeep;
+    }
+    if (clientSel) {
+        const clients = [...new Set((state.programmes || []).map(r => (r.fields || {})['Client']).filter(Boolean))].sort();
+        clientSel.innerHTML = '<option value="">All</option>' + clients.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+        clientSel.value = clientKeep;
+    }
+    if (setaSel) {
+        const setas = [...new Set((state.programmes || []).map(r => (r.fields || {})['SETA']).filter(Boolean))].sort();
+        setaSel.innerHTML = '<option value="">All</option>' + setas.map(s => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+        setaSel.value = setaKeep;
+    }
+
+    renderPmTrackerTable();
+}
+
+function renderPmTrackerTable() {
+    const pmFilter = (document.getElementById('filter-pmtracker-pm') || {}).value || '';
+    const clientFilter = (document.getElementById('filter-pmtracker-client') || {}).value || '';
+    const setaFilter = (document.getElementById('filter-pmtracker-seta') || {}).value || '';
+    const qualityFilter = (document.getElementById('filter-pmtracker-quality') || {}).value || '';
+
+    const all = state.programmes || [];
+    const filtered = all.filter(r => {
+        const f = r.fields || {};
+        const pm = (f['Project Manager'] || '').trim() || 'Unassigned';
+        if (pmFilter && pm !== pmFilter) return false;
+        if (clientFilter && f['Client'] !== clientFilter) return false;
+        if (setaFilter && f['SETA'] !== setaFilter) return false;
+        if (qualityFilter === 'incomplete' && !pmTrackerIsIncomplete(f)) return false;
+        return true;
+    });
+    _pmTrackerFiltered = filtered;
+
+    document.getElementById('pmtracker-detail-title').textContent = pmFilter ? pmFilter : 'All Project Managers';
+    document.getElementById('pmtracker-showing').textContent = filtered.length;
+    document.getElementById('pmtracker-total').textContent = all.length;
+
+    const tbody = document.getElementById('tbody-pmtracker');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="14" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No matching programmes.</td></tr>';
+        return;
+    }
+    filtered.forEach(r => {
+        const f = r.fields || {};
+        const incomplete = pmTrackerIsIncomplete(f);
+        const tr = document.createElement('tr');
+        if (incomplete) tr.style.background = 'rgba(244,63,94,0.06)';
+        tr.innerHTML = `
+            <td>${blankCellLabel(f['Prog ID'], '—')}</td>
+            <td>${escapeHtml(f['Project Manager'] || 'Unassigned')}</td>
+            <td>${escapeHtml(f['Client'] || '')}</td>
+            <td>${blankCellLabel(f['Qualification'], '— missing —')}</td>
+            <td>${escapeHtml(f['Cohort'] || '')}</td>
+            <td>${escapeHtml(f['Learners'] || '')}</td>
+            <td>${escapeHtml(f['Employment Status'] || '')}</td>
+            <td>${escapeHtml(f['Mode of Delivery'] || '')}</td>
+            <td>${escapeHtml(f['SETA'] || '')}</td>
+            <td>${escapeHtml(f['NQF'] || '')}</td>
+            <td>${blankCellLabel(f['Start Date'], '—')}</td>
+            <td>${blankCellLabel(f['End Date'], '—')}</td>
+            <td>${escapeHtml(f['Facilitator'] || '')}</td>
+            <td>${escapeHtml(f['Assessor'] || '')}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function clearPmTrackerFilters() {
+    ['filter-pmtracker-pm','filter-pmtracker-client','filter-pmtracker-seta','filter-pmtracker-quality'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
+    });
+    renderPmTrackerTable();
+}
+
 // ===================== SMART EXCEL IMPORT =====================
 
 // Field definitions for each table
@@ -7262,6 +7463,9 @@ const TABLE_FIELDS = {
             {name:'EISA End',      aliases:['eisa end','eisa end date','assessment end'],               required:false},
             {name:'Facilitator',   aliases:['facilitator','trainer','knowledge facilitator'],           required:false},
             {name:'Assessor',      aliases:['assessor','assessment officer'],                           required:false},
+            {name:'SETA',          aliases:['seta','qualification seta','name of the seta','name of seta'],required:false},
+            {name:'Mode of Delivery',aliases:['mode of delivery','delivery mode','mode'],                required:false},
+            {name:'Employment Status',aliases:['employment status','employment','learner status'],      required:false},
             {name:'Comments',      aliases:['comments','notes','remarks'],                              required:false},
         ]
     },
