@@ -7756,7 +7756,11 @@ function handleImportFile(input) {
         try {
             impWorkbook = XLSX.read(e.target.result, {type:'array', cellDates:true});
             document.getElementById('imp-file-label').textContent = '📄 ' + file.name;
-            buildSheetTabs();
+            if (isPmMasterlistWorkbook(impWorkbook)) {
+                showPmMasterlistPreview();
+            } else {
+                buildSheetTabs();
+            }
             document.getElementById('imp-step-1').style.display = 'none';
             document.getElementById('imp-step-2').style.display = 'block';
             document.getElementById('import-run-btn').disabled = false;
@@ -7765,6 +7769,234 @@ function handleImportFile(input) {
         }
     };
     reader.readAsArrayBuffer(file);
+}
+
+// ===================== PM/SME MASTERLIST — DIRECT IMPORT =====================
+// Recognizes the PM/SME Masterlist workbook shape (one sheet per Project
+// Manager, a banner + header row a few rows down, inconsistent column
+// order/names between sheets) and imports it straight into the Programme
+// Ledger — no column mapping step, no pre-normalizing in Excel first.
+const PM_MASTERLIST_SKIP_SHEETS = ['sme allocation', 'induction schedule', 'instructions', 'read me first'];
+const PM_MASTERLIST_TRAINING_SHEET = 'training completed';
+const PM_MASTERLIST_TRAINING_COLUMNS = ['Entity','Project Manager','Client','Type','Qualification','Cohort',
+    'Learners','Employment Status','Start Date','End Date','NQF','Facilitator','Assessor','SETA'];
+
+// Exact-match aliases (post-normalizeHeader) for the masterlist's verbose,
+// wording-inconsistent headers. Deliberately NOT using autoMapColumns()'s
+// substring/word-fuzzy matching here — headers like "TYPE OF LEARNING
+// PROGRAMME (SKILLS PROGRAMME/LEARNERSHIP)" and "ENTITY QUALIFICATION FALLS
+// UNDER" contain other fields' alias words as substrings (e.g. "learnership"
+// contains "learners", "...qualification falls under" contains
+// "qualification"), which silently mismaps columns under fuzzy matching.
+const PM_MASTERLIST_FIELD_ALIASES = {
+    'Entity':            ['entity qualification falls under', 'entity'],
+    'Project Manager':   ['project manager'],
+    'Client':            ['client'],
+    'Type':              ['type of learning programme (skills programme/learnership)', 'type'],
+    'Qualification':     ['qualification as per ofo code/description of the qualification'],
+    'Cohort':            ['group', 'groups'],
+    'Learners':          ['number of the learners', 'number of learners'],
+    'Employment Status': ['employment status'],
+    'Start Date':        ['actual start date of the learning programme', 'start date'],
+    'End Date':          ['end date of the learning programme', 'end date'],
+    'NQF':               ['nqf level (nqf act)', 'nqf'],
+    'Mode of Delivery':  ['mode of delivery'],
+    'Facilitator':       ['facilitator'],
+    'Assessor':          ['assessor'],
+    'SETA':              ['qualification seta', 'name of the seta'],
+    'Status':            ['status'],
+};
+
+function pmMasterlistMapColumns(headerRow) {
+    const normHeaders = headerRow.map(normalizeHeader);
+    const colIndex = {};
+    Object.entries(PM_MASTERLIST_FIELD_ALIASES).forEach(([fname, aliases]) => {
+        for (const alias of aliases) {
+            const idx = normHeaders.indexOf(alias);
+            if (idx >= 0) { colIndex[fname] = idx; return; }
+        }
+    });
+    return colIndex;
+}
+
+function pmMasterlistCellVal(v) {
+    if (v instanceof Date) return v.toISOString().slice(0,10);
+    if (v === null || v === undefined) return '';
+    return String(v).trim();
+}
+
+// A sheet "has" a header row if one of its first ~20 rows contains a cell
+// that normalizes to exactly "project manager" — mirrors how these sheets
+// are actually laid out (a merged banner, then the real header a few rows down).
+function pmMasterlistFindHeaderRow(aoa) {
+    const limit = Math.min(aoa.length, 20);
+    for (let r = 0; r < limit; r++) {
+        const row = aoa[r] || [];
+        if (row.some(cell => normalizeHeader(cell) === 'project manager')) return r;
+    }
+    return -1;
+}
+
+function isPmMasterlistWorkbook(wb) {
+    let qualifying = 0;
+    wb.SheetNames.forEach(name => {
+        const lname = name.toLowerCase().trim();
+        if (PM_MASTERLIST_SKIP_SHEETS.includes(lname)) return;
+        if (lname === PM_MASTERLIST_TRAINING_SHEET) { qualifying++; return; }
+        const aoa = XLSX.utils.sheet_to_json(wb.Sheets[name], {header:1, defval:''});
+        if (pmMasterlistFindHeaderRow(aoa) >= 0) qualifying++;
+    });
+    // Require 2+ recognized sheets so an ordinary single-sheet Programmes
+    // file (which also has a "Project Manager" column) doesn't get routed
+    // here instead of the normal column-mapping flow.
+    return qualifying >= 2;
+}
+
+let _pmMasterlistSlugSeen = {};
+function pmMasterlistSlugify(s, maxlen) {
+    return String(s || '').toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0, maxlen || 40) || 'x';
+}
+function pmMasterlistProgId(fields) {
+    const base = [pmMasterlistSlugify(fields['Project Manager'], 15),
+                  pmMasterlistSlugify(fields['Client'], 18),
+                  pmMasterlistSlugify(fields['Qualification'], 20),
+                  'g' + (fields['Cohort'] || '1')].join('-');
+    const n = _pmMasterlistSlugSeen[base] || 0;
+    _pmMasterlistSlugSeen[base] = n + 1;
+    return n === 0 ? base : base + '-' + (n + 1);
+}
+
+// Parses one sheet into an array of Programme field-objects, ready for createRecord().
+function parsePmMasterlistSheet(sheetName, wb) {
+    const lname = sheetName.toLowerCase().trim();
+    const ws = wb.Sheets[sheetName];
+    const aoa = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const records = [];
+
+    if (lname === PM_MASTERLIST_TRAINING_SHEET) {
+        // Headerless sheet, fixed column order, one row per completed programme.
+        aoa.forEach(row => {
+            if (!row || !row.some(v => pmMasterlistCellVal(v) !== '')) return;
+            const fields = {};
+            PM_MASTERLIST_TRAINING_COLUMNS.forEach((fname, i) => {
+                const val = pmMasterlistCellVal(row[i]);
+                if (val !== '') fields[fname] = val;
+            });
+            if (!fields['Client'] && !fields['Qualification']) return;
+            if (!fields['Project Manager']) fields['Project Manager'] = sheetName;
+            fields['Status'] = 'Completed';
+            if (!fields['Prog ID']) fields['Prog ID'] = pmMasterlistProgId(fields);
+            records.push(fields);
+        });
+        return records;
+    }
+
+    const hdrIdx = pmMasterlistFindHeaderRow(aoa);
+    if (hdrIdx < 0) return records;
+    const headerRow = (aoa[hdrIdx] || []).map(h => String(h || '').trim());
+    const colIndex = pmMasterlistMapColumns(headerRow);
+
+    for (let r = hdrIdx + 1; r < aoa.length; r++) {
+        const row = aoa[r] || [];
+        if (!row.some(v => pmMasterlistCellVal(v) !== '')) continue;
+        const fields = {};
+        Object.entries(colIndex).forEach(([fname, idx]) => {
+            const val = pmMasterlistCellVal(row[idx]);
+            if (val !== '') fields[fname] = val;
+        });
+        if (!fields['Client'] && !fields['Qualification']) continue;
+        if (!fields['Project Manager']) fields['Project Manager'] = sheetName;
+        if (!fields['Status']) fields['Status'] = 'Active';
+        if (!fields['Prog ID']) fields['Prog ID'] = pmMasterlistProgId(fields);
+        records.push(fields);
+    }
+    return records;
+}
+
+function showPmMasterlistPreview() {
+    document.getElementById('imp-sheet-tabs').innerHTML = '';
+    const eligible = impWorkbook.SheetNames.filter(n => !PM_MASTERLIST_SKIP_SHEETS.includes(n.toLowerCase().trim()));
+    const skipped  = impWorkbook.SheetNames.filter(n =>  PM_MASTERLIST_SKIP_SHEETS.includes(n.toLowerCase().trim()));
+
+    let html = `<div style="padding:10px 14px;background:rgba(16,185,129,0.08);border-radius:var(--radius-sm);font-size:12px;color:var(--text-secondary);margin-bottom:12px;">
+        📋 <strong>PM/SME Masterlist recognized</strong> — ${eligible.length} sheet${eligible.length!==1?'s':''} will be read and added to the Programme Ledger, whatever order their columns are in.
+    </div>`;
+    html += '<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px;">';
+    eligible.forEach(n => { html += `<span style="padding:3px 10px;background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.3);border-radius:999px;font-size:11px;color:var(--accent-emerald);">✓ ${escapeHtml(n)}</span>`; });
+    html += '</div>';
+    if (skipped.length) {
+        html += `<div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Skipped (not programme rows): ${skipped.map(escapeHtml).join(', ')}</div>`;
+    }
+    html += `<div style="padding:8px 12px;background:rgba(29,93,166,0.06);border-radius:var(--radius-sm);font-size:11px;color:var(--text-secondary);">
+        A blank Project Manager cell falls back to the sheet's tab name. Rows are <strong>added</strong> — nothing existing is deleted or overwritten.
+        <br><a href="#" onclick="buildSheetTabs();return false;" style="color:var(--accent-primary);">Map columns manually instead →</a>
+    </div>`;
+    document.getElementById('imp-col-mapping').innerHTML = html;
+    const btn = document.getElementById('import-run-btn');
+    btn.onclick = runPmMasterlistImport;
+    btn.textContent = 'Import Data';
+}
+
+async function runPmMasterlistImport() {
+    _pmMasterlistSlugSeen = {};
+    const btn = document.getElementById('import-run-btn');
+    btn.disabled = true;
+    btn.textContent = 'Importing…';
+
+    const progressDiv   = document.getElementById('import-progress');
+    const progressBar   = document.getElementById('import-progress-bar');
+    const progressLabel = document.getElementById('import-progress-label');
+    const summaryDiv    = document.getElementById('import-summary');
+    progressDiv.style.display = 'block';
+    summaryDiv.style.display  = 'none';
+
+    const eligible = impWorkbook.SheetNames.filter(n => !PM_MASTERLIST_SKIP_SHEETS.includes(n.toLowerCase().trim()));
+    const results = [];
+
+    for (let i = 0; i < eligible.length; i++) {
+        const name = eligible[i];
+        progressBar.style.width = Math.round((i / eligible.length) * 100) + '%';
+        progressLabel.textContent = `Importing "${name}"…`;
+        await new Promise(r => setTimeout(r, 30));
+        try {
+            const records = parsePmMasterlistSheet(name, impWorkbook);
+            let saved = 0;
+            for (const fields of records) {
+                try { await createRecord('Programmes', fields); saved++; }
+                catch(e) { console.warn('PM masterlist row failed:', e); }
+            }
+            results.push({sheet: name, count: saved, ok: true});
+        } catch(err) {
+            results.push({sheet: name, count: 0, ok: false, err: err.message});
+        }
+    }
+
+    progressBar.style.width = '100%';
+    progressLabel.textContent = 'Saving…';
+    saveAll();
+    await new Promise(r => setTimeout(r, 200));
+    await loadProgrammes();
+    await loadWorklists();
+
+    summaryDiv.innerHTML = `<div style="font-size:12px;font-weight:700;color:var(--text-primary);margin-bottom:8px;">Import Complete</div>` +
+        results.map(r => `<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;
+            background:${r.ok?'rgba(16,185,129,0.1)':'rgba(244,63,94,0.1)'};
+            border-radius:var(--radius-sm);margin-bottom:6px;
+            border-left:3px solid ${r.ok?'var(--accent-emerald)':'var(--accent-rose)'};">
+            <span style="font-size:16px;">${r.ok?'✅':'❌'}</span>
+            <div>
+                <div style="font-size:12px;font-weight:600;color:var(--text-primary);">${escapeHtml(r.sheet)} → Programme Ledger</div>
+                <div style="font-size:11px;color:var(--text-muted);">${r.ok ? (r.count+' rows imported') : 'Error: '+(r.err||'unknown')}</div>
+            </div></div>`).join('');
+
+    summaryDiv.style.display = 'block';
+    progressDiv.style.display = 'none';
+
+    const totalSaved = results.reduce((a, r) => a + (r.count || 0), 0);
+    btn.textContent = '✓ Close';
+    btn.disabled = false;
+    btn.onclick = () => { closeModal('import-modal'); resetImportModal(); };
+    showToast('success', `Imported ${totalSaved} programme row${totalSaved!==1?'s':''} from ${results.length} sheet${results.length!==1?'s':''}.`);
 }
 
 function buildSheetTabs() {
@@ -8161,51 +8393,67 @@ function downloadImportTemplate() {
 }
 
 // ===================== PM TRACKER: TEMPLATE + IMPORT =====================
-// A focused, single-sheet template matching the PM/SME masterlist column
-// layout (Prog ID, Project Manager, Client, SETA, Mode of Delivery,
-// Employment Status, etc). Headers are written exactly as the app's field
-// names so Smart Import auto-maps every column with no manual mapping step.
+// Mirrors the PM/SME Masterlist workbook exactly: one coloured tab per
+// Project Manager, same column set. A filled-in copy of this template is
+// recognized and imported directly by Import Excel — see
+// isPmMasterlistWorkbook() / parsePmMasterlistSheet() below, no column
+// mapping step needed.
 function downloadPmTrackerTemplate() {
     const wb = XLSX.utils.book_new();
 
-    const headers = ['Prog ID','Entity','Project Manager','Client','Type','Qualification',
-                      'NQF','Cohort','Learners','Employment Status','Mode of Delivery',
-                      'Start Date','End Date','Facilitator','Assessor','SETA','Status'];
-    const sample =   ['wendell-peterson-acme-plant-production-g1','APEXU Training','Wendell Peterson','Acme Manufacturing',
-                       'Learnership','Plant Production NQF 3','3','2026-A','20','Employed','Blended',
-                       '2026-01-15','2026-12-15','John Doe','Mary Jones','MERSETA','Active'];
+    const PM_SHEETS = [
+        {name:'Wendell',        color:'FFFF00'},
+        {name:'Nombulelo',      color:'7030A0'},
+        {name:'Faeeza Smith',   color:'FF0000'},
+        {name:'Hansie',         color:'70AD47'},
+        {name:'Amanda Majija',  color:'FFC000'},
+        {name:'Ayanda Tafeni',  color:'D9D9D9'},
+        {name:'Tia Govender',   color:'0070C0'},
+        {name:'Nancy',          color:'ED7D31'},
+    ];
 
-    const aoa = [headers, sample];
-    const ws  = XLSX.utils.aoa_to_sheet(aoa);
-    ws['!cols'] = headers.map(() => ({wch: 20}));
-    ws['!rows'] = [{hpt:22},{hpt:18}];
-    XLSX.utils.book_append_sheet(wb, ws, 'Programmes');
+    const headers = ['Entity Qualification Falls Under','PROJECT MANAGER','CLIENT',
+        'TYPE OF LEARNING PROGRAMME  (SKILLS PROGRAMME/LEARNERSHIP)',
+        'QUALIFICATION  AS PER OFO CODE/DESCRIPTION OF THE QUALIFICATION',
+        'Group','NUMBER OF THE LEARNERS','EMPLOYMENT STATUS',
+        'ACTUAL START DATE OF THE LEARNING PROGRAMME','END DATE OF THE LEARNING PROGRAMME',
+        'NQF LEVEL (NQF ACT)','Mode of Delivery','Facilitator','Assessor',
+        'Qualification SETA','Status'];
+
     if (!wb.Workbook) wb.Workbook = {Sheets:[]};
-    wb.Workbook.Sheets[0] = {TabColor:{rgb:'1B1F8A'}};
+    PM_SHEETS.forEach((pm, idx) => {
+        const ws = XLSX.utils.aoa_to_sheet([headers]);
+        ws['!cols'] = headers.map(() => ({wch: 20}));
+        ws['!rows'] = [{hpt:24}];
+        XLSX.utils.book_append_sheet(wb, ws, pm.name);
+        if (!wb.Workbook.Sheets[idx]) wb.Workbook.Sheets[idx] = {};
+        wb.Workbook.Sheets[idx].TabColor = {rgb: pm.color};
+    });
 
     const instrData = [
-        ['PM TRACKER — IMPORT TEMPLATE'],
+        ['PM/SME MASTERLIST — IMPORT TEMPLATE'],
         [''],
         ['HOW TO USE THIS TEMPLATE'],
-        ['1. Fill in one row per programme. Keep the column headers exactly as they are.'],
-        ['2. Delete the sample row (row 2) before importing.'],
-        ['3. Save as .xlsx, then go to PM Tracker → Import Excel and choose this file.'],
-        ['4. All 17 columns auto-map to the Programme Ledger — new rows are added, nothing existing is deleted or overwritten.'],
-        ['5. Already have your own SME/PM masterlist in a different layout? You can still use Import Excel — it lets you map your own columns on the next screen.'],
+        ['1. Each tab is one Project Manager — matches the layout of the SME Masterlist you already work in.'],
+        ['2. Fill in one row per programme on the relevant PM tab. Keep the column headers exactly as they are.'],
+        ['3. Leave "PROJECT MANAGER" blank on a row and it will default to that tab’s name.'],
+        ['4. Leave "Status" blank and it defaults to Active — set it to Completed, Initiated, etc. as needed.'],
+        ['5. Save as .xlsx, then go to PM Tracker → Import Excel and choose this file.'],
+        ['6. The app recognizes this multi-tab layout automatically and imports every tab in one click — no column mapping needed. New rows are added; nothing existing is deleted or overwritten.'],
+        ['7. Already keep your masterlist in this same multi-tab layout under different tab names? Import Excel accepts that too — tab names don’t have to match this list, and column order/wording can vary.'],
         [''],
         ['COLUMN GUIDE'],
-        ['Prog ID',            'Unique programme reference. Leave blank and the system will still import the row, but a Prog ID makes it easier to find later.'],
-        ['Employment Status',  'e.g. Employed / Unemployed'],
+        ['EMPLOYMENT STATUS',  'e.g. Employed / Unemployed'],
         ['Mode of Delivery',   'e.g. Contact / Blended / Distance'],
-        ['SETA',               'e.g. MERSETA, SETASA, W&RSETA'],
+        ['Qualification SETA', 'e.g. MERSETA, SERVICES SETA, MICT SETA'],
         ['Status',             'Active / Completed / Initiated'],
     ];
     const wsInstr = XLSX.utils.aoa_to_sheet(instrData);
-    wsInstr['!cols'] = [{wch:22},{wch:70}];
+    wsInstr['!cols'] = [{wch:26},{wch:75}];
     XLSX.utils.book_append_sheet(wb, wsInstr, 'Read me first');
 
-    XLSX.writeFile(wb, 'PM_Tracker_Import_Template.xlsx');
-    showToast('success', 'PM Tracker template downloaded — fill it in and use Import Excel to load it.');
+    XLSX.writeFile(wb, 'PM_Tracker_Masterlist_Template.xlsx');
+    showToast('success', 'Masterlist-style template downloaded — one tab per PM, matching your SME Masterlist.');
 }
 
 // Opens the existing Smart Import modal, reset to a clean state, so PMs can
