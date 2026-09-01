@@ -2579,8 +2579,10 @@ async function updateRecord(table, recordId, fields) {
     const stateKey  = tableToStateKey(table);
     if (!supaTable || !stateKey) return Promise.reject(new Error('Unknown table: ' + table));
 
-    // Merge with existing fields
-    const existing = state[stateKey].find(r => r.id === recordId);
+    // Merge with existing fields. Ids compare as strings — Supabase returns
+    // numeric ids in state, but onclick attributes always pass the id as a
+    // quoted string, so a strict === here would never match.
+    const existing = state[stateKey].find(r => String(r.id) === String(recordId));
     const merged   = Object.assign({}, existing ? existing.fields : {});
     Object.keys(fields).forEach(k => {
         if (fields[k] === null || fields[k] === undefined) delete merged[k];
@@ -2628,7 +2630,7 @@ async function deleteRecord(table, recordId) {
             console.error('Supabase delete error:', res.status, err);
             throw new Error('Supabase delete failed: ' + res.status);
         }
-        const idx = state[stateKey].findIndex(r => r.id === recordId);
+        const idx = state[stateKey].findIndex(r => String(r.id) === String(recordId));
         if (idx !== -1) state[stateKey].splice(idx, 1);
         saveAll();
         auditLog('DELETE', table, recordId, {});
@@ -3348,7 +3350,7 @@ async function handOverProgramme(recordId) {
     const ok = await callProgrammeStageRpc('handover_programme',
         { p_id: recordId, p_to_email: email }, 'Programme handed over to ' + email);
     if (ok) {
-        const rec = state.programmes.find(p => p.id === recordId);
+        const rec = state.programmes.find(p => String(p.id) === String(recordId));
         const label = rec?.fields?.['Prog ID'] || rec?.fields?.['Qualification'] || recordId;
         notifyAdmins('programme_handover', `${label} handed over to ${email} by ${state.currentUserEmail || state.currentUser}`);
     }
@@ -3358,7 +3360,7 @@ async function activateProgramme(recordId) {
     if (!confirm('Mark this programme as Active? This confirms you are taking it on.')) return;
     const ok = await callProgrammeStageRpc('activate_programme', { p_id: recordId }, 'Programme marked Active');
     if (ok) {
-        const rec = state.programmes.find(p => p.id === recordId);
+        const rec = state.programmes.find(p => String(p.id) === String(recordId));
         const label = rec?.fields?.['Prog ID'] || rec?.fields?.['Qualification'] || recordId;
         notifyAdmins('programme_activated', `${label} marked Active by ${state.currentUserEmail || state.currentUser}`);
     }
@@ -3368,7 +3370,7 @@ async function closeProgramme(recordId) {
     if (!confirm('Mark this programme as Closed? This is the final stage.')) return;
     const ok = await callProgrammeStageRpc('close_programme', { p_id: recordId }, 'Programme marked Closed');
     if (ok) {
-        const rec = state.programmes.find(p => p.id === recordId);
+        const rec = state.programmes.find(p => String(p.id) === String(recordId));
         const label = rec?.fields?.['Prog ID'] || rec?.fields?.['Qualification'] || recordId;
         notifyAdmins('programme_closed', `${label} marked Closed by ${state.currentUserEmail || state.currentUser}`);
     }
@@ -4907,7 +4909,7 @@ async function saveProgrammeRow(recordId) {
 }
 
 function openEditProgramme(recordId) {
-    const record = state.programmes.find(r => r.id === recordId);
+    const record = state.programmes.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error','Programme not found'); return; }
     const f = record.fields || {};
     populateClientSelects();
@@ -5096,7 +5098,7 @@ async function saveClient() {
 }
 
 function openEditClient(recordId) {
-    const record = state.clients.find(r => r.id === recordId);
+    const record = state.clients.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error','Client not found'); return; }
     const f = record.fields || {};
     document.getElementById('ec-id').value             = recordId;
@@ -5232,7 +5234,7 @@ async function saveAssessor() {
 }
 
 function openEditAssessor(recordId) {
-    const record = state.assessors.find(r => r.id === recordId);
+    const record = state.assessors.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error','Record not found'); return; }
     const f = record.fields || {};
     document.getElementById('ea-id').value     = recordId;
@@ -5447,7 +5449,7 @@ function populateEnrolmentSelects() {
 function openVisitModal(recordId) {
     populateProgrammeSelects();
     populateAssessorDatalist();
-    const record = state.monitoring.find(r => r.id === recordId);
+    const record = state.monitoring.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error','Record not found'); return; }
     const f = record.fields || {};
     currentVisitModalId = recordId;
@@ -5635,7 +5637,7 @@ function renderHealthCheck() {
 
 // ===================== PRINT-READY VISIT REPORT =====================
 function printVisitReport(recordId) {
-    const rec = state.monitoring.find(r => r.id === recordId);
+    const rec = state.monitoring.find(r => String(r.id) === String(recordId));
     if (!rec) { showToast('error', 'Visit not found'); return; }
     const f = rec.fields || {};
     const progName = pickName(f['Programme Name']) || (state.programmes.find(p => (f['Programme']||[]).includes(p.id))?.fields['Qualification'] || '');
@@ -8367,7 +8369,7 @@ async function downloadExcel(filters, onlyTables) {
 
 // ── LEARNER ──────────────────────────────────────────────────────────
 function openEditLearner(recordId) {
-    const record = state.learners.find(r => r.id === recordId);
+    const record = state.learners.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error', 'Learner not found'); return; }
     const f = record.fields || {};
     document.getElementById('el-id').value        = recordId;
@@ -8435,7 +8437,7 @@ async function saveEditLearner() {
 
 // ── ENROLMENT ────────────────────────────────────────────────────────
 function openEditEnrolment(recordId) {
-    const record = state.enrolments.find(r => r.id === recordId);
+    const record = state.enrolments.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error', 'Enrolment not found'); return; }
     const f = record.fields || {};
     document.getElementById('ee-id').value        = recordId;
@@ -8471,7 +8473,7 @@ async function saveEditEnrolment() {
 
 // ── EISA ─────────────────────────────────────────────────────────────
 function openEditEisa(recordId) {
-    const record = state.eisa.find(r => r.id === recordId);
+    const record = state.eisa.find(r => String(r.id) === String(recordId));
     if (!record) { showToast('error', 'EISA record not found'); return; }
     const f = record.fields || {};
     const learnerId = firstLinked(f, 'Learner');
