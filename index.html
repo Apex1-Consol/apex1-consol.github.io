@@ -910,6 +910,7 @@
                         <h2>Project Manager Tracker</h2>
                         <div class="container-actions">
                             <span style="font-size:11px;color:var(--text-muted);">Caseload rollup, sourced from the Programme Ledger — grouped by Project Manager</span>
+                            <button class="btn btn-gold btn-sm" data-roles="admin,project_manager,pi_specialist" onclick="openAddProgrammeFromPmTracker()">+ Add Programme</button>
                             <button class="btn btn-secondary btn-sm" onclick="downloadPmTrackerTemplate()" style="background:rgba(29,93,166,0.15);color:var(--accent-primary);border-color:var(--accent-primary);">&#128196; Download Template</button>
                             <button class="btn btn-secondary btn-sm" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo" onclick="openPmTrackerImport()" style="background:rgba(16,185,129,0.15);color:var(--accent-emerald);border-color:var(--accent-emerald);">&#128229; Import Excel</button>
                         </div>
@@ -935,7 +936,7 @@
                     </div>
                     <div class="table-wrapper sticky-col">
                         <table class="data-table" id="table-pmtracker">
-                            <thead><tr><th>Prog ID</th><th>Project Manager</th><th>Client</th><th>Qualification</th><th>Cohort</th><th>Learners</th><th>Employment</th><th>Mode</th><th>SETA</th><th>NQF</th><th>Start</th><th>End</th><th>Facilitator</th><th>Assessor</th></tr></thead>
+                            <thead><tr><th>Prog ID</th><th>Project Manager</th><th>Client</th><th>Qualification</th><th>Cohort</th><th>Learners</th><th>Employment</th><th>Mode</th><th>SETA</th><th>NQF</th><th>Start</th><th>End</th><th>Facilitator</th><th>Assessor</th><th>Actions</th></tr></thead>
                             <tbody id="tbody-pmtracker"></tbody>
                         </table>
                     </div>
@@ -3448,6 +3449,11 @@ async function loadProgrammes() {
     const progTbody = document.getElementById('tbody-programmes');
     if (progTbody) wireAutosave(progTbody, 'Programmes', loadProgrammes);
     if (pipelineActive) renderPipelineView();
+    // PM Tracker reads the same state.programmes — keep its cards/table in sync
+    // whenever a save/add/delete/stage-change happens, whether or not that tab
+    // is the one currently visible (matches Add/Edit/Del now being reachable
+    // from PM Tracker itself, not just the Programme Ledger).
+    if (typeof renderPmTracker === 'function') renderPmTracker();
     applyActionVisibility();
 }
 
@@ -5940,6 +5946,16 @@ async function saveVisitModal() {
 
 // ===================== ADD RECORD MODALS =====================
 function openAddProgrammeModal() { populateClientSelects(); populateNqfSelects(); populateAssessorDatalist(); openModal('add-programme-modal'); }
+
+// Same Add Programme modal as the Programme Ledger, opened from PM Tracker.
+// If a single Project Manager is currently selected in the PM Tracker filter,
+// pre-fill it — saves a step for the common case of a PM adding their own row.
+function openAddProgrammeFromPmTracker() {
+    openAddProgrammeModal();
+    const pmFilter = (document.getElementById('filter-pmtracker-pm') || {}).value || '';
+    const apPm = document.getElementById('ap-pm');
+    if (apPm && pmFilter) apPm.value = pmFilter;
+}
 async function saveProgramme() {
     const progId = document.getElementById('ap-progid').value.trim();
     if (!progId) { showToast('error','Prog ID is required'); return; }
@@ -7420,7 +7436,7 @@ function renderPmTrackerTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="14" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No matching programmes.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="15" style="color:var(--text-muted);padding:20px;text-align:center;font-style:italic;">No matching programmes.</td></tr>';
         return;
     }
     filtered.forEach(r => {
@@ -7443,6 +7459,11 @@ function renderPmTrackerTable() {
             <td>${blankCellLabel(f['End Date'], '—')}</td>
             <td>${escapeHtml(f['Facilitator'] || '')}</td>
             <td>${escapeHtml(f['Assessor'] || '')}</td>
+            <td style="white-space:nowrap;">
+                ${programmeStageActions(f, r.id)}
+                <button class="btn btn-gold btn-sm" onclick="openEditProgramme('${r.id}')">Edit</button>
+                <button class="btn btn-secondary btn-sm" onclick="deleteRow('Programmes','${r.id}',loadProgrammes)">Del</button>
+            </td>
         `;
         tbody.appendChild(tr);
     });
