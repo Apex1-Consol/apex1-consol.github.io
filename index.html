@@ -672,12 +672,12 @@
                 <li class="nav-section-divider">Overview</li>
                 <li class="nav-item" data-view="hoo" data-roles="head_of_ops" onclick="switchTab('hoo')"><span class="nav-icon">&#128202;</span>Consolidated View</li>
                 <li class="nav-item" data-view="dashboard" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('dashboard')"><span class="nav-icon">&#9632;</span>Dashboard / Worklist</li>
+                <li class="nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')" title="Caseload per Project Manager — programme counts, learner totals and data completeness, rolled up from the Programme Ledger."><span class="nav-icon">&#128100;</span>PM Tracker</li>
                 <li class="nav-section-divider">Programme Setup</li>
                 <li class="nav-item" data-roles="admin,pi_specialist,demo" onclick="openExternalApp('programme-initiation.html')"><span class="nav-icon">&#128203;</span>Programme Initiation</li>
                 <li class="nav-section-divider">Records</li>
                 <li class="nav-item" data-view="clients" data-roles="admin,project_manager,operations,demo,pi_specialist" onclick="switchTab('clients')"><span class="nav-icon">&#127970;</span>Client Register</li>
                 <li class="nav-item" data-view="programmes" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('programmes')"><span class="nav-icon">&#9776;</span>Programme Ledger</li>
-                <li class="nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')" title="Caseload per Project Manager — programme counts, learner totals and data completeness, rolled up from the Programme Ledger."><span class="nav-icon">&#128100;</span>PM Tracker</li>
                 <li class="nav-item" data-view="learners" data-roles="admin,etqa,operations,demo" onclick="switchTab('learners')"><span class="nav-icon">&#9829;</span>Learners Registry</li>
                 <li class="nav-item" data-view="enrolment" data-roles="admin,etqa,demo" onclick="switchTab('enrolment')"><span class="nav-icon">&#9744;</span>Enrolment &amp; EISA</li>
                 <li class="nav-section-divider">Compliance Workflow</li>
@@ -754,10 +754,10 @@
 
         <div class="mobile-nav">
             <div class="mobile-nav-item" data-view="dashboard" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('dashboard')">Dashboard</div>
+            <div class="mobile-nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')">PM Tracker</div>
             <div class="mobile-nav-item" data-roles="admin,pi_specialist,demo" onclick="openExternalApp('programme-initiation.html')">Prog. Initiation</div>
             <div class="mobile-nav-item" data-view="clients" data-roles="admin,project_manager,operations,demo,pi_specialist" onclick="switchTab('clients')">Clients</div>
             <div class="mobile-nav-item" data-view="programmes" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('programmes')">Programmes</div>
-            <div class="mobile-nav-item" data-view="pm-tracker" data-roles="admin,qa_specialist,project_manager,demo,pi_specialist" onclick="switchTab('pm-tracker')">PM Tracker</div>
             <div class="mobile-nav-item" data-view="learners" data-roles="admin,etqa,operations,demo" onclick="switchTab('learners')">Learners</div>
             <div class="mobile-nav-item" data-view="enrolment" data-roles="admin,etqa,demo" onclick="switchTab('enrolment')">Enrolment</div>
             <div class="mobile-nav-item" data-view="attendance" data-roles="admin,qa_specialist,project_manager,operations,demo" onclick="switchTab('attendance')">Attendance</div>
@@ -1501,6 +1501,9 @@
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">SAQA ID</span><input id="ap-saqa" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">NQF Level</span><select id="ap-nqf" class="filter-select" style="width:100%;"></select></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Learners</span><input id="ap-learners" class="filter-input" type="number" min="0" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Employment Status</span><select id="ap-employment" class="filter-select" style="width:100%;"><option value="">-</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option></select></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Mode of Delivery</span><select id="ap-mode" class="filter-select" style="width:100%;"><option value="">-</option><option value="Face to Face">Face to Face</option><option value="Online">Online</option><option value="Blended">Blended</option></select></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">SETA</span><input id="ap-seta" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Status</span><select id="ap-status" class="filter-select" style="width:100%;"><option value="Active">Active</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option><option value="Completed">Completed</option></select></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Accreditation End Date</span><input id="ap-accred" class="filter-input" type="date" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">EISA Start</span><input id="ap-eisastart" class="filter-input" type="date" style="width:100%;"></div>
@@ -1541,6 +1544,9 @@
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">NQF Level</span><select id="ep-nqf" class="filter-select" style="width:100%;"></select></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Cohort</span><input id="ep-cohort" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Learners</span><input id="ep-learners" class="filter-input" type="number" min="0" style="width:100%;"></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Employment Status</span><select id="ep-employment" class="filter-select" style="width:100%;"><option value="">-</option><option value="Employed">Employed</option><option value="Unemployed">Unemployed</option></select></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Mode of Delivery</span><select id="ep-mode" class="filter-select" style="width:100%;"><option value="">-</option><option value="Face to Face">Face to Face</option><option value="Online">Online</option><option value="Blended">Blended</option></select></div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">SETA</span><input id="ep-seta" class="filter-input" type="text" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Status</span><select id="ep-status" class="filter-select" style="width:100%;"><option value="Active">Active</option><option value="Completed">Completed</option><option value="Suspended">Suspended</option><option value="Cancelled">Cancelled</option></select></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Start Date</span><input id="ep-start" class="filter-input" type="date" style="width:100%;"></div>
         <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">End Date</span><input id="ep-end" class="filter-input" type="date" style="width:100%;"></div>
@@ -4919,6 +4925,9 @@ function openEditProgramme(recordId) {
     document.getElementById('ep-nqf').value         = f['NQF']                          || '';
     document.getElementById('ep-cohort').value      = f['Cohort']                       || '';
     document.getElementById('ep-learners').value    = f['Learners']                     || '';
+    document.getElementById('ep-employment').value  = f['Employment Status']            || '';
+    document.getElementById('ep-mode').value        = f['Mode of Delivery']             || '';
+    document.getElementById('ep-seta').value        = f['SETA']                         || '';
     document.getElementById('ep-status').value      = f['Status']                       || 'Active';
     document.getElementById('ep-start').value       = f['Start Date']                   || '';
     document.getElementById('ep-end').value         = f['End Date']                     || '';
@@ -4950,6 +4959,9 @@ async function saveEditProgramme() {
         'NQF':                           document.getElementById('ep-nqf').value         || '',
         'Cohort':                        document.getElementById('ep-cohort').value      || '',
         'Learners':                      numOrNull(document.getElementById('ep-learners').value),
+        'Employment Status':             document.getElementById('ep-employment').value  || '',
+        'Mode of Delivery':              document.getElementById('ep-mode').value        || '',
+        'SETA':                          document.getElementById('ep-seta').value        || '',
         'Status':                        document.getElementById('ep-status').value      || 'Active',
         'Start Date':                    document.getElementById('ep-start').value       || null,
         'End Date':                      document.getElementById('ep-end').value         || null,
@@ -5937,6 +5949,9 @@ async function saveProgramme() {
         'SAQA ID': document.getElementById('ap-saqa').value,
         'NQF': document.getElementById('ap-nqf').value,
         'Learners': numOrNull(document.getElementById('ap-learners').value),
+        'Employment Status': document.getElementById('ap-employment').value,
+        'Mode of Delivery': document.getElementById('ap-mode').value,
+        'SETA': document.getElementById('ap-seta').value,
         'Status': document.getElementById('ap-status').value,
         'Accreditation Period End Date': document.getElementById('ap-accred').value || null,
         'EISA Start': document.getElementById('ap-eisastart').value || null,
