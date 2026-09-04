@@ -501,7 +501,13 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 /* ATTENDANCE PILLS */
 .att-p{display:inline-block;width:28px;text-align:center;background:var(--success-bg);color:var(--success);border:1px solid #9FE1CB;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
 .att-a{display:inline-block;width:28px;text-align:center;background:var(--danger-bg);color:var(--danger);border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
-.att-r{display:inline-block;width:28px;text-align:center;background:#FFF0F0;color:#9B1C1C;border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
+/* Resigned used to share Absent's red family (#FFF0F0/#9B1C1C vs Absent's
+   var(--danger-bg)/var(--danger)) — close enough in hue to be hard to tell
+   apart at a glance in the register/legend. Switched to the brand navy
+   (var(--navy), same blue used for --gradFrom/--gradMid and the "In
+   progress" module-status tag) so it reads as its own status, not a shade
+   of Absent. */
+.att-r{display:inline-block;width:28px;text-align:center;background:#E8ECF5;color:var(--navy);border:1px solid #B9C6DE;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
 .att-na{display:inline-block;width:28px;text-align:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:4px;font-size:7.5pt;font-weight:500;padding:2px 0;cursor:pointer}
 td.att-cell{text-align:center;padding:6px 4px}
 /* ATTENDANCE THRESHOLD */
@@ -4403,16 +4409,25 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const CIRC=2*Math.PI*50;
   function arcSeg(offset,count,total){return total>0?(count/total*CIRC):0;}
   let flaggedModules=0;
+  // Per-module learner count for the Programme Timeline badge below — a
+  // module whose dates are in the past reads as "Completed" from modStatus()
+  // alone, even when learners are still sitting at NYC on that module (the
+  // Module N stat cards a few rows up already show this via "N competent ·
+  // N NYC", so a plain green "Completed" next to that read as contradicting
+  // it). Reuses the same per-learner classification as buildCohortSummary's
+  // modCards so the two numbers can't drift apart.
+  const nycCountByModule={};
   displayModuleNums(activeProgramme).forEach(m=>{
-    let anyNYC=false;
+    let anyNYC=false,nycCount=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
       const ek=`${l.id}_m${m}`;
       const ov=narratives._eisa||{};
       const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
       const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-      if(vals.some(v=>v==='NYC'))anyNYC=true;
+      if(vals.some(v=>v==='NYC')){anyNYC=true;nycCount++;}
     });
+    nycCountByModule[m]=nycCount;
     if(anyNYC)flaggedModules++;
   });
   const nCount=pLearners.length;
@@ -4498,9 +4513,22 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
           <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">Programme timeline</div>
           ${timelineMods.length?`<div style="display:flex;flex-direction:column;gap:10px">${timelineMods.map(m=>{
-            const st=MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'};
+            const modNyc=nycCountByModule[m.n]||0;
+            // A module whose facilitation dates have passed but still has
+            // learners at NYC isn't done in the sense the plain green
+            // "Completed" label implies — show the outstanding count instead
+            // of hiding it, in the same amber used for "Upcoming" elsewhere
+            // on this page.
+            // Spelled out rather than the internal "NYC" shorthand (used
+            // elsewhere in the report, e.g. the stat cards above) — this
+            // badge is small and easy to read in isolation, so it should
+            // make sense to a client without them having to know that
+            // abbreviation.
+            const st=(m.status==='done'&&modNyc>0)
+              ?{label:`Completed · ${modNyc} outstanding`,fg:'#8A5A00'}
+              :(MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'});
             const pct=m.status==='done'?100:m.status==='current'?55:0;
-            const barCol=m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
+            const barCol=(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
             return`<div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                 <span style="font-size:10.5px;color:#1E2533;font-weight:600">Module ${m.n}</span>
