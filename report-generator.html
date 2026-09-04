@@ -4744,7 +4744,16 @@ function hexMix(a,b,t){
 function modStatus(datesStr){
   try{
     if(!datesStr) return null;
-    const parts=datesStr.split(/[–-]/).map(s=>s.trim()).filter(Boolean);
+    // Split on any dash-like separator, not just en dash/hyphen — a date range
+    // typed or pasted in (Excel/Word smart punctuation, mobile keyboards, etc.)
+    // can just as easily land as an em dash (—), figure dash, or minus sign.
+    // Previously only "–"/"-" matched, so e.g. "11 Mar 26 — 29 Jun 26" (em dash)
+    // silently failed to split into 2 parts, modStatus() returned null, and
+    // both the Programme Timeline bar/badge AND the Overview page's status
+    // badge went blank for that module — even though the Overview page's
+    // KM/PM/WM progress bars (computed independently of this date parsing)
+    // kept showing real completion data, making the two look out of sync.
+    const parts=datesStr.split(/[‐‑‒–—―−-]/).map(s=>s.trim()).filter(Boolean);
     if(parts.length<2) return null;
     let startStr=parts[0],endStr=parts[parts.length-1];
     // Year token off the end date's trailing digits — accepts a full 4-digit
