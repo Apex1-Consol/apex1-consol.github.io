@@ -177,6 +177,12 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   border-radius:2px;
   position:relative;overflow:hidden;
 }
+/* Landscape variant (currently only the Attendance Register — see
+   buildAttendancePage/pageShell) — swaps A4 portrait for A4 landscape so
+   a page with many session-date columns has ~40% more width before
+   columns start getting clipped by the page edge. Screen-only sizing;
+   the matching print/@page override lives in each print-CSS block below. */
+.report-page.landscape{width:297mm}
 
 /* COVER PAGE */
 .cover-page{
@@ -896,6 +902,11 @@ tr.att-below-threshold td:first-child{border-left:3px solid #C8272C}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
@@ -4206,10 +4217,10 @@ function generateReport(skipChecklistGate){
 }
 
 // ── PAGE BUILDERS ──
-function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML){
+function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
   const p=activeProvider||PROVIDERS.apex;
   const div=document.createElement('div');
-  div.className='report-page content-page';
+  div.className=landscape?'report-page content-page landscape':'report-page content-page';
   div.style.borderTop=`4px solid ${p.accentFrom}`;
   div.innerHTML=`
     <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
@@ -5226,7 +5237,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
       <span class="att-na">N/A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Not Applicable</span>
       <span class="att-r">R</span><span style="font-size:8pt;color:var(--muted);align-self:center">Resigned</span>
     </div>`;
-  return pageShell(pn,0,activeClient.client_name,'Attendance Register',body);
+  return pageShell(pn,0,activeClient.client_name,'Attendance Register',body,true);
 }
 
 function makeAttPageWrap(pLearners,attDates,pn=4){
@@ -7312,6 +7323,11 @@ ${styleNodes}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
@@ -7514,6 +7530,11 @@ ${styleNodes}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
