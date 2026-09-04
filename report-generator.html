@@ -2899,11 +2899,107 @@ let programmeNotes=[]; // [{id,type,content,created_at}] — fetched from progra
       const o=document.createElement('option');
       o.value=`${m} ${yr}`;
       o.textContent=`${m} ${yr}`;
+      o.dataset.base=o.textContent;
       sel.appendChild(o);
     });
   });
 })();
 document.getElementById('sel-month').addEventListener('change',()=>{if(activeProgramme&&activeClient)generateReport();updateStepsGuide();});
+
+// ── Auto-select the Reporting Month that actually needs a report ──
+// The dropdown used to always start blank and force the PM to know which
+// month they were up to. It now still works exactly the same way if they
+// pick a month themselves, but as soon as a programme is chosen we look at
+// what's already been submitted (reports.reports) or drafted (reports.drafts)
+// for that programme and jump straight to the earliest month in its active
+// window that still needs attention — a month kicked back with
+// "needs_changes" first, otherwise the earliest month with no report at all.
+// If every month already has a report in flight, the dropdown is left as-is
+// (blank, or whatever the PM already had selected) rather than guessing.
+let programmeReportStatus={}; // {"Month Year": {status?, hasDraft?}} for the active programme
+function _reportStatusSuffix(info){
+  if(!info)return'';
+  if(info.status==='needs_changes')return' — changes requested';
+  if(info.status==='approved')return' — approved';
+  if(info.status==='sent_to_client')return' — sent';
+  if(info.status==='archived')return' — archived';
+  if(info.status==='pending')return' — pending review';
+  if(info.hasDraft)return' — draft saved';
+  return'';
+}
+function decorateMonthOptions(){
+  const sel=document.getElementById('sel-month');
+  if(!sel)return;
+  [...sel.options].forEach(o=>{
+    if(!o.value)return;
+    const base=o.dataset.base||o.textContent;
+    o.dataset.base=base;
+    o.textContent=base+_reportStatusSuffix(programmeReportStatus[o.value]);
+  });
+}
+const _AUTO_MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function _programmeMonthWindow(prog){
+  // Earliest module start date through the later of (latest module end date,
+  // today) — every month the programme has actually been running is a
+  // candidate, including the current month even if modules run past it.
+  if(!prog)return null;
+  const ranges=[1,2,3,4,5].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
+  if(!ranges.length)return null;
+  const start=new Date(Math.min(...ranges.map(r=>r.start)));
+  const latestEnd=new Date(Math.max(...ranges.map(r=>r.end)));
+  const now=new Date();
+  const end=latestEnd>now?latestEnd:now;
+  if(isNaN(start)||isNaN(end))return null;
+  return{start,end};
+}
+function _monthsInWindow(win){
+  if(!win)return[];
+  const out=[];
+  let y=win.start.getFullYear(),m=win.start.getMonth();
+  const endY=win.end.getFullYear(),endM=win.end.getMonth();
+  let guard=0;
+  while((y<endY||(y===endY&&m<=endM))&&guard++<60){
+    out.push(`${_AUTO_MONTH_NAMES[m]} ${y}`);
+    m++; if(m>11){m=0;y++;}
+  }
+  return out;
+}
+async function fetchProgrammeReportStatus(pid){
+  programmeReportStatus={};
+  if(!isOnline||!pid)return;
+  try{
+    const [rep,dr]=await Promise.all([
+      sb('reports',`select=month,status&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=printed_at.desc&limit=100`),
+      sb('drafts',`select=month&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=saved_at.desc&limit=100`).catch(()=>[])
+    ]);
+    rep.forEach(r=>{ if(!programmeReportStatus[r.month])programmeReportStatus[r.month]={status:r.status||'pending'}; });
+    dr.forEach(d=>{
+      if(!programmeReportStatus[d.month])programmeReportStatus[d.month]={hasDraft:true};
+      else programmeReportStatus[d.month].hasDraft=true;
+    });
+  }catch(e){console.warn('Report status fetch failed:',e.message);}
+}
+function _pickAutoMonth(prog){
+  const months=_monthsInWindow(_programmeMonthWindow(prog));
+  if(!months.length)return null;
+  const needsChanges=months.find(m=>programmeReportStatus[m]?.status==='needs_changes');
+  if(needsChanges)return needsChanges;
+  const neverSent=months.find(m=>!programmeReportStatus[m]||!programmeReportStatus[m].status);
+  return neverSent||null;
+}
+function autoSelectReportMonth(){
+  const sel=document.getElementById('sel-month');
+  if(!sel||!activeProgramme)return;
+  decorateMonthOptions();
+  if(sel.value)return; // already has a month (user pick, or an earlier step) — don't override it
+  const target=_pickAutoMonth(activeProgramme);
+  if(!target)return; // everything in the active window already has a report — leave blank
+  const opt=[...sel.options].find(o=>o.value===target);
+  if(!opt)return;
+  sel.value=target;
+  if(activeClient)generateReport();
+  updateStepsGuide();
+}
 
 // ── Provider config ──
 const PROVIDERS={
@@ -3458,6 +3554,8 @@ async function onProgrammeChange(){
   learners=[];enrolments=[];attendance=[];eisa=[];
   attState={};eisaState={};remoteComments={};_eisaUndoStack=[];
   _eisaUndoBtnSync();
+  programmeReportStatus={};
+  decorateMonthOptions(); // clear any decoration left over from the previous programme while the new one loads
 
   if(isOnline){
     try{
@@ -3509,6 +3607,11 @@ async function onProgrammeChange(){
       // an earlier failed init() call, since the badge is otherwise only
       // updated by init() and the browser's online/offline events.
       setStatus(true,'Ready');
+      // Which month actually needs a report? Decorate the dropdown with each
+      // month's status and jump straight to it, rather than leaving the PM to
+      // remember where they left off.
+      await fetchProgrammeReportStatus(pid);
+      autoSelectReportMonth();
     }catch(e){
       // Offline or error — fall through to cached/demo state
       console.warn('Programme load failed:',e.message);
@@ -3888,15 +3991,40 @@ function _downloadCSV(filename,rows){
 function _templateFilenamePart(){
   return(activeProgramme&&activeProgramme.programme_name||'programme').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,60)||'programme';
 }
+// Pulls each roster learner's CURRENTLY SAVED Module N results out of
+// eisaState (loaded from the public.eisa table — see buildEisaState),
+// applying the same narratives._eisa override lookup used everywhere else
+// EISA values are read, so a not-yet-synced local edit is reflected too.
+// Shared by downloadEisaTemplate() and loadCurrentEisaValues() so the
+// downloaded CSV and the in-app "Load Current Values" button can't disagree
+// about what's currently on file.
+function eisaCurrentRows(modNum,roster){
+  const ov=narratives._eisa||{};
+  return roster.map(l=>{
+    const res=(eisaState[l.id]||{})[modNum]||{};
+    const ek=`${l.id}_m${modNum}`;
+    const ov_v=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
+    return{
+      id:l.id_number||'',name:`${l.first_name||''} ${l.last_name||''}`.trim(),
+      km:ov_v('km',res.km),pm:ov_v('pm',res.pm),wm:ov_v('wm',res.wm),
+      examv1:ov_v('examv1',res.examv1),examv1_pct:ov_v('examv1_pct',res.examv1_pct),
+      examv2:ov_v('examv2',res.examv2),examv2_pct:ov_v('examv2_pct',res.examv2_pct),
+    };
+  });
+}
 function downloadEisaTemplate(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
   const modNum=+document.getElementById('eisa-paste-mod').value||1;
   const roster=getProgrammeLearners();
   if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  // Pre-filled with whatever's already saved for this module, not blank —
+  // editing only the cells that actually changed is far less error-prone
+  // than retyping a whole roster's results from scratch or from memory.
+  const current=eisaCurrentRows(modNum,roster);
   const rows=[['ID Number','KM','PM','WM','Exam V1','Exam V1%','Exam V2','Exam V2%','Date','Learner (reference only — do not paste this column)']];
-  roster.forEach(l=>rows.push([l.id_number||'','','','','','','','','',`${l.first_name||''} ${l.last_name||''}`.trim()]));
+  current.forEach(r=>rows.push([r.id,r.km,r.pm,r.wm,r.examv1,r.examv1_pct,r.examv2,r.examv2_pct,'',r.name]));
   _downloadCSV(`EISA_template_module${modNum}_${_templateFilenamePart()}.csv`,rows);
-  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''} — pre-filled with current saved results`,'success');
 }
 function downloadAttTemplate(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
@@ -13827,7 +13955,7 @@ async function runExportWithFilter(){
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Module</label>
-          <select id="eisa-paste-mod" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 14px;color:#fff;font-family:var(--font);font-size:10pt;outline:none;color-scheme:dark">
+          <select id="eisa-paste-mod" onchange="loadCurrentEisaValues()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 14px;color:#fff;font-family:var(--font);font-size:10pt;outline:none;color-scheme:dark">
             <option value="1">Module 1</option>
             <option value="2">Module 2</option>
             <option value="3">Module 3</option>
@@ -13835,7 +13963,8 @@ async function runExportWithFilter(){
           </select>
         </div>
         <div style="display:flex;flex-direction:column;gap:5px;justify-content:flex-end">
-          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="downloadEisaTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers for the selected module">⬇ Download Template</button>
+          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="loadCurrentEisaValues()" title="Reload the paste box with what's currently saved for this module — discards anything typed here that hasn't been applied">↺ Reload Current Values</button>
+          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="downloadEisaTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers and current saved results for the selected module">⬇ Download Template</button>
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:5px">
           <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
@@ -14178,13 +14307,33 @@ function commitUsPaste(){
 // ── Bulk EISA Paste ──
 let _eisaPasteRows=[];
 
+// Fills the paste box with what's ALREADY on file for the selected module
+// (via eisaCurrentRows — same source as downloadEisaTemplate) instead of a
+// blank textarea, then re-parses so the preview shows it immediately. This
+// is the "auto-populate from the database" default: a PM editing here is
+// changing a handful of results, not retyping the whole roster, so having
+// the correct starting values already in place is what actually reduces
+// transcription-error risk — a blank box only invites re-keying everything.
+function loadCurrentEisaValues(){
+  if(!activeProgramme)return;
+  const modNum=+document.getElementById('eisa-paste-mod').value||1;
+  const roster=getProgrammeLearners();
+  if(!roster.length){
+    document.getElementById('eisa-paste-area').value='';
+    parseEisaPaste();
+    return;
+  }
+  const current=eisaCurrentRows(modNum,roster);
+  const lines=['ID Number\tKM\tPM\tWM\tExam V1\tExam V1%\tExam V2\tExam V2%\tDate'];
+  current.forEach(r=>lines.push([r.id||r.name,r.km,r.pm,r.wm,r.examv1,r.examv1_pct,r.examv2,r.examv2_pct,''].join('\t')));
+  document.getElementById('eisa-paste-area').value=lines.join('\n');
+  parseEisaPaste();
+}
 function openEisaPaste(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
-  document.getElementById('eisa-paste-area').value='';
-  document.getElementById('eisa-paste-preview').innerHTML='<div id="eisa-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
-  document.getElementById('eisa-paste-summary').textContent='—';
   document.getElementById('eisa-paste-commit').disabled=true;
   _eisaPasteRows=[];
+  loadCurrentEisaValues();
   const m=document.getElementById('eisa-paste-modal');
   m.style.display='flex';
 }
