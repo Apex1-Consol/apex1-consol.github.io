@@ -1077,6 +1077,20 @@ body.compact-density .progress-bar-wrap{height:6px}
 .dash-alert-icon{font-size:11pt;flex-shrink:0}
 .dash-alert-text{flex:1}
 .dash-alert-action{font-size:7.5pt;opacity:.7;white-space:nowrap}
+.dash-alert-band{border:1px solid rgba(255,255,255,.08);border-radius:var(--r);overflow:hidden;background:rgba(255,255,255,.02)}
+.dash-alert-band summary{
+  list-style:none;display:flex;align-items:center;gap:9px;cursor:pointer;
+  padding:10px 16px;font-size:8pt;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:rgba(255,255,255,.6);
+}
+.dash-alert-band summary::-webkit-details-marker{display:none}
+.dash-band-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.dash-band-dot.danger{background:#f87171}
+.dash-band-dot.warn{background:#fbbf24}
+.dash-band-dot.info{background:#a5b4fc}
+.dash-band-count{font-weight:400;text-transform:none;letter-spacing:0;color:rgba(255,255,255,.35);font-size:7.5pt}
+.dash-band-chev{margin-left:auto;font-size:7pt;color:rgba(255,255,255,.35);transition:transform .15s}
+.dash-alert-band[open] .dash-band-chev{transform:rotate(90deg)}
+.dash-band-items{display:flex;flex-direction:column;gap:8px;padding:0 12px 12px}
 .dash-rs-badge{display:inline-flex;align-items:center;gap:4px;border-radius:4px;font-size:7pt;font-weight:700;padding:2px 7px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
 .dash-rs-approved{background:rgba(27,122,74,.15);color:#4ade80;border:1px solid rgba(74,222,128,.2)}
 .dash-rs-pending{background:rgba(234,179,8,.12);color:#fcd34d;border:1px solid rgba(234,179,8,.25)}
@@ -10327,11 +10341,24 @@ async function renderDashboard(){
     </div>`:''}`;
 
   // ── Alerts strip ──
+  // Bands, worst-first: critical (overdue / changes requested) and warning (due soon /
+  // low attendance) start open; info (nothing wrong yet, just outstanding) starts closed,
+  // since on a busy tenant it's usually the longest list and rarely the reason someone opened
+  // the dashboard.
   if(alertsEl){
-    const alerts=[];
-    // Overdue reports
+    const bands={critical:[],warning:[],info:[]};
+    // De-duplicate defensively by programme id — a programme can otherwise be pushed into the
+    // shared `programmes` array more than once (e.g. via adminLoadReport/pmLoadReport fetching
+    // a programme that was already loaded), which would show the same alert twice.
+    const seenProgIds=new Set();
+    const uniqueProgrammes=programmes.filter(p=>{
+      if(seenProgIds.has(p.id))return false;
+      seenProgIds.add(p.id);
+      return true;
+    });
+    // Overdue / due-soon reports
     const today=new Date(); today.setHours(0,0,0,0);
-    programmes.forEach(p=>{
+    uniqueProgrammes.forEach(p=>{
       if(!p.report_due_date)return;
       const due=new Date(p.report_due_date); due.setHours(0,0,0,0);
       const daysLeft=Math.round((due-today)/(1000*60*60*24));
@@ -10340,13 +10367,13 @@ async function renderDashboard(){
       if(isApproved)return;
       const cid=p.client_id;
       if(daysLeft<0){
-        alerts.push(`<div class="dash-alert danger" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
+        bands.critical.push(`<div class="dash-alert danger" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
           <span class="dash-alert-icon">🚨</span>
           <span class="dash-alert-text"><strong>${esc(p.programme_name)}</strong> — report overdue by <strong>${Math.abs(daysLeft)} day${Math.abs(daysLeft)===1?'':'s'}</strong></span>
           <span class="dash-alert-action">Open →</span>
         </div>`);
       } else if(daysLeft<=7){
-        alerts.push(`<div class="dash-alert warn" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
+        bands.warning.push(`<div class="dash-alert warn" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
           <span class="dash-alert-icon">⏰</span>
           <span class="dash-alert-text"><strong>${esc(p.programme_name)}</strong> — report due in <strong>${daysLeft} day${daysLeft===1?'':'s'}</strong></span>
           <span class="dash-alert-action">Open →</span>
@@ -10354,13 +10381,13 @@ async function renderDashboard(){
       }
     });
     // Programmes with low attendance
-    programmes.forEach(p=>{
+    uniqueProgrammes.forEach(p=>{
       const att=attByProg[p.id];
       if(att&&att.t>0){
         const pct=Math.round(att.p/att.t*100);
         if(pct<ATT_THRESHOLD){
           const cid=p.client_id;
-          alerts.push(`<div class="dash-alert warn" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
+          bands.warning.push(`<div class="dash-alert warn" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
             <span class="dash-alert-icon">⚠️</span>
             <span class="dash-alert-text"><strong>${esc(p.programme_name)}</strong> — attendance at <strong>${pct}%</strong>, below ${ATT_THRESHOLD}% threshold</span>
             <span class="dash-alert-action">Open →</span>
@@ -10370,23 +10397,23 @@ async function renderDashboard(){
     });
     // Reports needing changes (PM view)
     if(!IS_ADMIN&&needsChanges>0){
-      alerts.push(`<div class="dash-alert danger" onclick="openHistoryPanel()" title="Click to open History">
+      bands.critical.push(`<div class="dash-alert danger" onclick="openHistoryPanel()" title="Click to open History">
         <span class="dash-alert-icon">↩</span>
-        <span class="dash-alert-text"><strong>${needsChanges} report${needsChanges>1?'s':''}</strong> have changes requested by Admin — open the programme to view feedback</span>
+        <span class="dash-alert-text"><strong>${needsChanges} report${needsChanges>1?'s':''}</strong> ${needsChanges>1?'have':'has'} changes requested by Admin — open the programme to view feedback</span>
         <span class="dash-alert-action">Open →</span>
       </div>`);
     }
     // No report printed this month (PM view)
-    if(!IS_ADMIN&&programmes.length){
+    if(!IS_ADMIN&&uniqueProgrammes.length){
       const curMonth=new Date().toLocaleString('en-ZA',{month:'long',year:'numeric'});
       // reportRows is ordered desc; build a set of programme_ids that have a report this month
       const reportedThisMonth=new Set(
         reportRows.filter(r=>r.month===curMonth).map(r=>r.programme_id)
       );
-      programmes.forEach(p=>{
+      uniqueProgrammes.forEach(p=>{
         if(!reportedThisMonth.has(p.id)){
           const cid=p.client_id;
-          alerts.push(`<div class="dash-alert info" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
+          bands.info.push(`<div class="dash-alert info" onclick="dashGoTo(${cid},${p.id})" title="Click to open">
             <span class="dash-alert-icon">📄</span>
             <span class="dash-alert-text"><strong>${esc(p.programme_name)}</strong> — no report printed for <strong>${curMonth}</strong></span>
             <span class="dash-alert-action">Open →</span>
@@ -10396,13 +10423,30 @@ async function renderDashboard(){
     }
     // Reports pending review (Admin view)
     if(IS_ADMIN&&pendingReviews>0){
-      alerts.push(`<div class="dash-alert info" onclick="openHistoryPanel()">
+      bands.info.push(`<div class="dash-alert info" onclick="openHistoryPanel()">
         <span class="dash-alert-icon">📋</span>
         <span class="dash-alert-text"><strong>${pendingReviews} report${pendingReviews>1?'s':''}</strong> pending your review</span>
         <span class="dash-alert-action">Open review queue →</span>
       </div>`);
     }
-    alertsEl.innerHTML=alerts.join('');
+
+    const totalAlerts=bands.critical.length+bands.warning.length+bands.info.length;
+    if(totalAlerts===0){
+      alertsEl.innerHTML='';
+    }else{
+      const band=(key,label,dotClass,openByDefault)=>{
+        const items=bands[key];
+        if(!items.length)return '';
+        return `<details class="dash-alert-band"${openByDefault?' open':''}>
+          <summary><span class="dash-band-dot ${dotClass}"></span>${label}<span class="dash-band-count">${items.length}</span><span class="dash-band-chev">▶</span></summary>
+          <div class="dash-band-items">${items.join('')}</div>
+        </details>`;
+      };
+      alertsEl.innerHTML=
+        band('critical','Critical','danger',true)+
+        band('warning','Warning','warn',true)+
+        band('info','Outstanding','info',false);
+    }
   }
 
   // ── Programme table ──
@@ -11418,7 +11462,7 @@ async function adminLoadReport(reportRecord){
   if(!prog&&reportRecord.programme_id){
     try{
       const rows=await sb('programmes',`select=*&id=eq.${reportRecord.programme_id}&limit=1`);
-      if(rows&&rows[0]){prog=rows[0];programmes.push(prog);}
+      if(rows&&rows[0]){prog=rows[0];if(!programmes.find(x=>x.id===prog.id))programmes.push(prog);}
     }catch(e){console.warn('adminLoadReport: programme fetch failed',e.message);}
   }
 
@@ -11484,7 +11528,7 @@ async function pmLoadReport(reportRecord){
   if(!prog&&reportRecord.programme_id){
     try{
       const rows=await sb('programmes',`select=*&id=eq.${reportRecord.programme_id}&limit=1`);
-      if(rows&&rows[0]){prog=rows[0];programmes.push(prog);}
+      if(rows&&rows[0]){prog=rows[0];if(!programmes.find(x=>x.id===prog.id))programmes.push(prog);}
     }catch(e){console.warn('pmLoadReport: programme fetch failed',e.message);}
   }
 
