@@ -4860,7 +4860,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     const fieldMap=moduleFieldMap(modNums);
     return{num:n,cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
       qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null,
-      applies:legacy?null:moduleAppliesTypes(prog,n)};
+      hasUnits:modUnits.length>0,applies:legacy?null:moduleAppliesTypes(prog,n)};
   });
   let body=`
     <div class="sec-header"><div class="sec-accent" style="background:${p.accentFrom}"></div>
@@ -4893,7 +4893,22 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         return `<div class="mod-formsum"><span>${label}</span><b>${done}/${total}</b></div><div class="fs-bar"><div class="fs-bar-fill" style="width:${pct}%;background:${barColor(pct)}"></div></div>`;
       };
       let progressHtml='';
-      if(m.qp&&m.qp.total>0){
+      // m.qp.total/m.lp.total are the cohort size (pLearners.length), not a
+      // count of registered unit standards — computeQctoModuleProgress and
+      // computeLegacyModuleProgress tally against every enrolled learner
+      // regardless of whether this module has any unit standards imported
+      // yet. So total>0 alone doesn't mean there's anything real to report:
+      // a module with zero registered unit standards (e.g. one just
+      // restored via "Restore Module N" and never configured) still had
+      // total===pLearners.length, and moduleAppliesTypes() itself defaults
+      // to {km:true,pm:true,wm:true} when it finds no unit standards to
+      // read types from (see moduleAppliesTypes) — so the card showed
+      // fabricated "KM 0/21 · PM 0/21 · WM 0/21" bars next to the
+      // placeholder "KM-0N · PM-0N · WM-0N" unit text, implying real
+      // assessment tracking that doesn't exist. Gate on m.hasUnits so a
+      // module with no unit standards registered shows only the "Add
+      // dates"/placeholder state, not invented progress.
+      if(m.hasUnits&&m.qp&&m.qp.total>0){
         // Only show a KM/PM/WM bar for the types this module's registered unit
         // standards actually carry (moduleAppliesTypes) — a KM-only module (e.g.
         // Module 1 with just KM01/KM02) was previously always showing PM 0/x and
@@ -4902,7 +4917,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         // on the Assessment page below (which already filters correctly).
         const ap=m.applies||{km:true,pm:true,wm:true};
         progressHtml=`<div class="mod-formsum-wrap">${ap.km?bar('KM',m.qp.km,m.qp.total):''}${ap.pm?bar('PM',m.qp.pm,m.qp.total):''}${ap.wm?bar('WM',m.qp.wm,m.qp.total):''}</div>`;
-      } else if(m.lp&&m.lp.total>0){
+      } else if(m.hasUnits&&m.lp&&m.lp.total>0){
         progressHtml=`<div class="mod-formsum-wrap">${bar('Form',m.lp.fDone,m.lp.total)}${bar('Sum',m.lp.sDone,m.lp.total)}</div>`;
       }
       return `
