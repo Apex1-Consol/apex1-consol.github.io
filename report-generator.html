@@ -2018,7 +2018,24 @@ body.compact-density .progress-bar-wrap{height:6px}
       #steps-guide .step-item.done .step-label{color:rgba(255,255,255,.85)}
       #steps-guide .step-item.active .step-dot{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
       #steps-guide .step-item.active .step-label{color:#fff;font-weight:700}
+
+      /* Concept 2 (toolbar restructure test): segmented progress meter + active-field highlight */
+      .filter-meter{display:flex;gap:4px;margin:0 0 12px}
+      .filter-meter .fm-seg{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.08);transition:background .15s}
+      .filter-meter .fm-seg.filled{background:var(--success,#1B7A4A)}
+      .filter-meter .fm-seg.active{background:var(--gold2,#F0C040)}
+      .controls-grid{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--r,8px);padding:16px}
+      .controls-grid .field-wrap{position:relative}
+      .controls-grid .field-wrap:not(:last-of-type)::after{content:"";position:absolute;top:2px;bottom:2px;right:-9px;width:1px;background:rgba(255,255,255,.08)}
+      .controls-grid .field-wrap.active-cell{outline:1px solid rgba(240,192,64,.35);outline-offset:7px;border-radius:var(--r,8px)}
+      .controls-grid .field-wrap.active-cell .field-label{color:var(--gold2,#F0C040)}
     </style>
+    <div class="filter-meter" id="filter-meter">
+      <div class="fm-seg" data-seg="provider"></div>
+      <div class="fm-seg" data-seg="client"></div>
+      <div class="fm-seg" data-seg="programme"></div>
+      <div class="fm-seg" data-seg="month"></div>
+    </div>
   <div class="controls-grid">
     <div class="field-wrap">
       <label class="field-label">Provider</label>
@@ -2935,6 +2952,22 @@ function updateStepsGuide(){
       else if(key===nextStep)el.classList.add('active');
     }
   });
+  // Concept 2 test: segmented meter + active-field highlight for the scope bar (provider/client/programme/month)
+  const meter=document.getElementById('filter-meter');
+  if(meter){
+    meter.querySelectorAll('.fm-seg').forEach(seg=>{
+      const key=seg.dataset.seg;
+      seg.classList.remove('filled','active');
+      if(states[key])seg.classList.add('filled');
+      else if(key===nextStep)seg.classList.add('active');
+    });
+  }
+  const barFieldIds={provider:'sel-provider',client:'sel-client',programme:'sel-programme',month:'sel-month'};
+  document.querySelectorAll('.controls-grid > .field-wrap').forEach(fw=>fw.classList.remove('active-cell'));
+  if(nextStep&&barFieldIds[nextStep]){
+    const wrap=document.getElementById(barFieldIds[nextStep])?.closest('.field-wrap');
+    if(wrap)wrap.classList.add('active-cell');
+  }
 }
 function onProviderChange(){
   const val=document.getElementById('sel-provider').value;
