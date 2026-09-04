@@ -177,6 +177,12 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   border-radius:2px;
   position:relative;overflow:hidden;
 }
+/* Landscape variant (currently only the Attendance Register — see
+   buildAttendancePage/pageShell) — swaps A4 portrait for A4 landscape so
+   a page with many session-date columns has ~40% more width before
+   columns start getting clipped by the page edge. Screen-only sizing;
+   the matching print/@page override lives in each print-CSS block below. */
+.report-page.landscape{width:297mm}
 
 /* COVER PAGE */
 .cover-page{
@@ -223,7 +229,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;
 }
 .cover-field label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
-.cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}.cover-field.full{grid-column:1/-1}
+.cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}
 .cover-footer{
   padding:20px 48px;
   display:flex;align-items:center;justify-content:space-between;
@@ -495,7 +501,13 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 /* ATTENDANCE PILLS */
 .att-p{display:inline-block;width:28px;text-align:center;background:var(--success-bg);color:var(--success);border:1px solid #9FE1CB;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
 .att-a{display:inline-block;width:28px;text-align:center;background:var(--danger-bg);color:var(--danger);border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
-.att-r{display:inline-block;width:28px;text-align:center;background:#FFF0F0;color:#9B1C1C;border:1px solid #F7C1C1;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
+/* Resigned used to share Absent's red family (#FFF0F0/#9B1C1C vs Absent's
+   var(--danger-bg)/var(--danger)) — close enough in hue to be hard to tell
+   apart at a glance in the register/legend. Switched to the brand navy
+   (var(--navy), same blue used for --gradFrom/--gradMid and the "In
+   progress" module-status tag) so it reads as its own status, not a shade
+   of Absent. */
+.att-r{display:inline-block;width:28px;text-align:center;background:#E8ECF5;color:var(--navy);border:1px solid #B9C6DE;border-radius:4px;font-size:7.5pt;font-weight:700;padding:2px 0;cursor:pointer}
 .att-na{display:inline-block;width:28px;text-align:center;background:var(--surface);color:var(--muted);border:1px solid var(--border);border-radius:4px;font-size:7.5pt;font-weight:500;padding:2px 0;cursor:pointer}
 td.att-cell{text-align:center;padding:6px 4px}
 /* ATTENDANCE THRESHOLD */
@@ -896,6 +908,11 @@ tr.att-below-threshold td:first-child{border-left:3px solid #C8272C}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
@@ -1958,6 +1975,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     </div>
   </div>
   <div class="topbar-right">
+    <a class="btn btn-ghost" href="index.html" style="font-size:8.5pt;padding:9px 14px;text-decoration:none" title="Return to the ApexOne hub">&#8592; Back to Hub</a>
     <div id="status-dot"></div>
     <span id="status-txt">Loading…</span>
     <span id="queue-badge" title="Writes pending — will sync when online">⏳ <span id="queue-count">0</span> queued</span>
@@ -1982,6 +2000,7 @@ body.compact-density .progress-bar-wrap{height:6px}
 <!-- Mobile nav drawer -->
 <div id="mob-nav-overlay" class="mob-nav-overlay" onclick="_mobMenuClose()"></div>
 <div id="mob-nav-drawer">
+  <a class="mob-nav-item" href="index.html" style="text-decoration:none;display:block">&#8592; Back to Hub</a>
   <button class="mob-nav-item" onclick="_mobMenuClose();showDashboard()">📊 Dashboard</button>
   <button class="mob-nav-item" onclick="_mobMenuClose();openImportModal()">📥 Import Excel</button>
   <button class="mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">📊 Import LMS Report</button>
@@ -2033,7 +2052,24 @@ body.compact-density .progress-bar-wrap{height:6px}
       #steps-guide .step-item.done .step-label{color:rgba(255,255,255,.85)}
       #steps-guide .step-item.active .step-dot{background:rgba(255,255,255,.18);color:#fff;box-shadow:0 0 0 2px rgba(255,255,255,.15)}
       #steps-guide .step-item.active .step-label{color:#fff;font-weight:700}
+
+      /* Concept 2 (toolbar restructure test): segmented progress meter + active-field highlight */
+      .filter-meter{display:flex;gap:4px;margin:0 0 12px}
+      .filter-meter .fm-seg{flex:1;height:3px;border-radius:3px;background:rgba(255,255,255,.08);transition:background .15s}
+      .filter-meter .fm-seg.filled{background:var(--success,#1B7A4A)}
+      .filter-meter .fm-seg.active{background:var(--gold2,#F0C040)}
+      .controls-grid{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.08);border-radius:var(--r,8px);padding:16px}
+      .controls-grid .field-wrap{position:relative}
+      .controls-grid .field-wrap:not(:last-of-type)::after{content:"";position:absolute;top:2px;bottom:2px;right:-9px;width:1px;background:rgba(255,255,255,.08)}
+      .controls-grid .field-wrap.active-cell{outline:1px solid rgba(240,192,64,.35);outline-offset:7px;border-radius:var(--r,8px)}
+      .controls-grid .field-wrap.active-cell .field-label{color:var(--gold2,#F0C040)}
     </style>
+    <div class="filter-meter" id="filter-meter">
+      <div class="fm-seg" data-seg="provider"></div>
+      <div class="fm-seg" data-seg="client"></div>
+      <div class="fm-seg" data-seg="programme"></div>
+      <div class="fm-seg" data-seg="month"></div>
+    </div>
   <div class="controls-grid">
     <div class="field-wrap">
       <label class="field-label">Provider</label>
@@ -2880,11 +2916,107 @@ let programmeNotes=[]; // [{id,type,content,created_at}] — fetched from progra
       const o=document.createElement('option');
       o.value=`${m} ${yr}`;
       o.textContent=`${m} ${yr}`;
+      o.dataset.base=o.textContent;
       sel.appendChild(o);
     });
   });
 })();
 document.getElementById('sel-month').addEventListener('change',()=>{if(activeProgramme&&activeClient)generateReport();updateStepsGuide();});
+
+// ── Auto-select the Reporting Month that actually needs a report ──
+// The dropdown used to always start blank and force the PM to know which
+// month they were up to. It now still works exactly the same way if they
+// pick a month themselves, but as soon as a programme is chosen we look at
+// what's already been submitted (reports.reports) or drafted (reports.drafts)
+// for that programme and jump straight to the earliest month in its active
+// window that still needs attention — a month kicked back with
+// "needs_changes" first, otherwise the earliest month with no report at all.
+// If every month already has a report in flight, the dropdown is left as-is
+// (blank, or whatever the PM already had selected) rather than guessing.
+let programmeReportStatus={}; // {"Month Year": {status?, hasDraft?}} for the active programme
+function _reportStatusSuffix(info){
+  if(!info)return'';
+  if(info.status==='needs_changes')return' — changes requested';
+  if(info.status==='approved')return' — approved';
+  if(info.status==='sent_to_client')return' — sent';
+  if(info.status==='archived')return' — archived';
+  if(info.status==='pending')return' — pending review';
+  if(info.hasDraft)return' — draft saved';
+  return'';
+}
+function decorateMonthOptions(){
+  const sel=document.getElementById('sel-month');
+  if(!sel)return;
+  [...sel.options].forEach(o=>{
+    if(!o.value)return;
+    const base=o.dataset.base||o.textContent;
+    o.dataset.base=base;
+    o.textContent=base+_reportStatusSuffix(programmeReportStatus[o.value]);
+  });
+}
+const _AUTO_MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function _programmeMonthWindow(prog){
+  // Earliest module start date through the later of (latest module end date,
+  // today) — every month the programme has actually been running is a
+  // candidate, including the current month even if modules run past it.
+  if(!prog)return null;
+  const ranges=[1,2,3,4,5].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
+  if(!ranges.length)return null;
+  const start=new Date(Math.min(...ranges.map(r=>r.start)));
+  const latestEnd=new Date(Math.max(...ranges.map(r=>r.end)));
+  const now=new Date();
+  const end=latestEnd>now?latestEnd:now;
+  if(isNaN(start)||isNaN(end))return null;
+  return{start,end};
+}
+function _monthsInWindow(win){
+  if(!win)return[];
+  const out=[];
+  let y=win.start.getFullYear(),m=win.start.getMonth();
+  const endY=win.end.getFullYear(),endM=win.end.getMonth();
+  let guard=0;
+  while((y<endY||(y===endY&&m<=endM))&&guard++<60){
+    out.push(`${_AUTO_MONTH_NAMES[m]} ${y}`);
+    m++; if(m>11){m=0;y++;}
+  }
+  return out;
+}
+async function fetchProgrammeReportStatus(pid){
+  programmeReportStatus={};
+  if(!isOnline||!pid)return;
+  try{
+    const [rep,dr]=await Promise.all([
+      sb('reports',`select=month,status&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=printed_at.desc&limit=100`),
+      sb('drafts',`select=month&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=saved_at.desc&limit=100`).catch(()=>[])
+    ]);
+    rep.forEach(r=>{ if(!programmeReportStatus[r.month])programmeReportStatus[r.month]={status:r.status||'pending'}; });
+    dr.forEach(d=>{
+      if(!programmeReportStatus[d.month])programmeReportStatus[d.month]={hasDraft:true};
+      else programmeReportStatus[d.month].hasDraft=true;
+    });
+  }catch(e){console.warn('Report status fetch failed:',e.message);}
+}
+function _pickAutoMonth(prog){
+  const months=_monthsInWindow(_programmeMonthWindow(prog));
+  if(!months.length)return null;
+  const needsChanges=months.find(m=>programmeReportStatus[m]?.status==='needs_changes');
+  if(needsChanges)return needsChanges;
+  const neverSent=months.find(m=>!programmeReportStatus[m]||!programmeReportStatus[m].status);
+  return neverSent||null;
+}
+function autoSelectReportMonth(){
+  const sel=document.getElementById('sel-month');
+  if(!sel||!activeProgramme)return;
+  decorateMonthOptions();
+  if(sel.value)return; // already has a month (user pick, or an earlier step) — don't override it
+  const target=_pickAutoMonth(activeProgramme);
+  if(!target)return; // everything in the active window already has a report — leave blank
+  const opt=[...sel.options].find(o=>o.value===target);
+  if(!opt)return;
+  sel.value=target;
+  if(activeClient)generateReport();
+  updateStepsGuide();
+}
 
 // ── Provider config ──
 const PROVIDERS={
@@ -2950,6 +3082,22 @@ function updateStepsGuide(){
       else if(key===nextStep)el.classList.add('active');
     }
   });
+  // Concept 2 test: segmented meter + active-field highlight for the scope bar (provider/client/programme/month)
+  const meter=document.getElementById('filter-meter');
+  if(meter){
+    meter.querySelectorAll('.fm-seg').forEach(seg=>{
+      const key=seg.dataset.seg;
+      seg.classList.remove('filled','active');
+      if(states[key])seg.classList.add('filled');
+      else if(key===nextStep)seg.classList.add('active');
+    });
+  }
+  const barFieldIds={provider:'sel-provider',client:'sel-client',programme:'sel-programme',month:'sel-month'};
+  document.querySelectorAll('.controls-grid > .field-wrap').forEach(fw=>fw.classList.remove('active-cell'));
+  if(nextStep&&barFieldIds[nextStep]){
+    const wrap=document.getElementById(barFieldIds[nextStep])?.closest('.field-wrap');
+    if(wrap)wrap.classList.add('active-cell');
+  }
 }
 function onProviderChange(){
   const val=document.getElementById('sel-provider').value;
@@ -3423,6 +3571,8 @@ async function onProgrammeChange(){
   learners=[];enrolments=[];attendance=[];eisa=[];
   attState={};eisaState={};remoteComments={};_eisaUndoStack=[];
   _eisaUndoBtnSync();
+  programmeReportStatus={};
+  decorateMonthOptions(); // clear any decoration left over from the previous programme while the new one loads
 
   if(isOnline){
     try{
@@ -3432,7 +3582,7 @@ async function onProgrammeChange(){
         `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`
       );
       // Unpack: enrolments array with nested learner object
-      enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status}));
+      enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
       learners=enrolled.map(e=>e.learner).filter(Boolean);
 
       const [att,ei,lc]=await Promise.all([
@@ -3474,6 +3624,11 @@ async function onProgrammeChange(){
       // an earlier failed init() call, since the badge is otherwise only
       // updated by init() and the browser's online/offline events.
       setStatus(true,'Ready');
+      // Which month actually needs a report? Decorate the dropdown with each
+      // month's status and jump straight to it, rather than leaving the PM to
+      // remember where they left off.
+      await fetchProgrammeReportStatus(pid);
+      autoSelectReportMonth();
     }catch(e){
       // Offline or error — fall through to cached/demo state
       console.warn('Programme load failed:',e.message);
@@ -3562,8 +3717,11 @@ function saveNarratives(showToast=false){
   // Start from the in-memory narratives store so fields accepted while their
   // textarea wasn't mounted in the DOM (e.g. via the Draft-all wizard) are
   // still persisted, then let any live DOM values override with the freshest edits.
-  DA_KEYS.forEach(k=>{if(narratives[k]!==undefined)data[k]=narratives[k];});
+  daKeys().forEach(k=>{if(narratives[k]!==undefined)data[k]=narratives[k];});
   document.querySelectorAll('[data-nar]').forEach(el=>{data[el.dataset.nar]=el.value;});
+  // "No classes held this month" flag (see setNoClasses/buildAttendanceRegisterPage) —
+  // not a daKeys() field or a [data-nar] textarea, so it needs its own persist line.
+  if(narratives.no_classes!==undefined)data.no_classes=narratives.no_classes===true||narratives.no_classes==='true';
   // survey
   const sv={};
   // Only record the checked element per question (store column name, not boolean)
@@ -3770,6 +3928,48 @@ function _throttle(fn,ms){
   };
 }
 function getAssessor(id){return assessors.find(a=>a.id===id)?.full_name||'—';}
+// ── Learner termination status ──────────────────────────────────────────────
+// Tracked on the enrolment row (per-programme, so a learner terminated on one
+// programme can still be active on another): status ('active'|'terminated')
+// plus, when terminated, which module they left in (enrolments.fields.
+// terminated_module). Works the same for QCTO/occupational and Legacy quals —
+// it's a property of the enrolment, not of the qualification type.
+function _findEnrolment(learnerId){
+  if(!activeProgramme)return null;
+  return enrolments.find(e=>String(e.learner_id)===String(learnerId)&&String(e.programme_id)===String(activeProgramme.id))||null;
+}
+function isLearnerTerminated(learnerId){
+  const e=_findEnrolment(learnerId);
+  return!!e&&e.status==='terminated';
+}
+function getLearnerTerminatedModule(learnerId){
+  const e=_findEnrolment(learnerId);
+  const m=e&&e.fields&&e.fields.terminated_module;
+  return m?+m:null;
+}
+async function setLearnerTermination(learnerId,terminated,moduleNum){
+  const e=_findEnrolment(learnerId);
+  if(!e)return;
+  e.status=terminated?'terminated':'active';
+  e.fields={...(e.fields||{})};
+  if(terminated)e.fields.terminated_module=moduleNum?+moduleNum:null;
+  else delete e.fields.terminated_module;
+  const payload={status:e.status,fields:e.fields};
+  if(isOnline&&!isTempId(e.id)){
+    try{await sbPatch('enrolments',e.id,payload);showSaved();}
+    catch(err){
+      console.warn('Learner status patch failed:',err?.message);
+      enqueueWrite('patch','enrolments',payload,e.id);
+      updateQueueBadge();
+      toast('Change queued for retry when online','warn');
+      showSaved();
+    }
+  } else if(isOnline){showSaved();}
+  else{toast('Offline — change queued for sync','info',3000);}
+  _lastGenKey=null;
+  generateReport(true);
+  updateProgressPanel();
+}
 function getProgrammeLearners(){
   // learners is already scoped to the selected programme via join fetch in the normal
   // switch-programme flow — but after a multi-programme import, `learners` and `enrolments`
@@ -3784,6 +3984,90 @@ function getProgrammeLearners(){
   getProgrammeLearners._c={k,v};
   return v;
 }
+
+// ── Bulk paste "Download Template" helpers ──
+// PMs often have nothing to paste yet — these give them a starting point:
+// a CSV pre-filled with every enrolled learner's ID number (and name, for
+// reference) in the exact column order the matching paste box expects, so
+// they can fill in results/attendance offline in Excel and paste the whole
+// thing back in.
+function _downloadCSV(filename,rows){
+  const escCell=v=>{
+    v=String(v==null?'':v);
+    return /[",\n\r]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;
+  };
+  const csv=rows.map(r=>r.map(escCell).join(',')).join('\r\n');
+  const blob=new Blob(['﻿'+csv],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;a.download=filename;
+  document.body.appendChild(a);a.click();
+  document.body.removeChild(a);
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+function _templateFilenamePart(){
+  return(activeProgramme&&activeProgramme.programme_name||'programme').replace(/[^a-z0-9]+/gi,'_').replace(/^_+|_+$/g,'').slice(0,60)||'programme';
+}
+// Pulls each roster learner's CURRENTLY SAVED Module N results out of
+// eisaState (loaded from the public.eisa table — see buildEisaState),
+// applying the same narratives._eisa override lookup used everywhere else
+// EISA values are read, so a not-yet-synced local edit is reflected too.
+// Shared by downloadEisaTemplate() and loadCurrentEisaValues() so the
+// downloaded CSV and the in-app "Load Current Values" button can't disagree
+// about what's currently on file.
+function eisaCurrentRows(modNum,roster){
+  const ov=narratives._eisa||{};
+  return roster.map(l=>{
+    const res=(eisaState[l.id]||{})[modNum]||{};
+    const ek=`${l.id}_m${modNum}`;
+    const ov_v=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
+    return{
+      id:l.id_number||'',name:`${l.first_name||''} ${l.last_name||''}`.trim(),
+      km:ov_v('km',res.km),pm:ov_v('pm',res.pm),wm:ov_v('wm',res.wm),
+      examv1:ov_v('examv1',res.examv1),examv1_pct:ov_v('examv1_pct',res.examv1_pct),
+      examv2:ov_v('examv2',res.examv2),examv2_pct:ov_v('examv2_pct',res.examv2_pct),
+    };
+  });
+}
+function downloadEisaTemplate(){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  const modNum=+document.getElementById('eisa-paste-mod').value||1;
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  // Pre-filled with whatever's already saved for this module, not blank —
+  // editing only the cells that actually changed is far less error-prone
+  // than retyping a whole roster's results from scratch or from memory.
+  const current=eisaCurrentRows(modNum,roster);
+  const rows=[['ID Number','KM','PM','WM','Exam V1','Exam V1%','Exam V2','Exam V2%','Date','Learner (reference only — do not paste this column)']];
+  current.forEach(r=>rows.push([r.id,r.km,r.pm,r.wm,r.examv1,r.examv1_pct,r.examv2,r.examv2_pct,'',r.name]));
+  _downloadCSV(`EISA_template_module${modNum}_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''} — pre-filled with current saved results`,'success');
+}
+function downloadAttTemplate(){
+  if(!activeProgramme){toast('Load a report first','warn');return;}
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  const existing=getAttDates();
+  const dateCols=existing.length?existing:['YYYY-MM-DD'];
+  const rows=[['ID Number',...dateCols,'Learner (reference only — do not paste this column)']];
+  roster.forEach(l=>rows.push([l.id_number||'',...dateCols.map(()=>''),`${l.first_name||''} ${l.last_name||''}`.trim()]));
+  _downloadCSV(`Attendance_template_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+}
+function downloadUsTemplate(){
+  if(!activeProgramme||!_usPasteModNum){toast('Open a module\'s Bulk Paste first','warn');return;}
+  const roster=getProgrammeLearners();
+  if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
+  const headerCols=['ID Number','Formative','Summative','Logbook','Learner (reference only — do not paste this column)'];
+  const rows=[headerCols];
+  roster.forEach(l=>{
+    const blanks=headerCols.slice(1,-1).map(()=>'');
+    rows.push([l.id_number||'',...blanks,`${l.first_name||''} ${l.last_name||''}`.trim()]);
+  });
+  _downloadCSV(`UnitStandards_module${_usPasteModNum}_${_templateFilenamePart()}.csv`,rows);
+  toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
+}
+
 function getAttDates(){
   const dates=new Set();
   Object.values(attState).forEach(d=>Object.keys(d).forEach(k=>dates.add(normDateKey(k))));
@@ -4084,10 +4368,10 @@ function generateReport(skipChecklistGate){
 }
 
 // ── PAGE BUILDERS ──
-function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML){
+function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
   const p=activeProvider||PROVIDERS.apex;
   const div=document.createElement('div');
-  div.className='report-page content-page';
+  div.className=landscape?'report-page content-page landscape':'report-page content-page';
   div.style.borderTop=`4px solid ${p.accentFrom}`;
   div.innerHTML=`
     <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
@@ -4126,26 +4410,19 @@ function computeCoverStats(pLearners,prog){
   });
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
   const modNums=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))];
-  let flaggedModules=0;const flaggedLearnerIds=new Set();
+  let flagged=0;
   const legacy=isLegacyProgramme(prog);
   if(legacy){
-    // Legacy: a "module" (unit-standard grouping) is flagged if any learner has
-    // been marked Not Yet Achieved on any unit standard within that group.
-    const unitsByMod={};
-    unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).forEach(u=>{
-      const m=u.mod||1;
-      (unitsByMod[m]=unitsByMod[m]||[]).push(u);
-    });
+    // Legacy: a module is flagged if any learner has been marked Not Yet on
+    // that module's Formative or Summative assessment (tracked per module,
+    // not per unit standard — see legacyFormativeValue/legacySummativeValue).
     modNums.forEach(m=>{
-      const units=unitsByMod[m]||[];
       let anyNYC=false;
       pLearners.forEach(l=>{
-        units.forEach(u=>{
-          const ov=narratives._eisa||{};
-          if(ov[usFormativeKey(l.id,u.id)]==='NYC'||ov[usSummativeKey(l.id,u.id)]==='NYC'){anyNYC=true;flaggedLearnerIds.add(l.id);}
-        });
+        const ov=narratives._eisa||{};
+        if(legacyFormativeValue(ov,l.id,m)==='NYC'||legacySummativeValue(ov,l.id,m)==='NYC')anyNYC=true;
       });
-      if(anyNYC)flaggedModules++;
+      if(anyNYC)flagged++;
     });
   } else {
     modNums.forEach(m=>{
@@ -4156,12 +4433,12 @@ function computeCoverStats(pLearners,prog){
         const ov=narratives._eisa||{};
         const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
         const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-        if(vals.some(v=>v==='NYC')){anyNYC=true;flaggedLearnerIds.add(l.id);}
+        if(vals.some(isEisaOutstanding))anyNYC=true;
       });
-      if(anyNYC)flaggedModules++;
+      if(anyNYC)flagged++;
     });
   }
-  return{avgAtt,flaggedLearners:flaggedLearnerIds.size,flaggedModules,onTrack:Math.max(0,totalMods-flaggedModules),totalMods};
+  return{avgAtt,flagged,onTrack:Math.max(0,totalMods-flagged),totalMods};
 }
 
 function buildCoverPage(prog,client,month){
@@ -4219,7 +4496,7 @@ function buildCoverPage(prog,client,month){
               <div class="cover-stat-label">Modules On Track</div>
             </div>
             <div class="cover-stat" style="background:${p.gradFrom}0C">
-              <div class="cover-stat-num" style="color:${p.gradFrom}">${stats.flaggedLearners}</div>
+              <div class="cover-stat-num" style="color:${p.gradFrom}">${stats.flagged}</div>
               <div class="cover-stat-label">Flagged NYC</div>
             </div>
           </div>
@@ -4230,7 +4507,7 @@ function buildCoverPage(prog,client,month){
           <div class="cover-field"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
           <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
           <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
-          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div>
         </div>
       </div>
     </div>
@@ -4267,8 +4544,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   });
   const totalFlags=highRiskCount+medRiskCount+belowThresholdCount;
   // Module timeline — reuses modStatus()/MOD_STATUS_STYLE already used on the Overview page.
-  const fieldMap=moduleFieldMap(allModuleNums(activeProgramme));
-  const timelineMods=allModuleNums(activeProgramme).map(n=>{
+  const fieldMap=moduleFieldMap(displayModuleNums(activeProgramme));
+  const timelineMods=displayModuleNums(activeProgramme).map(n=>{
     const dates=activeProgramme[fieldMap[n]]||'';
     const st=dates?modStatus(dates):null;
     return{n,dates,status:st};
@@ -4277,16 +4554,25 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const CIRC=2*Math.PI*50;
   function arcSeg(offset,count,total){return total>0?(count/total*CIRC):0;}
   let flaggedModules=0;
-  allModuleNums(activeProgramme).forEach(m=>{
-    let anyNYC=false;
+  // Per-module learner count for the Programme Timeline badge below — a
+  // module whose dates are in the past reads as "Completed" from modStatus()
+  // alone, even when learners are still sitting at NYC on that module (the
+  // Module N stat cards a few rows up already show this via "N competent ·
+  // N NYC", so a plain green "Completed" next to that read as contradicting
+  // it). Reuses the same per-learner classification as buildCohortSummary's
+  // modCards so the two numbers can't drift apart.
+  const nycCountByModule={};
+  displayModuleNums(activeProgramme).forEach(m=>{
+    let anyNYC=false,nycCount=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
       const ek=`${l.id}_m${m}`;
       const ov=narratives._eisa||{};
       const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
       const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-      if(vals.some(v=>v==='NYC'))anyNYC=true;
+      if(vals.some(isEisaOutstanding)){anyNYC=true;nycCount++;}
     });
+    nycCountByModule[m]=nycCount;
     if(anyNYC)flaggedModules++;
   });
   const nCount=pLearners.length;
@@ -4299,17 +4585,20 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   let usEarnedCredits=0,usTotalCredits=0,usPct=null;
   if(legacy){
     // ── Unit standards credit progress ──
-    // Achieved = Formative AND Summative both 'C' for that learner+unit
-    // (same rule as buildLegacyAssessmentPages' per-module credit total).
+    // Achieved = Formative AND Summative both 'C' for that learner+module
+    // (tracked per module, not per unit standard — same rule as
+    // buildLegacyAssessmentPages' per-module credit total).
     const legacyUnits=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
     const ov=narratives._eisa||{};
+    const creditsByMod={};
+    legacyUnits.forEach(u=>{const m=u.mod||1;creditsByMod[m]=(creditsByMod[m]||0)+(+u.credits||0);});
     const perLearnerCredits=legacyUnits.reduce((s,u)=>s+(+u.credits||0),0);
     usTotalCredits=perLearnerCredits*nCount;
     pLearners.forEach(l=>{
-      legacyUnits.forEach(u=>{
-        const fv=ov[usFormativeKey(l.id,u.id)]||'';
-        const sv=ov[usSummativeKey(l.id,u.id)]||'';
-        if(fv==='C'&&sv==='C')usEarnedCredits+=(+u.credits||0);
+      Object.keys(creditsByMod).forEach(m=>{
+        const fv=legacyFormativeValue(ov,l.id,m)||'';
+        const sv=legacySummativeValue(ov,l.id,m)||'';
+        if(fv==='C'&&sv==='C')usEarnedCredits+=creditsByMod[m];
       });
     });
     usPct=usTotalCredits>0?Math.round(usEarnedCredits/usTotalCredits*100):null;
@@ -4369,9 +4658,22 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
           <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">Programme timeline</div>
           ${timelineMods.length?`<div style="display:flex;flex-direction:column;gap:10px">${timelineMods.map(m=>{
-            const st=MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'};
+            const modNyc=nycCountByModule[m.n]||0;
+            // A module whose facilitation dates have passed but still has
+            // learners at NYC isn't done in the sense the plain green
+            // "Completed" label implies — show the outstanding count instead
+            // of hiding it, in the same amber used for "Upcoming" elsewhere
+            // on this page.
+            // Spelled out rather than the internal "NYC" shorthand (used
+            // elsewhere in the report, e.g. the stat cards above) — this
+            // badge is small and easy to read in isolation, so it should
+            // make sense to a client without them having to know that
+            // abbreviation.
+            const st=(m.status==='done'&&modNyc>0)
+              ?{label:`Completed · ${modNyc} outstanding`,fg:'#8A5A00'}
+              :(MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'});
             const pct=m.status==='done'?100:m.status==='current'?55:0;
-            const barCol=m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
+            const barCol=(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
             return`<div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                 <span style="font-size:10.5px;color:#1E2533;font-weight:600">Module ${m.n}</span>
@@ -4420,19 +4722,19 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
           </div>`:`<div style="font-size:10px;color:#94A3B8">No risk flags raised for this reporting period.</div>`}
         </div>
       </div>
-      ${legacy?`
       <div class="exec-visual-row" style="display:grid;grid-template-columns:118px 1fr;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
         <div style="text-align:center;padding-top:2px">
           <svg viewBox="0 0 120 120" width="90" height="90" style="margin:0 auto;display:block">
             <circle cx="60" cy="60" r="50" fill="none" stroke="#F1F5F9" stroke-width="10"/>
-            ${usPct!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${usPct>=80?'#1B7A4A':usPct>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(usPct/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
-            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${usPct!==null?usPct+'%':'—'}</text>
-            <text x="60" y="73" text-anchor="middle" font-size="6.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">UNIT STANDARDS</text>
+            ${(legacy?usPct:eisaCompletedPct)!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${(legacy?usPct:eisaCompletedPct)>=80?'#1B7A4A':(legacy?usPct:eisaCompletedPct)>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${((legacy?usPct:eisaCompletedPct)/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
+            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${(legacy?usPct:eisaCompletedPct)!==null?(legacy?usPct:eisaCompletedPct)+'%':'—'}</text>
+            <text x="60" y="73" text-anchor="middle" font-size="${legacy?6.5:7.5}" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">${legacy?'UNIT STANDARDS':'EISA'}</text>
           </svg>
-          <div style="font-size:8px;color:#94A3B8;margin-top:6px">credits achieved</div>
+          <div style="font-size:8px;color:#94A3B8;margin-top:6px">${legacy?'credits achieved':'completed'}</div>
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
-          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">Unit Standards progress</div>
+          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">${legacy?'Unit Standards progress':'EISA progress'}</div>
+          ${legacy?`
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
@@ -4442,59 +4744,32 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
               <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${usPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
             </div>
             ${!usTotalCredits?`<div style="font-size:9px;color:#94A3B8">No unit standards registered for this programme yet.</div>`:''}
-          </div>
+          </div>`:`
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+                <span style="font-size:10.5px;color:#1E2533;font-weight:600">EISA Booked</span>
+                <span style="display:flex;align-items:center;gap:5px">
+                  <span id="eisa-booked-count" style="font-size:9px;color:#1A365D;font-weight:700">${eisaBookedCount} of ${nCount}</span>
+                  <input type="number" min="0" max="${nCount}" value="${eisaBookedCount}" class="no-print"
+                    style="width:38px;padding:1px 3px;font-size:8pt;border:1px solid #E2E8F0;border-radius:4px;text-align:center"
+                    title="Enter number of learners booked for EISA"
+                    onblur="saveEisaBooked(this,${nCount})" onkeydown="if(event.key==='Enter')this.blur()">
+                </span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div id="eisa-booked-bar" style="height:100%;width:${eisaBookedPct}%;background:#1A365D;border-radius:3px"></div></div>
+            </div>
+            <div>
+              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+                <span style="font-size:10.5px;color:#1E2533;font-weight:600">EISA Completed</span>
+                <span style="font-size:9px;color:#0F6B6B;font-weight:700">${eisaCompletedCount} of ${nCount}</span>
+              </div>
+              <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${eisaCompletedPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
+            </div>
+          </div>`}
         </div>
-      </div>`:(()=>{
-        // EISA completion is a late-programme milestone — showing a bare "0%"
-        // every month before the final module even ends misreads as a red flag
-        // when nothing is actually wrong yet. eisaDue mirrors the module-timeline
-        // status logic above: only once the last dated module is 'done' do we
-        // treat EISA as due, and the status chip reflects that instead of a
-        // single completion percentage dominating the widget (which also buried
-        // the fact that Booking — the PM's actual task — is usually already 100%).
-        const lastMod=timelineMods[timelineMods.length-1];
-        const eisaDue=!!lastMod&&lastMod.status==='done';
-        const chip=!eisaDue
-          ?{label:'Not yet due',bg:'#FAEEDA',fg:'#633806'}
-          :eisaCompletedCount<nCount
-          ?{label:'Needs follow-up',bg:'#FBE3E3',fg:'#8C1616'}
-          :{label:'Complete',bg:'#EAF3DE',fg:'#27500A'};
-        return`
-      <div class="exec-visual-row" style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
-          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8">EISA progress</div>
-          <span style="font-size:8px;font-weight:700;padding:3px 10px;border-radius:999px;background:${chip.bg};color:${chip.fg}">${chip.label}</span>
-        </div>
-        <div style="display:flex;align-items:flex-start">
-          <div style="flex:1;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#1E2533">${nCount}</div>
-            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Enrolled</div>
-          </div>
-          <div style="width:28px;height:2px;background:#CBD5E1;margin-top:11px;flex-shrink:0"></div>
-          <div style="flex:1;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:#1A365D">${eisaBookedCount}</div>
-            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Booked</div>
-          </div>
-          <div style="width:28px;height:2px;background:${eisaCompletedCount>0?'#0F6B6B':'#CBD5E1'};margin-top:11px;flex-shrink:0"></div>
-          <div style="flex:1;text-align:center">
-            <div style="font-size:22px;font-weight:800;color:${eisaCompletedCount>0?'#0F6B6B':'#94A3B8'}">${eisaCompletedCount}</div>
-            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Completed</div>
-          </div>
-        </div>
-        <div style="margin-top:14px;height:6px;border-radius:3px;background:#F1F5F9;overflow:hidden;position:relative">
-          <div id="eisa-booked-bar" style="position:absolute;inset:0;height:100%;width:${eisaBookedPct}%;background:#1A365D;border-radius:3px"></div>
-          <div style="position:absolute;inset:0;height:100%;width:${eisaCompletedPct||0}%;background:#0F6B6B;border-radius:3px"></div>
-        </div>
-        <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:8px">
-          <span style="font-size:8px;color:#94A3B8">Adjust booked</span>
-          <input type="number" min="0" max="${nCount}" value="${eisaBookedCount}" class="no-print"
-            style="width:38px;padding:1px 3px;font-size:8pt;border:1px solid #E2E8F0;border-radius:4px;text-align:center"
-            title="Enter number of learners booked for EISA"
-            onblur="saveEisaBooked(this,${nCount})" onkeydown="if(event.key==='Enter')this.blur()">
-          <span id="eisa-booked-count" style="font-size:8px;color:#B5BEC9">${eisaBookedCount} of ${nCount}</span>
-        </div>
-      </div>`;
-      })()}
+      </div>
+      ${buildLearnerStatusBlock(pLearners,p)}
       <div class="exec-headline" style="margin-top:20px;padding:18px 22px;background:linear-gradient(90deg,${p.gradFrom}12,transparent);border-left:4px solid ${p.accentFrom};border-radius:0 8px 8px 0">
         <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:6px">Headline</div>
         <div style="font-size:10pt;color:#333;line-height:1.6">${esc(headline)}</div>
@@ -4568,7 +4843,7 @@ function buildCohortSummary(pLearners){
       const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
       if(!vals.length){blank++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else blank++;
     });
     const total=pLearners.length||1;
@@ -4577,7 +4852,7 @@ function buildCohortSummary(pLearners){
     return`<div class="cs-card cs-m${m}">
       <label>Module ${m}</label>
       <div class="cs-big">${comp}<span style="font-size:10pt;font-weight:600;color:var(--muted)">/${total}</span></div>
-      <div class="cs-sub">${comp} competent · ${nyc} NYC</div>
+      <div class="cs-sub">${comp} competent · ${nyc} outstanding</div>
       <div class="cs-bar"><div class="cs-bar-fill" style="width:${pct}%;background:${barCol}"></div></div>
     </div>`;
   }).join('');
@@ -4598,6 +4873,51 @@ function buildCohortSummary(pLearners){
   </div>`;
 }
 
+// ── Learner Status block (Executive Summary) ──────────────────────────────
+// Shows Enrolled / Active / Terminated counts and, on screen, an editable
+// per-learner status control (Active, or Terminated + which module) — see
+// isLearnerTerminated/setLearnerTermination. Works for QCTO and Legacy quals
+// alike since it's driven off the enrolment record, not qualification type.
+function buildLearnerStatusBlock(pLearners,p){
+  const modNums=activeProgramme?displayModuleNums(activeProgramme):[1,2,3,4];
+  const terminated=pLearners.filter(l=>isLearnerTerminated(l.id));
+  const active=pLearners.filter(l=>!isLearnerTerminated(l.id));
+  const rows=[...pLearners].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).map(l=>{
+    const isTerm=isLearnerTerminated(l.id);
+    const termMod=getLearnerTerminatedModule(l.id);
+    const modOptions=modNums.map(n=>`<option value="${n}" ${termMod===n?'selected':''}>Module ${n}</option>`).join('');
+    return`<div class="no-print" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F1F5F9">
+      <span style="flex:1;font-size:9pt;color:#1E2533">${esc(l.first_name)} ${esc(l.last_name)}</span>
+      <select style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},this.value==='terminated',document.getElementById('term-mod-${l.id}')?document.getElementById('term-mod-${l.id}').value:null);_lsRefreshModSelect(this)">
+        <option value="active" ${!isTerm?'selected':''}>Active</option>
+        <option value="terminated" ${isTerm?'selected':''}>Terminated</option>
+      </select>
+      <select id="term-mod-${l.id}" style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px;${isTerm?'':'visibility:hidden'}" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},true,this.value)">
+        ${modOptions}
+      </select>
+    </div>`;
+  }).join('');
+  const termNames=terminated.map(l=>{
+    const m=getLearnerTerminatedModule(l.id);
+    return`${esc(l.first_name)} ${esc(l.last_name)}${m?` (Module ${m})`:''}`;
+  }).join(', ');
+  return`<div class="exec-learner-status" style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Enrolled</label><div class="cs-big">${pLearners.length}</div></div>
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Active</label><div class="cs-big">${active.length}</div></div>
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Terminated</label><div class="cs-big">${terminated.length}</div></div>
+    </div>
+    <div style="font-size:9pt;color:#4A5568;margin-bottom:8px">${terminated.length?`Terminated: ${termNames}.`:'No learners terminated this period.'}</div>
+    <div class="no-print" style="font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Learner Status <span style="font-weight:400;text-transform:none;letter-spacing:normal;color:#B5BEC9">(screen only — editable)</span></div>
+    <div class="no-print" style="max-height:220px;overflow-y:auto">${rows}</div>
+  </div>`;
+}
+function _lsRefreshModSelect(sel){
+  const row=sel.closest('div');
+  const modSel=row?row.querySelector('select[id^="term-mod-"]'):null;
+  if(modSel)modSel.style.visibility=sel.value==='terminated'?'visible':'hidden';
+}
+
 function hexMix(a,b,t){
   const pa=parseInt(a.slice(1),16),pb=parseInt(b.slice(1),16);
   const ar=(pa>>16)&255,ag=(pa>>8)&255,ab=pa&255;
@@ -4608,12 +4928,28 @@ function hexMix(a,b,t){
 function modStatus(datesStr){
   try{
     if(!datesStr) return null;
-    const parts=datesStr.split(/[–-]/).map(s=>s.trim()).filter(Boolean);
+    // Split on any dash-like separator, not just en dash/hyphen — a date range
+    // typed or pasted in (Excel/Word smart punctuation, mobile keyboards, etc.)
+    // can just as easily land as an em dash (—), figure dash, or minus sign.
+    // Previously only "–"/"-" matched, so e.g. "11 Mar 26 — 29 Jun 26" (em dash)
+    // silently failed to split into 2 parts, modStatus() returned null, and
+    // both the Programme Timeline bar/badge AND the Overview page's status
+    // badge went blank for that module — even though the Overview page's
+    // KM/PM/WM progress bars (computed independently of this date parsing)
+    // kept showing real completion data, making the two look out of sync.
+    const parts=datesStr.split(/[‐‑‒–—―−-]/).map(s=>s.trim()).filter(Boolean);
     if(parts.length<2) return null;
     let startStr=parts[0],endStr=parts[parts.length-1];
-    const yearMatch=endStr.match(/\d{4}/);
+    // Year token off the end date's trailing digits — accepts a full 4-digit
+    // year ("29 Jun 2026") and also the 2-digit shorthand PMs often type
+    // ("29 Jun 26"). The old regex only matched \d{4}, so a 2-digit year
+    // silently failed to parse and the module's status fell back to "—"
+    // even when the module's facilitation was clearly long done.
+    const yearMatch=endStr.match(/(\d{4}|\d{2})\s*$/);
     if(!yearMatch) return null;
-    if(!/\d{4}/.test(startStr)) startStr+=' '+yearMatch[0];
+    const fullYear=yearMatch[1].length===2?('20'+yearMatch[1]):yearMatch[1];
+    endStr=endStr.replace(/(\d{4}|\d{2})\s*$/,fullYear);
+    if(!/\d{4}\s*$/.test(startStr)) startStr+=' '+fullYear;
     const start=new Date(startStr),end=new Date(endStr);
     if(isNaN(start)||isNaN(end)) return null;
     const now=new Date();
@@ -4627,6 +4963,36 @@ const MOD_STATUS_STYLE={
   current:{label:'In progress',bg:'#E6F1FB',fg:'#0C447C'},
   upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'}
 };
+// ── EISA result codes (KM/PM/WM/Exam) ──
+// 'NYC' used to be the only non-Competent outcome a facilitator could record.
+// NS (Non-Submission) and RW (Remediation) are two more specific reasons a
+// module isn't Competent yet — kept as their own codes (not folded into a
+// generic NYC) so the Learner Report Card's Provisional Status can say which
+// one applies, while every existing "is this module NYC?" check (risk
+// flags, cohort NYC counts, the Programme Timeline badge) still needs to
+// treat all three as "not yet competent" for counting purposes. Everywhere
+// that used to test `v==='NYC'` for that purpose now calls
+// isEisaOutstanding(v) instead, so NS/RW aren't silently miscounted as
+// "no data yet".
+const EISA_RESULT_LABELS={C:'Competent',NYC:'Not Yet Competent',NS:'Non-Submission',RW:'Remediation'};
+function isEisaOutstanding(v){return v==='NYC'||v==='NS'||v==='RW';}
+function eisaResultLabel(v){return EISA_RESULT_LABELS[v]||'';}
+// Shared "overall module status for this learner" used by the Assessment
+// Results table, its live onchange handler, and the Learner Report Card —
+// same priority order everywhere (Non-Submission > Remediation > Not Yet
+// Competent > Competent > Pending) so the three surfaces can't disagree.
+function eisaOverallLabel(allC,vals){
+  if(allC)return'Competent';
+  if(vals.some(v=>v==='NS'))return'Non-Submission';
+  if(vals.some(v=>v==='RW'))return'Remediation';
+  if(vals.some(v=>v==='NYC'))return'Not Yet Competent';
+  return'Pending';
+}
+function eisaOverallBadgeClass(allC,vals){
+  if(allC)return'badge-c';
+  if(vals.some(isEisaOutstanding))return'badge-nyc';
+  return'badge-pending';
+}
 // Shared per-learner risk rating — mirrors the logic used on the Participation
 // page (getRiskLabel/getLegacyRiskLabel) so risk counts stay consistent
 // wherever they're shown in the report (Participation page, Executive Summary).
@@ -4636,17 +5002,12 @@ function getLearnerRiskLabel(l){
     if(!units.length)return'Unknown';
     let nyc=0,total=0;
     const ov=narratives._eisa||{};
-    units.forEach(u=>{
-      [usFormativeKey(l.id,u.id),usSummativeKey(l.id,u.id)].forEach(k=>{
-        const v=ov[k];
+    // Formative/Summative/Logbook are tracked per module now, not per unit
+    // standard (see legacyFormativeValue/legacySummativeValue/legacyLogbookValue).
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
         if(v){total++;if(v==='NYC')nyc++;}
       });
-    });
-    // One logbook mark per module now (see legacyLogbookValue) — count each
-    // module's logbook as its own signal, same as before but per module.
-    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
-      const lbv=legacyLogbookValue(ov,l.id,modNum);
-      if(lbv){total++;if(lbv==='NYC')nyc++;}
     });
     if(!total)return'Unknown';
     const pct=nyc/total;
@@ -4655,7 +5016,7 @@ function getLearnerRiskLabel(l){
   const res=eisaState[l.id]||{};
   if(!Object.keys(res).length)return'Unknown';
   let nyc=0,total=0;
-  allModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+  displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(isEisaOutstanding(r[k]))nyc++;}});});
   if(!total)return'Unknown';
   const pct=nyc/total;
   return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -4683,21 +5044,16 @@ function computeQctoModuleProgress(modNums,pLearners){
 // (Legacy only) — units grouped by u.mod, same grouping used by the
 // flagging logic above and by buildLegacyAssessmentPages.
 function computeLegacyModuleProgress(modNums,prog,pLearners){
+  // Formative/Summative are tracked once per learner per module (see
+  // legacyFormativeValue/legacySummativeValue), not per unit standard — so
+  // "total" here is one mark per learner, not per learner×unit-standard.
   const ov=narratives._eisa||{};
-  const unitsByMod={};
-  unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).forEach(u=>{
-    const m=u.mod||1;(unitsByMod[m]=unitsByMod[m]||[]).push(u);
-  });
   const out={};
   modNums.forEach(m=>{
-    const units=unitsByMod[m]||[];
-    let fDone=0,sDone=0,total=0;
+    let fDone=0,sDone=0,total=pLearners.length;
     pLearners.forEach(l=>{
-      units.forEach(u=>{
-        total++;
-        if(ov[usFormativeKey(l.id,u.id)]==='C')fDone++;
-        if(ov[usSummativeKey(l.id,u.id)]==='C')sDone++;
-      });
+      if(legacyFormativeValue(ov,l.id,m)==='C')fDone++;
+      if(legacySummativeValue(ov,l.id,m)==='C')sDone++;
     });
     out[m]={fDone,sDone,total};
   });
@@ -4718,18 +5074,18 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     const fieldMap=moduleFieldMap(modNums);
     return{num:n,cls:`m${n}`,label:`Module ${n}`,field:fieldMap[n],dates:prog[fieldMap[n]]||'',units:unitStr,
       qp:qctoProgress?qctoProgress[n]:null,lp:legacyProgress?legacyProgress[n]:null,
-      applies:legacy?null:moduleAppliesTypes(prog,n)};
+      hasUnits:modUnits.length>0,applies:legacy?null:moduleAppliesTypes(prog,n)};
   });
   let body=`
     <div class="sec-header"><div class="sec-accent" style="background:${p.accentFrom}"></div>
-      <div><div class="sec-title">Programme Overview</div><div style="height:3px;width:44px;border-radius:2px;background:linear-gradient(90deg,${p.accentFrom},${p.accentTo});margin:5px 0"></div><div class="sec-subtitle">Module schedule and overall feedback</div></div>
+      <div><div class="sec-title">Programme Overview</div><div style="height:3px;width:44px;border-radius:2px;background:linear-gradient(90deg,${p.accentFrom},${p.accentTo});margin:5px 0"></div><div class="sec-subtitle">Client details, module schedule and overall feedback</div></div>
     </div>
-    <div class="info-grid" style="margin-bottom:0">
-      
-      
-      
-      
-      
+    <div class="info-grid">
+      <div class="info-card${!client.client_name?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Client Name</label><span>${esc(client.client_name||'Not set')}</span></div>
+      <div class="info-card${(!client.contact_person&&!client.contact_number)?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Contact Person</label><span>${esc(client.contact_person||'Not set')} &nbsp;·&nbsp; ${esc(client.contact_number||'—')}</span></div>
+      <div class="info-card${!client.sales_person?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'Not set')}</span></div>
+      <div class="info-card${!client.project_manager?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'Not set')}</span></div>
+      <div class="info-card full${(!prog.saqa_id||!prog.qualification_code)?' needs-input':''}" data-edit="programme" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'Not set')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'Not set')}</span></div>
     </div>
     <div class="mod-connector no-print">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
@@ -4751,7 +5107,22 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         return `<div class="mod-formsum"><span>${label}</span><b>${done}/${total}</b></div><div class="fs-bar"><div class="fs-bar-fill" style="width:${pct}%;background:${barColor(pct)}"></div></div>`;
       };
       let progressHtml='';
-      if(m.qp&&m.qp.total>0){
+      // m.qp.total/m.lp.total are the cohort size (pLearners.length), not a
+      // count of registered unit standards — computeQctoModuleProgress and
+      // computeLegacyModuleProgress tally against every enrolled learner
+      // regardless of whether this module has any unit standards imported
+      // yet. So total>0 alone doesn't mean there's anything real to report:
+      // a module with zero registered unit standards (e.g. one just
+      // restored via "Restore Module N" and never configured) still had
+      // total===pLearners.length, and moduleAppliesTypes() itself defaults
+      // to {km:true,pm:true,wm:true} when it finds no unit standards to
+      // read types from (see moduleAppliesTypes) — so the card showed
+      // fabricated "KM 0/21 · PM 0/21 · WM 0/21" bars next to the
+      // placeholder "KM-0N · PM-0N · WM-0N" unit text, implying real
+      // assessment tracking that doesn't exist. Gate on m.hasUnits so a
+      // module with no unit standards registered shows only the "Add
+      // dates"/placeholder state, not invented progress.
+      if(m.hasUnits&&m.qp&&m.qp.total>0){
         // Only show a KM/PM/WM bar for the types this module's registered unit
         // standards actually carry (moduleAppliesTypes) — a KM-only module (e.g.
         // Module 1 with just KM01/KM02) was previously always showing PM 0/x and
@@ -4760,7 +5131,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         // on the Assessment page below (which already filters correctly).
         const ap=m.applies||{km:true,pm:true,wm:true};
         progressHtml=`<div class="mod-formsum-wrap">${ap.km?bar('KM',m.qp.km,m.qp.total):''}${ap.pm?bar('PM',m.qp.pm,m.qp.total):''}${ap.wm?bar('WM',m.qp.wm,m.qp.total):''}</div>`;
-      } else if(m.lp&&m.lp.total>0){
+      } else if(m.hasUnits&&m.lp&&m.lp.total>0){
         progressHtml=`<div class="mod-formsum-wrap">${bar('Form',m.lp.fDone,m.lp.total)}${bar('Sum',m.lp.sDone,m.lp.total)}</div>`;
       }
       return `
@@ -4799,8 +5170,10 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
   // Only one Module N feedback block per module this programme actually
   // runs (modNums already excludes anything in excluded_modules — see
   // displayModuleNums) — a deleted/not-applicable module no longer gets a
-  // permanently-empty "Module 4" box on the client-facing report.
-  modNums.filter(n=>n<=4).forEach(n=>{
+  // permanently-empty "Module 4" box on the client-facing report. No cap at
+  // 4 — a programme with 5+ modules (e.g. a 5-module Legacy qual) gets a
+  // feedback box for every module it actually runs.
+  modNums.forEach(n=>{
     const key=`feedback_m${n}`;
     const modCls=`m${n}`;
     const label=`Module ${n}`;
@@ -4860,7 +5233,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     if(isLegacyProgramme(activeProgramme))return getLegacyRiskLabel(l);
     if(!hasAny)return'Unknown';
     let nyc=0,total=0;
-    allModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+    displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(isEisaOutstanding(r[k]))nyc++;}});});
     if(!total)return'Unknown';
     const pct=nyc/total;
     return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -4871,15 +5244,11 @@ function buildParticipationPage(pLearners,nar,pn=3){
     if(!units.length)return'Unknown';
     let nyc=0,total=0;
     const ov=nar._eisa||{};
-    units.forEach(u=>{
-      [usFormativeKey(l.id,u.id),usSummativeKey(l.id,u.id)].forEach(k=>{
-        const v=ov[k];
+    // Formative/Summative/Logbook are tracked once per learner per module.
+    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
+      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
         if(v){total++;if(v==='NYC')nyc++;}
       });
-    });
-    new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
-      const lbv=legacyLogbookValue(ov,l.id,modNum);
-      if(lbv){total++;if(lbv==='NYC')nyc++;}
     });
     if(!total)return'Unknown';
     const pct=nyc/total;
@@ -4927,15 +5296,17 @@ function buildParticipationPage(pLearners,nar,pn=3){
       const units=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===activeProgramme.saqa_id);
       const totalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
       if(!totalCredits)return false;
-      const earned=units.reduce((s,u)=>{
-        const ov=nar._eisa||{};
-        const fv=ov[usFormativeKey(l.id,u.id)],sv=ov[usSummativeKey(l.id,u.id)];
-        return s+(fv==='C'&&sv==='C'?(+u.credits||0):0);
+      const ov=nar._eisa||{};
+      const creditsByMod={};
+      units.forEach(u=>{const m=u.mod||1;creditsByMod[m]=(creditsByMod[m]||0)+(+u.credits||0);});
+      const earned=Object.keys(creditsByMod).reduce((s,m)=>{
+        const fv=legacyFormativeValue(ov,l.id,m),sv=legacySummativeValue(ov,l.id,m);
+        return s+(fv==='C'&&sv==='C'?creditsByMod[m]:0);
       },0);
       return earned/totalCredits>=0.5;
     }
     const res=eisaState[l.id]||{};
-    return allModuleNums(activeProgramme).some(m=>(res[m]||{}).wm==='C');
+    return displayModuleNums(activeProgramme).some(m=>(res[m]||{}).wm==='C');
   }
   const satLearners=pLearners.filter(learnerIsCompetent);
   const remLearners=pLearners.filter(l=>!learnerIsCompetent(l));
@@ -5033,7 +5404,19 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
   },0);
   const warnBadge=warnCount>0&&dates.length>0
     ?`<span class="att-warn-count no-print" title="Learners below ${ATT_THRESHOLD}% threshold">${warnCount} below ${ATT_THRESHOLD}%</span>`:'';
-  const emptyHint=dates.length===0?`<div style="font-size:8.5pt;color:var(--muted);padding:16px 0;font-style:italic">No session dates yet — use ＋ Add Date to add columns.</div>`:'';
+  // "No classes held" note — lets a PM explain a month with zero session dates
+  // (e.g. a planned break) instead of the report just looking like missing
+  // data, and satisfies the Attendance checklist item so Send for Review /
+  // Print aren't blocked over a month that genuinely had no facilitation.
+  const noClasses=narratives.no_classes===true||narratives.no_classes==='true';
+  const noClassesToggle=`<label class="no-print" style="display:flex;align-items:center;gap:6px;font-size:8pt;color:var(--muted);margin:2px 0 10px;cursor:pointer">
+      <input type="checkbox" ${noClasses?'checked':''} onchange="setNoClasses(this.checked)"> No classes were held this month
+    </label>`;
+  const emptyHint=dates.length===0
+    ?(noClasses
+      ?`<div style="font-size:8.5pt;color:var(--body);padding:16px 0;font-style:italic">No classes were held during this reporting period.</div>`
+      :`<div style="font-size:8.5pt;color:var(--muted);padding:16px 0;font-style:italic">No session dates yet — use ＋ Add Date to add columns.</div>`)
+    :'';
 
   const body=`
     <div class="sec-header">
@@ -5043,6 +5426,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
         <div class="sec-subtitle">Click any cell to cycle: P → A → N/A → R · Right-click for bulk options</div>
       </div>
     </div>
+    ${noClassesToggle}
     ${emptyHint}
     ${dates.length>0?`<div style="overflow-x:auto">
       <table class="data-table" id="att-table">
@@ -5056,7 +5440,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
       <span class="att-na">N/A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Not Applicable</span>
       <span class="att-r">R</span><span style="font-size:8pt;color:var(--muted);align-self:center">Resigned</span>
     </div>`;
-  return pageShell(pn,0,activeClient.client_name,'Attendance Register',body);
+  return pageShell(pn,0,activeClient.client_name,'Attendance Register',body,true);
 }
 
 function makeAttPageWrap(pLearners,attDates,pn=4){
@@ -5136,6 +5520,15 @@ function addAttDate(){
 // pattern, instead of clicking ＋ Add Date once per session. Values start
 // blank, same as a single Add Date — this only creates the columns; actual
 // P/A/N/A/R entry still happens on the grid (or via Bulk Attendance paste).
+//
+// NOTE: always format the range/loop dates from LOCAL date components
+// (_fmtLocalDate), never Date#toISOString() -- toISOString() converts to
+// UTC first, which silently shifts the date back a day in any timezone
+// ahead of UTC (e.g. SAST, UTC+2). That caused a real off-by-one bug here.
+function _fmtLocalDate(d){
+  const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,'0'),day=String(d.getDate()).padStart(2,'0');
+  return`${y}-${m}-${day}`;
+}
 function openBulkDatesModal(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
   const modal=document.getElementById('bulk-dates-modal');
@@ -5144,8 +5537,8 @@ function openBulkDatesModal(){
   const today=new Date();
   const first=new Date(today.getFullYear(),today.getMonth(),1);
   const last=new Date(today.getFullYear(),today.getMonth()+1,0);
-  document.getElementById('bulk-dates-from').value=first.toISOString().slice(0,10);
-  document.getElementById('bulk-dates-to').value=last.toISOString().slice(0,10);
+  document.getElementById('bulk-dates-from').value=_fmtLocalDate(first);
+  document.getElementById('bulk-dates-to').value=_fmtLocalDate(last);
   [1,2,3,4,5].forEach(d=>{const el=document.getElementById('bulk-dates-dow-'+d);if(el)el.checked=true;});
   [0,6].forEach(d=>{const el=document.getElementById('bulk-dates-dow-'+d);if(el)el.checked=false;});
   modal.style.display='flex';
@@ -5168,7 +5561,7 @@ function _bulkDatesCompute(){
   const cur=new Date(from);
   let guard=0; // hard stop against an accidental multi-year range
   while(cur<=to&&guard<1000){
-    if(dows.has(cur.getDay()))out.push(cur.toISOString().slice(0,10));
+    if(dows.has(cur.getDay()))out.push(_fmtLocalDate(cur));
     cur.setDate(cur.getDate()+1);
     guard++;
   }
@@ -5275,29 +5668,32 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
     const res=(eisaState[l.id]||{})[modNum]||{};
     const ek=`${l.id}_m${modNum}`;
     const mkVal=(field,val)=>{const saved=(nar._eisa||{})[`${ek}_${field}`];return saved!==undefined?saved:val||'';};
+    // NS (Non-Submission) and RW (Remediation) sit alongside NYC as the
+    // specific reasons a result isn't Competent yet — see isEisaOutstanding.
+    const resultOptions=v=>`<option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option><option value="NS" ${v==='NS'?'selected':''}>NS</option><option value="RW" ${v==='RW'?'selected':''}>RW</option>`;
     const mkResult=(field,val)=>{
       const v=mkVal(field,val);
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
-      return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option></select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
+      return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}</select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
     };
     const mkExam=(field,pctField,val,pct)=>{
       const v=mkVal(field,val);const p=mkVal(pctField,pct);
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
       const pt=v?(p?v+' / '+p+'%':v):'&#8212;';
-      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option><option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
+      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}<option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
     };
     const km=mkVal('km',res.km),pm=mkVal('pm',res.pm),wm=mkVal('wm',res.wm),ev1=mkVal('examv1',res.examv1),ev2=mkVal('examv2',res.examv2);
     const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
-    const allC=[km,pm,wm,ev1,ev2].filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
-    const anyNYC=[km,pm,wm,ev1,ev2].some(v=>v==='NYC');
-    const overall=allC?'<span class="badge badge-c">Complete</span>':anyNYC?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+    const rowVals=[km,pm,wm,ev1,ev2];
+    const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+    const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
     const resultVals={km,pm,wm};
     const colCells=cols.map(c=>`<td>${mkResult(c.key,resultVals[c.key])}</td>`).join('');
     return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${colCells}<td>${mkExam('examv1','examv1_pct',res.examv1,res.examv1_pct)}</td><td>${mkExam('examv2','examv2_pct',res.examv2,res.examv2_pct)}</td><td style="text-align:center">${overall}</td></tr>`;
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
-  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
   return pageShell(pn||4+modNum,0,activeClient.client_name,'Assessment — Module '+modNum,body);
 }
 
@@ -5311,14 +5707,14 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
 function usKey(learnerId,usCode){
   return`${learnerId}_us_${String(usCode).replace(/[^a-zA-Z0-9]/g,'')}`;
 }
-// Legacy quals track Formative + Summative per unit standard (credits require
-// both), plus a Logbook mark per learner PER MODULE (each module's assessment
-// page is printed separately with its own logbook section — see
-// buildLegacyAssessmentPages). Logbook used to be tracked once per learner for
-// the whole qualification; logbookKey(learnerId) with no module number still
-// returns that old key so already-saved values aren't lost, and
-// legacyLogbookValue() below carries that old value forward as the starting
-// point for every module until a module's logbook is set individually.
+// Legacy quals track Formative, Summative and Logbook once per learner PER
+// MODULE — not per unit standard. Unit standards for a module are still
+// listed (read-only, for reference/POE purposes) but no longer need their
+// own Achieved/Not Yet entry; PMs mark the whole module's Formative/
+// Summative/Logbook instead, which is what actually drives credit/status.
+// usFormativeKey/usSummativeKey are kept only so any already-saved
+// per-unit-standard values aren't silently lost — they're no longer written
+// by the UI, but old drafts/exports that still reference them keep working.
 function usFormativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_formative';}
 function usSummativeKey(learnerId,usCode){return usKey(learnerId,usCode)+'_summative';}
 function logbookKey(learnerId,modNum){return modNum!=null?`${learnerId}_m${modNum}_logbook`:`${learnerId}_logbook`;}
@@ -5327,6 +5723,10 @@ function legacyLogbookValue(ov,learnerId,modNum){
   if(perModule!==undefined)return perModule;
   return(ov||{})[logbookKey(learnerId)]||''; // pre-migration single value, carried forward
 }
+function legacyFormativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_formative`;}
+function legacySummativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_summative`;}
+function legacyFormativeValue(ov,learnerId,modNum){return(ov||{})[legacyFormativeKey(learnerId,modNum)]||'';}
+function legacySummativeValue(ov,learnerId,modNum){return(ov||{})[legacySummativeKey(learnerId,modNum)]||'';}
 function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   const allUnits=unitStandards
     .filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id)
@@ -5353,10 +5753,10 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     grp.units.push(u);
   });
 
-  const mkFsCell=(key,val,uscode,credits,role)=>{
+  const mkFsCell=(key,val,cls)=>{
     const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
     const label=val==='C'?'Achieved':val==='NYC'?'Not Yet':'&#8212;';
-    return`<td style="text-align:center"><div><select class="result-select result-screen legacy-us-select" data-eisa="${key}" data-uscode="${esc(String(uscode))}" data-credits="${credits}" data-role="${role}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
+    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
   };
 
   let pn=startPn;
@@ -5364,6 +5764,12 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   modGroups.forEach(grp=>{
     const modNum=grp.mod,units=grp.units;
     const modTotalCredits=units.reduce((s,u)=>s+(+u.credits||0),0);
+    // Reference list of the unit standards this module actually covers —
+    // read-only (title/level/credits), for POE/audit reference. Results are
+    // no longer captured per unit standard; see below.
+    const usListRows=units.map(u=>`<tr><td style="font-family:var(--mono);white-space:nowrap">${esc(u.id)}</td><td>${esc(u.title||'')}</td><td style="text-align:center">${esc(String(u.level||''))}</td><td style="text-align:center">${esc(String(u.credits||0))}</td></tr>`).join('');
+    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
+
     const chunks=[];
     for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
     if(!chunks.length)chunks.push([]);
@@ -5371,17 +5777,12 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     chunks.forEach((chunk,pageIdx)=>{
       const tableId=`legacy-us-table-m${modNum}-${pageIdx}`;
       const rows=chunk.map(l=>{
-        let earned=0;
-        let anyAssessed=false;
-        const unitCells=units.map(u=>{
-          const fKey=usFormativeKey(l.id,u.id),sKey=usSummativeKey(l.id,u.id);
-          const fv=(nar._eisa||{})[fKey]||'';
-          const sv=(nar._eisa||{})[sKey]||'';
-          const cr=+u.credits||0;
-          if(fv==='C'&&sv==='C')earned+=cr;
-          if(fv||sv)anyAssessed=true;
-          return mkFsCell(fKey,fv,u.id,cr,'formative')+mkFsCell(sKey,sv,u.id,cr,'summative');
-        }).join('');
+        const fKey=legacyFormativeKey(l.id,modNum),sKey=legacySummativeKey(l.id,modNum);
+        const fv=legacyFormativeValue(nar._eisa,l.id,modNum);
+        const sv=legacySummativeValue(nar._eisa,l.id,modNum);
+        const earned=(fv==='C'&&sv==='C')?modTotalCredits:0;
+        const anyAssessed=!!(fv||sv);
+        const fsCells=mkFsCell(fKey,fv,'legacy-formative-select')+mkFsCell(sKey,sv,'legacy-summative-select');
         const lbKey=logbookKey(l.id,modNum);
         const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
         const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
@@ -5390,13 +5791,10 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
         const anyProgress=earned>0||lbVal==='C'||anyAssessed;
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
-        return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${unitCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
+        return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
-      const usHeaderRow=units.map(u=>`<th colspan="2" style="text-align:center;font-size:7pt" title="${esc(u.title||'')}">${esc(u.id)}<br><span style="font-weight:400;opacity:.7">${esc(String(u.credits||0))}cr</span></th>`).join('');
-      const fsHeaderRow=units.map(()=>`<th style="text-align:center;font-size:6.5pt">F</th><th style="text-align:center;font-size:6.5pt">S</th>`).join('');
       const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
-        <tr><th rowspan="2">Learner Name</th>${usHeaderRow}<th rowspan="2">Logbook</th><th rowspan="2">Credits</th><th rowspan="2">Status</th></tr>
-        <tr>${fsHeaderRow}</tr>
+        <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
       const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
           <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
@@ -5408,10 +5806,11 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
           </span>
         </div>
+        ${usListTable}
         <div style="overflow-x:auto">
-          <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid;min-width:${360+units.length*2*42+90}px">${thead}<tbody>${rows}</tbody></table>
+          <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid">${thead}<tbody>${rows}</tbody></table>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">F = Formative &nbsp;&middot;&nbsp; S = Summative &nbsp;&middot;&nbsp; credit requires both &nbsp;&middot;&nbsp; Logbook tracked per module</span></div>`;
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
       pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
     });
   });
@@ -5433,23 +5832,17 @@ function syncUsResult(sel){
 function updateLegacyRowCredits(sel){
   const tr=sel.closest('tr');
   if(!tr)return;
-  // Group Formative/Summative selects by unit standard — a unit only earns
-  // its credit once BOTH are Achieved, so summing every select individually
-  // would double-count. Logbook is separate and gates overall completion.
-  const byUs={};
-  tr.querySelectorAll('select.legacy-us-select').forEach(s=>{
-    const code=s.dataset.uscode;
-    if(!code)return;
-    if(!byUs[code])byUs[code]={credits:+s.dataset.credits||0,f:'',s:''};
-    if(s.dataset.role==='formative')byUs[code].f=s.value;
-    else if(s.dataset.role==='summative')byUs[code].s=s.value;
-  });
-  let earned=0,total=0,anyAssessed=false;
-  Object.values(byUs).forEach(u=>{
-    total+=u.credits;
-    if(u.f==='C'&&u.s==='C')earned+=u.credits;
-    if(u.f||u.s)anyAssessed=true;
-  });
+  // Formative/Summative are now one mark each per learner for the whole
+  // module — the module's full credit total is earned only when both are
+  // Achieved (data-mod-credits carries the module's total, stashed on the
+  // row at render time since the row no longer has per-unit-standard cells
+  // to sum). Logbook is separate and gates overall completion.
+  const total=+tr.dataset.modCredits||0;
+  const fSel=tr.querySelector('select.legacy-formative-select');
+  const sSel=tr.querySelector('select.legacy-summative-select');
+  const fv=fSel?fSel.value:'',sv=sSel?sSel.value:'';
+  const earned=(fv==='C'&&sv==='C')?total:0;
+  const anyAssessed=!!(fv||sv);
   const logbookSel=tr.querySelector('select.legacy-logbook-select');
   const logbookAchieved=logbookSel&&logbookSel.value==='C';
   const credCell=tr.querySelector('.legacy-credits-cell');
@@ -5464,7 +5857,7 @@ function updateLegacyRowCredits(sel){
 function bulkSetLegacyResults(tableId,value){
   const table=document.getElementById(tableId);
   if(!table)return;
-  table.querySelectorAll('select.legacy-us-select,select.legacy-logbook-select').forEach(sel=>{
+  table.querySelectorAll('select.legacy-formative-select,select.legacy-summative-select,select.legacy-logbook-select').forEach(sel=>{
     sel.value=value;
     syncUsResult(sel);
   });
@@ -5878,6 +6271,17 @@ function toggleSurvey(el){
 function eisaChanged(el){autoSave();}
 function updateExamDisplay(el){autoSave();}
 
+// "No classes held this month" — see buildAttendanceRegisterPage note.
+function setNoClasses(checked){
+  if(!activeProgramme)return;
+  narratives.no_classes=checked;
+  autoSave();
+  toast(checked?'Noted: no classes were held this month':'Cleared "no classes" note','info',2500);
+  _lastGenKey=null;
+  generateReport(true);
+  updateProgressPanel();
+}
+
 // Dual-render sync functions
 function syncNar(ta){
   const key=ta.dataset.nar;
@@ -6066,14 +6470,14 @@ function draftNarrative(key, btn){
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
 
   // ── Per-module competency stats ──
-  const modStats=allModuleNums(activeProgramme).map(m=>{
+  const modStats=displayModuleNums(activeProgramme).map(m=>{
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
       const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else pending++;
     });
     return{m,comp,nyc,pending,total:pLearners.length};
@@ -6081,7 +6485,7 @@ function draftNarrative(key, btn){
 
   // ── EISA booked/completed stats (mirrors buildExecSummaryPage) ──
   const total=pLearners.length;
-  const eisaActiveMods=allModuleNums(activeProgramme).filter(m=>{
+  const eisaActiveMods=displayModuleNums(activeProgramme).filter(m=>{
     const d=activeProgramme[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
@@ -6102,14 +6506,17 @@ function draftNarrative(key, btn){
   let draft='';
 
   if(key.startsWith('feedback_m')){
-    const idx=parseInt(key.slice(-1),10)-1;
-    const s=modStats[idx];
+    const modNum=parseInt(key.slice('feedback_m'.length),10);
+    const s=modStats.find(x=>x.m===modNum);
+    if(!s){btn.disabled=false;btn.textContent='✨ Draft from data';return;}
     const pct=Math.round(s.comp/s.total*100);
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'){
-    if(avgAtt===null){
+    if(narratives.no_classes===true||narratives.no_classes==='true'){
+      draft='No classes were held during this reporting period.';
+    } else if(avgAtt===null){
       draft='No attendance data has been recorded for this period.';
     } else {
       draft=`Cohort attendance for this period averaged ${avgAtt}% across ${attDates.length} session${attDates.length!==1?'s':''} (${total} learner${total!==1?'s':''}). `
@@ -6124,22 +6531,23 @@ function draftNarrative(key, btn){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
     draft=`Learner participation has been ${compAll>total*2?'strong':'developing'} across the programme. `
-         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review. `
-         +'[Add notes on engagement, class discussion, facilitation observations.]';
+         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review.`;
   } else if(key==='eisa_summary'){
-    const pct=total>0?Math.round(eisaCompletedCount/total*100):null;
-    draft=pct===null
-      ?'No EISA data has been recorded for this period.'
-      :`${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
-       +(eisaBookedCount>eisaCompletedCount
-         ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
-         :'All booked learners have completed their EISA requirements.');
+    draft=eisaBookedCount===0
+      ?'No learners have been booked for EISA yet this period.'
+      :(()=>{
+          const pct=Math.round(eisaCompletedCount/eisaBookedCount*100);
+          return `${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
+           +(eisaBookedCount>eisaCompletedCount
+             ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
+             :'All booked learners have completed their EISA requirements.');
+        })();
   } else if(key==='concerns'){
     const concerns=[];
     if(avgAtt!==null&&avgAtt<ATT_THRESHOLD)concerns.push(`cohort attendance is below the ${ATT_THRESHOLD}% threshold (currently ${avgAtt}%)`);
     modStats.forEach(s=>{if(s.nyc>0)concerns.push(`${s.nyc} NYC result${s.nyc>1?'s':''} in Module ${s.m}`);});
     draft=concerns.length
-      ?`Areas requiring attention: ${concerns.join('; ')}. [Add any additional context or escalation notes.]`
+      ?`Areas requiring attention: ${concerns.join('; ')}.`
       :'No significant concerns to report at this time. Cohort attendance and competency results are on track.';
   }
 
@@ -6158,18 +6566,25 @@ function draftNarrative(key, btn){
 }
 
 // ── Draft-All Review Panel ────────────────────────────────────────────────────
-const DA_KEYS=['feedback_m1','feedback_m2','feedback_m3','feedback_m4','att_summary','eisa_summary','interaction','concerns','time_keeping'];
-const DA_LABELS={
-  feedback_m1:'Module 1 — Feedback',
-  feedback_m2:'Module 2 — Feedback',
-  feedback_m3:'Module 3 — Feedback',
-  feedback_m4:'Module 4 — Feedback',
-  att_summary:'Attendance Summary',
-  eisa_summary:'EISA',
-  time_keeping:'Time Keeping',
-  interaction:'Interaction & Participation',
-  concerns:'Concerns'
-};
+// Built dynamically off the active programme's real module list (via
+// displayModuleNums) so a programme with 5+ modules (e.g. a 5-module Legacy
+// qual) gets a feedback field for every module it actually runs, not just
+// the first 4. EISA is dropped for Legacy quals, matching the report body.
+function daKeys(){
+  const mods=activeProgramme?displayModuleNums(activeProgramme):[1,2,3,4];
+  const legacy=activeProgramme?isLegacyProgramme(activeProgramme):false;
+  return [...mods.map(n=>`feedback_m${n}`),'att_summary',...(legacy?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
+}
+function daLabel(key){
+  if(key.startsWith('feedback_m'))return`Module ${key.slice('feedback_m'.length)} — Feedback`;
+  return{
+    att_summary:'Attendance Summary',
+    eisa_summary:'EISA',
+    time_keeping:'Time Keeping',
+    interaction:'Interaction & Participation',
+    concerns:'Concerns'
+  }[key]||key;
+}
 
 let _daState={idx:0, drafts:{}, undoMap:{}, editMode:false};
 
@@ -6195,21 +6610,21 @@ function _computeDraft(key){
   });
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
 
-  const modStats=allModuleNums(activeProgramme).map(m=>{
+  const modStats=displayModuleNums(activeProgramme).map(m=>{
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
       const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else pending++;
     });
     return{m,comp,nyc,pending,total:pLearners.length};
   });
 
   const total=pLearners.length;
-  const eisaActiveMods=allModuleNums(activeProgramme).filter(m=>{
+  const eisaActiveMods=displayModuleNums(activeProgramme).filter(m=>{
     const d=activeProgramme[`module_${m}_dates`];
     return d&&String(d).trim()!=='';
   });
@@ -6228,14 +6643,17 @@ function _computeDraft(key){
   let draft='';
 
   if(key.startsWith('feedback_m')){
-    const idx=parseInt(key.slice(-1),10)-1;
-    const s=modStats[idx];
+    const modNum=parseInt(key.slice('feedback_m'.length),10);
+    const s=modStats.find(x=>x.m===modNum);
+    if(!s)return null;
     const pct=Math.round(s.comp/s.total*100);
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'){
-    if(avgAtt===null){
+    if(narratives.no_classes===true||narratives.no_classes==='true'){
+      draft='No classes were held during this reporting period.';
+    } else if(avgAtt===null){
       draft='No attendance data has been recorded for this period.';
     } else {
       draft=`Cohort attendance for this period averaged ${avgAtt}% across ${attDates.length} session${attDates.length!==1?'s':''} (${total} learner${total!==1?'s':''}). `
@@ -6247,25 +6665,26 @@ function _computeDraft(key){
              :'All learners are meeting the attendance threshold.');
     }
   } else if(key==='eisa_summary'){
-    const pct=total>0?Math.round(eisaCompletedCount/total*100):null;
-    draft=pct===null
-      ?'No EISA data has been recorded for this period.'
-      :`${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
-       +(eisaBookedCount>eisaCompletedCount
-         ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
-         :'All booked learners have completed their EISA requirements.');
+    draft=eisaBookedCount===0
+      ?'No learners have been booked for EISA yet this period.'
+      :(()=>{
+          const pct=Math.round(eisaCompletedCount/eisaBookedCount*100);
+          return `${eisaBookedCount} of ${total} learner${total!==1?'s':''} booked for EISA, with ${eisaCompletedCount} (${pct}%) having completed all required assessments to date. `
+           +(eisaBookedCount>eisaCompletedCount
+             ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
+             :'All booked learners have completed their EISA requirements.');
+        })();
   } else if(key==='interaction'){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
     draft=`Learner participation has been ${compAll>total*2?'strong':'developing'} across the programme. `
-         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review. `
-         +'[Add notes on engagement, class discussion, facilitation observations.]';
+         +`${compAll} module-level competencies have been achieved to date, with ${nycAll} NYC result${nycAll!==1?'s':''} under review.`;
   } else if(key==='concerns'){
     const concerns=[];
     if(avgAtt!==null&&avgAtt<ATT_THRESHOLD)concerns.push(`cohort attendance is below the ${ATT_THRESHOLD}% threshold (currently ${avgAtt}%)`);
     modStats.forEach(s=>{if(s.nyc>0)concerns.push(`${s.nyc} NYC result${s.nyc>1?'s':''} in Module ${s.m}`);});
     draft=concerns.length
-      ?`Areas requiring attention: ${concerns.join('; ')}. [Add any additional context or escalation notes.]`
+      ?`Areas requiring attention: ${concerns.join('; ')}.`
       :'No significant concerns to report at this time. Cohort attendance and competency results are on track.';
   }
 
@@ -6278,7 +6697,7 @@ function openDraftAllPanel(){
 
   // Pre-compute all drafts
   _daState={idx:0, drafts:{}, undoMap:{}, editMode:false};
-  DA_KEYS.forEach(k=>{_daState.drafts[k]=_computeDraft(k)||'';});
+  daKeys().forEach(k=>{_daState.drafts[k]=_computeDraft(k)||'';});
 
   document.getElementById('da-overlay').style.display='block';
   const panel=document.getElementById('da-panel');
@@ -6302,18 +6721,18 @@ function closeDraftAllPanel(){
 
 function _daRender(){
   const {idx,drafts,editMode}=_daState;
-  if(idx>=DA_KEYS.length){_daShowDone();return;}
+  if(idx>=daKeys().length){_daShowDone();return;}
 
-  const key=DA_KEYS[idx];
+  const key=daKeys()[idx];
   const draft=drafts[key]||'';
-  const total=DA_KEYS.length;
+  const total=daKeys().length;
 
   // Progress
   document.getElementById('da-progress-text').textContent=`${idx+1} of ${total}`;
   document.getElementById('da-progress-fill').style.width=`${((idx)/total)*100}%`;
 
   // Label
-  document.getElementById('da-field-label').textContent=DA_LABELS[key];
+  document.getElementById('da-field-label').textContent=daLabel(key);
 
   // Existing content warning
   const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
@@ -6358,7 +6777,7 @@ function _daShowDone(){
 }
 
 function daAccept(){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const draft=_daState.editMode
     ?document.getElementById('da-edit-area').value
     :_daState.drafts[key];
@@ -6368,7 +6787,7 @@ function daAccept(){
   // compute to ''. Without this guard, clicking Accept on such a field
   // silently overwrote — blanked — any content the PM had already typed in.
   if(!draft&&existing){
-    toast(`No auto-draft available for "${DA_LABELS[key]}" — use Skip to keep the existing text, or Edit to write one manually.`,'warn',5000);
+    toast(`No auto-draft available for "${daLabel(key)}" — use Skip to keep the existing text, or Edit to write one manually.`,'warn',5000);
     return;
   }
   if(ta){
@@ -6401,14 +6820,14 @@ function daSkip(){
 function daToggleEdit(){
   _daState.editMode=!_daState.editMode;
   if(_daState.editMode){
-    const key=DA_KEYS[_daState.idx];
+    const key=daKeys()[_daState.idx];
     document.getElementById('da-edit-area').value=_daState.drafts[key];
   }
   _daRender();
 }
 
 function daRegen(){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const fresh=_computeDraft(key);
   if(fresh){
     _daState.drafts[key]=fresh;
@@ -6421,7 +6840,7 @@ function daRegen(){
 }
 
 function daNudge(instruction){
-  const key=DA_KEYS[_daState.idx];
+  const key=daKeys()[_daState.idx];
   const current=_daState.editMode
     ?document.getElementById('da-edit-area').value
     :_daState.drafts[key];
@@ -6647,9 +7066,9 @@ function updateRowStatus(sel){
   const km=val('km'),pm=val('pm'),wm=val('wm'),ev1=val('examv1'),ev2=val('examv2');
   const applies=moduleAppliesTypes(activeProgramme,+m[2]);
   const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
-  const allC=[km,pm,wm,ev1,ev2].filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
-  const anyNYC=[km,pm,wm,ev1,ev2].some(v=>v==='NYC');
-  const overall=allC?'<span class="badge badge-c">Complete</span>':anyNYC?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+  const rowVals=[km,pm,wm,ev1,ev2];
+  const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+  const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
   const statusCell=document.querySelector(`select[data-eisa="${prefix}examv1"]`)?.closest('tr')?.querySelector('td:last-child');
   if(statusCell)statusCell.innerHTML=overall;
 }
@@ -6664,11 +7083,11 @@ function syncResult(sel){
   }
   if(printSpan&&printSpan.classList.contains('result-print')){
     const v=sel.value;
-    printSpan.className='result-print badge '+(v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na');
+    printSpan.className='result-print badge '+(v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na');
     printSpan.textContent=v||'—';
   }else if(printSpan&&printSpan.classList.contains('exam-print')){
     const v=sel.value;
-    const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+    const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
     const pctInp=sel.closest('.exam-screen')?.querySelector('.exam-input');
     const p=pctInp?pctInp.value:'';
     printSpan.className='exam-print badge '+(v?bc:'badge-na');
@@ -6697,7 +7116,7 @@ function syncExamPct(inp){
     if(printSpan){
       const v=sel.value;
       const p=inp.value;
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
       printSpan.className='result-print badge '+(v?bc:'badge-na');
       printSpan.textContent=v?(p?v+' / '+p+'%':v):'—';
     }
@@ -6718,12 +7137,13 @@ function parseModDateRange(str){
   if(parts.length<2)return null;
   const parseOne=s=>{
     s=s.trim();
-    // "09 Feb 2026"
-    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+    // "09 Feb 2026" or the 2-digit-year shorthand PMs often type, "09 Feb 26"
+    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2}|\d{4})$/);
     if(m1){
       const mon=MOD_MONTHS[m1[2].toLowerCase()];
       if(mon===undefined)return null;
-      return new Date(+m1[3],mon,+m1[1]);
+      const yr=m1[3].length===2?2000+ +m1[3]:+m1[3];
+      return new Date(yr,mon,+m1[1]);
     }
     // "2026-02-09"
     const m2=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
@@ -7101,6 +7521,11 @@ ${styleNodes}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
@@ -7303,6 +7728,11 @@ ${styleNodes}
     display:flex!important;flex-direction:column!important;
     transform:none!important;
   }
+  /* Landscape pages (Attendance Register) get their own named @page so this
+     one section prints/exports at 297x210mm while everything else stays
+     portrait A4 — see .report-page.landscape in the screen CSS above. */
+  .report-page.landscape{page:att-landscape;width:297mm!important;min-height:210mm!important}
+  @page att-landscape{size:A4 landscape;margin:0}
   .report-page:last-child{page-break-after:avoid;break-after:avoid}
   .page-body{flex:1!important;overflow:visible!important;height:auto!important}
   .cover-hero{height:auto!important;min-height:240mm!important}
@@ -11970,7 +12400,7 @@ async function _loadProgrammeDataForExport(programme){
     'enrolments',
     `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${programme.id}&order=learner(last_name)`
   );
-  enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status}));
+  enrolments=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
   learners=enrolled.map(e=>e.learner).filter(Boolean);
   const[att,ei]=await Promise.all([
     sb('attendance',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${programme.id}`),
@@ -12805,7 +13235,7 @@ async function checkAdminFeedback(){
 // ── Delegated click handler for report-page info-cards ──
 // onclick attrs inside innerHTML don't fire; use event delegation instead
 document.addEventListener('click', function(e){
-  const card = e.target.closest('.info-card[data-edit], .cover-field[data-edit]');
+  const card = e.target.closest('.info-card[data-edit]');
   if(!card) return;
   const target = card.dataset.edit;
   if(target === 'client') openModal('client','edit');
@@ -13343,11 +13773,15 @@ function _renderLRC(){
       examv1:ov_v('examv1',base.examv1),examv2:ov_v('examv2',base.examv2),
       examv1_pct:ov_v('examv1_pct',base.examv1_pct),examv2_pct:ov_v('examv2_pct',base.examv2_pct)
     };
-    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
+    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':isEisaOutstanding(v)?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
     const pct=v=>res[v+'_pct']?` <small style="color:var(--muted)">${res[v+'_pct']}%</small>`:'';
+    const lrcRowVals=[res.km,res.pm,res.wm,res.examv1,res.examv2];
     const allC=res.km==='C'&&res.pm==='C'&&res.wm==='C'&&res.examv1==='C'&&(res.examv2==='C'||!res.examv2||res.examv2==='N/A');
-    const anyNYC=res.km==='NYC'||res.pm==='NYC'||res.wm==='NYC'||res.examv1==='NYC'||res.examv2==='NYC';
-    const overall=allC?`<span class="lrc-badge c">Complete</span>`:anyNYC?`<span class="lrc-badge nyc">In Progress</span>`:`<span class="lrc-badge na">Pending</span>`;
+    // .lrc-badge only defines c/nyc/na variants (no dedicated "pending"
+    // style), unlike the .badge-* classes used on the main Assessment
+    // Results table — map badge-pending to the existing na (grey) look.
+    const lrcCls=eisaOverallBadgeClass(allC,lrcRowVals)==='badge-c'?'c':eisaOverallBadgeClass(allC,lrcRowVals)==='badge-nyc'?'nyc':'na';
+    const overall=`<span class="lrc-badge ${lrcCls}">${eisaOverallLabel(allC,lrcRowVals)}</span>`;
     return`<tr>
       <td style="border-left:3px solid ${modColors[mod]};padding-left:12px;font-weight:700;color:${modColors[mod]}">${modLabels[mod]}</td>
       <td style="text-align:center">${mkB(res.km)}${pct('km')}</td>
@@ -13359,30 +13793,38 @@ function _renderLRC(){
     </tr>`;
   }).join('');
 
-  // ── Legacy: Unit Standards Achieved (Formative/Summative + Logbook + credits) ──
+  // ── Legacy: Formative/Summative/Logbook — tracked once per module, not per
+  // unit standard. The unit standards themselves are listed separately below
+  // as a read-only reference (POE/audit purposes only). ──
   const usUnits=lrcIsLegacy?unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id):[];
-  const usTotalCredits=usUnits.reduce((s,u)=>s+(+u.credits||0),0);
+  const usCreditsByMod={};
+  usUnits.forEach(u=>{const m=u.mod||1;usCreditsByMod[m]=(usCreditsByMod[m]||0)+(+u.credits||0);});
+  const usModNums=Object.keys(usCreditsByMod).map(Number).sort((a,b)=>a-b);
+  const usTotalCredits=usModNums.reduce((s,m)=>s+usCreditsByMod[m],0);
   let usEarned=0;
-  const usRows=usUnits.map(u=>{
-    const ov=narratives._eisa||{};
-    const fv=ov[usFormativeKey(l.id,u.id)]||'';
-    const sv=ov[usSummativeKey(l.id,u.id)]||'';
-    const cr=+u.credits||0;
+  const ovLrc=narratives._eisa||{};
+  const mkLrcB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
+  const usRows=usModNums.map(modNum=>{
+    const fv=legacyFormativeValue(ovLrc,l.id,modNum);
+    const sv=legacySummativeValue(ovLrc,l.id,modNum);
+    const lbv=legacyLogbookValue(ovLrc,l.id,modNum);
+    const cr=usCreditsByMod[modNum];
     const achieved=fv==='C'&&sv==='C';
     if(achieved)usEarned+=cr;
-    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
     return`<tr>
-      <td style="text-align:left;padding-left:12px">${esc(String(u.id))} ${u.title?`<small style="color:var(--muted)">— ${esc(u.title)}</small>`:''}</td>
+      <td style="text-align:left;padding-left:12px">Module ${modNum}</td>
       <td style="text-align:center">${cr}</td>
-      <td style="text-align:center">${mkB(fv)}</td>
-      <td style="text-align:center">${mkB(sv)}</td>
-      <td style="text-align:center">${achieved?'<span class="lrc-badge c">Achieved</span>':'<span class="lrc-badge na">Not Yet</span>'}</td>
+      <td style="text-align:center">${mkLrcB(fv)}</td>
+      <td style="text-align:center">${mkLrcB(sv)}</td>
+      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</td>
+      <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
     </tr>`;
   }).join('');
-  // One logbook mark per module now — build a compact per-module list instead
-  // of a single qualification-wide value (see legacyLogbookValue).
-  const usLogbookMods=[...new Set(usUnits.map(u=>u.mod||1))].sort((a,b)=>a-b);
-  const usLogbookByMod=usLogbookMods.map(modNum=>({mod:modNum,val:legacyLogbookValue(narratives._eisa,l.id,modNum)}));
+  // Read-only reference list of the actual unit standards, grouped by module.
+  const usRefList=usModNums.map(modNum=>{
+    const units=usUnits.filter(u=>(u.mod||1)===modNum);
+    return`<div style="margin-bottom:4px"><strong>Module ${modNum}:</strong> ${units.map(u=>`${esc(String(u.id))} (${esc(String(u.credits||0))}cr)`).join(', ')}</div>`;
+  }).join('');
 
   // ── Comment ──
   const comment=(narratives._comments||{})[l.id]||remoteComments[`${l.id}_${month}`]||'';
@@ -13436,20 +13878,20 @@ function _renderLRC(){
         <div class="lrc-section-title">📊 ${lrcIsLegacy?'Unit Standards Achieved':'Assessment Results (EISA)'}</div>
         ${lrcIsLegacy?`<table class="lrc-eisa-table">
           <thead><tr>
-            <th style="text-align:left">Unit Standard</th><th style="text-align:center">Credits</th>
+            <th style="text-align:left">Module</th><th style="text-align:center">Credits</th>
             <th style="text-align:center">Formative</th><th style="text-align:center">Summative</th>
-            <th style="text-align:center">Status</th>
+            <th style="text-align:center">Logbook</th><th style="text-align:center">Status</th>
           </tr></thead>
-          <tbody>${usRows||`<tr><td colspan="5" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
+          <tbody>${usRows||`<tr><td colspan="6" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
         </table>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;font-size:8.5pt;flex-wrap:wrap;gap:8px">
-          <span style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">Logbook: ${usLogbookByMod.map(m=>`<span style="white-space:nowrap">M${m.mod} ${m.val==='C'?'<span class="lrc-badge c">Achieved</span>':m.val==='NYC'?'<span class="lrc-badge nyc">Not Yet</span>':'<span class="lrc-badge na">—</span>'}</span>`).join('')||'<span class="lrc-badge na">—</span>'}</span>
+        <div style="margin-top:8px;font-size:7.5pt;color:var(--muted)">${usRefList}</div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:6px;font-size:8.5pt">
           <strong>Total Credits: ${usEarned} / ${usTotalCredits}</strong>
         </div>`:`<table class="lrc-eisa-table">
           <thead><tr>
             <th>Module</th><th style="text-align:center">KM</th><th style="text-align:center">PM</th>
             <th style="text-align:center">WM</th><th style="text-align:center">Exam V1</th>
-            <th style="text-align:center">Exam V2</th><th style="text-align:center">Status</th>
+            <th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th>
           </tr></thead>
           <tbody>${eisaRows}</tbody>
         </table>`}
@@ -13634,7 +14076,7 @@ async function runExportWithFilter(){
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk EISA Entry</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file.</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file. Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Competent) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent) · <span style="font-family:var(--mono);color:var(--gold2)">NS</span> (Non-Submission) · <span style="font-family:var(--mono);color:var(--gold2)">RW</span> (Remediation) · <span style="font-family:var(--mono);color:var(--gold2)">N/A</span>.</div>
       </div>
       <button onclick="closeEisaPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
     </div>
@@ -13643,12 +14085,16 @@ async function runExportWithFilter(){
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap">
         <div style="display:flex;flex-direction:column;gap:5px">
           <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Module</label>
-          <select id="eisa-paste-mod" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 14px;color:#fff;font-family:var(--font);font-size:10pt;outline:none;color-scheme:dark">
+          <select id="eisa-paste-mod" onchange="loadCurrentEisaValues()" style="background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:8px 14px;color:#fff;font-family:var(--font);font-size:10pt;outline:none;color-scheme:dark">
             <option value="1">Module 1</option>
             <option value="2">Module 2</option>
             <option value="3">Module 3</option>
             <option value="4">Module 4</option>
           </select>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;justify-content:flex-end">
+          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="loadCurrentEisaValues()" title="Reload the paste box with what's currently saved for this module — discards anything typed here that hasn't been applied">↺ Reload Current Values</button>
+          <button type="button" class="btn btn-ghost" style="padding:8px 14px;font-size:8.5pt;white-space:nowrap" onclick="downloadEisaTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers and current saved results for the selected module">⬇ Download Template</button>
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:5px">
           <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
@@ -13684,6 +14130,9 @@ async function runExportWithFilter(){
     <!-- Paste area -->
     <div style="padding:20px 24px 0;flex-shrink:0">
       <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <div style="margin:4px 0 6px">
+        <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:8pt;white-space:nowrap" onclick="downloadAttTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers and current session dates">⬇ Download Template</button>
+      </div>
       <textarea id="att-paste-area" rows="4" placeholder="ID Number&#9;2026-03-03&#9;2026-03-05&#9;2026-03-10&#10;9001234567890&#9;P&#9;P&#9;A&#10;8905123456789&#9;A&#9;P&#9;P" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseAttPaste()"></textarea>
     </div>
     <!-- Preview table -->
@@ -13750,13 +14199,16 @@ document.getElementById('bulk-dates-modal').addEventListener('click',function(e)
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div id="us-paste-title" style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Unit Standards Paste</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file):</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file). Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent).</div>
         <div id="us-paste-template" style="font-family:var(--mono);font-size:7.5pt;color:var(--gold2);background:rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;margin-top:6px;user-select:all;overflow-x:auto;white-space:nowrap"></div>
       </div>
       <button onclick="closeUsPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
     </div>
     <div style="padding:16px 24px 0;flex-shrink:0">
       <label style="font-size:8pt;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:rgba(255,255,255,.45)">Paste Excel data here (Ctrl+V / ⌘V)</label>
+      <div style="margin:4px 0 6px">
+        <button type="button" class="btn btn-ghost" style="padding:6px 12px;font-size:8pt;white-space:nowrap" onclick="downloadUsTemplate()" title="Download a CSV pre-filled with this programme's learner ID numbers for this module">⬇ Download Template</button>
+      </div>
       <textarea id="us-paste-area" rows="4" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.2);border-radius:8px;padding:10px 14px;color:#fff;font-family:var(--mono);font-size:8.5pt;outline:none;resize:vertical;width:100%;transition:.15s;margin-top:5px" onfocus="this.style.borderColor='var(--gold2)'" onblur="this.style.borderColor='rgba(255,255,255,.2)'" oninput="parseUsPaste()"></textarea>
     </div>
     <div id="us-paste-preview" style="flex:1;overflow:auto;padding:14px 24px 20px;min-height:100px">
@@ -13796,7 +14248,10 @@ function openUsResultsPaste(modNum){
   if(!units.length){toast('No unit standards registered for this module','warn');return;}
   _usPasteModNum=modNum;
   _usPasteUnits=units;
-  const headerCols=['ID Number',...units.flatMap(u=>[`${u.id}-F`,`${u.id}-S`]),'Logbook'];
+  // Formative/Summative/Logbook are tracked once per learner per module now
+  // (not per unit standard) — one column each, regardless of how many unit
+  // standards this module lists.
+  const headerCols=['ID Number','Formative','Summative','Logbook'];
   document.getElementById('us-paste-title').textContent=`📋 Bulk Unit Standards Paste — Module ${modNum}`;
   document.getElementById('us-paste-template').textContent=headerCols.join('\t');
   document.getElementById('us-paste-area').value='';
@@ -13820,7 +14275,7 @@ function _usNormResult(v){
 
 function _usColLabel(c){
   if(c.type==='logbook')return'Logbook';
-  return`${c.usId}-${c.role==='formative'?'F':'S'}`;
+  return c.role==='formative'?'Formative':'Summative';
 }
 
 function parseUsPaste(){
@@ -13837,20 +14292,15 @@ function parseUsPaste(){
   const lines=raw.split('\n').map(l=>l.split('\t').map(c=>c.trim())).filter(r=>r.length>=1&&r.some(c=>c));
   if(!lines.length){commit.disabled=true;return;}
 
-  // Match header columns to unit standards by normalised label (spaces,
-  // dashes and underscores stripped) so "10047-F", "10047 F" and "10047_F"
-  // all resolve the same way regardless of how Excel formatted the paste.
-  const colMap={};
-  _usPasteUnits.forEach(u=>{
-    const idNorm=String(u.id).toUpperCase().replace(/[\s_-]+/g,'');
-    colMap[idNorm+'F']={type:'unit',usId:u.id,role:'formative',credits:+u.credits||0};
-    colMap[idNorm+'S']={type:'unit',usId:u.id,role:'summative',credits:+u.credits||0};
-  });
+  // Formative/Summative/Logbook are tracked once per learner per module —
+  // recognise those three columns by header label regardless of exact
+  // wording ("Formative"/"F", "Summative"/"S", "Logbook"/"LB").
   const header=lines[0];
   const allCols=header.slice(1).map((h,i)=>{
     const norm=(h||'').toUpperCase().replace(/[\s_-]+/g,'');
     if(norm==='LOGBOOK'||norm==='LB')return{col:i+1,type:'logbook',label:h};
-    if(colMap[norm])return{col:i+1,label:h,...colMap[norm]};
+    if(norm==='FORMATIVE'||norm==='F')return{col:i+1,type:'unit',role:'formative',label:h};
+    if(norm==='SUMMATIVE'||norm==='S')return{col:i+1,type:'unit',role:'summative',label:h};
     return{col:i+1,type:null,label:h};
   });
   const validCols=allCols.filter(c=>c.type);
@@ -13877,7 +14327,7 @@ function parseUsPaste(){
     let learner=lMap[idNum];
     if(!learner&&idNum){const nk=normName(idNum);if(nk&&nameMap[nk]&&!nameDupes.has(nk))learner=nameMap[nk];}
     const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
-    const cells=validCols.map(c=>({...c,value:_usNormResult(cols[c.col])}));
+    const cells=validCols.map(c=>{const raw=(cols[c.col]||'').trim();const value=_usNormResult(cols[c.col]);return{...c,value,invalid:!!raw&&!value};});
     return{idNum,learner,cells,unmatchReason,rowIdx:i+2};
   });
 
@@ -13895,8 +14345,10 @@ function parseUsPaste(){
     ${validCols.map(c=>`<th style="text-align:center;padding:8px 6px;font-size:7pt;letter-spacing:.04em;color:rgba(255,255,255,.4);font-weight:700;white-space:nowrap">${esc(_usColLabel(c))}</th>`).join('')}
   </tr>`;
   const bodyRows=_usPasteRows.map(r=>{
+    const invalidCells=r.cells.filter(c=>c.invalid);
+    const invalidNote=invalidCells.length?` <span style="color:#f87171;font-weight:700" title="${esc(invalidCells.map(c=>_usColLabel(c)).join(', '))}">⚠ ${invalidCells.length} unrecognised</span>`:'';
     const matchCell=(r.learner&&!r.unmatchReason)
-      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      ?`<td style="color:#4ade80;font-size:8pt;padding:7px 10px;white-space:nowrap">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}${invalidNote}</td>`
       :`<td style="color:#f87171;font-size:8pt;padding:7px 10px;white-space:nowrap">⚠ ${esc(r.unmatchReason)}</td>`;
     return`<tr style="border-bottom:1px solid rgba(255,255,255,.07)">
       <td style="font-family:var(--mono);font-size:8pt;color:rgba(255,255,255,.7);padding:7px 10px">${esc(r.idNum)}</td>
@@ -13910,7 +14362,9 @@ function parseUsPaste(){
 
   const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
   const colNote=skippedCols?` · ${skippedCols} column${skippedCols!==1?'s':''} skipped (not recognised)`:'';
-  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} column${validCols.length!==1?'s':''}${colNote}`;
+  const invalidTotal=_usPasteRows.reduce((n,r)=>n+r.cells.filter(c=>c.invalid).length,0);
+  const invalidNote=invalidTotal?` · <span style="color:#f87171;font-weight:700">${invalidTotal} unrecognised code${invalidTotal!==1?'s':''} ignored — valid codes are C / NYC</span>`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${validCols.length} column${validCols.length!==1?'s':''}${colNote}${invalidNote}`;
   commit.disabled=matched===0;
 }
 
@@ -13955,7 +14409,7 @@ function commitUsPaste(){
     const l=r.learner;
     r.cells.forEach(c=>{
       if(!c.value)return; // blank/unrecognised — leave the existing value alone
-      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?usFormativeKey(l.id,c.usId):usSummativeKey(l.id,c.usId));
+      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?legacyFormativeKey(l.id,modNum):legacySummativeKey(l.id,modNum));
       const prev=narratives._eisa[key]||'';
       if(prev===c.value)return; // no-op, keep the undo stack meaningful
       affected.push({key,prev});
@@ -13983,13 +14437,33 @@ function commitUsPaste(){
 // ── Bulk EISA Paste ──
 let _eisaPasteRows=[];
 
+// Fills the paste box with what's ALREADY on file for the selected module
+// (via eisaCurrentRows — same source as downloadEisaTemplate) instead of a
+// blank textarea, then re-parses so the preview shows it immediately. This
+// is the "auto-populate from the database" default: a PM editing here is
+// changing a handful of results, not retyping the whole roster, so having
+// the correct starting values already in place is what actually reduces
+// transcription-error risk — a blank box only invites re-keying everything.
+function loadCurrentEisaValues(){
+  if(!activeProgramme)return;
+  const modNum=+document.getElementById('eisa-paste-mod').value||1;
+  const roster=getProgrammeLearners();
+  if(!roster.length){
+    document.getElementById('eisa-paste-area').value='';
+    parseEisaPaste();
+    return;
+  }
+  const current=eisaCurrentRows(modNum,roster);
+  const lines=['ID Number\tKM\tPM\tWM\tExam V1\tExam V1%\tExam V2\tExam V2%\tDate'];
+  current.forEach(r=>lines.push([r.id||r.name,r.km,r.pm,r.wm,r.examv1,r.examv1_pct,r.examv2,r.examv2_pct,''].join('\t')));
+  document.getElementById('eisa-paste-area').value=lines.join('\n');
+  parseEisaPaste();
+}
 function openEisaPaste(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
-  document.getElementById('eisa-paste-area').value='';
-  document.getElementById('eisa-paste-preview').innerHTML='<div id="eisa-paste-empty" style="padding:40px 0;text-align:center;color:rgba(255,255,255,.3);font-size:10pt">Paste data above to preview rows</div>';
-  document.getElementById('eisa-paste-summary').textContent='—';
   document.getElementById('eisa-paste-commit').disabled=true;
   _eisaPasteRows=[];
+  loadCurrentEisaValues();
   const m=document.getElementById('eisa-paste-modal');
   m.style.display='flex';
 }
@@ -14032,8 +14506,8 @@ function parseEisaPaste(){
   const idCounts={};
   dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
 
-  const VALID_RESULT=['C','NYC','N/A',''];
-  const normResult=v=>{const u=(v||'').toUpperCase().trim();if(u==='COMPETENT'||u==='C')return'C';if(u==='NYC'||u==='NOT YET COMPETENT')return'NYC';if(u==='N/A'||u==='NA')return'N/A';return'';}
+  const VALID_RESULT=['C','NYC','NS','RW','N/A',''];
+  const normResult=v=>{const u=(v||'').toUpperCase().trim();if(u==='COMPETENT'||u==='C')return'C';if(u==='NYC'||u==='NOT YET COMPETENT')return'NYC';if(u==='NS'||u==='NON-SUBMISSION'||u==='NON SUBMISSION')return'NS';if(u==='RW'||u==='REMEDIATION')return'RW';if(u==='N/A'||u==='NA')return'N/A';return'';}
   const normPct=v=>{const s=(v||'').replace('%','').trim();return s===''?'':s;}
 
   _eisaPasteRows=[];
@@ -14050,7 +14524,14 @@ function parseEisaPaste(){
     const examv2_pct=normPct(cols[7]);
     const date=(cols[8]||'').trim();
     const unmatchReason=!idNum?'No ID':idCounts[idNum]>1?'Duplicate ID':(learner?'':(nameDupes.has(normName(idNum))?'Name matches multiple learners':'ID/Name not in roster'));
-    _eisaPasteRows.push({idNum,learner,km,pm,wm,examv1,examv1_pct,examv2,examv2_pct,date,modNum,rowIdx:i+startIdx+1,unmatchReason});
+    // Flag cells where the PM typed *something* (e.g. "Y"/"N") that isn't a
+    // recognised result code — these were silently dropped before, which
+    // looked identical to leaving the cell blank. Surface them instead.
+    const invalidCols=[];
+    [['KM',1,km],['PM',2,pm],['WM',3,wm],['Exam V1',4,examv1],['Exam V2',6,examv2]].forEach(([label,ci,norm])=>{
+      if((cols[ci]||'').trim()&&!norm)invalidCols.push({label,raw:(cols[ci]||'').trim()});
+    });
+    _eisaPasteRows.push({idNum,learner,km,pm,wm,examv1,examv1_pct,examv2,examv2_pct,date,modNum,rowIdx:i+startIdx+1,unmatchReason,invalidCols});
   });
 
   const matched=_eisaPasteRows.filter(r=>r.learner&&!r.unmatchReason).length;
@@ -14060,11 +14541,12 @@ function parseEisaPaste(){
   const notInRosterCount=_eisaPasteRows.filter(r=>r.unmatchReason==='ID not in roster').length;
 
   // Build preview table
-  const badgeResult=v=>v==='C'?`<span style="background:#1B7A4A;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">C</span>`:v==='NYC'?`<span style="background:#CC6B00;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">NYC</span>`:v==='N/A'?`<span style="background:#666;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">N/A</span>`:v?`<span style="color:rgba(255,255,255,.4)">${v}</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
+  const badgeResult=v=>v==='C'?`<span style="background:#1B7A4A;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">C</span>`:isEisaOutstanding(v)?`<span style="background:#CC6B00;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">${v}</span>`:v==='N/A'?`<span style="background:#666;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">N/A</span>`:v?`<span style="color:rgba(255,255,255,.4)">${v}</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
 
   const rows=_eisaPasteRows.map(r=>{
+    const invalidNote=r.invalidCols&&r.invalidCols.length?` <span style="color:#f87171;font-weight:700" title="${esc(r.invalidCols.map(c=>c.label+': "'+c.raw+'"').join(', '))}">⚠ ${r.invalidCols.length} unrecognised code${r.invalidCols.length!==1?'s':''}</span>`:'';
     const matchCell=(r.learner&&!r.unmatchReason)
-      ?`<td style="color:#4ade80;font-size:8pt">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}</td>`
+      ?`<td style="color:#4ade80;font-size:8pt">${esc(r.learner.first_name)} ${esc(r.learner.last_name)}${invalidNote}</td>`
       :`<td style="color:#f87171;font-size:8pt">⚠ ${esc(r.unmatchReason)}</td>`;
     const examCell=r.examv1?(r.examv1_pct?`${badgeResult(r.examv1)} <span style="color:rgba(255,255,255,.5);font-size:7.5pt">${r.examv1_pct}%</span>`:badgeResult(r.examv1)):badgeResult('');
     const exam2Cell=r.examv2?(r.examv2_pct?`${badgeResult(r.examv2)} <span style="color:rgba(255,255,255,.5);font-size:7.5pt">${r.examv2_pct}%</span>`:badgeResult(r.examv2)):badgeResult('');
@@ -14095,7 +14577,9 @@ function parseEisaPaste(){
   </table>`;
 
   const unmatchedBreakdown=unmatched?[notInRosterCount&&`${notInRosterCount} not in roster`,dupCount&&`${dupCount} duplicate ID`,noIdCount&&`${noIdCount} no ID`].filter(Boolean).join(', '):'';
-  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${_eisaPasteRows.length} rows total`;
+  const invalidCount=_eisaPasteRows.reduce((n,r)=>n+(r.invalidCols?r.invalidCols.length:0),0);
+  const invalidNote=invalidCount?` · <span style="color:#f87171;font-weight:700">${invalidCount} unrecognised code${invalidCount!==1?'s':''} ignored — valid codes are C / NYC / N/A</span>`:'';
+  summary.innerHTML=`<span style="color:#4ade80;font-weight:700">${matched} matched</span> · <span style="color:${unmatched?'#f87171':'rgba(255,255,255,.4)'}${unmatched?';font-weight:700':''}">${unmatched} unmatched${unmatchedBreakdown?` (${unmatchedBreakdown})`:''}</span> · ${_eisaPasteRows.length} rows total${invalidNote}`;
   commit.disabled=matched===0;
 }
 
@@ -14478,7 +14962,8 @@ function _updateProgressPanel(){
     const a=attState[l.id]||{};
     return attDates.every(d=>a[d]&&a[d]!=='');
   });
-  items.push({id:'att',label:'Attendance',state:allAttFilled?'done':attFilled?'partial':'',anchor:'att'});
+  const noClassesThisMonth=narratives.no_classes===true||narratives.no_classes==='true';
+  items.push({id:'att',label:'Attendance',state:noClassesThisMonth?'done':(allAttFilled?'done':attFilled?'partial':''),anchor:'att'});
 
   // 2b. Module dates — every module card needs a date range before send,
   // so a report can never go out showing an unfilled "Add dates" card to
@@ -14518,9 +15003,9 @@ function _updateProgressPanel(){
   // Formative/Summative unit-standard tracking, not a QCTO EISA process, so
   // there's nothing meaningful for a PM to write here.
   const legacyForNar=isLegacyProgramme(activeProgramme);
-  const narModNums=displayModuleNums(activeProgramme).filter(n=>n<=4);
+  const narModNums=displayModuleNums(activeProgramme);
   const narKeys=[...narModNums.map(n=>`feedback_m${n}`),'att_summary',...(legacyForNar?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
-  const narLabels={feedback_m1:'Module 1 Narrative',feedback_m2:'Module 2 Narrative',feedback_m3:'Module 3 Narrative',feedback_m4:'Module 4 Narrative',att_summary:'Attendance Summary',eisa_summary:'EISA',time_keeping:'Time Keeping',interaction:'Interaction & Participation',concerns:'Concerns'};
+  const narLabels=Object.fromEntries(narKeys.map(k=>[k,daLabel(k).replace(' — Feedback',' Narrative')]));
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
   items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
@@ -14836,7 +15321,7 @@ async function runMultiProgExport() {
         'enrolments',
         `select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`
       );
-      progEnrolments = enrolled.map(e => ({ id: e.id, programme_id: e.programme_id, learner_id: e.learner_id, status: e.status }));
+      progEnrolments = enrolled.map(e => ({ id: e.id, programme_id: e.programme_id, learner_id: e.learner_id, status: e.status, fields: e.fields || {} }));
       progLearners = enrolled.map(e => e.learner).filter(Boolean);
 
       const [att, ei, lc] = await Promise.all([
