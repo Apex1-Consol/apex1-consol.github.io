@@ -4288,7 +4288,7 @@ function computeCoverStats(pLearners,prog){
         const ov=narratives._eisa||{};
         const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
         const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-        if(vals.some(v=>v==='NYC'))anyNYC=true;
+        if(vals.some(isEisaOutstanding))anyNYC=true;
       });
       if(anyNYC)flagged++;
     });
@@ -4425,7 +4425,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
       const ov=narratives._eisa||{};
       const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
       const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-      if(vals.some(v=>v==='NYC')){anyNYC=true;nycCount++;}
+      if(vals.some(isEisaOutstanding)){anyNYC=true;nycCount++;}
     });
     nycCountByModule[m]=nycCount;
     if(anyNYC)flaggedModules++;
@@ -4698,7 +4698,7 @@ function buildCohortSummary(pLearners){
       const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
       if(!vals.length){blank++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else blank++;
     });
     const total=pLearners.length||1;
@@ -4707,7 +4707,7 @@ function buildCohortSummary(pLearners){
     return`<div class="cs-card cs-m${m}">
       <label>Module ${m}</label>
       <div class="cs-big">${comp}<span style="font-size:10pt;font-weight:600;color:var(--muted)">/${total}</span></div>
-      <div class="cs-sub">${comp} competent · ${nyc} NYC</div>
+      <div class="cs-sub">${comp} competent · ${nyc} outstanding</div>
       <div class="cs-bar"><div class="cs-bar-fill" style="width:${pct}%;background:${barCol}"></div></div>
     </div>`;
   }).join('');
@@ -4818,6 +4818,36 @@ const MOD_STATUS_STYLE={
   current:{label:'In progress',bg:'#E6F1FB',fg:'#0C447C'},
   upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'}
 };
+// ── EISA result codes (KM/PM/WM/Exam) ──
+// 'NYC' used to be the only non-Competent outcome a facilitator could record.
+// NS (Non-Submission) and RW (Remediation) are two more specific reasons a
+// module isn't Competent yet — kept as their own codes (not folded into a
+// generic NYC) so the Learner Report Card's Provisional Status can say which
+// one applies, while every existing "is this module NYC?" check (risk
+// flags, cohort NYC counts, the Programme Timeline badge) still needs to
+// treat all three as "not yet competent" for counting purposes. Everywhere
+// that used to test `v==='NYC'` for that purpose now calls
+// isEisaOutstanding(v) instead, so NS/RW aren't silently miscounted as
+// "no data yet".
+const EISA_RESULT_LABELS={C:'Competent',NYC:'Not Yet Competent',NS:'Non-Submission',RW:'Remediation'};
+function isEisaOutstanding(v){return v==='NYC'||v==='NS'||v==='RW';}
+function eisaResultLabel(v){return EISA_RESULT_LABELS[v]||'';}
+// Shared "overall module status for this learner" used by the Assessment
+// Results table, its live onchange handler, and the Learner Report Card —
+// same priority order everywhere (Non-Submission > Remediation > Not Yet
+// Competent > Competent > Pending) so the three surfaces can't disagree.
+function eisaOverallLabel(allC,vals){
+  if(allC)return'Competent';
+  if(vals.some(v=>v==='NS'))return'Non-Submission';
+  if(vals.some(v=>v==='RW'))return'Remediation';
+  if(vals.some(v=>v==='NYC'))return'Not Yet Competent';
+  return'Pending';
+}
+function eisaOverallBadgeClass(allC,vals){
+  if(allC)return'badge-c';
+  if(vals.some(isEisaOutstanding))return'badge-nyc';
+  return'badge-pending';
+}
 // Shared per-learner risk rating — mirrors the logic used on the Participation
 // page (getRiskLabel/getLegacyRiskLabel) so risk counts stay consistent
 // wherever they're shown in the report (Participation page, Executive Summary).
@@ -4841,7 +4871,7 @@ function getLearnerRiskLabel(l){
   const res=eisaState[l.id]||{};
   if(!Object.keys(res).length)return'Unknown';
   let nyc=0,total=0;
-  displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+  displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(isEisaOutstanding(r[k]))nyc++;}});});
   if(!total)return'Unknown';
   const pct=nyc/total;
   return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -5058,7 +5088,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     if(isLegacyProgramme(activeProgramme))return getLegacyRiskLabel(l);
     if(!hasAny)return'Unknown';
     let nyc=0,total=0;
-    displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(r[k]==='NYC')nyc++;}});});
+    displayModuleNums(activeProgramme).forEach(m=>{const r=res[m]||{};['km','pm','wm'].forEach(k=>{if(r[k]){total++;if(isEisaOutstanding(r[k]))nyc++;}});});
     if(!total)return'Unknown';
     const pct=nyc/total;
     return pct===0?'Low':pct<=0.5?'Medium':'High';
@@ -5493,29 +5523,32 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
     const res=(eisaState[l.id]||{})[modNum]||{};
     const ek=`${l.id}_m${modNum}`;
     const mkVal=(field,val)=>{const saved=(nar._eisa||{})[`${ek}_${field}`];return saved!==undefined?saved:val||'';};
+    // NS (Non-Submission) and RW (Remediation) sit alongside NYC as the
+    // specific reasons a result isn't Competent yet — see isEisaOutstanding.
+    const resultOptions=v=>`<option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option><option value="NS" ${v==='NS'?'selected':''}>NS</option><option value="RW" ${v==='RW'?'selected':''}>RW</option>`;
     const mkResult=(field,val)=>{
       const v=mkVal(field,val);
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
-      return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option></select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
+      return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}</select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
     };
     const mkExam=(field,pctField,val,pct)=>{
       const v=mkVal(field,val);const p=mkVal(pctField,pct);
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
       const pt=v?(p?v+' / '+p+'%':v):'&#8212;';
-      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)"><option value="">&#8212;</option><option value="C" ${v==='C'?'selected':''}>C</option><option value="NYC" ${v==='NYC'?'selected':''}>NYC</option><option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
+      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}<option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
     };
     const km=mkVal('km',res.km),pm=mkVal('pm',res.pm),wm=mkVal('wm',res.wm),ev1=mkVal('examv1',res.examv1),ev2=mkVal('examv2',res.examv2);
     const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
-    const allC=[km,pm,wm,ev1,ev2].filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
-    const anyNYC=[km,pm,wm,ev1,ev2].some(v=>v==='NYC');
-    const overall=allC?'<span class="badge badge-c">Complete</span>':anyNYC?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+    const rowVals=[km,pm,wm,ev1,ev2];
+    const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+    const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
     const resultVals={km,pm,wm};
     const colCells=cols.map(c=>`<td>${mkResult(c.key,resultVals[c.key])}</td>`).join('');
     return`<tr><td>${esc(l.first_name)} ${esc(l.last_name)}</td>${colCells}<td>${mkExam('examv1','examv1_pct',res.examv1,res.examv1_pct)}</td><td>${mkExam('examv2','examv2_pct',res.examv2,res.examv2_pct)}</td><td style="text-align:center">${overall}</td></tr>`;
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
-  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
   return pageShell(pn||4+modNum,0,activeClient.client_name,'Assessment — Module '+modNum,body);
 }
 
@@ -6299,7 +6332,7 @@ function draftNarrative(key, btn){
       const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else pending++;
     });
     return{m,comp,nyc,pending,total:pLearners.length};
@@ -6439,7 +6472,7 @@ function _computeDraft(key){
       const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
-      const anyNYC=vals.some(v=>v==='NYC');
+      const anyNYC=vals.some(isEisaOutstanding);
       if(allC)comp++;else if(anyNYC)nyc++;else pending++;
     });
     return{m,comp,nyc,pending,total:pLearners.length};
@@ -6888,9 +6921,9 @@ function updateRowStatus(sel){
   const km=val('km'),pm=val('pm'),wm=val('wm'),ev1=val('examv1'),ev2=val('examv2');
   const applies=moduleAppliesTypes(activeProgramme,+m[2]);
   const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
-  const allC=[km,pm,wm,ev1,ev2].filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
-  const anyNYC=[km,pm,wm,ev1,ev2].some(v=>v==='NYC');
-  const overall=allC?'<span class="badge badge-c">Complete</span>':anyNYC?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
+  const rowVals=[km,pm,wm,ev1,ev2];
+  const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+  const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
   const statusCell=document.querySelector(`select[data-eisa="${prefix}examv1"]`)?.closest('tr')?.querySelector('td:last-child');
   if(statusCell)statusCell.innerHTML=overall;
 }
@@ -6905,11 +6938,11 @@ function syncResult(sel){
   }
   if(printSpan&&printSpan.classList.contains('result-print')){
     const v=sel.value;
-    printSpan.className='result-print badge '+(v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na');
+    printSpan.className='result-print badge '+(v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na');
     printSpan.textContent=v||'—';
   }else if(printSpan&&printSpan.classList.contains('exam-print')){
     const v=sel.value;
-    const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+    const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
     const pctInp=sel.closest('.exam-screen')?.querySelector('.exam-input');
     const p=pctInp?pctInp.value:'';
     printSpan.className='exam-print badge '+(v?bc:'badge-na');
@@ -6938,7 +6971,7 @@ function syncExamPct(inp){
     if(printSpan){
       const v=sel.value;
       const p=inp.value;
-      const bc=v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na';
+      const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
       printSpan.className='result-print badge '+(v?bc:'badge-na');
       printSpan.textContent=v?(p?v+' / '+p+'%':v):'—';
     }
@@ -13482,11 +13515,15 @@ function _renderLRC(){
       examv1:ov_v('examv1',base.examv1),examv2:ov_v('examv2',base.examv2),
       examv1_pct:ov_v('examv1_pct',base.examv1_pct),examv2_pct:ov_v('examv2_pct',base.examv2_pct)
     };
-    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
+    const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':isEisaOutstanding(v)?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
     const pct=v=>res[v+'_pct']?` <small style="color:var(--muted)">${res[v+'_pct']}%</small>`:'';
+    const lrcRowVals=[res.km,res.pm,res.wm,res.examv1,res.examv2];
     const allC=res.km==='C'&&res.pm==='C'&&res.wm==='C'&&res.examv1==='C'&&(res.examv2==='C'||!res.examv2||res.examv2==='N/A');
-    const anyNYC=res.km==='NYC'||res.pm==='NYC'||res.wm==='NYC'||res.examv1==='NYC'||res.examv2==='NYC';
-    const overall=allC?`<span class="lrc-badge c">Complete</span>`:anyNYC?`<span class="lrc-badge nyc">In Progress</span>`:`<span class="lrc-badge na">Pending</span>`;
+    // .lrc-badge only defines c/nyc/na variants (no dedicated "pending"
+    // style), unlike the .badge-* classes used on the main Assessment
+    // Results table — map badge-pending to the existing na (grey) look.
+    const lrcCls=eisaOverallBadgeClass(allC,lrcRowVals)==='badge-c'?'c':eisaOverallBadgeClass(allC,lrcRowVals)==='badge-nyc'?'nyc':'na';
+    const overall=`<span class="lrc-badge ${lrcCls}">${eisaOverallLabel(allC,lrcRowVals)}</span>`;
     return`<tr>
       <td style="border-left:3px solid ${modColors[mod]};padding-left:12px;font-weight:700;color:${modColors[mod]}">${modLabels[mod]}</td>
       <td style="text-align:center">${mkB(res.km)}${pct('km')}</td>
@@ -13596,7 +13633,7 @@ function _renderLRC(){
           <thead><tr>
             <th>Module</th><th style="text-align:center">KM</th><th style="text-align:center">PM</th>
             <th style="text-align:center">WM</th><th style="text-align:center">Exam V1</th>
-            <th style="text-align:center">Exam V2</th><th style="text-align:center">Status</th>
+            <th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th>
           </tr></thead>
           <tbody>${eisaRows}</tbody>
         </table>`}
@@ -13781,7 +13818,7 @@ async function runExportWithFilter(){
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk EISA Entry</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file. Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent) · <span style="font-family:var(--mono);color:var(--gold2)">N/A</span>.</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — columns: <span style="font-family:var(--mono);color:var(--gold2)">ID Number · KM · PM · WM · Exam V1 · Exam V1% · Exam V2 · Exam V2% · Date</span>. First column can be an ID Number or the learner's full name if no ID Number is on file. Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Competent) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent) · <span style="font-family:var(--mono);color:var(--gold2)">NS</span> (Non-Submission) · <span style="font-family:var(--mono);color:var(--gold2)">RW</span> (Remediation) · <span style="font-family:var(--mono);color:var(--gold2)">N/A</span>.</div>
       </div>
       <button onclick="closeEisaPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center">×</button>
     </div>
@@ -14190,8 +14227,8 @@ function parseEisaPaste(){
   const idCounts={};
   dataLines.forEach(cols=>{const id=(cols[0]||'').trim();if(id)idCounts[id]=(idCounts[id]||0)+1;});
 
-  const VALID_RESULT=['C','NYC','N/A',''];
-  const normResult=v=>{const u=(v||'').toUpperCase().trim();if(u==='COMPETENT'||u==='C')return'C';if(u==='NYC'||u==='NOT YET COMPETENT')return'NYC';if(u==='N/A'||u==='NA')return'N/A';return'';}
+  const VALID_RESULT=['C','NYC','NS','RW','N/A',''];
+  const normResult=v=>{const u=(v||'').toUpperCase().trim();if(u==='COMPETENT'||u==='C')return'C';if(u==='NYC'||u==='NOT YET COMPETENT')return'NYC';if(u==='NS'||u==='NON-SUBMISSION'||u==='NON SUBMISSION')return'NS';if(u==='RW'||u==='REMEDIATION')return'RW';if(u==='N/A'||u==='NA')return'N/A';return'';}
   const normPct=v=>{const s=(v||'').replace('%','').trim();return s===''?'':s;}
 
   _eisaPasteRows=[];
@@ -14225,7 +14262,7 @@ function parseEisaPaste(){
   const notInRosterCount=_eisaPasteRows.filter(r=>r.unmatchReason==='ID not in roster').length;
 
   // Build preview table
-  const badgeResult=v=>v==='C'?`<span style="background:#1B7A4A;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">C</span>`:v==='NYC'?`<span style="background:#CC6B00;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">NYC</span>`:v==='N/A'?`<span style="background:#666;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">N/A</span>`:v?`<span style="color:rgba(255,255,255,.4)">${v}</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
+  const badgeResult=v=>v==='C'?`<span style="background:#1B7A4A;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">C</span>`:isEisaOutstanding(v)?`<span style="background:#CC6B00;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">${v}</span>`:v==='N/A'?`<span style="background:#666;color:#fff;border-radius:4px;padding:2px 8px;font-size:7.5pt;font-weight:700">N/A</span>`:v?`<span style="color:rgba(255,255,255,.4)">${v}</span>`:`<span style="color:rgba(255,255,255,.2)">—</span>`;
 
   const rows=_eisaPasteRows.map(r=>{
     const invalidNote=r.invalidCols&&r.invalidCols.length?` <span style="color:#f87171;font-weight:700" title="${esc(r.invalidCols.map(c=>c.label+': "'+c.raw+'"').join(', '))}">⚠ ${r.invalidCols.length} unrecognised code${r.invalidCols.length!==1?'s':''}</span>`:'';
