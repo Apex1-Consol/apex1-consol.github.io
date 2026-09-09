@@ -7715,16 +7715,25 @@ async function runGenericOnSheet(sheetName) {
         return { fields };
     }).filter(r => Object.keys(r.fields).length > 0);
 
-    let saved = 0, skipped = 0;
+    let saved = 0, skipped = 0, failed = 0;
     for (const rec of records) {
         if (createTableName === 'Learners') {
             const nid = (rec.fields['National ID'] || '').trim();
             if (nid && isDuplicateLearner(nid, null)) { skipped++; continue; }
         }
         try { await createRecord(createTableName, rec.fields); saved++; }
-        catch(e) { console.warn('Generic import row failed:', e); }
+        catch(e) {
+            console.warn('Generic import row failed:', e);
+            // A 409 on a Learners insert almost always means the National ID collided
+            // with an existing row that isDuplicateLearner's in-memory check missed
+            // (e.g. a row whose fields blob doesn't carry "National ID" even though its
+            // flat id_number column is set). Count it as a caught duplicate rather than
+            // letting it vanish silently from the summary.
+            if (createTableName === 'Learners' && String(e.message||'').includes('409')) skipped++;
+            else failed++;
+        }
     }
-    return [{sheet:sheetName, table:tableDef.label + ' (auto-detected)', count:saved, skipped:skipped, ok:true, targetKey:bestKey}];
+    return [{sheet:sheetName, table:tableDef.label + ' (auto-detected)', count:saved, skipped:skipped, failed:failed, ok:true, targetKey:bestKey}];
 }
 
 // Build preview for generic mode
@@ -8268,7 +8277,7 @@ async function runSmartImport() {
             // row is saved, so this also catches duplicates repeated within
             // the same import file. This is the fix for imported learner
             // lists silently re-creating duplicates when re-uploaded.
-            let saved = 0, skipped = 0;
+            let saved = 0, skipped = 0, failed = 0;
             for (const rec of records) {
                 if (createTableName === 'Learners') {
                     const nid = (rec.fields['National ID'] || '').trim();
@@ -8277,9 +8286,19 @@ async function runSmartImport() {
                 try {
                     await createRecord(createTableName, rec.fields);
                     saved++;
-                } catch(e) { console.warn('Import row failed:', e); }
+                } catch(e) {
+                    console.warn('Import row failed:', e);
+                    // A 409 on a Learners insert almost always means the National ID
+                    // collided with an existing row that isDuplicateLearner's in-memory
+                    // check missed (e.g. a row whose fields blob doesn't carry
+                    // "National ID" even though its flat id_number column is set).
+                    // Count it as a caught duplicate rather than letting it vanish
+                    // silently from the summary.
+                    if (createTableName === 'Learners' && String(e.message||'').includes('409')) skipped++;
+                    else failed++;
+                }
             }
-            results.push({sheet:sheetName, table:TABLE_FIELDS[tableKey].label, count:saved, skipped:skipped, ok:true});
+            results.push({sheet:sheetName, table:TABLE_FIELDS[tableKey].label, count:saved, skipped:skipped, failed:failed, ok:true});
         } catch(err) {
             results.push({sheet:sheetName, table:tableKey, count:0, ok:false, err:err.message});
         }
@@ -8304,7 +8323,7 @@ async function runSmartImport() {
             <span style="font-size:16px;">${r.ok?'✅':'❌'}</span>
             <div>
                 <div style="font-size:12px;font-weight:600;color:var(--text-primary);">${escapeHtml(r.sheet)} → ${escapeHtml(r.table)}</div>
-                <div style="font-size:11px;color:var(--text-muted);">${r.ok ? r.count+' records imported'+(r.skipped?' · '+r.skipped+' skipped (duplicate ID number)':'') : 'Error: '+(r.err||'unknown')}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${r.ok ? r.count+' records imported'+(r.skipped?' · '+r.skipped+' skipped (duplicate ID number)':'')+(r.failed?' · '+r.failed+' failed (see console)':'') : 'Error: '+(r.err||'unknown')}</div>
             </div></div>`).join('');
 
     summaryDiv.style.display = 'block';
