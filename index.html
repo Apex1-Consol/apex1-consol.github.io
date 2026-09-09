@@ -2493,6 +2493,13 @@ async function buildTypedColumns(table, fields) {
         case 'Learners':
             cols.first_name = fields['First Name'] || '';
             cols.last_name  = fields['Last Name']  || '';
+            // Mirror National ID into the typed id_number column (kept in
+            // sync with fields['National ID'] above) so the DB-level
+            // uq_learners_id_number unique index actually has something to
+            // enforce against for rows created through the app — it was
+            // previously left NULL here, which meant the constraint never
+            // applied to app-created learners at all.
+            cols.id_number = fields['National ID'] || null;
             break;
         case 'Clients':
             cols.client_name = fields['Company Name'] || 'Unnamed Client';
@@ -7708,12 +7715,16 @@ async function runGenericOnSheet(sheetName) {
         return { fields };
     }).filter(r => Object.keys(r.fields).length > 0);
 
-    let saved = 0;
+    let saved = 0, skipped = 0;
     for (const rec of records) {
+        if (createTableName === 'Learners') {
+            const nid = (rec.fields['National ID'] || '').trim();
+            if (nid && isDuplicateLearner(nid, null)) { skipped++; continue; }
+        }
         try { await createRecord(createTableName, rec.fields); saved++; }
         catch(e) { console.warn('Generic import row failed:', e); }
     }
-    return [{sheet:sheetName, table:tableDef.label + ' (auto-detected)', count:saved, ok:true, targetKey:bestKey}];
+    return [{sheet:sheetName, table:tableDef.label + ' (auto-detected)', count:saved, skipped:skipped, ok:true, targetKey:bestKey}];
 }
 
 // Build preview for generic mode
@@ -8250,15 +8261,25 @@ async function runSmartImport() {
             };
             const createTableName = tableNameMap[tableKey] || tableKey;
 
-            // Write each record to Supabase
-            let saved = 0;
+            // Write each record to Supabase. For Learners specifically,
+            // skip rows whose National ID already matches an existing (or
+            // already-imported-this-run) learner — isDuplicateLearner reads
+            // state.learners, which createRecord keeps up to date as each
+            // row is saved, so this also catches duplicates repeated within
+            // the same import file. This is the fix for imported learner
+            // lists silently re-creating duplicates when re-uploaded.
+            let saved = 0, skipped = 0;
             for (const rec of records) {
+                if (createTableName === 'Learners') {
+                    const nid = (rec.fields['National ID'] || '').trim();
+                    if (nid && isDuplicateLearner(nid, null)) { skipped++; continue; }
+                }
                 try {
                     await createRecord(createTableName, rec.fields);
                     saved++;
                 } catch(e) { console.warn('Import row failed:', e); }
             }
-            results.push({sheet:sheetName, table:TABLE_FIELDS[tableKey].label, count:saved, ok:true});
+            results.push({sheet:sheetName, table:TABLE_FIELDS[tableKey].label, count:saved, skipped:skipped, ok:true});
         } catch(err) {
             results.push({sheet:sheetName, table:tableKey, count:0, ok:false, err:err.message});
         }
@@ -8283,7 +8304,7 @@ async function runSmartImport() {
             <span style="font-size:16px;">${r.ok?'✅':'❌'}</span>
             <div>
                 <div style="font-size:12px;font-weight:600;color:var(--text-primary);">${escapeHtml(r.sheet)} → ${escapeHtml(r.table)}</div>
-                <div style="font-size:11px;color:var(--text-muted);">${r.ok ? r.count+' records imported' : 'Error: '+(r.err||'unknown')}</div>
+                <div style="font-size:11px;color:var(--text-muted);">${r.ok ? r.count+' records imported'+(r.skipped?' · '+r.skipped+' skipped (duplicate ID number)':'') : 'Error: '+(r.err||'unknown')}</div>
             </div></div>`).join('');
 
     summaryDiv.style.display = 'block';

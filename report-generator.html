@@ -2425,7 +2425,10 @@ body.compact-density .progress-bar-wrap{height:6px}
         <div id="review-tag-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
           <span style="font-size:7pt;color:rgba(255,255,255,.4);width:100%;margin-bottom:2px">Tag the section(s) that need fixing (optional):</span>
           <span class="review-tag-chip" data-tag="att" onclick="_toggleReviewTag(this)">Attendance</span>
-          <span id="review-tag-mod-chips" style="display:contents"></span>
+          <span class="review-tag-chip" data-tag="eisa-mod-1" onclick="_toggleReviewTag(this)">Module 1 EISA</span>
+          <span class="review-tag-chip" data-tag="eisa-mod-2" onclick="_toggleReviewTag(this)">Module 2 EISA</span>
+          <span class="review-tag-chip" data-tag="eisa-mod-3" onclick="_toggleReviewTag(this)">Module 3 EISA</span>
+          <span class="review-tag-chip" data-tag="eisa-mod-4" onclick="_toggleReviewTag(this)">Module 4 EISA</span>
           <span class="review-tag-chip" data-tag="comments" onclick="_toggleReviewTag(this)">Observations</span>
           <span class="review-tag-chip" data-tag="overview-narratives" onclick="_toggleReviewTag(this)">Narratives</span>
         </div>
@@ -4251,21 +4254,10 @@ function generateReport(skipChecklistGate){
       el.style.display=isLegacy?'none':'';
     }
   });
-  // Module chips generated from actual module count, not hardcoded to 4
-  // (legacy quals can have 5+ modules; a hardcoded list left module 5+
-  // untaggable for review comments).
-  {
-    const modChipUnits=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
-    const modNums=[...new Set(modChipUnits.map(u=>u.mod||1))].sort((a,b)=>a-b);
-    const wrap=document.getElementById('review-tag-mod-chips');
-    if(wrap){
-      wrap.innerHTML=modNums.map(m=>{
-        const label=isLegacy?`Module ${m}`:`Module ${m} EISA`;
-        REVIEW_TAG_LABELS['eisa-mod-'+m]=label;
-        return`<span class="review-tag-chip" data-tag="eisa-mod-${m}" onclick="_toggleReviewTag(this)">${esc(label)}</span>`;
-      }).join('');
-    }
-  }
+  document.querySelectorAll('.review-tag-chip[data-tag^="eisa-mod-"]').forEach(el=>{
+    const modN=el.getAttribute('data-tag').replace('eisa-mod-','');
+    el.textContent=isLegacy?`Module ${modN}`:`Module ${modN} EISA`;
+  });
 
   const pages=document.getElementById('report-pages');
   pages.innerHTML='';
@@ -6046,8 +6038,6 @@ function getModuleTrainingStatus(modNum){
     if(modStarted&&!modComplete)anyProgress=true;
   });
   if(allTrained)return'trained';
-  const range=(typeof parseModDateRange==='function')?parseModDateRange(activeProgramme&&activeProgramme['module_'+modNum+'_dates']):null;
-  if(range&&range.end&&range.end<new Date())return'completed';
   if(anyProgress)return'progress';
   return'nyt';
 }
@@ -6086,8 +6076,6 @@ function buildUnitsTable(prog){
     const st=modStatus[u.mod]||'nyt';
     const status=st==='trained'
       ?`<span class="unit-status unit-complete">Trained</span>`
-      :st==='completed'
-      ?`<span class="unit-status unit-complete">Completed</span>`
       :st==='progress'
       ?`<span class="unit-status unit-pending">In Progress</span>`
       :`<span class="unit-status unit-nyt">Not Yet Trained</span>`;
