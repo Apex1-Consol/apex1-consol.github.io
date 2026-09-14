@@ -4,16 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APEX ONE - Central Hub System</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2">
-var currentFramework=localStorage.getItem('apexone_framework')||'seta';
-function toggleFrameworkDropdown(e){if(e)e.stopPropagation();document.getElementById('fwDropdown').classList.toggle('open');}
-document.addEventListener('click',function(e){var s=document.getElementById('fwSelect');if(s&&!s.contains(e.target))document.getElementById('fwDropdown').classList.remove('open');});
-function setFramework(fw){currentFramework=fw;localStorage.setItem('apexone_framework',fw);document.getElementById('fwLabel').textContent=fw==='seta'?'SETA Legacy':'QCTO Occupational';document.getElementById('fwDot').className='fw-dot '+fw;document.querySelectorAll('.fw-option').forEach(function(o){o.classList.toggle('active',o.getAttribute('data-fw')===fw);});document.getElementById('fwDropdown').classList.remove('open');applyFrameworkVisibility();}
-function applyFrameworkVisibility(){document.querySelectorAll('[data-fw-show]').forEach(function(el){el.classList.toggle('fw-hidden',el.getAttribute('data-fw-show')!==currentFramework);});}
-var _origAV=typeof applyActionVisibility==='function'?applyActionVisibility:null;
-if(_origAV){var _fp=false;applyActionVisibility=function(){_origAV.apply(this,arguments);if(!_fp){_fp=true;setFramework(currentFramework);}else{applyFrameworkVisibility();}};}
-document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){setFramework(currentFramework);},300);});
-</script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://unpkg.com/pizzip@3.1.4/dist/pizzip.js"></script>
     <script src="https://unpkg.com/docxtemplater@3.44.0/js/docxtemplater.js"></script>
@@ -9129,6 +9120,18 @@ window.addEventListener('afterprint', () => {
 
 
 
+
+// ============================================
+// Framework Switching & Lifecycle Nav (v4.0)
+// ============================================
+var currentFramework=localStorage.getItem('apexone_framework')||'seta';
+function toggleFrameworkDropdown(e){if(e)e.stopPropagation();document.getElementById('fwDropdown').classList.toggle('open');}
+document.addEventListener('click',function(e){var s=document.getElementById('fwSelect');if(s&&!s.contains(e.target))document.getElementById('fwDropdown').classList.remove('open');});
+function setFramework(fw){currentFramework=fw;localStorage.setItem('apexone_framework',fw);document.getElementById('fwLabel').textContent=fw==='seta'?'SETA Legacy':'QCTO Occupational';document.getElementById('fwDot').className='fw-dot '+fw;document.querySelectorAll('.fw-option').forEach(function(o){o.classList.toggle('active',o.getAttribute('data-fw')===fw);});document.getElementById('fwDropdown').classList.remove('open');applyFrameworkVisibility();}
+function applyFrameworkVisibility(){document.querySelectorAll('[data-fw-show]').forEach(function(el){el.classList.toggle('fw-hidden',el.getAttribute('data-fw-show')!==currentFramework);});}
+var _origAV=typeof applyActionVisibility==='function'?applyActionVisibility:null;
+if(_origAV){var _fp=false;applyActionVisibility=function(){_origAV.apply(this,arguments);if(!_fp){_fp=true;setFramework(currentFramework);}else{applyFrameworkVisibility();}};}
+document.addEventListener('DOMContentLoaded',function(){setTimeout(function(){setFramework(currentFramework);},300);});
 </script>
 <!-- DOWNLOAD MODAL -->
 <div id="download-modal" class="modal-overlay hidden" onclick="if(event.target===this)closeModal('download-modal')">
