@@ -3608,6 +3608,15 @@ async function onProgrammeChange(){
               level:r.us_level||r.level||'',
               credits:+r.us_credits||+r.credits||0,
               saqa_id:r.saqa_id||activeProgramme.saqa_id,
+              // _dbId = the real unit_standards.id row this record maps to. Without
+              // this, saveUsEdit()/deleteUs() (which branch on u._dbId to decide
+              // PATCH/DELETE vs "must still be offline-only, so POST/no-op") treat
+              // every unit standard loaded from the database as if it had never been
+              // saved: an edit silently creates a duplicate row instead of updating
+              // the original, and a delete only removes it from the in-memory list —
+              // the original row (and its original module number) is left untouched
+              // in Supabase and reappears next time this programme is opened.
+              _dbId:r.id,
             }));
             unitStandards=[
               ...unitStandards.filter(u=>u.saqa_id&&u.saqa_id!==activeProgramme.saqa_id),
@@ -8341,20 +8350,46 @@ async function saveModal(){
         if(idx>-1)learners[idx]={...learners[idx],...payload};
       } else {
         // Add
-        saved=isOnline?await sbPost('learners',payload):null;
-        if(!saved||!saved.id)saved={...payload,id:localId()};
+        // Always go through sbPost — it already knows to queue the write (via
+        // enqueueWrite) and return null when offline, instead of us silently
+        // skipping the call entirely. Skipping it (the old `isOnline ? ... : null`
+        // bypass) meant an offline-added learner was never queued for sync at
+        // all: it looked saved in this browser but would vanish the next time
+        // anything did a fresh fetch from Supabase (a different device, or just
+        // reselecting the programme), because it had never actually reached the
+        // database. See apexone-handoff notes on "learners added but not
+        // appearing in report".
+        saved=await sbPost('learners',payload);
+        const learnerIsTemp=!saved||!saved.id;
+        if(learnerIsTemp)saved={...payload,id:localId()};
         if(!learners.find(l=>l.id===saved.id))learners.push(saved);
+        if(learnerIsTemp){
+          // sbPost already enqueued the underlying write when offline; tag it with
+          // this temp id so flushWriteQueue can relink the enrolment below once the
+          // learner actually gets a real id.
+          _tagLastQueuedCreate('learners',saved.id);
+        }
         // Guard: a numeric id > 1e12 is a local-only temp id (e.g. from an offline/unsynced
         // Excel import) — the programme was never actually persisted to Supabase.
         // Self-heal instead of blocking: save it now, then continue enrolling the learner.
         if(isOnline&&isTempId(activeProgramme.id)){
           activeProgramme=await ensureProgrammeSynced(activeProgramme);
         }
-        // Enrol in current programme
-        const enr=isOnline
-          ?await sbPost('enrolments',{tenant_id:TENANT_DB_ID,learner_id:saved.id,programme_id:activeProgramme.id,status:'active'})
-          :{id:localId(),tenant_id:TENANT_DB_ID,learner_id:saved.id,programme_id:activeProgramme.id,status:'active'};
+        // Enrol in current programme. If the learner above is still an unsynced temp
+        // id, don't even attempt the POST (it would fail a foreign-key check once the
+        // learner eventually exists under a different id) — go straight to a queued,
+        // relinked write instead.
+        const enrPayload={tenant_id:TENANT_DB_ID,learner_id:saved.id,programme_id:activeProgramme.id,status:'active'};
+        let enr=learnerIsTemp?null:await sbPost('enrolments',enrPayload);
+        if(!enr||!enr.id){
+          enr={...enrPayload,id:localId()};
+          enqueueWrite('post','enrolments',enrPayload,null,learnerIsTemp?{relinkField:'learner_id',relinkTempId:saved.id}:null);
+        }
         enrolments.push(enr);
+        // Surface the offline/queued state explicitly — previously this path gave no
+        // indication anything was different, so a learner added while offline looked
+        // identically "saved" whether or not it had actually reached Supabase.
+        if(learnerIsTemp)toast('Offline — learner saved locally and queued to sync when reconnected','info',4000);
       }
       saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
       closeModal();showSaved();
@@ -12377,15 +12412,24 @@ function updateQueueBadge(){
     badge.style.display='none';
   }
 }
-function enqueueWrite(method,table,body,id){
+// `meta` carries optional cross-entity linking info for queued creates whose payload
+// references another record that may itself still be an unsynced temp id:
+//   tempId       — this queued 'post' represents the local record with this temp id
+//                  (e.g. a learner created offline); once it syncs, flushWriteQueue
+//                  swaps the temp id for the real one everywhere it's referenced.
+//   relinkField/relinkTempId — this entry's body should have relinkField's value
+//                  rewritten to the real id once relinkTempId resolves (e.g. a queued
+//                  enrolment created in the same offline session as its learner).
+function enqueueWrite(method,table,body,id,meta){
   const q=loadWriteQueue();
   // Deduplicate: merge-replace same table+id (upsert/patch) so stale writes don't pile up
   const dedupKey=id?`${method}:${table}:${id}`:null;
+  const entry={method,table,body,id,dedupKey,ts:Date.now(),...(meta||{})};
   if(dedupKey){
     const existing=q.findIndex(e=>e.dedupKey===dedupKey);
-    if(existing>-1){q[existing]={method,table,body,id,dedupKey,ts:Date.now()};saveWriteQueue(q);updateQueueBadge();return;}
+    if(existing>-1){q[existing]=entry;saveWriteQueue(q);updateQueueBadge();return;}
   }
-  q.push({method,table,body,id,dedupKey,ts:Date.now()});
+  q.push(entry);
   saveWriteQueue(q);
   updateQueueBadge();
 }
@@ -12399,6 +12443,19 @@ function _updateQueuedCreate(table,tempId,updates){
   entry.body={...entry.body,...updates};
   saveWriteQueue(q);
   return true;
+}
+// sbPost() queues an untagged 'post' entry (dedupKey null, since the payload has no
+// id yet) when offline. Called immediately after such a call returns, this finds that
+// just-queued entry — the newest untagged post for this table — and tags it with the
+// local temp id already assigned to the in-memory record, so flushWriteQueue can later
+// relink any dependent record (e.g. this learner's enrolment) to the real id.
+function _tagLastQueuedCreate(table,tempId){
+  const q=loadWriteQueue();
+  let best=null;
+  q.forEach(e=>{
+    if(e.method==='post'&&e.table===table&&e.tempId==null&&(!best||e.ts>best.ts))best=e;
+  });
+  if(best){best.tempId=tempId;saveWriteQueue(q);}
 }
 function _removeQueuedCreate(table,tempId){
   const q=loadWriteQueue();
@@ -12418,6 +12475,25 @@ function _logWriteFailure(event,entry,errMsg){
     localStorage.setItem(WRITE_FAILURE_LOG_KEY,JSON.stringify(log));
   }catch{}
 }
+// A record created offline (temp numeric id > 1e12) has just synced and got a real
+// database id back. Swap that id into whatever in-memory arrays hold it — and any
+// place that referenced it as a foreign key — so the currently-open page reflects
+// reality without needing a full reload, and so a later save against this record
+// (edit/remove) targets the real row instead of a temp id that no longer exists
+// anywhere to resolve against.
+function _resolveLocalTempId(table,tempId,realId){
+  try{
+    if(table==='learners'){
+      const l=learners.find(x=>x.id===tempId);
+      if(l)l.id=realId;
+      enrolments.forEach(e=>{if(e.learner_id===tempId)e.learner_id=realId;});
+    } else if(table==='enrolments'){
+      const e=enrolments.find(x=>x.id===tempId);
+      if(e)e.id=realId;
+    }
+    saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+  }catch(err){console.warn('_resolveLocalTempId failed:',err.message);}
+}
 async function flushWriteQueue(){
   const q=loadWriteQueue();
   if(!q.length)return;
@@ -12426,6 +12502,11 @@ async function flushWriteQueue(){
   _flushingQueue=true;
   let succeeded=0,failed=0;
   const remaining=[];
+  // Maps a temp id (e.g. a learner created while offline) to the real database id it
+  // resolves to once its own queued 'post' succeeds in this same flush pass — so a
+  // dependent record queued alongside it (e.g. that learner's enrolment) can have its
+  // foreign key rewritten before it fires, instead of shipping a dangling temp id.
+  const tempIdMap={};
   for(const entry of q){
     // Drop entries that have failed too many times (max 10 retries)
     const retries=(entry.retries||0);
@@ -12435,12 +12516,27 @@ async function flushWriteQueue(){
       toast(`A change to "${entry.table}" could not be saved after repeated attempts and was discarded. Please re-check and re-enter that data.`,'error',0);
       continue;
     }
+    // Relink a dependent create to the real id its referenced temp record resolved to
+    // earlier in this same pass (no-op if that record hasn't resolved yet — it'll be
+    // retried next flush once it has).
+    if(entry.relinkTempId!=null&&tempIdMap[entry.relinkTempId]!=null){
+      entry.body={...entry.body,[entry.relinkField]:tempIdMap[entry.relinkTempId]};
+    }
     try{
-      if(entry.method==='upsert')await sbUpsert(entry.table,entry.body);
-      else if(entry.method==='patch')await sbPatch(entry.table,entry.id,entry.body);
-      else if(entry.method==='post')await sbPost(entry.table,entry.body);
+      let result=null;
+      if(entry.method==='upsert')result=await sbUpsert(entry.table,entry.body);
+      else if(entry.method==='patch')result=await sbPatch(entry.table,entry.id,entry.body);
+      else if(entry.method==='post')result=await sbPost(entry.table,entry.body);
       else if(entry.method==='delete')await sbDelete(entry.table,entry.id);
       succeeded++;
+      // This entry was a tagged temp-id create (see enqueueWrite's `meta.tempId`) —
+      // record the real id so later entries in this pass relink to it, and patch the
+      // record already sitting in the in-memory/local-snapshot arrays so the app
+      // reflects the real id immediately rather than only after a full reload.
+      if(entry.tempId!=null&&result&&result.id!=null){
+        tempIdMap[entry.tempId]=result.id;
+        _resolveLocalTempId(entry.table,entry.tempId,result.id);
+      }
     }catch(e){
       failed++;
       _logWriteFailure('retry-failed',entry,e&&e.message);
