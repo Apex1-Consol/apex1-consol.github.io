@@ -6080,8 +6080,15 @@ function getModuleTrainingStatus(modNum){
     const res=(eisaState[l.id]||{})[modNum]||{};
     const km=res.km||'',pm=res.pm||'',wm=res.wm||'',ev1=res.examv1||'',ev2=res.examv2||'';
     const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
-    const modComplete=requiredVals.every(v=>v==='C')&&(ev1==='C'||ev1===''||ev1==='N/A')&&(ev2==='C'||ev2===''||ev2==='N/A');
     const modStarted=km||pm||wm||ev1||ev2;
+    // Bug fix: when this module's unit standards don't carry a km/pm/wm prefix
+    // (e.g. plain numeric SAQA unit standard IDs), `applies` comes back all-false,
+    // so requiredVals is empty and `[].every(...)` is vacuously true. Combined with
+    // blank exam fields also counting as "satisfied" below, a module nobody had
+    // touched at all was being marked Trained. Require actual recorded evidence
+    // (either an applicable km/pm/wm result, or an exam result of 'C') before a
+    // learner's module can count as complete — no evidence means not trained.
+    const modComplete=!!modStarted&&requiredVals.every(v=>v==='C')&&(ev1==='C'||ev1===''||ev1==='N/A')&&(ev2==='C'||ev2===''||ev2==='N/A');
     if(!modComplete)allTrained=false;
     if(modStarted&&!modComplete)anyProgress=true;
   });
@@ -11371,7 +11378,15 @@ async function addAssessor(){
   const role=(roleEl.value||'').trim()||'Assessor';
   if(!name){errEl.textContent='Name is required.';errEl.style.display='block';return;}
   if(name.length>ASSESSOR_NAME_MAX_LEN){errEl.textContent=`Name must be ${ASSESSOR_NAME_MAX_LEN} characters or fewer.`;errEl.style.display='block';return;}
-  if(_isDuplicate(assessors,'full_name',name,null)){errEl.textContent=`An assessor named "${name}" already exists.`;errEl.style.display='block';return;}
+  // Bug fix: assessors are one shared list per tenant (not per-programme), and the
+  // "Role" field here is just a free-text label — the same person is meant to be
+  // reused for both the Facilitator dropdown (Programme screen) and any assessor
+  // duty rather than added a second time under a different role. The old message
+  // ("already exists") gave no next step, so a PM who'd already added someone as
+  // e.g. "Assessor" and then tried adding them again as "Facilitator" would hit a
+  // dead end here, never realise they just needed to pick that person from the
+  // Programme's Facilitator dropdown, and the report would look stuck. Tell them.
+  if(_isDuplicate(assessors,'full_name',name,null)){errEl.textContent=`"${name}" is already in the list — no need to add them again. Open the Programme's edit screen and pick them from the Facilitator dropdown; the same person can cover both Facilitator and Assessor duties.`;errEl.style.display='block';return;}
   errEl.style.display='none';
   const payload={tenant_id:TENANT_DB_ID,full_name:name,role};
   try{
