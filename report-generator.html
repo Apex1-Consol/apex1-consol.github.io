@@ -8468,9 +8468,16 @@ async function saveModal(){
           if(!el)return;
           const hasIssue=modDateWarns.some(w=>new RegExp(`Module ${i}\\b`).test(w));
           el.style.borderColor=hasIssue?'var(--danger)':'';
+          el.title=hasIssue?modDateWarns.join('\n'):'';
         });
-        const proceed=confirm('⚠ Module date conflict detected:\n\n'+modDateWarns.join('\n')+'\n\nSave anyway?');
-        if(!proceed){btn.disabled=false;btn.textContent=modalMode==='edit'?'Save Changes':'Add';return;}
+        // Non-blocking by design: some rollout schedules legitimately have a module
+        // starting before the previous one's dates fully close out, so this is only
+        // a heads-up (red border + toast), matching how the same check already
+        // behaves when editing module dates on an existing programme (saveModDates,
+        // above). This used to gate Save behind a native confirm() dialog, which
+        // could silently swallow the save with no visible error if the browser had
+        // previously suppressed dialogs on this page — removed for that reason.
+        toast('⚠ Module date conflict: '+modDateWarns.join('; '),'warn',6000);
       }
       let saved;
       const progIdIsTemp=typeof activeProgramme?.id==='number'&&activeProgramme.id>1e12;
