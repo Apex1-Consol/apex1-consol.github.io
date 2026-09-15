@@ -229,7 +229,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;
 }
 .cover-field label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
-.cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}
+.cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}.cover-field.full{grid-column:1/-1}
 .cover-footer{
   padding:20px 48px;
   display:flex;align-items:center;justify-content:space-between;
@@ -2425,10 +2425,7 @@ body.compact-density .progress-bar-wrap{height:6px}
         <div id="review-tag-picker" style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:6px">
           <span style="font-size:7pt;color:rgba(255,255,255,.4);width:100%;margin-bottom:2px">Tag the section(s) that need fixing (optional):</span>
           <span class="review-tag-chip" data-tag="att" onclick="_toggleReviewTag(this)">Attendance</span>
-          <span class="review-tag-chip" data-tag="eisa-mod-1" onclick="_toggleReviewTag(this)">Module 1 EISA</span>
-          <span class="review-tag-chip" data-tag="eisa-mod-2" onclick="_toggleReviewTag(this)">Module 2 EISA</span>
-          <span class="review-tag-chip" data-tag="eisa-mod-3" onclick="_toggleReviewTag(this)">Module 3 EISA</span>
-          <span class="review-tag-chip" data-tag="eisa-mod-4" onclick="_toggleReviewTag(this)">Module 4 EISA</span>
+          <span id="review-tag-mod-chips" style="display:contents"></span>
           <span class="review-tag-chip" data-tag="comments" onclick="_toggleReviewTag(this)">Observations</span>
           <span class="review-tag-chip" data-tag="overview-narratives" onclick="_toggleReviewTag(this)">Narratives</span>
         </div>
@@ -3943,6 +3940,10 @@ function isLearnerTerminated(learnerId){
   const e=_findEnrolment(learnerId);
   return!!e&&e.status==='terminated';
 }
+function isLearnerResigned(learnerId){
+  const e=_findEnrolment(learnerId);
+  return!!e&&e.status==='resigned';
+}
 function getLearnerTerminatedModule(learnerId){
   const e=_findEnrolment(learnerId);
   const m=e&&e.fields&&e.fields.terminated_module;
@@ -3959,12 +3960,14 @@ function terminatedTag(learnerId,modNum){
   if(m&&m!==modNum)return'';
   return'<span class="badge badge-terminated">Terminated</span>';
 }
-async function setLearnerTermination(learnerId,terminated,moduleNum){
+async function setLearnerTermination(learnerId,status,moduleNum){
   const e=_findEnrolment(learnerId);
   if(!e)return;
-  e.status=terminated?'terminated':'active';
+  // status: 'active' | 'terminated' | 'resigned'. Back-compat: a boolean true
+  // (old callers) means 'terminated'.
+  e.status=status===true?'terminated':(status||'active');
   e.fields={...(e.fields||{})};
-  if(terminated)e.fields.terminated_module=moduleNum?+moduleNum:null;
+  if(e.status==='terminated'||e.status==='resigned')e.fields.terminated_module=moduleNum?+moduleNum:null;
   else delete e.fields.terminated_module;
   const payload={status:e.status,fields:e.fields};
   if(isOnline&&!isTempId(e.id)){
@@ -4254,10 +4257,21 @@ function generateReport(skipChecklistGate){
       el.style.display=isLegacy?'none':'';
     }
   });
-  document.querySelectorAll('.review-tag-chip[data-tag^="eisa-mod-"]').forEach(el=>{
-    const modN=el.getAttribute('data-tag').replace('eisa-mod-','');
-    el.textContent=isLegacy?`Module ${modN}`:`Module ${modN} EISA`;
-  });
+  // Module chips generated from actual module count, not hardcoded to 4
+  // (legacy quals can have 5+ modules; a hardcoded list left module 5+
+  // untaggable for review comments).
+  {
+    const modChipUnits=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
+    const modNums=[...new Set(modChipUnits.map(u=>u.mod||1))].sort((a,b)=>a-b);
+    const wrap=document.getElementById('review-tag-mod-chips');
+    if(wrap){
+      wrap.innerHTML=modNums.map(m=>{
+        const label=isLegacy?`Module ${m}`:`Module ${m} EISA`;
+        REVIEW_TAG_LABELS['eisa-mod-'+m]=label;
+        return`<span class="review-tag-chip" data-tag="eisa-mod-${m}" onclick="_toggleReviewTag(this)">${esc(label)}</span>`;
+      }).join('');
+    }
+  }
 
   const pages=document.getElementById('report-pages');
   pages.innerHTML='';
@@ -4290,6 +4304,7 @@ function generateReport(skipChecklistGate){
     pages.appendChild(notesEl);
     pages.appendChild(buildSignoffPage(prog,client,month,narratives,++pn));
     initSignaturePad();
+    autoGrowAllNar(pages);
   });
 
   // Restore saved values
@@ -4332,6 +4347,9 @@ function generateReport(skipChecklistGate){
       if(el){el.textContent=val;applyAttStyle(el,val);}
     });
   }
+
+  // Size every narrative textarea to its actual content.
+  autoGrowAllNar(pages);
 
   // Scroll to preview
   document.getElementById('report-preview').scrollIntoView({behavior:'smooth'});
@@ -4422,7 +4440,7 @@ function computeCoverStats(pLearners,prog){
   });
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
   const modNums=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))];
-  let flagged=0;
+  let flaggedModules=0;const flaggedLearnerIds=new Set();
   const legacy=isLegacyProgramme(prog);
   if(legacy){
     // Legacy: a module is flagged if any learner has been marked Not Yet on
@@ -4432,9 +4450,9 @@ function computeCoverStats(pLearners,prog){
       let anyNYC=false;
       pLearners.forEach(l=>{
         const ov=narratives._eisa||{};
-        if(legacyFormativeValue(ov,l.id,m)==='NYC'||legacySummativeValue(ov,l.id,m)==='NYC')anyNYC=true;
+        if(legacyFormativeValue(ov,l.id,m)==='NYC'||legacySummativeValue(ov,l.id,m)==='NYC'){anyNYC=true;flaggedLearnerIds.add(l.id);}
       });
-      if(anyNYC)flagged++;
+      if(anyNYC)flaggedModules++;
     });
   } else {
     modNums.forEach(m=>{
@@ -4445,12 +4463,12 @@ function computeCoverStats(pLearners,prog){
         const ov=narratives._eisa||{};
         const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
         const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
-        if(vals.some(isEisaOutstanding))anyNYC=true;
+        if(vals.some(isEisaOutstanding)){anyNYC=true;flaggedLearnerIds.add(l.id);}
       });
-      if(anyNYC)flagged++;
+      if(anyNYC)flaggedModules++;
     });
   }
-  return{avgAtt,flagged,onTrack:Math.max(0,totalMods-flagged),totalMods};
+  return{avgAtt,flaggedLearners:flaggedLearnerIds.size,flaggedModules,onTrack:Math.max(0,totalMods-flaggedModules),totalMods};
 }
 
 function buildCoverPage(prog,client,month){
@@ -4508,7 +4526,7 @@ function buildCoverPage(prog,client,month){
               <div class="cover-stat-label">Modules On Track</div>
             </div>
             <div class="cover-stat" style="background:${p.gradFrom}0C">
-              <div class="cover-stat-num" style="color:${p.gradFrom}">${stats.flagged}</div>
+              <div class="cover-stat-num" style="color:${p.gradFrom}">${stats.flaggedLearners}</div>
               <div class="cover-stat-label">Flagged NYC</div>
             </div>
           </div>
@@ -4519,7 +4537,7 @@ function buildCoverPage(prog,client,month){
           <div class="cover-field"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
           <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
           <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
-          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
         </div>
       </div>
     </div>
@@ -4734,19 +4752,19 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
           </div>`:`<div style="font-size:10px;color:#94A3B8">No risk flags raised for this reporting period.</div>`}
         </div>
       </div>
+      ${legacy?`
       <div class="exec-visual-row" style="display:grid;grid-template-columns:118px 1fr;gap:16px;margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
         <div style="text-align:center;padding-top:2px">
           <svg viewBox="0 0 120 120" width="90" height="90" style="margin:0 auto;display:block">
             <circle cx="60" cy="60" r="50" fill="none" stroke="#F1F5F9" stroke-width="10"/>
-            ${(legacy?usPct:eisaCompletedPct)!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${(legacy?usPct:eisaCompletedPct)>=80?'#1B7A4A':(legacy?usPct:eisaCompletedPct)>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${((legacy?usPct:eisaCompletedPct)/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
-            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${(legacy?usPct:eisaCompletedPct)!==null?(legacy?usPct:eisaCompletedPct)+'%':'—'}</text>
-            <text x="60" y="73" text-anchor="middle" font-size="${legacy?6.5:7.5}" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">${legacy?'UNIT STANDARDS':'EISA'}</text>
+            ${usPct!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${usPct>=80?'#1B7A4A':usPct>=50?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(usPct/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
+            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${usPct!==null?usPct+'%':'—'}</text>
+            <text x="60" y="73" text-anchor="middle" font-size="6.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">UNIT STANDARDS</text>
           </svg>
-          <div style="font-size:8px;color:#94A3B8;margin-top:6px">${legacy?'credits achieved':'completed'}</div>
+          <div style="font-size:8px;color:#94A3B8;margin-top:6px">credits achieved</div>
         </div>
         <div style="border-left:1px solid #F1F5F9;padding-left:16px">
-          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">${legacy?'Unit Standards progress':'EISA progress'}</div>
-          ${legacy?`
+          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:11px">Unit Standards progress</div>
           <div style="display:flex;flex-direction:column;gap:10px">
             <div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
@@ -4756,31 +4774,59 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
               <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${usPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
             </div>
             ${!usTotalCredits?`<div style="font-size:9px;color:#94A3B8">No unit standards registered for this programme yet.</div>`:''}
-          </div>`:`
-          <div style="display:flex;flex-direction:column;gap:10px">
-            <div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-                <span style="font-size:10.5px;color:#1E2533;font-weight:600">EISA Booked</span>
-                <span style="display:flex;align-items:center;gap:5px">
-                  <span id="eisa-booked-count" style="font-size:9px;color:#1A365D;font-weight:700">${eisaBookedCount} of ${nCount}</span>
-                  <input type="number" min="0" max="${nCount}" value="${eisaBookedCount}" class="no-print"
-                    style="width:38px;padding:1px 3px;font-size:8pt;border:1px solid #E2E8F0;border-radius:4px;text-align:center"
-                    title="Enter number of learners booked for EISA"
-                    onblur="saveEisaBooked(this,${nCount})" onkeydown="if(event.key==='Enter')this.blur()">
-                </span>
-              </div>
-              <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div id="eisa-booked-bar" style="height:100%;width:${eisaBookedPct}%;background:#1A365D;border-radius:3px"></div></div>
-            </div>
-            <div>
-              <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
-                <span style="font-size:10.5px;color:#1E2533;font-weight:600">EISA Completed</span>
-                <span style="font-size:9px;color:#0F6B6B;font-weight:700">${eisaCompletedCount} of ${nCount}</span>
-              </div>
-              <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${eisaCompletedPct||0}%;background:#0F6B6B;border-radius:3px"></div></div>
-            </div>
-          </div>`}
+          </div>
         </div>
-      </div>
+      </div>`:(()=>{
+        // EISA completion is a late-programme milestone — showing a bare "0%"
+        // every month before the final module even ends misreads as a red flag
+        // when nothing is actually wrong yet. eisaDue mirrors the module-timeline
+        // status logic above: only once the last dated module is 'done' do we
+        // treat EISA as due, and the status chip reflects that instead of a
+        // single completion percentage dominating the widget (which also buried
+        // the fact that Booking — the PM's actual task — is usually already 100%).
+        const lastMod=timelineMods[timelineMods.length-1];
+        const eisaDue=!!lastMod&&lastMod.status==='done';
+        const chip=!eisaDue
+          ?{label:'Not yet due',bg:'#FAEEDA',fg:'#633806'}
+          :eisaCompletedCount<nCount
+          ?{label:'Needs follow-up',bg:'#FBE3E3',fg:'#8C1616'}
+          :{label:'Complete',bg:'#EAF3DE',fg:'#27500A'};
+        return`
+      <div class="exec-visual-row" style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+          <div style="font-size:8.5px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8">EISA progress</div>
+          <span style="font-size:8px;font-weight:700;padding:3px 10px;border-radius:999px;background:${chip.bg};color:${chip.fg}">${chip.label}</span>
+        </div>
+        <div style="display:flex;align-items:flex-start">
+          <div style="flex:1;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#1E2533">${nCount}</div>
+            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Enrolled</div>
+          </div>
+          <div style="width:28px;height:2px;background:#CBD5E1;margin-top:11px;flex-shrink:0"></div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:#1A365D">${eisaBookedCount}</div>
+            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Booked</div>
+          </div>
+          <div style="width:28px;height:2px;background:${eisaCompletedCount>0?'#0F6B6B':'#CBD5E1'};margin-top:11px;flex-shrink:0"></div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:22px;font-weight:800;color:${eisaCompletedCount>0?'#0F6B6B':'#94A3B8'}">${eisaCompletedCount}</div>
+            <div style="font-size:8px;letter-spacing:.08em;text-transform:uppercase;color:#94A3B8;margin-top:3px">Completed</div>
+          </div>
+        </div>
+        <div style="margin-top:14px;height:6px;border-radius:3px;background:#F1F5F9;overflow:hidden;position:relative">
+          <div id="eisa-booked-bar" style="position:absolute;inset:0;height:100%;width:${eisaBookedPct}%;background:#1A365D;border-radius:3px"></div>
+          <div style="position:absolute;inset:0;height:100%;width:${eisaCompletedPct||0}%;background:#0F6B6B;border-radius:3px"></div>
+        </div>
+        <div style="display:flex;justify-content:flex-end;align-items:center;gap:5px;margin-top:8px">
+          <span style="font-size:8px;color:#94A3B8">Adjust booked</span>
+          <input type="number" min="0" max="${nCount}" value="${eisaBookedCount}" class="no-print"
+            style="width:38px;padding:1px 3px;font-size:8pt;border:1px solid #E2E8F0;border-radius:4px;text-align:center"
+            title="Enter number of learners booked for EISA"
+            onblur="saveEisaBooked(this,${nCount})" onkeydown="if(event.key==='Enter')this.blur()">
+          <span id="eisa-booked-count" style="font-size:8px;color:#B5BEC9">${eisaBookedCount} of ${nCount}</span>
+        </div>
+      </div>`;
+      })()}
       ${buildLearnerStatusBlock(pLearners,p)}
       <div class="exec-headline" style="margin-top:20px;padding:18px 22px;background:linear-gradient(90deg,${p.gradFrom}12,transparent);border-left:4px solid ${p.accentFrom};border-radius:0 8px 8px 0">
         <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:6px">Headline</div>
@@ -4893,18 +4939,22 @@ function buildCohortSummary(pLearners){
 function buildLearnerStatusBlock(pLearners,p){
   const modNums=activeProgramme?displayModuleNums(activeProgramme):[1,2,3,4];
   const terminated=pLearners.filter(l=>isLearnerTerminated(l.id));
-  const active=pLearners.filter(l=>!isLearnerTerminated(l.id));
+  const resigned=pLearners.filter(l=>isLearnerResigned(l.id));
+  const active=pLearners.filter(l=>!isLearnerTerminated(l.id)&&!isLearnerResigned(l.id));
   const rows=[...pLearners].sort((a,b)=>(a.last_name||'').localeCompare(b.last_name||'')).map(l=>{
     const isTerm=isLearnerTerminated(l.id);
+    const isRes=isLearnerResigned(l.id);
+    const status=isTerm?'terminated':isRes?'resigned':'active';
     const termMod=getLearnerTerminatedModule(l.id);
     const modOptions=modNums.map(n=>`<option value="${n}" ${termMod===n?'selected':''}>Module ${n}</option>`).join('');
     return`<div class="no-print" style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid #F1F5F9">
       <span style="flex:1;font-size:9pt;color:#1E2533">${esc(l.first_name)} ${esc(l.last_name)}</span>
-      <select style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},this.value==='terminated',document.getElementById('term-mod-${l.id}')?document.getElementById('term-mod-${l.id}').value:null);_lsRefreshModSelect(this)">
-        <option value="active" ${!isTerm?'selected':''}>Active</option>
-        <option value="terminated" ${isTerm?'selected':''}>Terminated</option>
+      <select style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},this.value,document.getElementById('term-mod-${l.id}')?document.getElementById('term-mod-${l.id}').value:null);_lsRefreshModSelect(this)">
+        <option value="active" ${status==='active'?'selected':''}>Active</option>
+        <option value="terminated" ${status==='terminated'?'selected':''}>Terminated</option>
+        <option value="resigned" ${status==='resigned'?'selected':''}>Resigned</option>
       </select>
-      <select id="term-mod-${l.id}" style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px;${isTerm?'':'visibility:hidden'}" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},true,this.value)">
+      <select id="term-mod-${l.id}" style="font-size:8pt;padding:2px 6px;border:1px solid #E2E8F0;border-radius:4px;${status==='active'?'visibility:hidden':''}" onchange="setLearnerTermination(${JSON.stringify(String(l.id))},'${status==='resigned'?'resigned':'terminated'}',this.value)">
         ${modOptions}
       </select>
     </div>`;
@@ -4913,13 +4963,18 @@ function buildLearnerStatusBlock(pLearners,p){
     const m=getLearnerTerminatedModule(l.id);
     return`${esc(l.first_name)} ${esc(l.last_name)}${m?` (Module ${m})`:''}`;
   }).join(', ');
+  const resNames=resigned.map(l=>{
+    const m=getLearnerTerminatedModule(l.id);
+    return`${esc(l.first_name)} ${esc(l.last_name)}${m?` (Module ${m})`:''}`;
+  }).join(', ');
   return`<div class="exec-learner-status" style="margin-top:18px;padding-top:16px;border-top:1px solid #F1F5F9">
     <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
       <div class="cs-card" style="flex:1;min-width:90px"><label>Enrolled</label><div class="cs-big">${pLearners.length}</div></div>
       <div class="cs-card" style="flex:1;min-width:90px"><label>Active</label><div class="cs-big">${active.length}</div></div>
       <div class="cs-card" style="flex:1;min-width:90px"><label>Terminated</label><div class="cs-big">${terminated.length}</div></div>
+      <div class="cs-card" style="flex:1;min-width:90px"><label>Resigned</label><div class="cs-big">${resigned.length}</div></div>
     </div>
-    <div style="font-size:9pt;color:#4A5568;margin-bottom:8px">${terminated.length?`Terminated: ${termNames}.`:'No learners terminated this period.'}</div>
+    <div style="font-size:9pt;color:#4A5568;margin-bottom:8px">${terminated.length?`Terminated: ${termNames}.`:'No learners terminated this period.'} ${resigned.length?`Resigned: ${resNames}.`:''}</div>
     <div class="no-print" style="font-size:8pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#94A3B8;margin-bottom:4px">Learner Status <span style="font-weight:400;text-transform:none;letter-spacing:normal;color:#B5BEC9">(screen only — editable)</span></div>
     <div class="no-print" style="max-height:220px;overflow-y:auto">${rows}</div>
   </div>`;
@@ -4927,7 +4982,7 @@ function buildLearnerStatusBlock(pLearners,p){
 function _lsRefreshModSelect(sel){
   const row=sel.closest('div');
   const modSel=row?row.querySelector('select[id^="term-mod-"]'):null;
-  if(modSel)modSel.style.visibility=sel.value==='terminated'?'visible':'hidden';
+  if(modSel)modSel.style.visibility=(sel.value==='terminated'||sel.value==='resigned')?'visible':'hidden';
 }
 
 function hexMix(a,b,t){
@@ -5090,14 +5145,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
   });
   let body=`
     <div class="sec-header"><div class="sec-accent" style="background:${p.accentFrom}"></div>
-      <div><div class="sec-title">Programme Overview</div><div style="height:3px;width:44px;border-radius:2px;background:linear-gradient(90deg,${p.accentFrom},${p.accentTo});margin:5px 0"></div><div class="sec-subtitle">Client details, module schedule and overall feedback</div></div>
-    </div>
-    <div class="info-grid">
-      <div class="info-card${!client.client_name?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Client Name</label><span>${esc(client.client_name||'Not set')}</span></div>
-      <div class="info-card${(!client.contact_person&&!client.contact_number)?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Contact Person</label><span>${esc(client.contact_person||'Not set')} &nbsp;·&nbsp; ${esc(client.contact_number||'—')}</span></div>
-      <div class="info-card${!client.sales_person?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'Not set')}</span></div>
-      <div class="info-card${!client.project_manager?' needs-input':''}" data-edit="client" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'Not set')}</span></div>
-      <div class="info-card full${(!prog.saqa_id||!prog.qualification_code)?' needs-input':''}" data-edit="programme" style="cursor:pointer;border-left-color:${p.accentFrom};background:linear-gradient(${p.accentFrom}0d,${p.accentFrom}0d)" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'Not set')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'Not set')}</span></div>
+      <div><div class="sec-title">Programme Overview</div><div style="height:3px;width:44px;border-radius:2px;background:linear-gradient(90deg,${p.accentFrom},${p.accentTo});margin:5px 0"></div><div class="sec-subtitle">Module schedule and overall feedback</div></div>
     </div>
     <div class="mod-connector no-print">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
@@ -5689,10 +5737,10 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
       return`<div style="text-align:center"><select class="result-select result-screen" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}</select><span class="result-print badge ${bc}">${v||'&#8212;'}</span></div>`;
     };
     const mkExam=(field,pctField,val,pct)=>{
-      const v=mkVal(field,val);const p=mkVal(pctField,pct);
+      const v=mkVal(field,val);
       const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
-      const pt=v?(p?v+' / '+p+'%':v):'&#8212;';
-      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}<option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select><input class="exam-input" type="text" placeholder="%" data-eisa="${ek}_${pctField}" value="${p}" oninput="syncExamPct(this)" maxlength="6"></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
+      const pt=v||'&#8212;';
+      return`<div style="text-align:center"><div class="exam-screen" style="display:flex;flex-direction:column;align-items:center;gap:2px"><select class="result-select" data-eisa="${ek}_${field}" onchange="syncResult(this)">${resultOptions(v)}<option value="N/A" ${v==='N/A'?'selected':''}>N/A</option></select></div><span class="exam-print badge ${v?bc:'badge-na'}" data-eisa-print="${ek}_${field}">${pt}</span></div>`;
     };
     const km=mkVal('km',res.km),pm=mkVal('pm',res.pm),wm=mkVal('wm',res.wm),ev1=mkVal('examv1',res.examv1),ev2=mkVal('examv2',res.examv2);
     const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
@@ -6038,6 +6086,8 @@ function getModuleTrainingStatus(modNum){
     if(modStarted&&!modComplete)anyProgress=true;
   });
   if(allTrained)return'trained';
+  const range=(typeof parseModDateRange==='function')?parseModDateRange(activeProgramme&&activeProgramme['module_'+modNum+'_dates']):null;
+  if(range&&range.end&&range.end<new Date())return'completed';
   if(anyProgress)return'progress';
   return'nyt';
 }
@@ -6076,6 +6126,8 @@ function buildUnitsTable(prog){
     const st=modStatus[u.mod]||'nyt';
     const status=st==='trained'
       ?`<span class="unit-status unit-complete">Trained</span>`
+      :st==='completed'
+      ?`<span class="unit-status unit-complete">Completed</span>`
       :st==='progress'
       ?`<span class="unit-status unit-pending">In Progress</span>`
       :`<span class="unit-status unit-nyt">Not Yet Trained</span>`;
@@ -6294,12 +6346,23 @@ function setNoClasses(checked){
   updateProgressPanel();
 }
 
+// Auto-grow a narrative textarea to fit its content.
+function autoGrowNar(ta){
+  if(!ta)return;
+  ta.style.height='auto';
+  ta.style.height=(ta.scrollHeight+2)+'px';
+}
+function autoGrowAllNar(root){
+  (root||document).querySelectorAll('.narrative-textarea').forEach(autoGrowNar);
+}
+
 // Dual-render sync functions
 function syncNar(ta){
   const key=ta.dataset.nar;
   const printEl=document.querySelector(`[data-nar-print="${key}"]`);
   if(printEl)printEl.textContent=ta.value;
   narratives[key]=ta.value;
+  autoGrowNar(ta);
   autoSave();
 }
 
@@ -6910,6 +6973,7 @@ function syncCommentToSupabase(lid,comment){
   },1000);
 }
 function onCommentInput(ta){
+  autoGrowNar(ta);
   ta.classList.remove('comment-default');
   // Check if value now matches the default (re-badge)
   const bulkVal=document.getElementById('bulk-comment-text')?.value?.trim()||'';
@@ -6959,6 +7023,7 @@ function applyBulkComment(overwrite=false){
       // was edited afterward.
       narratives._comments[lid]=personalised;
       syncCommentToSupabase(lid, personalised);
+      autoGrowNar(ta);
     }
   });
   autoSave();
@@ -7039,12 +7104,12 @@ function syncEisaToSupabase(changedEl){
 
 function bulkSetExam(modNum,field,value){
   const label=field==='examv1'?'Exam V1':'Exam V2';
-  const pct=prompt(`Set ${label} result for ALL learners in Module ${modNum} to "${value}".\n\nEnter a % score to apply to everyone too (leave blank to skip and set % individually):`,'');
-  if(pct===null)return;
+  if(!confirm(`Set ${label} result for ALL learners in Module ${modNum} to "${value}"?`))return;
+  
   document.querySelectorAll(`select[data-eisa*="_m${modNum}_${field}"]`).forEach(sel=>{
     sel.value=value;
     syncResult(sel);
-    if(pct!==''){
+    if(false){
       const wrap=sel.closest('.exam-screen');
       const inp=wrap?.querySelector(`input[data-eisa*="_m${modNum}_${field}_pct"]`);
       if(inp){inp.value=pct;syncExamPct(inp);}
@@ -7060,7 +7125,7 @@ function bulkSetModuleResults(modNum,value){
   });
 }
 function bulkClearModule(modNum){
-  if(!confirm(`Clear ALL results (KM/PM/WM/Exam V1/Exam V2 + %) for every learner in Module ${modNum}? This cannot be undone.`))return;
+  if(!confirm(`Clear ALL results (KM/PM/WM/Exam V1/Exam V2) for every learner in Module ${modNum}? This cannot be undone.`))return;
   document.querySelectorAll(`select[data-eisa*="_m${modNum}_km"],select[data-eisa*="_m${modNum}_pm"],select[data-eisa*="_m${modNum}_wm"],select[data-eisa*="_m${modNum}_examv1"],select[data-eisa*="_m${modNum}_examv2"]`).forEach(sel=>{
     sel.value='';
     syncResult(sel);
@@ -7100,10 +7165,10 @@ function syncResult(sel){
   }else if(printSpan&&printSpan.classList.contains('exam-print')){
     const v=sel.value;
     const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
-    const pctInp=sel.closest('.exam-screen')?.querySelector('.exam-input');
-    const p=pctInp?pctInp.value:'';
+    
+    
     printSpan.className='exam-print badge '+(v?bc:'badge-na');
-    printSpan.textContent=v?(p?v+' / '+p+'%':v):'—';
+    printSpan.textContent=v||'—';
   }
   if(!narratives._eisa)narratives._eisa={};
   narratives._eisa[sel.dataset.eisa]=sel.value;
@@ -7131,14 +7196,13 @@ function syncExamPct(inp){
       const p=inp.value;
       const bc=v==='C'?'badge-c':isEisaOutstanding(v)?'badge-nyc':'badge-na';
       printSpan.className='result-print badge '+(v?bc:'badge-na');
-      printSpan.textContent=v?(p?v+' / '+p+'%':v):'—';
+      printSpan.textContent=v||'—';
     }
     syncEisaToSupabase(sel);
   }
   if(!narratives._eisa)narratives._eisa={};
   narratives._eisa[inp.dataset.eisa]=inp.value;
   autoSave();
-  updateProgressPanel();
 }
 
 // ── Module date validation helpers ──
@@ -7971,6 +8035,62 @@ async function sbUpsert(table,body){
 let modalType=null; // 'client' | 'programme'
 let modalMode=null; // 'add' | 'edit'
 
+// ── Modal in-progress draft (autosave) ──────────────────────────────────────
+// Protects Add/Edit Client, Add/Edit Programme and Add/Edit Learner forms from
+// being lost if the tab/window closes (crash, accidental close, laptop lid)
+// before the user hits Save. Debounced per-keystroke to localStorage, keyed by
+// which record is open, and restored the next time that same modal is opened.
+// Cleared whenever the modal is closed via Save, Cancel, the × button, or an
+// overlay click — only an unclosed modal (i.e. the tab actually disappeared)
+// leaves a draft behind for restoreModalDraft() to pick back up.
+const MODAL_DRAFT_PREFIX='apex_modaldraft_';
+function modalDraftKey(){
+  if(modalType==='learner'){
+    const lid=document.getElementById('modal-save-btn')?.dataset.learnerId||'new';
+    return`${MODAL_DRAFT_PREFIX}learner_${lid}`;
+  }
+  if(modalType==='client'||modalType==='programme'){
+    const src=modalType==='client'?activeClient:activeProgramme;
+    const id=(modalMode==='edit'&&src)?src.id:'new';
+    return`${MODAL_DRAFT_PREFIX}${modalType}_${id}`;
+  }
+  return null; // 'learners' list modal has no fields worth drafting
+}
+let _modalDraftTimer=null;
+function scheduleModalDraftSave(){
+  clearTimeout(_modalDraftTimer);
+  _modalDraftTimer=setTimeout(saveModalDraftNow,600);
+}
+function saveModalDraftNow(){
+  const key=modalDraftKey();
+  if(!key)return;
+  const data={};
+  document.querySelectorAll('#modal-body .modal-input,#modal-body .modal-select').forEach(el=>{
+    if(el.id&&el.value)data[el.id]=el.value;
+  });
+  try{
+    if(Object.keys(data).length)localStorage.setItem(key,JSON.stringify(data));
+    else localStorage.removeItem(key);
+  }catch{}
+}
+function restoreModalDraft(){
+  const key=modalDraftKey();
+  if(!key)return;
+  let data=null;
+  try{data=JSON.parse(localStorage.getItem(key)||'null');}catch{}
+  if(!data)return;
+  let restoredAny=false;
+  Object.entries(data).forEach(([id,val])=>{
+    const el=document.getElementById(id);
+    if(el&&!el.value&&val){el.value=val;restoredAny=true;}
+  });
+  if(restoredAny)toast('↺ Restored an unsaved draft of this form','warn',3500);
+}
+function clearModalDraft(){
+  const key=modalDraftKey();
+  if(key){try{localStorage.removeItem(key);}catch{}}
+}
+
 function openModal(type,mode,learnerId){
   modalType=type;modalMode=mode;
 
@@ -8024,6 +8144,7 @@ function openModal(type,mode,learnerId){
         </div>
       </div>`;
     document.getElementById('modal-overlay').classList.add('open');
+    restoreModalDraft();
     return;
   }
 
@@ -8149,11 +8270,13 @@ function openModal(type,mode,learnerId){
     if(ptSel)ptSel.value=getProgrammeType(isEdit&&src?src.id:null);
   }
   document.getElementById('modal-overlay').classList.add('open');
+  restoreModalDraft();
   // Focus first input
   setTimeout(()=>document.querySelector('#modal-body .modal-input')?.focus(),50);
 }
 
 function closeModal(){
+  clearModalDraft();
   document.getElementById('modal-overlay').classList.remove('open');
   modalType=null;modalMode=null;
   updateStepsGuide();
@@ -8967,7 +9090,7 @@ function detectMoodleBlankNameColumn(headers,dataRows){
 
 // Scan one sheet and return {programmes[], learners[]}
 function scanSheet(sheetName,rows){
-  if(rows.length<2)return{programmes:[],learners:[],attendance:[],eisa:[],units:[]};
+  if(rows.length<2)return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
 
   // ── Legend/guide sheets are pure metadata (SHEET|COLUMN|DESCRIPTION|REQUIRED? style rows)
   // and must never be scanned for programme/learner data. Checked by name only, before header
@@ -8975,7 +9098,7 @@ function scanSheet(sheetName,rows){
   // ('Learner Data','Client Name','Name of the company/client','Yes') as a real header —
   // which then flips isLearnerSheet/hasClient true and defeats a later name-based skip that's
   // conditioned on those flags. This check has no such condition, so it can't be bypassed.
-  if(/^(column guide|guide)/i.test(sheetName.trim()))return{programmes:[],learners:[],attendance:[],eisa:[],units:[]};
+  if(/^(column guide|guide)/i.test(sheetName.trim()))return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
 
   // ── Free-text fallback: some exports state the facilitator/assessor as a single label
   // cell (e.g. "Facilitator: Charles") rather than a proper header/value column pair.
@@ -9075,7 +9198,7 @@ function scanSheet(sheetName,rows){
   }
   const headers=rows[headerIdx].map(h=>normCell(h));
   const dataRows=rows.slice(headerIdx+1).filter(r=>r.some(c=>normCell(c)!==''));
-  if(!dataRows.length)return{programmes:[],learners:[],attendance:[],eisa:[],units:[]};
+  if(!dataRows.length)return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
   if(detectMoodleBlankNameColumn(headers,dataRows)){
     headers[0]='Full Name'; // Moodle export: blank header, but confirmed to hold full names.
     // Must match the pick-list used for extraction (['learner name','full name',...]) below —
@@ -9088,6 +9211,8 @@ function scanSheet(sheetName,rows){
   const attendance=[];
   const eisa=[];
   const units=[];
+  const moduleDatesMap={}; // per-module date range, keyed by `${pkey}||${moduleNumber}` — see the
+                            // "Module date range" block below, near the unit-standard extraction.
   const progSeen=new Set();
   const learnerSeen=new Set();
   const unitSeen=new Set();
@@ -9173,7 +9298,7 @@ function scanSheet(sheetName,rows){
   // sheets are exempt since we now parse those intentionally.
   const skipSheetPatterns=/^(eisa|monitoring|compliance|recommendation|visit|summary|audit|report|log|column guide|guide)/i;
   if(skipSheetPatterns.test(sheetName.trim())&&!isLearnerSheet&&!hasSaqa&&!isAttendanceSheet&&!isEisaSheet&&!isWideAttendanceSheet&&!isWideEisaSheet){
-    return{programmes:[],learners:[],attendance:[],eisa:[],units:[]};
+    return{programmes:[],learners:[],attendance:[],eisa:[],units:[],moduleDates:[]};
   }
 
   // ── Forward-fill state for merged/blank-on-repeat cells (common Excel export pattern:
@@ -9372,12 +9497,30 @@ function scanSheet(sheetName,rows){
     // riding along a learner/programme row) ──
     if(hasUsId){
       const usId=p(['us id','unit standard id','unit std id','standard id']);
+      const usModNum =numFromCell(p(['module number','module','module no']))||'1';
+      const pkey=`${clientName}||${saqaId||progName}`;
+
+      // Module date range (timetable-style sheet): this row's Start/End Date columns
+  // describe THAT MODULE's schedule here, not the whole programme's (handled
+        // separately above as module_1_dates) - only fires on non-learner rows so a
+  // mixed roster+module sheet doesn't misread a learner's enrolment dates as a
+                        // module date range. Multiple rows for the same module merge to the earliest
+  // start / latest end seen.
+  if(!isLearnerSheet&&(fmtStart||fmtEnd)){
+  const modKey=`${pkey}||${usModNum}`;
+    const sIso=parseImportDateISO(startDate),eIso=parseImportDateISO(endDate);
+    const cur=moduleDatesMap[modKey];
+  if(!cur){
+    moduleDatesMap[modKey]={_sheet:sheetName,_pkey:pkey,mod:+usModNum||1,startIso:sIso,endIso:eIso,start:fmtStart,end:fmtEnd};
+  }else{
+    if(sIso&&(!cur.startIso||sIso<cur.startIso)){cur.startIso=sIso;cur.start=fmtStart;}
+    if(eIso&&(!cur.endIso||eIso>cur.endIso)){cur.endIso=eIso;cur.end=fmtEnd;}
+  }
+  }
       if(usId){
         const usTitle =p(['us title','unit standard title','standard title']);
         const usLevel =numFromCell(p(['us level','unit standard level','standard level']));
         const usCredits=numFromCell(p(['us credits','unit standard credits','standard credits']));
-        const usModNum =numFromCell(p(['module number','module','module no']))||'1';
-        const pkey=`${clientName}||${saqaId||progName}`;
         const unitKey=`${pkey}||${usId}`;
         if(!unitSeen.has(unitKey)){
           unitSeen.add(unitKey);
@@ -9393,7 +9536,7 @@ function scanSheet(sheetName,rows){
     }
   });
 
-  return{programmes,learners,attendance,eisa,units,facilitatorFallback:sheetFacilitatorFallback,assessorFallback:sheetAssessorFallback,clientFallback:sheetClientFallback,qualificationFallback:sheetQualificationFallback,saqaFallback:sheetSaqaFallback};
+  return{programmes,learners,attendance,eisa,units,moduleDates:Object.values(moduleDatesMap),facilitatorFallback:sheetFacilitatorFallback,assessorFallback:sheetAssessorFallback,clientFallback:sheetClientFallback,qualificationFallback:sheetQualificationFallback,saqaFallback:sheetSaqaFallback};
 }
 
 // ── Safe sheet reader — guards against corrupted/inflated used-ranges ──
@@ -9447,7 +9590,7 @@ function previewImport(input){
       }else{
         wb=XLSX.read(e.target.result,{type:'array'});
       }
-      const allProgs=[],allLearners=[],allAttendance=[],allEisa=[],allUnits=[];
+      const allProgs=[],allLearners=[],allAttendance=[],allEisa=[],allUnits=[],allModuleDates=[];
       const sheetLog=[];
       const sheetWarnings=[];
       let wbFacilitatorFallback='',wbAssessorFallback='',wbClientFallback='',wbQualificationFallback='',wbSaqaFallback='';
@@ -9456,7 +9599,7 @@ function previewImport(input){
       wb.SheetNames.forEach(name=>{
         const ws=wb.Sheets[name];
         const rows=safeSheetRows(ws,name,sheetWarnings);
-        const{programmes,learners,attendance,eisa,units,facilitatorFallback,assessorFallback,clientFallback,qualificationFallback,saqaFallback}=scanSheet(name,rows);
+        const{programmes,learners,attendance,eisa,units,moduleDates,facilitatorFallback,assessorFallback,clientFallback,qualificationFallback,saqaFallback}=scanSheet(name,rows);
         if(!wbFacilitatorFallback&&facilitatorFallback)wbFacilitatorFallback=facilitatorFallback;
         if(!wbAssessorFallback&&assessorFallback)wbAssessorFallback=assessorFallback;
         if(!wbClientFallback&&clientFallback)wbClientFallback=clientFallback;
@@ -9467,6 +9610,7 @@ function previewImport(input){
         allAttendance.push(...attendance);
         allEisa.push(...eisa);
         allUnits.push(...(units||[]));
+        allModuleDates.push(...(moduleDates||[]));
         if(programmes.length||learners.length||attendance.length||eisa.length){
           const parts=[`${programmes.length} programme row${programmes.length!==1?'s':''}`,`${learners.length} learner${learners.length!==1?'s':''}`];
           if(attendance.length)parts.push(`${attendance.length} attendance row${attendance.length!==1?'s':''}`);
@@ -9695,7 +9839,22 @@ function previewImport(input){
       });
       const linkedUnits=Object.values(unitMap);
 
-      importData={progMap,learnerMap:learnerMap,learnerRows:linkedLearners,attendanceRows:linkedAttendance,eisaRows:linkedEisa,unitsRows:linkedUnits};
+  // Module date ranges are also already tagged with a _pkey - dedupe/merge
+      // across sheets the same way scanSheet merges them within one sheet
+  // (earliest start, latest end wins for a given programme+module).
+  const moduleDateMap={};
+  allModuleDates.forEach(m=>{
+  const key=`${m._pkey}||${m.mod}`;
+  const cur=moduleDateMap[key];
+  if(!cur){moduleDateMap[key]={...m};}
+  else{
+                                                             if(m.startIso&&(!cur.startIso||m.startIso<cur.startIso)){cur.startIso=m.startIso;cur.start=m.start;}
+                  if(m.endIso&&(!cur.endIso||m.endIso>cur.endIso)){cur.endIso=m.endIso;cur.end=m.end;}
+  }
+  });
+  const linkedModuleDates=Object.values(moduleDateMap);
+
+      importData={progMap,learnerMap:learnerMap,learnerRows:linkedLearners,attendanceRows:linkedAttendance,eisaRows:linkedEisa,unitsRows:linkedUnits,moduleDatesRows:linkedModuleDates};
 
       // Per-programme learner counts
       const progLearnerCounts={};
@@ -9713,6 +9872,7 @@ function previewImport(input){
       const na=linkedAttendance.length;
       const ne=linkedEisa.length;
       const nu=linkedUnits.length;
+      const nmd=linkedModuleDates.length;
 
       // Show what fields were found vs blank
       // Build richer found/missing summary across all programmes
@@ -9736,6 +9896,7 @@ function previewImport(input){
         na>0&&'Attendance',
         ne>0&&'EISA results',
         nu>0&&'Unit standards',
+        nmd>0&&'Module dates',
       ].filter(Boolean);
       const missingFields=[
         !anyFound('client_name')&&'Client name',
@@ -9755,6 +9916,7 @@ function previewImport(input){
           ${na?`<div>🗓️ <strong style="color:#fff">${na}</strong> attendance row${na!==1?'s':''}</div>`:''}
           ${ne?`<div>📝 <strong style="color:#fff">${ne}</strong> EISA row${ne!==1?'s':''}</div>`:''}
           ${nu?`<div>📚 <strong style="color:#fff">${nu}</strong> unit standard${nu!==1?'s':''}</div>`:''}
+          ${nmd?`<div>🗓️ <strong style="color:#fff">${nmd}</strong> module date range${nmd!==1?'s':''}</div>`:''}
           ${naFac?`<div>🎓 <strong style="color:#fff">${naFac}</strong> facilitator name${naFac!==1?'s':''} → added to Assessors</div>`:''}
           ${naAss?`<div>✅ <strong style="color:#fff">${naAss}</strong> assessor name${naAss!==1?'s':''} → added to Assessors</div>`:''}
           ${foundFields.length?`<div style="margin-top:8px;color:#6ee7b7">✓ Will populate: ${foundFields.join(', ')}</div>`:''}
@@ -9842,6 +10004,20 @@ async function confirmImport(){
     }
 
     // ── 3. Programmes ──
+    // Module date ranges pulled from a timetable-style sheet (moduleDatesRows,
+  // built in previewImport) - only covers module_1..4_dates since those are
+  // the only module_N_dates columns the base schema guarantees; a programme
+  // using module 5+ (added manually via "+ Add Module") keeps working the
+  // same way it always did, just not auto-filled by this import.
+  const{moduleDatesRows=[]}=importData;
+  const modDatesPayloadFor=(pkey)=>{
+  const out={};
+  moduleDatesRows.filter(m=>m._pkey===pkey&&m.mod>=1&&m.mod<=4).forEach(m=>{
+  const range=m.start&&m.end?`${m.start} – ${m.end}`:(m.start||m.end||'');
+  if(range)out[`module_${m.mod}_dates`]=range;
+  });
+  return out;
+  };
     for(const pkey of Object.keys(progMap)){
       const pd=progMap[pkey];
       const cid=clientNameToId[pd.client_name];
@@ -9850,6 +10026,7 @@ async function confirmImport(){
         (pd.saqa_id&&p.saqa_id===pd.saqa_id&&p.client_id===cid)||
         (pd.programme_name&&p.programme_name===pd.programme_name&&p.client_id===cid)
       );
+      const modDates=modDatesPayloadFor(pkey);
       if(!existing){
         const fac=assessors.find(a=>a.full_name===pd.facilitator_name);
         const payload={
@@ -9860,9 +10037,11 @@ async function confirmImport(){
           qualification_code:pd.qualification_code||null,
           group_name:pd.group_name||null,
           group_size:pd.group_size||null,
-          module_1_dates:pd.module_1_dates||null,
-          module_2_dates:null,module_3_dates:null,module_4_dates:null,
-          facilitator_id:fac?fac.id:null,
+module_1_dates:pd.module_1_dates||modDates.module_1_dates||null,
+  module_2_dates:modDates.module_2_dates||null,
+  module_3_dates:modDates.module_3_dates||null,
+  module_4_dates:modDates.module_4_dates||null,
+    facilitator_id:fac?fac.id:null,
         };
         existing=syncDB
           ?await sbPost('programmes',payload)
@@ -9876,7 +10055,11 @@ async function confirmImport(){
         if(!existing.qualification_code&&pd.qualification_code)fill.qualification_code=pd.qualification_code;
         if(!existing.group_name&&pd.group_name)fill.group_name=pd.group_name;
         if(!existing.group_size&&pd.group_size)fill.group_size=pd.group_size;
-        if(!existing.module_1_dates&&pd.module_1_dates)fill.module_1_dates=pd.module_1_dates;
+        if(!existing.module_1_dates&&(pd.module_1_dates||modDates.module_1_dates))fill.module_1_dates=pd.module_1_dates||modDates.module_1_dates;
+        [2,3,4].forEach(n=>{
+  const key=`module_${n}_dates`;
+  if(!existing[key]&&modDates[key])fill[key]=modDates[key];
+     });
         if(!existing.facilitator_id&&fac)fill.facilitator_id=fac.id;
         if(Object.keys(fill).length){
           if(syncDB){try{await sbPatch('programmes',existing.id,fill);}catch(e){console.warn('Programme fill failed:',e.message);}}
@@ -12900,6 +13083,10 @@ document.addEventListener('DOMContentLoaded',()=>{
   document.getElementById('login-email')?.addEventListener('keydown',e=>{if(e.key==='Enter')document.getElementById('login-password')?.focus();});
   document.getElementById('reset-email')?.addEventListener('keydown',e=>{if(e.key==='Enter')_authSendReset();});
   document.getElementById('reset-code')?.addEventListener('keydown',e=>{if(e.key==='Enter')_authVerifyCode();});
+  // Autosave a draft of whatever Add/Edit Client/Programme/Learner form is open,
+  // so it survives an accidental tab close — see modalDraftKey()/restoreModalDraft().
+  document.getElementById('modal-body')?.addEventListener('input',scheduleModalDraftSave);
+  document.getElementById('modal-body')?.addEventListener('change',scheduleModalDraftSave);
 });
 
 // ──────────────────────────────────────────────
@@ -13249,7 +13436,7 @@ async function checkAdminFeedback(){
 // ── Delegated click handler for report-page info-cards ──
 // onclick attrs inside innerHTML don't fire; use event delegation instead
 document.addEventListener('click', function(e){
-  const card = e.target.closest('.info-card[data-edit]');
+  const card = e.target.closest('.info-card[data-edit], .cover-field[data-edit]');
   if(!card) return;
   const target = card.dataset.edit;
   if(target === 'client') openModal('client','edit');
@@ -13788,7 +13975,7 @@ function _renderLRC(){
       examv1_pct:ov_v('examv1_pct',base.examv1_pct),examv2_pct:ov_v('examv2_pct',base.examv2_pct)
     };
     const mkB=v=>v?`<span class="lrc-badge ${v==='C'?'c':isEisaOutstanding(v)?'nyc':'na'}">${v}</span>`:`<span class="lrc-badge na">—</span>`;
-    const pct=v=>res[v+'_pct']?` <small style="color:var(--muted)">${res[v+'_pct']}%</small>`:'';
+    
     const lrcRowVals=[res.km,res.pm,res.wm,res.examv1,res.examv2];
     const allC=res.km==='C'&&res.pm==='C'&&res.wm==='C'&&res.examv1==='C'&&(res.examv2==='C'||!res.examv2||res.examv2==='N/A');
     // .lrc-badge only defines c/nyc/na variants (no dedicated "pending"
@@ -13798,11 +13985,11 @@ function _renderLRC(){
     const overall=`<span class="lrc-badge ${lrcCls}">${eisaOverallLabel(allC,lrcRowVals)}</span>`;
     return`<tr>
       <td style="border-left:3px solid ${modColors[mod]};padding-left:12px;font-weight:700;color:${modColors[mod]}">${modLabels[mod]}</td>
-      <td style="text-align:center">${mkB(res.km)}${pct('km')}</td>
-      <td style="text-align:center">${mkB(res.pm)}${pct('pm')}</td>
-      <td style="text-align:center">${mkB(res.wm)}${pct('wm')}</td>
-      <td style="text-align:center">${mkB(res.examv1)}${pct('examv1')}</td>
-      <td style="text-align:center">${mkB(res.examv2)}${pct('examv2')}</td>
+      <td style="text-align:center">${mkB(res.km)}</td>
+      <td style="text-align:center">${mkB(res.pm)}</td>
+      <td style="text-align:center">${mkB(res.wm)}</td>
+      <td style="text-align:center">${mkB(res.examv1)}</td>
+      <td style="text-align:center">${mkB(res.examv2)}</td>
       <td style="text-align:center">${overall}</td>
     </tr>`;
   }).join('');
@@ -15023,33 +15210,6 @@ function _updateProgressPanel(){
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
   items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
-
-  // 9. Exam % — whenever an Exam V1/V2 result is set to an actual code (C /
-  // NYC / NS / RW, i.e. not blank and not N/A), the matching % score field is
-  // now mandatory before a report can be sent for review, printed, or
-  // downloaded (see _checklistBlocksFinalize). Legacy (SETA unit-standard)
-  // programmes have no Exam V1/V2 concept at all, so this item is skipped
-  // for them entirely — same gate as eisa_summary above.
-  if(!legacyForNar){
-    let examTotal=0,examDone=0;
-    pLearners.forEach(l=>{
-      narModNums.forEach(modNum=>{
-        const res=(eisaState[l.id]||{})[modNum]||{};
-        const ek=`${l.id}_m${modNum}`;
-        const ov=(k,fallback)=>{const saved=(narratives._eisa||{})[`${ek}_${k}`];return saved!==undefined?saved:(fallback||'');};
-        ['examv1','examv2'].forEach(field=>{
-          const v=ov(field,res[field]);
-          if(v&&v!=='N/A'){
-            examTotal++;
-            const p=ov(field+'_pct',res[field+'_pct']);
-            if(p&&String(p).trim().length>0)examDone++;
-          }
-        });
-      });
-    });
-    const examState=examTotal===0?'done':examDone===examTotal?'done':examDone>0?'partial':'';
-    items.push({id:'exampct',label:examTotal>0?`Exam % (${examDone}/${examTotal})`:'Exam %',state:examState,anchor:null});
-  }
 
   // Discoverability nudge for "Draft from data" / "Draft all": badge the
   // toolbar button with how many narrative fields are still empty, and put a
