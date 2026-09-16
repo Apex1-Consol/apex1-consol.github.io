@@ -545,7 +545,7 @@ function renderDetail(assessorId){
 
   const docs = state.documents.filter(d => d.assessor_id === assessorId);
   const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => `
-      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>${d.file_url?`<div style="margin-top:4px;"><a href="${d.file_url}" target="_blank" rel="noopener" class="small-link">View file</a></div>`:''}</div>`).join('')}</div>`
+      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>${d.file_url?`<div style="margin-top:4px;"><button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button></div>`:''}</div>`).join('')}</div>`
     : `<div class="empty-note">No documents captured yet.</div>`;
 
   const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -671,7 +671,15 @@ async function uploadDocumentFile(file, tenantId, assessorId){
     body: file,
   });
   if (!res.ok) throw new Error('File upload failed: ' + (await res.text()));
-  return `${SUPA_URL}/storage/v1/object/public/fam-documents/${path}`;
+  return path; // fam_documents.file_url now stores the storage object path, not a public URL —
+               // the bucket is private, so viewing goes through viewDocument()'s signed URL below.
+}
+async function viewDocument(path){
+  try {
+    const { data, error } = await sb.storage.from('fam-documents').createSignedUrl(path, 60);
+    if (error) throw error;
+    window.open(data.signedUrl, '_blank', 'noopener');
+  } catch(e) { toast('error', 'Could not open file: ' + e.message); }
 }
 async function saveDocument(){
   const assessorId = document.getElementById('dc-assessor-id').value;
