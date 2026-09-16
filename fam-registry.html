@@ -332,7 +332,11 @@ async function handleLogin(){
   const errEl = document.getElementById('login-error');
   errEl.textContent = '';
   if (!email || !password) { errEl.textContent = 'Email and password are required.'; return; }
-  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (typeof turnstileToken !== 'undefined' && !turnstileToken) { errEl.textContent = 'Please complete the security check first.'; return; }
+  const loginOpts = (typeof turnstileToken !== 'undefined' && turnstileToken) ? { captchaToken: turnstileToken } : {};
+  const { error } = await sb.auth.signInWithPassword({ email, password, options: loginOpts });
+  if (typeof window.turnstile !== 'undefined' && typeof turnstileWidgetId !== 'undefined' && turnstileWidgetId !== null) { window.turnstile.reset(turnstileWidgetId); }
+  if (typeof turnstileToken !== 'undefined') turnstileToken = '';
   if (error) { errEl.textContent = error.message; return; }
   await boot();
 }
@@ -741,12 +745,18 @@ function toast(type, msg){
   setTimeout(() => el.remove(), 4000);
 }
 
+let recoveryInFlight = false;
 async function startRecovery(){
+  if (recoveryInFlight) return;
   const email=document.getElementById('login-email').value.trim(), err=document.getElementById('login-error');
   if(!email){err.textContent='Enter your email first, then choose Forgot password.';return;}
   if(typeof turnstileToken!=='undefined' && !turnstileToken){err.textContent='Please complete the security check first.';return;}
+  recoveryInFlight = true;
   const opts=typeof turnstileToken!=='undefined' && turnstileToken ? {captchaToken:turnstileToken} : {};
   const {error}=await sb.auth.resetPasswordForEmail(email,{...opts,redirectTo:window.location.origin+window.location.pathname});
+  if (typeof window.turnstile !== 'undefined' && typeof turnstileWidgetId !== 'undefined' && turnstileWidgetId !== null) { window.turnstile.reset(turnstileWidgetId); }
+  if (typeof turnstileToken !== 'undefined') turnstileToken = '';
+  recoveryInFlight = false;
   if(error){err.textContent='Password reset failed: '+error.message;return;}
   document.querySelector('.login-password-field').style.display='none';
   document.querySelector('.login-submit-button').style.display='none';
