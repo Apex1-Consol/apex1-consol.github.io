@@ -288,12 +288,14 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
   </div>
 </div>
 
-<!-- Add document modal -->
+<!-- Add / replace document modal -->
 <div class="modal-overlay" id="modal-document">
   <div class="modal">
-    <h3>Add / update document</h3>
+    <h3 id="dc-title">Add / update document</h3>
     <div class="modal-error" id="dc-error"></div>
     <input type="hidden" id="dc-assessor-id">
+    <input type="hidden" id="dc-replace-of">
+    <div id="dc-replace-note" style="display:none;font-size:11px;color:var(--text-muted);margin:-4px 0 10px;">Replacing keeps the current file as version history — it is never deleted, just marked superseded.</div>
     <div class="field"><label>Document type *</label>
       <select id="dc-type"><option>CV</option><option>Highest Qualification</option><option>SLA</option><option>ID</option><option>QUAL</option><option>AFFIDAVIT</option></select>
     </div>
@@ -301,7 +303,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
       <select id="dc-status"><option>Missing</option><option>Current</option></select>
     </div>
     <div class="field"><label>Date loaded</label><input id="dc-date" type="date"></div>
-    <div class="field"><label>Upload file</label><input id="dc-file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png">
+    <div class="field"><label id="dc-file-label">Upload file</label><input id="dc-file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png">
       <div style="font-size:11px;color:var(--text-muted);margin-top:4px;">PDF, Word, or image (JPG/PNG) — up to 10 MB.</div>
     </div>
     <div class="modal-actions">
@@ -334,7 +336,15 @@ let state = {
   })(),
   activeTab: 'all',
   tenantId: null,
+  isAdmin: false,
 };
+
+// Mirrors public.auth_is_admin() in Postgres: role can be a plain string or an
+// array of strings on app_metadata, depending on how the user was provisioned.
+function isAdminRole(role){
+  if (Array.isArray(role)) return role.includes('admin');
+  return role === 'admin';
+}
 
 // ---------- auth ----------
 async function handleLogin(){
@@ -367,6 +377,7 @@ let bootInProgress=false; let turnstileToken=''; let turnstileWidgetId=null; con
             document.getElementById('app').style.display = 'grid';
             const meta = session.user.app_metadata || {};
             state.tenantId = meta.tenant || null;
+            state.isAdmin = isAdminRole(meta.role);
             document.getElementById('whoami').textContent = session.user.email + (meta.role ? ' · ' + meta.role : '');
             await loadAll();
       } catch (err) {
@@ -718,9 +729,29 @@ function renderDetail(assessorId){
       }).join('')}
     </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
 
-  const docs = state.documents.filter(d => d.assessor_id === assessorId);
-  const docsHtml = docs.length ? `<div class="doc-grid">${docs.map(d => `
-      <div class="doc-card ${d.status==='Missing'?'missing':''}"><div class="name">${escapeHtml(d.doc_type)}</div><div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>${d.file_url?`<div style="margin-top:4px;"><button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button></div>`:''}</div>`).join('')}</div>`
+  const allDocs = state.documents.filter(d => d.assessor_id === assessorId);
+  const currentDocs = allDocs.filter(d => d.is_current !== false);
+  const historyByType = {};
+  allDocs.filter(d => d.is_current === false).forEach(d => { (historyByType[d.doc_type] ||= []).push(d); });
+  Object.values(historyByType).forEach(list => list.sort((a,b) => (b.version||0) - (a.version||0)));
+
+  const docsHtml = currentDocs.length ? `<div class="doc-grid">${currentDocs.map(d => {
+      const hist = historyByType[d.doc_type] || [];
+      const histId = `doc-hist-${d.id}`;
+      return `
+      <div class="doc-card ${d.status==='Missing'?'missing':''}">
+        <div class="name">${escapeHtml(d.doc_type)}${d.version>1?` <span style="opacity:.6;font-weight:400;">v${d.version}</span>`:''}</div>
+        <div class="meta">${escapeHtml(d.status)}${d.doc_date?' · '+d.doc_date:''}</div>
+        <div style="margin-top:4px;display:flex;gap:10px;flex-wrap:wrap;">
+          ${d.file_url?`<button class="small-link" onclick="viewDocument('${escapeHtml(d.file_url)}')">View file</button>`:''}
+          ${state.isAdmin && d.file_url?`<button class="small-link" onclick="openReplaceDocument(${d.id})">Replace</button>`:''}
+          ${hist.length?`<button class="small-link" onclick="toggleDocHistory('${histId}')">History (${hist.length})</button>`:''}
+        </div>
+        ${hist.length?`<div id="${histId}" style="display:none;margin-top:8px;padding-top:8px;border-top:1px solid var(--border-subtle);">
+          ${hist.map(h => `<div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;">v${h.version||1} · superseded ${h.superseded_at?h.superseded_at.slice(0,10):''}${h.file_url?` · <button class="small-link" onclick="viewDocument('${escapeHtml(h.file_url)}')">View file</button>`:''}</div>`).join('')}
+        </div>`:''}
+      </div>`;
+    }).join('')}</div>`
     : `<div class="empty-note">No documents captured yet.</div>`;
 
   const initials = (a.full_name||'?').split(/\s+/).map(w=>w[0]).slice(0,2).join('').toUpperCase();
@@ -825,13 +856,43 @@ async function saveRegistration(){
 }
 
 function openAddDocument(assessorId){
+  document.getElementById('dc-title').textContent = 'Add / update document';
+  document.getElementById('dc-replace-note').style.display = 'none';
   document.getElementById('dc-assessor-id').value = assessorId;
+  document.getElementById('dc-replace-of').value = '';
+  document.getElementById('dc-type').disabled = false;
   document.getElementById('dc-type').value = 'CV';
   document.getElementById('dc-status').value = 'Missing';
   document.getElementById('dc-date').value = '';
   document.getElementById('dc-file').value = '';
+  document.getElementById('dc-file-label').textContent = 'Upload file';
   document.getElementById('dc-error').textContent = '';
   openModal('modal-document');
+}
+
+// Admin-only: uploads a new file as the next version of an existing document and
+// marks the current row superseded (immutable history — nothing is deleted).
+function openReplaceDocument(docId){
+  if (!state.isAdmin) { toast('error', 'Only admins can replace a document.'); return; }
+  const d = state.documents.find(x => x.id === docId);
+  if (!d) { toast('error', 'Document not found — try reloading.'); return; }
+  document.getElementById('dc-title').textContent = `Replace ${d.doc_type} — v${(d.version||1)+1}`;
+  document.getElementById('dc-replace-note').style.display = 'block';
+  document.getElementById('dc-assessor-id').value = d.assessor_id;
+  document.getElementById('dc-replace-of').value = docId;
+  document.getElementById('dc-type').value = d.doc_type;
+  document.getElementById('dc-type').disabled = true; // replacement must stay the same doc type
+  document.getElementById('dc-status').value = 'Current';
+  document.getElementById('dc-date').value = '';
+  document.getElementById('dc-file').value = '';
+  document.getElementById('dc-file-label').textContent = 'New file *';
+  document.getElementById('dc-error').textContent = '';
+  openModal('modal-document');
+}
+
+function toggleDocHistory(elId){
+  const el = document.getElementById(elId);
+  if (el) el.style.display = el.style.display === 'none' ? 'block' : 'none';
 }
 // Kept in sync with the fam-documents bucket's own file_size_limit / allowed_mime_types
 // (set at the storage layer too, so this is a friendly first check, not the only guard).
@@ -885,12 +946,16 @@ async function viewDocument(path){
 async function saveDocument(){
   const assessorId = document.getElementById('dc-assessor-id').value;
   const docType = document.getElementById('dc-type').value;
+  const replaceOfRaw = document.getElementById('dc-replace-of').value;
+  const replaceOfId = replaceOfRaw ? Number(replaceOfRaw) : null;
   if (!state.tenantId) { document.getElementById('dc-error').textContent = 'No tenant on your account.'; return; }
+  if (replaceOfId && !state.isAdmin) { document.getElementById('dc-error').textContent = 'Only admins can replace a document.'; return; }
   const saveBtn = document.querySelector('#modal-document .btn-gold');
   saveBtn.disabled = true; saveBtn.textContent = 'Saving…';
   try {
     const fileInput = document.getElementById('dc-file');
     const file = fileInput.files && fileInput.files[0];
+    if (replaceOfId && !file) { throw new Error('Choose a replacement file.'); }
     let fileUrl = null;
     if (file) {
       fileUrl = await uploadDocumentFile(file, state.tenantId, assessorId);
@@ -900,23 +965,52 @@ async function saveDocument(){
       const { data: { user } } = await sb.auth.getUser();
       uploaderEmail = user ? user.email : null;
     }
-    await api('fam_documents', { method:'POST', body: JSON.stringify({
-      tenant_id: state.tenantId,
-      assessor_id: Number(assessorId),
-      doc_type: docType,
-      status: document.getElementById('dc-status').value,
-      doc_date: document.getElementById('dc-date').value || null,
-      ...(fileUrl ? {
+
+    if (replaceOfId) {
+      // Versioned replace: the old row is never touched except to mark it
+      // superseded — its file_url and metadata stay exactly as they were, so its
+      // signed-URL link keeps working as permanent history.
+      const oldDoc = state.documents.find(x => x.id === replaceOfId);
+      if (!oldDoc) throw new Error('Original document not found — try reloading.');
+      const [created] = await api('fam_documents', { method:'POST', body: JSON.stringify({
+        tenant_id: state.tenantId,
+        assessor_id: Number(assessorId),
+        doc_type: oldDoc.doc_type,
+        status: document.getElementById('dc-status').value,
+        doc_date: document.getElementById('dc-date').value || null,
+        version: (oldDoc.version||1) + 1,
+        is_current: true,
         file_url: fileUrl,
         file_name: file.name,
         file_size_bytes: file.size,
         mime_type: file.type || null,
         uploaded_by: uploaderEmail,
         uploaded_at: new Date().toISOString(),
-      } : {}),
-    })});
+      })});
+      await api(`fam_documents?id=eq.${replaceOfId}`, { method:'PATCH', body: JSON.stringify({
+        is_current: false,
+        superseded_at: new Date().toISOString(),
+        superseded_by: created ? created.id : null,
+      })});
+    } else {
+      await api('fam_documents', { method:'POST', body: JSON.stringify({
+        tenant_id: state.tenantId,
+        assessor_id: Number(assessorId),
+        doc_type: docType,
+        status: document.getElementById('dc-status').value,
+        doc_date: document.getElementById('dc-date').value || null,
+        ...(fileUrl ? {
+          file_url: fileUrl,
+          file_name: file.name,
+          file_size_bytes: file.size,
+          mime_type: file.type || null,
+          uploaded_by: uploaderEmail,
+          uploaded_at: new Date().toISOString(),
+        } : {}),
+      })});
+    }
     closeModal('modal-document');
-    toast('success','Document saved.');
+    toast('success', replaceOfId ? 'Document replaced — previous version kept as history.' : 'Document saved.');
     await loadAll();
     renderDetail(Number(assessorId));
   } catch(e){ document.getElementById('dc-error').textContent = 'Failed to save: ' + e.message; }
