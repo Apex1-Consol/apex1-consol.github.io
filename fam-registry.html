@@ -141,27 +141,12 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
 
-/* Fit-first layout: preserve the profile drawer until the viewport truly needs stacking */
+/* Canonical responsive layout */
 .content{width:100%;max-width:1600px;margin-inline:auto;}
 .two-col{grid-template-columns:minmax(0,1fr) clamp(320px,28vw,390px);gap:16px;}
-.detail-panel{min-width:0;}
-@media (max-width: 1040px){
-  .content{padding-left:18px;padding-right:18px;}
-  .two-col{grid-template-columns:minmax(0,1fr) 320px;gap:12px;}
-  .detail-body{padding:16px;}
-  .kv-grid{grid-template-columns:1fr;}
-}
-@media (max-width: 860px){
-  .two-col{grid-template-columns:1fr;}
-  .detail-panel{position:relative;top:auto;max-height:none;}
-}
-@media (max-width: 640px){
-  .content{padding:12px 10px;}
-  .top-bar{padding:14px 16px;}
-  .stat-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
-  .filter-row{display:grid;grid-template-columns:1fr 1fr;}
-  .filter-row input{grid-column:1/-1;min-width:0;}
-}
+@media (max-width:1040px){.content{padding-left:18px;padding-right:18px}.two-col{grid-template-columns:minmax(0,1fr) 320px;gap:12px}.detail-body{padding:16px}.kv-grid{grid-template-columns:1fr}}
+@media (max-width:860px){.two-col{grid-template-columns:1fr}.detail-panel{position:relative;top:auto;max-height:none}}
+@media (max-width:640px){.content{padding:12px 10px}.top-bar{padding:14px 16px}.stat-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.filter-row{display:grid;grid-template-columns:1fr 1fr}.filter-row input{grid-column:1/-1;min-width:0}}
 
 </style>
 </head>
@@ -208,7 +193,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
         <div class="page-subtitle">Registry &middot; scope and documents tracked per person, per SETA</div>
       </div>
       <div style="display:flex;gap:10px;">
-        <button class="btn btn-secondary btn-sm" onclick="loadAll()">&#8635; Refresh</button>
+        <button id="refresh-btn" class="btn btn-secondary btn-sm" onclick="refreshWithFeedback()">&#8635; Refresh</button><span id="refresh-state" style="font-size:10.5px;color:var(--text-muted);align-self:center;"></span>
         <button class="btn btn-gold btn-sm" onclick="openAddPractitioner()">+ Add practitioner</button>
       </div>
     </div>
@@ -428,6 +413,8 @@ async function api(path, opts = {}){
 }
 
 // ---------- data load ----------
+async function refreshWithFeedback(){const b=document.getElementById('refresh-btn'),e=document.getElementById('refresh-state');if(b){b.disabled=true;b.textContent='↻ Refreshing…'}if(e)e.textContent='Loading live data';const t=Date.now();try{await loadAll();if(e)e.textContent='Updated just now · '+((Date.now()-t)/1000).toFixed(1)+'s';toast('success','Registry refreshed from ApexOne.')}catch(x){if(e)e.textContent='Refresh failed';toast('error','Refresh failed: '+x.message)}finally{if(b){b.disabled=false;b.textContent='↻ Refresh'}}}
+
 async function loadAll(){
   try {
     const [assessors, regs, scope, docs, quals, followUps] = await Promise.all([
