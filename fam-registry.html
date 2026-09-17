@@ -134,12 +134,45 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .modal .field label{display:block;font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);margin-bottom:5px;}
 .modal .field input,.modal .field select,.modal .field textarea{width:100%;padding:9px 11px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12.5px;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
-.modal-error{color:var(--accent-rose);font-size:11.5px;min-height:14px;} .intelligence-card{border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;background:var(--bg-secondary);font-size:11px}.conflict{margin-top:8px;padding:8px 10px;border-radius:7px;background:rgba(166,58,58,.14);color:#E08585}
+.modal-error{color:var(--accent-rose);font-size:11.5px;min-height:14px;}
 
 #toast{position:fixed;bottom:20px;right:20px;z-index:4000;display:flex;flex-direction:column;gap:8px;}
 .toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
+
+/* Responsive QA polish */
+@media (max-width: 1180px){
+  .content{padding:20px 18px;}
+  .two-col{grid-template-columns:minmax(0,1fr) 320px;gap:14px;}
+  .filter-row{gap:7px;}
+  .filter-row input{min-width:160px;}
+}
+@media (max-width: 900px){
+  .two-col{grid-template-columns:1fr;}
+  .detail-panel{position:relative;top:auto;max-height:none;}
+  table{min-width:680px;}
+  .action-item{display:grid!important;grid-template-columns:1fr auto;align-items:center;gap:8px!important;}
+  .action-item .action-meta{grid-column:1/-1;}
+  .action-item .action-buttons{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;}
+}
+@media (max-width: 640px){
+  #app{display:block!important;}
+  .sidebar{display:none;}
+  .top-bar{padding:16px 14px;}
+  .content{padding:14px 10px;}
+  .stat-row{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}
+  .stat-card{padding:12px;}
+  .stat-value{font-size:20px;}
+  .filter-row{display:grid;grid-template-columns:1fr 1fr;}
+  .filter-row input{grid-column:1/-1;min-width:0;}
+  .filter-row select{min-width:0;width:100%;}
+  .container-header{padding:13px 14px;}
+  th,td{padding-left:12px;padding-right:12px;}
+  .action-item{padding:12px 14px!important;}
+  .action-item .action-buttons .btn{flex:1 1 auto;min-width:72px;}
+}
+
 </style>
 </head>
 <body>
@@ -174,7 +207,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <div class="sidebar-footer">
       <span id="whoami" style="color:var(--text-secondary);"></span>
       <button onclick="handleLogout()">Sign out</button>
-      <span id="last-updated">FAM Registry · v1.0 standalone</span>
+      <span>FAM Registry &middot; v1.0 standalone</span>
     </div>
   </aside>
 
@@ -185,13 +218,12 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
         <div class="page-subtitle">Registry &middot; scope and documents tracked per person, per SETA</div>
       </div>
       <div style="display:flex;gap:10px;">
-        <button id="refresh-btn" class="btn btn-secondary btn-sm" onclick="refreshWithFeedback()">&#8635; Refresh</button><span id="refresh-state" style="font-size:10.5px;color:var(--text-muted);align-self:center;"></span>
+        <button class="btn btn-secondary btn-sm" onclick="loadAll()">&#8635; Refresh</button>
         <button class="btn btn-gold btn-sm" onclick="openAddPractitioner()">+ Add practitioner</button>
       </div>
     </div>
 
     <div class="content">
-      <div class="banner"><span><strong>Document review queue:</strong> uploads are stored as evidence first, then classified and linked before they affect compliance status.</span></div>
       <div class="banner" id="renewal-banner" style="display:none;"></div>
 
       <div class="stat-row" id="stat-row"></div>
@@ -406,15 +438,6 @@ async function api(path, opts = {}){
 }
 
 // ---------- data load ----------
-async function refreshWithFeedback(){
-  const btn=document.getElementById('refresh-btn'), el=document.getElementById('refresh-state');
-  if(btn){btn.disabled=true;btn.textContent='↻ Refreshing…';} if(el)el.textContent='Loading live data';
-  const started=Date.now();
-  try{await loadAll();if(el)el.textContent='Updated just now · '+((Date.now()-started)/1000).toFixed(1)+'s';toast('success','Registry refreshed from ApexOne.');}
-  catch(e){if(el)el.textContent='Refresh failed';toast('error','Refresh failed: '+e.message);}
-  finally{if(btn){btn.disabled=false;btn.textContent='↻ Refresh';}}
-}
-
 async function loadAll(){
   try {
     const [assessors, regs, scope, docs, quals, followUps] = await Promise.all([
@@ -437,12 +460,10 @@ async function loadAll(){
     sel.innerHTML = state.qualifications.map(q => `<option value="${q.id}">${q.seta && q.seta!=='N/A' ? '['+escapeHtml(q.seta)+'] ' : ''}${escapeHtml(q.name)}</option>`).join('');
 
     renderStats();
-    const lu=document.getElementById('last-updated'); if(lu)lu.textContent='Live data · updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     renderFilterOptions();
     renderTabs();
     renderTable();
     renderRenewalQueue();
-    if (!state.selectedAssessorId && state.assessors.length) state.selectedAssessorId=state.assessors[0].id;
     if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
   } catch (e) {
     console.error(e);
@@ -459,7 +480,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
   return 'active';
 }
 function rolesFor(assessorId){
@@ -494,7 +515,7 @@ function assessorRiskStates(assessorId){
 }
 
 function statusPillHtml(status){
-  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], needs_review:['status-mixed','Needs review'], unknown:['status-unknown','No registrations'] };
+  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
   const [cls,label] = map[status] || map.unknown;
   return `<span class="status-dot ${cls}">${label}</span>`;
 }
@@ -543,7 +564,7 @@ function renderFilterOptions(){
 }
 
 function renderTabs(){
-  const needsAttention = state.assessors.filter(a => ['expired','mixed','needs_review'].includes(overallStatus(a.id))).length;
+  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
   const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
   const tabs = [
     ['all', `All practitioners (${state.assessors.length})`],
@@ -563,7 +584,7 @@ function renderTable(){
   const setaFilter = document.getElementById('seta-filter').value;
   let rows = state.assessors.filter(a => {
     const status = overallStatus(a.id);
-    if (state.activeTab === 'attention' && !['expired','mixed','needs_review'].includes(status)) return false;
+    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
     if (state.activeTab === 'active' && status !== 'active') return false;
     if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
     if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
@@ -689,23 +710,23 @@ function renderRenewalQueue(){
     if (item.kind === 'missing_doc') {
       const a = state.assessors.find(x => x.id === item.d.assessor_id);
       const { statusChip, noteChip, buttons } = followUpActionsHtml('document', item.d.id, item.d.assessor_id, 'missing_doc');
-      return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
-        <div style="flex:1;min-width:200px;">
+      return `<div class="action-item" style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+        <div class="action-meta" style="flex:1;min-width:200px;">
           <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(item.d.doc_type)}</span></div>
           <div style="font-size:11px;color:var(--text-muted);">Supporting document not yet on file</div>
           ${noteChip}
         </div>
         ${statusChip}${riskBadgeHtml('missing_doc')}
         <button class="btn btn-secondary btn-sm" onclick="renderDetail(${a?a.id:0})">Open profile</button>
-        ${buttons}
+        <div class="action-buttons">${buttons}</div>
       </div>`;
     }
     const r = item.r;
     const a = state.assessors.find(x => x.id === r.assessor_id);
     const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
     const { statusChip, noteChip, buttons } = followUpActionsHtml('registration', r.id, r.assessor_id, item.kind);
-    return `<div style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
-      <div style="flex:1;min-width:200px;">
+    return `<div class="action-item" style="display:flex;align-items:center;gap:14px;padding:12px 18px;border-bottom:1px solid var(--border-subtle);flex-wrap:wrap;">
+      <div class="action-meta" style="flex:1;min-width:200px;">
         <div style="font-size:12.5px;font-weight:600;">${escapeHtml(a?a.full_name:'Unknown')} <span style="color:var(--text-muted);font-weight:400;">&middot; ${escapeHtml(r.seta_name)}</span></div>
         <div style="font-size:11px;color:var(--text-muted);">${escapeHtml(roleLabel)} &middot; ${escapeHtml(r.registration_number||'no reg number')}</div>
         ${noteChip}
@@ -735,7 +756,7 @@ function renderDetail(assessorId){
       ${list.map(r => {
         const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
         return `<div class="reg-card">
-          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regRiskState(r) === 'pending' ? 'needs_review' : (regRiskState(r) === 'expired' ? 'expired' : (regIsActive(r) ? 'active' : 'inactive')))}</div>
+          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regIsActive(r) ? 'active' : 'inactive')}</div>
           <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
         </div>`;
       }).join('')}
@@ -798,14 +819,6 @@ function renderDetail(assessorId){
           <button class="small-link" onclick="openAddDocument(${assessorId})">+ Add document</button>
         </div>
         <div style="margin-top:8px;">${docsHtml}</div>
-      </div>
-      <div>
-        <div class="detail-section-title">Document intelligence</div>
-        <div class="intelligence-card" style="margin-top:8px;">
-          <strong>Evidence coverage</strong><br>
-          <span>${allDocs.length} linked document${allDocs.length===1?'':'s'} · ${regs.reduce((n,r)=>n+r.scope.length,0)} scope link${regs.reduce((n,r)=>n+r.scope.length,0)===1?'':'s'} · ${regs.filter(r=>regRiskState(r)==='pending').length} registration${regs.filter(r=>regRiskState(r)==='pending').length===1?'':'s'} needing review</span>
-        </div>
-        ${regs.some(r=>regRiskState(r)==='pending') ? '<div class="conflict"><strong>Review needed:</strong> incomplete registration details must be verified before attached qualifications become confirmed scope.</div>' : ''}
       </div>
     </div>`;
 }
