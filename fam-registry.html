@@ -140,6 +140,10 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
+
+/* Canonical deployment layout */
+html,body{max-width:100%;overflow-x:hidden}.content{width:100%;max-width:1600px;margin-inline:auto}.two-col{grid-template-columns:minmax(0,1fr) clamp(320px,28vw,390px);gap:16px}.detail-panel{min-width:0}.reg-card .chip-plain{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block}.tablewrap{max-width:100%;overflow-x:auto}@media(max-width:860px){.two-col{grid-template-columns:1fr}.detail-panel{position:relative;top:auto;max-height:none}}@media(max-width:720px){table thead{display:none}table,table tbody,table tr,table td{display:block;width:100%}table tr.reg-row{padding:12px;border-bottom:1px solid var(--border-subtle)}table tr.reg-row td{border:0;padding:3px 0}.content{padding:12px 10px}}
+
 </style>
 </head>
 <body>
@@ -174,7 +178,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <div class="sidebar-footer">
       <span id="whoami" style="color:var(--text-secondary);"></span>
       <button onclick="handleLogout()">Sign out</button>
-      <span id="build-stamp">FAM Registry · build 2026-09-18.1</span>
+      <span id="build-stamp">FAM Registry · canonical build 2026-09-18.2</span>
     </div>
   </aside>
 
@@ -432,6 +436,7 @@ async function loadAll(){
     renderTable();
     renderRenewalQueue();
     if (!state.selectedAssessorId || !state.assessors.some(a=>String(a.id)===String(state.selectedAssessorId))) state.selectedAssessorId = state.assessors[0]?.id || null;
+    if (!state.selectedAssessorId || !state.assessors.some(a=>String(a.id)===String(state.selectedAssessorId))) state.selectedAssessorId=state.assessors[0]?.id||null;
     if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
   } catch (e) {
     console.error(e);
@@ -448,7 +453,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
   return 'active';
 }
 function rolesFor(assessorId){
@@ -532,7 +537,7 @@ function renderFilterOptions(){
 }
 
 function renderTabs(){
-  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
+  const needsAttention = state.assessors.filter(a => ['expired','mixed','needs_review'].includes(overallStatus(a.id))).length;
   const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
   const tabs = [
     ['all', `All practitioners (${state.assessors.length})`],
@@ -553,7 +558,7 @@ function renderTable(){
   const setaFilter = document.getElementById('seta-filter').value;
   let rows = state.assessors.filter(a => {
     const status = overallStatus(a.id);
-    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
+    if (state.activeTab === 'attention' && !['expired','mixed','needs_review'].includes(status)) return false;
     if (state.activeTab === 'active' && status !== 'active') return false;
     if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
     if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
