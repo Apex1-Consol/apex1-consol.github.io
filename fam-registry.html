@@ -135,6 +135,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .modal .field input,.modal .field select,.modal .field textarea{width:100%;padding:9px 11px;background:var(--bg-secondary);border:1px solid var(--border-subtle);border-radius:var(--radius-sm);color:var(--text-primary);font-size:12.5px;}
 .modal-actions{display:flex;justify-content:flex-end;gap:10px;margin-top:16px;}
 .modal-error{color:var(--accent-rose);font-size:11.5px;min-height:14px;}
+.drop-zone-active{border-color:var(--accent-gold)!important;background:rgba(212,165,55,.12)!important;}
 
 #toast{position:fixed;bottom:20px;right:20px;z-index:4000;display:flex;flex-direction:column;gap:8px;}
 .toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
@@ -174,7 +175,7 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
     <div class="sidebar-footer">
       <span id="whoami" style="color:var(--text-secondary);"></span>
       <button onclick="handleLogout()">Sign out</button>
-      <span>FAM Registry &middot; v1.0 standalone</span>
+      <span id="last-updated">FAM Registry · v1.0 standalone</span>
     </div>
   </aside>
 
@@ -406,14 +407,12 @@ async function api(path, opts = {}){
 
 // ---------- data load ----------
 async function refreshWithFeedback(){
-  const btn=document.getElementById('refresh-btn');
-  const stateEl=document.getElementById('refresh-state');
-  if(btn) { btn.disabled=true; btn.textContent='↻ Refreshing…'; }
-  if(stateEl) stateEl.textContent='Loading live data';
+  const btn=document.getElementById('refresh-btn'), stateEl=document.getElementById('refresh-state');
+  if(btn){btn.disabled=true;btn.textContent='↻ Refreshing…';} if(stateEl)stateEl.textContent='Loading live data';
   const started=Date.now();
-  try { await loadAll(); const seconds=((Date.now()-started)/1000).toFixed(1); if(stateEl) stateEl.textContent='Updated just now · '+seconds+'s'; toast('success','Registry refreshed from ApexOne.'); }
-  catch(e) { if(stateEl) stateEl.textContent='Refresh failed'; toast('error','Refresh failed: '+e.message); }
-  finally { if(btn) { btn.disabled=false; btn.textContent='↻ Refresh'; } }
+  try{await loadAll(); if(stateEl)stateEl.textContent='Updated just now · '+((Date.now()-started)/1000).toFixed(1)+'s'; toast('success','Registry refreshed from ApexOne.');}
+  catch(e){if(stateEl)stateEl.textContent='Refresh failed';toast('error','Refresh failed: '+e.message);}
+  finally{if(btn){btn.disabled=false;btn.textContent='↻ Refresh';}}
 }
 
 async function loadAll(){
@@ -438,10 +437,12 @@ async function loadAll(){
     sel.innerHTML = state.qualifications.map(q => `<option value="${q.id}">${q.seta && q.seta!=='N/A' ? '['+escapeHtml(q.seta)+'] ' : ''}${escapeHtml(q.name)}</option>`).join('');
 
     renderStats();
+    const lu=document.getElementById('last-updated'); if(lu) lu.textContent='Live data · updated '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     renderFilterOptions();
     renderTabs();
     renderTable();
     renderRenewalQueue();
+    if (!state.selectedAssessorId && state.assessors.length) state.selectedAssessorId = state.assessors[0].id;
     if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
   } catch (e) {
     console.error(e);
@@ -458,7 +459,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'mixed' : 'inactive');
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
   return 'active';
 }
 function rolesFor(assessorId){
@@ -493,7 +494,7 @@ function assessorRiskStates(assessorId){
 }
 
 function statusPillHtml(status){
-  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
+  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], needs_review:['status-mixed','Needs review'], unknown:['status-unknown','No registrations'] };
   const [cls,label] = map[status] || map.unknown;
   return `<span class="status-dot ${cls}">${label}</span>`;
 }
@@ -542,7 +543,7 @@ function renderFilterOptions(){
 }
 
 function renderTabs(){
-  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
+  const needsAttention = state.assessors.filter(a => ['expired','mixed','needs_review'].includes(overallStatus(a.id))).length;
   const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
   const tabs = [
     ['all', `All practitioners (${state.assessors.length})`],
@@ -562,7 +563,7 @@ function renderTable(){
   const setaFilter = document.getElementById('seta-filter').value;
   let rows = state.assessors.filter(a => {
     const status = overallStatus(a.id);
-    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
+    if (state.activeTab === 'attention' && !['expired','mixed','needs_review'].includes(status)) return false;
     if (state.activeTab === 'active' && status !== 'active') return false;
     if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
     if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
@@ -866,6 +867,13 @@ async function saveRegistration(){
   } catch(e){ document.getElementById('rg-error').textContent = 'Failed to save: ' + e.message; }
 }
 
+function setupDocumentDropzone(){
+  const zone=document.getElementById('dc-dropzone'), input=document.getElementById('dc-file'); if(!zone||!input||zone.dataset.ready)return; zone.dataset.ready='1';
+  ['dragenter','dragover'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();zone.classList.add('drop-zone-active');}));
+  ['dragleave','drop'].forEach(ev=>zone.addEventListener(ev,e=>{e.preventDefault();zone.classList.remove('drop-zone-active');}));
+  zone.addEventListener('drop',e=>{if(e.dataTransfer.files.length){input.files=e.dataTransfer.files;zone.textContent=input.files[0].name;}});
+  input.addEventListener('change',()=>{if(input.files.length)zone.textContent=input.files[0].name;});
+}
 function openAddDocument(assessorId){
   document.getElementById('dc-title').textContent = 'Add / update document';
   document.getElementById('dc-replace-note').style.display = 'none';
@@ -878,7 +886,7 @@ function openAddDocument(assessorId){
   document.getElementById('dc-file').value = '';
   document.getElementById('dc-file-label').textContent = 'Upload file';
   document.getElementById('dc-error').textContent = '';
-  openModal('modal-document');
+  openModal('modal-document'); setupDocumentDropzone();
 }
 
 // Admin-only: uploads a new file as the next version of an existing document and
