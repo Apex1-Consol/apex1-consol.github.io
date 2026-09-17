@@ -140,31 +140,6 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
-
-/* Final compact table treatment: no exposed scrollbar in the main flow */
-.table-scroll-shell{overflow:hidden;max-width:100%;}
-@media (max-width: 980px){
-  table{min-width:0;width:100%;table-layout:fixed;}
-  table th:nth-child(2),table td:nth-child(2){width:18%;}
-  table th:nth-child(3),table td:nth-child(3){width:24%;}
-  table th:nth-child(4),table td:nth-child(4){width:18%;}
-  table th:nth-child(5),table td:nth-child(5){width:34%;}
-  table th,table td{padding:10px 9px;overflow-wrap:anywhere;}
-  .name-cell{gap:7px;}
-  .avatar{width:29px;height:29px;font-size:10px;}
-  .chip{white-space:normal;line-height:1.2;}
-}
-@media (max-width: 720px){
-  table thead{display:none;}
-  table,table tbody,table tr,table td{display:block;width:100%;}
-  table tr.reg-row{padding:12px;border-bottom:1px solid var(--border-subtle);}
-  table tr.reg-row td{border:0;padding:3px 0;}
-  table tr.reg-row td:nth-child(2)::before{content:'Role(s): ';color:var(--text-muted);font-size:10px;text-transform:uppercase;}
-  table tr.reg-row td:nth-child(3)::before{content:'Coverage: ';color:var(--text-muted);font-size:10px;text-transform:uppercase;}
-  table tr.reg-row td:nth-child(4)::before{content:'Status: ';color:var(--text-muted);font-size:10px;text-transform:uppercase;}
-  table tr.reg-row td:nth-child(5){text-align:right;margin-top:4px;}
-}
-
 </style>
 </head>
 <body>
@@ -456,6 +431,7 @@ async function loadAll(){
     renderTabs();
     renderTable();
     renderRenewalQueue();
+    if (!state.selectedAssessorId || !state.assessors.some(a=>String(a.id)===String(state.selectedAssessorId))) state.selectedAssessorId = state.assessors[0]?.id || null;
     if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
   } catch (e) {
     console.error(e);
@@ -472,7 +448,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
   return 'active';
 }
 function rolesFor(assessorId){
@@ -507,7 +483,7 @@ function assessorRiskStates(assessorId){
 }
 
 function statusPillHtml(status){
-  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], needs_review:['status-mixed','Needs review'], unknown:['status-unknown','No registrations'] };
+  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
   const [cls,label] = map[status] || map.unknown;
   return `<span class="status-dot ${cls}">${label}</span>`;
 }
@@ -556,7 +532,7 @@ function renderFilterOptions(){
 }
 
 function renderTabs(){
-  const needsAttention = state.assessors.filter(a => ['expired','mixed','needs_review'].includes(overallStatus(a.id))).length;
+  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
   const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
   const tabs = [
     ['all', `All practitioners (${state.assessors.length})`],
@@ -569,6 +545,7 @@ function renderTabs(){
 function setTab(key){ state.activeTab = key; renderTabs(); renderTable(); }
 
 // ---------- render: table ----------
+// preserve the active profile while filters and responsive layout redraw the registry
 function renderTable(){
   const search = (document.getElementById('search-box').value || '').toLowerCase();
   const roleFilter = document.getElementById('role-filter').value;
@@ -576,7 +553,7 @@ function renderTable(){
   const setaFilter = document.getElementById('seta-filter').value;
   let rows = state.assessors.filter(a => {
     const status = overallStatus(a.id);
-    if (state.activeTab === 'attention' && !['expired','mixed','needs_review'].includes(status)) return false;
+    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
     if (state.activeTab === 'active' && status !== 'active') return false;
     if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
     if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
@@ -734,7 +711,7 @@ function renderRenewalQueue(){
 function renderDetail(assessorId){
   state.selectedAssessorId = assessorId;
   renderTable();
-  const a = state.assessors.find(x => x.id === assessorId);
+  const a = state.assessors.find(x => String(x.id) === String(assessorId));
   const panel = document.getElementById('detail-panel');
   if (!a) { panel.innerHTML = `<div class="empty-note" style="padding:24px;">Practitioner not found.</div>`; return; }
 
@@ -748,7 +725,7 @@ function renderDetail(assessorId){
       ${list.map(r => {
         const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
         return `<div class="reg-card">
-          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regRiskState(r) === 'pending' ? 'needs_review' : (regRiskState(r) === 'expired' ? 'expired' : (regIsActive(r) ? 'active' : 'inactive')))}</div>
+          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regIsActive(r) ? 'active' : 'inactive')}</div>
           <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
         </div>`;
       }).join('')}
