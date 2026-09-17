@@ -6,8 +6,7 @@
 <title>FAM Registry — ApexOne</title>
   <meta name="robots" content="noindex, nofollow">
 <link rel="icon" href="data:,">
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js">window.addEventListener('resize', ensureSelectedProfile);
-</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
 <style>
 :root{
@@ -141,6 +140,13 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .toast-item{padding:12px 16px;border-radius:8px;font-size:12.5px;font-weight:600;box-shadow:var(--shadow-md);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
+
+/* Drawer scope density */
+.reg-card .chip-plain{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:top;}
+.scope-more{border:0;background:transparent;color:var(--accent-cyan);font-size:11px;padding:4px 0;cursor:pointer;}
+.scope-extra{display:none;}
+.scope-extra.open{display:inline;}
+
 </style>
 </head>
 <body>
@@ -433,9 +439,7 @@ async function loadAll(){
     renderTable();
     renderRenewalQueue();
     if (!state.selectedAssessorId || !state.assessors.some(a=>String(a.id)===String(state.selectedAssessorId))) state.selectedAssessorId = state.assessors[0]?.id || null;
-    ensureSelectedProfile();
     if (state.selectedAssessorId) renderDetail(state.selectedAssessorId);
-    setTimeout(ensureSelectedProfile, 0);
   } catch (e) {
     console.error(e);
     toast('error', 'Failed to load FAM Registry data: ' + e.message);
@@ -546,16 +550,6 @@ function renderTabs(){
     `<div class="tab ${state.activeTab===key?'active':''}" onclick="setTab('${key}')">${label}</div>`).join('');
 }
 function setTab(key){ state.activeTab = key; renderTabs(); renderTable(); }
-
-function ensureSelectedProfile(){
-  if (!state.assessors.length) return;
-  const current = state.assessors.find(a => String(a.id) === String(state.selectedAssessorId));
-  if (!current) state.selectedAssessorId = state.assessors[0].id;
-  const panel = document.getElementById('detail-panel');
-  if (panel && (!panel.querySelector('.detail-header') || panel.textContent.includes('Select a practitioner'))) {
-    try { renderDetail(state.selectedAssessorId); } catch (e) { console.error('Profile render failed', e); }
-  }
-}
 
 // ---------- render: table ----------
 // preserve the active profile while filters and responsive layout redraw the registry
@@ -738,8 +732,8 @@ function renderDetail(assessorId){
       ${list.map(r => {
         const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
         return `<div class="reg-card">
-          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regRiskState(r) === 'pending' ? 'needs_review' : (regRiskState(r) === 'expired' ? 'expired' : (regIsActive(r) ? 'active' : 'inactive')))}</div>
-          <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
+          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regIsActive(r) ? 'active' : 'inactive')}</div>
+          <div>${r.scope.length ? (()=>{ const visible=r.scope.slice(0,3), extra=r.scope.slice(3), hid=`scope-extra-${r.id}`; return visible.map(s=>`<span class="chip chip-plain" title="${escapeHtml(s.qualifications?.name || s.qualification_id)}">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') + (extra.length ? `<span id="${hid}" class="scope-extra">${extra.map(s=>`<span class="chip chip-plain" title="${escapeHtml(s.qualifications?.name || s.qualification_id)}">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('')}</span><button class="scope-more" onclick="toggleScope('${hid}',this)">+ ${extra.length} more</button>` : ''); })() : '<span class="empty-note">No scope captured yet</span>'}</div>
         </div>`;
       }).join('')}
     </div>`).join('') : `<div class="empty-note">No SETA registrations yet.</div>`;
@@ -804,6 +798,8 @@ function renderDetail(assessorId){
       </div>
     </div>`;
 }
+
+function toggleScope(id,btn){const el=document.getElementById(id);if(!el)return;const open=el.classList.toggle('open');btn.textContent=open?'Show less':'+'+el.querySelectorAll('.chip').length+' more';}
 
 // ---------- modals ----------
 function openModal(id){ document.getElementById(id).classList.add('open'); }
