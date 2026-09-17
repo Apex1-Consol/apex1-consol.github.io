@@ -141,10 +141,13 @@ tr.reg-row.selected td{background:rgba(212,165,55,0.08);}
 .toast-success{background:#1f4a1a;color:#8FC463;}
 .toast-error{background:#4a1a1a;color:#E08585;}
 
-/* Qualification scope wrapping */
-.reg-card,.reg-card>div{min-width:0;}
-.reg-card .chip{white-space:normal;overflow-wrap:anywhere;line-height:1.25;max-width:100%;vertical-align:top;}
-.reg-card{overflow:hidden;}
+/* Final overflow guard */
+html,body{max-width:100%;overflow-x:hidden;}
+#app,.main-canvas,.content,.two-col,.content-container,.detail-panel{min-width:0;max-width:100%;}
+.two-col>*,.action-item,.action-meta,.action-buttons{min-width:0;}
+.action-item{overflow:hidden;}
+.action-meta{overflow-wrap:anywhere;}
+.tablewrap{max-width:100%;overflow-x:auto;}
 
 </style>
 </head>
@@ -453,7 +456,7 @@ function overallStatus(assessorId){
   const states = regs.map(regRiskState);
   if (states.every(s => s === 'active')) return 'active';
   if (states.some(s => s === 'expired')) return states.every(s => s === 'expired') ? 'expired' : 'mixed';
-  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : (states.includes('pending') ? 'needs_review' : 'inactive');
+  if (states.some(s => ['due_30','due_60','pending','inactive'].includes(s))) return states.includes('active') ? 'mixed' : 'inactive';
   return 'active';
 }
 function rolesFor(assessorId){
@@ -488,7 +491,7 @@ function assessorRiskStates(assessorId){
 }
 
 function statusPillHtml(status){
-  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], needs_review:['status-mixed','Needs review'], unknown:['status-unknown','No registrations'] };
+  const map = { active:['status-active','Active'], inactive:['status-expired','Inactive'], expired:['status-expired','Expired'], mixed:['status-mixed','Mixed'], unknown:['status-unknown','No registrations'] };
   const [cls,label] = map[status] || map.unknown;
   return `<span class="status-dot ${cls}">${label}</span>`;
 }
@@ -537,7 +540,7 @@ function renderFilterOptions(){
 }
 
 function renderTabs(){
-  const needsAttention = state.assessors.filter(a => ['expired','mixed','needs_review'].includes(overallStatus(a.id))).length;
+  const needsAttention = state.assessors.filter(a => ['expired','mixed'].includes(overallStatus(a.id))).length;
   const activeOnly = state.assessors.filter(a => overallStatus(a.id) === 'active').length;
   const tabs = [
     ['all', `All practitioners (${state.assessors.length})`],
@@ -557,7 +560,7 @@ function renderTable(){
   const setaFilter = document.getElementById('seta-filter').value;
   let rows = state.assessors.filter(a => {
     const status = overallStatus(a.id);
-    if (state.activeTab === 'attention' && !['expired','mixed','needs_review'].includes(status)) return false;
+    if (state.activeTab === 'attention' && !['expired','mixed'].includes(status)) return false;
     if (state.activeTab === 'active' && status !== 'active') return false;
     if (roleFilter && !rolesFor(a.id).includes(roleFilter)) return false;
     if (statusFilter && !assessorRiskStates(a.id).includes(statusFilter)) return false;
@@ -729,7 +732,7 @@ function renderDetail(assessorId){
       ${list.map(r => {
         const roleLabel = (r.roles && r.roles.length) ? r.roles.join(' / ') : (r.role || '');
         return `<div class="reg-card">
-          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regRiskState(r) === 'pending' ? 'needs_review' : (regRiskState(r) === 'expired' ? 'expired' : (regIsActive(r) ? 'active' : 'inactive')))}</div>
+          <div class="reg-card-top"><span><strong>${escapeHtml(roleLabel)}</strong></span>${statusPillHtml(regIsActive(r) ? 'active' : 'inactive')}</div>
           <div>${r.scope.length ? r.scope.map(s=>`<span class="chip chip-plain">${escapeHtml(s.qualifications?.name || s.qualification_id)}</span>`).join('') : '<span class="empty-note">No scope captured yet</span>'}</div>
         </div>`;
       }).join('')}
