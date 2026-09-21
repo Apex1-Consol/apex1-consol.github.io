@@ -1,0 +1,31 @@
+name: FAM Expiry Check
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  check-expiries:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Call FAM expiry check
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/fam-expiry-cron" \
+            -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+
+          echo "Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::Expiry check failed with status $HTTP_CODE"
+            exit 1
+          fi
+
+          echo "$BODY" | jq -r '.result | "Created: \(.follow_ups_created) | Escalated: \(.follow_ups_escalated) | Already tracked: \(.already_tracked)"'
