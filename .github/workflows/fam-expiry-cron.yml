@@ -1,5 +1,5 @@
 # .github/workflows/fam-expiry-cron.yml
-# Daily FAM Registry: sync worker + expiry check
+# Daily ApexOne: sync + expiry check + notification digest
 # Runs 06:00 SAST (04:00 UTC). Manual trigger via Actions tab.
 
 name: FAM Expiry Check
@@ -12,7 +12,7 @@ on:
 jobs:
   fam-daily:
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 5
     steps:
       - name: Sync FAM changes to ClickUp
         run: |
@@ -21,12 +21,10 @@ jobs:
             -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/fam-sync-worker" \
             -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
             -H "Content-Type: application/json")
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
           echo "Status: $HTTP_CODE"
           echo "Response: $BODY"
-
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::warning::Sync worker returned $HTTP_CODE (non-fatal)"
           else
@@ -40,15 +38,29 @@ jobs:
             -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/fam-expiry-cron" \
             -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
             -H "Content-Type: application/json")
-
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
           echo "Status: $HTTP_CODE"
           echo "Response: $BODY"
-
           if [ "$HTTP_CODE" != "200" ]; then
             echo "::error::Expiry check failed with status $HTTP_CODE"
             exit 1
           fi
-
           echo "$BODY" | jq -r '.result | "Created: \(.follow_ups_created) | Escalated: \(.follow_ups_escalated) | Already tracked: \(.already_tracked)"' 2>/dev/null || true
+
+      - name: Generate daily notification digest
+        run: |
+          echo "=== Generating notification digest ==="
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/notification-digest" \
+            -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Status: $HTTP_CODE"
+          echo "Response: $BODY"
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Digest returned $HTTP_CODE (non-fatal)"
+          else
+            echo "$BODY" | jq -r '"Issues: \(.total_issues) | Overdue recs: \(.overdue_recs) | Expiring: \(.expiring_regs) | Stale programmes: \(.stale_programmes) | Missing docs: \(.missing_docs)"' 2>/dev/null || true
+          fi
