@@ -1,3 +1,7 @@
+# .github/workflows/fam-expiry-cron.yml
+# Daily FAM Registry: sync worker + expiry check
+# Runs 06:00 SAST (04:00 UTC). Manual trigger via Actions tab.
+
 name: FAM Expiry Check
 
 on:
@@ -6,12 +10,32 @@ on:
   workflow_dispatch:
 
 jobs:
-  check-expiries:
+  fam-daily:
     runs-on: ubuntu-latest
-    timeout-minutes: 2
+    timeout-minutes: 3
     steps:
-      - name: Call FAM expiry check
+      - name: Sync FAM changes to ClickUp
         run: |
+          echo "=== Processing FAM outbox events ==="
+          RESPONSE=$(curl -s -w "\n%{http_code}" \
+            -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/fam-sync-worker" \
+            -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
+            -H "Content-Type: application/json")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Status: $HTTP_CODE"
+          echo "Response: $BODY"
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::warning::Sync worker returned $HTTP_CODE (non-fatal)"
+          else
+            echo "$BODY" | jq -r '"Events: \(.events_seen) | Assessors: \(.assessors_processed)"' 2>/dev/null || true
+          fi
+
+      - name: Check registration expiries
+        run: |
+          echo "=== Scanning for upcoming expiries ==="
           RESPONSE=$(curl -s -w "\n%{http_code}" \
             -X POST "${{ secrets.SUPABASE_URL }}/functions/v1/fam-expiry-cron" \
             -H "Authorization: Bearer ${{ secrets.FAM_CRON_SECRET }}" \
@@ -19,7 +43,6 @@ jobs:
 
           HTTP_CODE=$(echo "$RESPONSE" | tail -1)
           BODY=$(echo "$RESPONSE" | head -n -1)
-
           echo "Status: $HTTP_CODE"
           echo "Response: $BODY"
 
@@ -28,4 +51,4 @@ jobs:
             exit 1
           fi
 
-          echo "$BODY" | jq -r '.result | "Created: \(.follow_ups_created) | Escalated: \(.follow_ups_escalated) | Already tracked: \(.already_tracked)"'
+          echo "$BODY" | jq -r '.result | "Created: \(.follow_ups_created) | Escalated: \(.follow_ups_escalated) | Already tracked: \(.already_tracked)"' 2>/dev/null || true
