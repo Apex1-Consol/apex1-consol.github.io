@@ -6247,7 +6247,7 @@ async function saveAIRecommendations() {
             const stale = Number(w.active_programmes_without_recent_visit || 0);
             if (stale) html += `<div style="margin-bottom:10px;"><strong>&#128269; Active programmes with no monitoring visit in 60+ days: ${stale}</strong></div>`;
             const total = (w.low_attendance || []).length + (w.overdue_recommendations || []).length + (w.registrations_expiring || []).length + (w.eisa_within_30_days || []).length + (stale ? 1 : 0);
-            document.getElementById('early-warnings-count').textContent = total ? `${total} item group${total === 1 ? '' : 's'} need attention` : 'all clear';
+            document.getElementById('early-warnings-count').textContent = total ? `${total} item${total === 1 ? '' : 's'} need${total === 1 ? 's' : ''} attention` : 'all clear';
             body.innerHTML = html || '<span style="color:var(--text-muted)">&#9989; Nothing needs attention right now.</span>';
             panel.style.display = '';
         } catch (err) {
