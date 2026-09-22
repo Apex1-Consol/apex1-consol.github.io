@@ -789,6 +789,21 @@
 <!-- PRINT REPORT AREA -->
 <div id="print-report-area" style="display:none;"></div>
 <!-- AI PROGRAMME SUMMARY MODAL -->
+    <!-- AI GENERIC REPORT MODAL (attendance / EISA / PoE / resolution / client risk) -->
+    <div id="ai-generic-modal" class="modal-overlay hidden">
+        <div class="modal-card" style="width:680px;max-height:85vh;display:flex;flex-direction:column;">
+            <h2 style="font-size:16px;margin-bottom:4px;"><span id="ai-generic-title">AI Report</span> <span class="ai-badge" id="ai-generic-badge" style="display:none;">&#10024; AI Generated</span></h2>
+            <p style="color:var(--text-muted);font-size:12px;margin-bottom:10px;" id="ai-generic-sub"></p>
+            <div id="ai-generic-tabs" style="display:none;gap:6px;flex-wrap:wrap;margin-bottom:10px;"></div>
+            <div id="ai-generic-body" style="flex:1;overflow-y:auto;white-space:pre-wrap;font-size:12.5px;line-height:1.55;background:var(--bg-secondary,rgba(255,255,255,0.03));border-radius:8px;padding:14px;margin-bottom:10px;min-height:120px;"></div>
+            <p style="color:var(--text-muted);font-size:11px;margin-bottom:12px;">AI draft &mdash; check it against the source data before sharing.</p>
+            <div style="display:flex;gap:10px;">
+                <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('ai-generic-modal')">Close</button>
+                <button class="btn btn-gold" style="flex:1;" onclick="copyAIGeneric()">&#128203; Copy Text</button>
+            </div>
+        </div>
+    </div>
+
     <div id="ai-programme-summary-modal" class="modal-overlay hidden">
         <div class="modal-card" style="width:640px;max-height:85vh;display:flex;flex-direction:column;">
             <h2 style="font-size:16px;margin-bottom:4px;">AI Programme Summary <span class="ai-badge" id="ai-programme-summary-badge" style="display:none;">&#10024; AI Generated</span></h2>
@@ -1233,6 +1248,7 @@
                             <button class="btn btn-gold btn-sm" data-roles="admin,qa_specialist,project_manager" onclick="openAddRecommendationModal()">+ Add</button>
                             <button class="btn btn-secondary btn-sm" id="resolved-recs-load-btn" onclick="loadResolvedRecommendations()">Load Resolved History</button>
                             <button class="btn btn-secondary btn-sm" onclick="exportResolvedRecsCsv()">Export Resolved CSV</button>
+                            <button class="btn btn-ai btn-sm" onclick="generateAIResolutionSummary()">&#10024; Resolution Summary</button>
                         </div>
                     </div>
                     <div class="quick-stats">
@@ -3821,6 +3837,7 @@ async function loadProgrammes() {
                 <td>
                     ${programmeStageActions(f, r.id)}
                                         <button class="btn btn-ai btn-sm" onclick="generateAIProgrammeSummary('${r.id}')">&#128203; Summary</button>
+                    <button class="btn btn-ai btn-sm" onclick="openAIProgrammeInsights('${r.id}')" title="Attendance analysis, EISA readiness and PoE gaps">&#10024; Insights</button>
                     <button class="btn btn-gold btn-sm" onclick="openEditProgramme('${r.id}')">Edit</button>
                     <button class="btn btn-secondary btn-sm" onclick="saveProgrammeRow('${r.id}')">Dates</button>
                     <button class="btn btn-secondary btn-sm" onclick="deleteRow('Programmes','${r.id}',loadProgrammes)">Del</button>
@@ -5460,6 +5477,7 @@ async function loadClients() {
                 <td>${escapeHtml(expiryDisplay)}</td>
                 <td>${linkedProgs.length ? linkedProgs.length + ' programme' + (linkedProgs.length>1?'s':'') : '—'}</td>
                 <td>
+                    <button class="btn btn-ai btn-sm" onclick="generateAIClientRisk('${r.id}')" title="AI risk rating for this client's programmes">&#10024; Risk</button>
                     <button class="btn btn-gold btn-sm" onclick="openEditClient('${r.id}')">Edit</button>
                     <button class="btn btn-secondary btn-sm" onclick="deleteRow('Clients','${r.id}',loadClients)">Del</button>
                 </td>`;
@@ -6189,6 +6207,81 @@ async function saveAIRecommendations() {
         showToast('error','Failed to save one or more recommendations');
     }
 }
+
+    // ── Generic AI report modal ─────────────────────────────────────────────
+    let _aiGenericText = '';
+    let _aiGenericSeq = 0;
+    function _aiGenericFormat(type, j) {
+        const rows = j.per_learner || [];
+        const noData = { attendance_analysis: 'No attendance has been captured for this programme yet.', eisa_readiness_check: 'No EISA results have been captured for this programme yet.', poe_gap_analysis: 'No PoE checklist has been captured for this programme yet.' };
+        if (noData[type] && !rows.length) return noData[type];
+        // Plain-text modal: drop markdown markers the model adds (**bold**, ### headings).
+        let text = (j.narrative || '').replace(/\*\*/g, '').replace(/^#{1,6}\s*/gm, '');
+        if (type === 'attendance_analysis' && rows.length) {
+            text += `\n\n— Per learner (lowest first) —\n` + rows.map(l => `${l.learner}: ${l.pct ?? 'N/A'}% (${l.present}/${l.total})`).join('\n');
+        } else if (type === 'eisa_readiness_check' && rows.length) {
+            text += `\n\n— Modules with complete KM/PM/WM results —\n` + rows.map(l => `${l.learner}: ${l.modules_complete}/${l.modules_total}`).join('\n');
+        } else if (type === 'poe_gap_analysis' && rows.length) {
+            text += `\n\n— Missing PoE items —\n` + rows.filter(l => l.missing && l.missing.length).map(l => `${l.learner}: ${l.missing.join(', ')}`).join('\n');
+        } else if (type === 'risk_assessment' && (j.programmes || []).length) {
+            text += `\n\n— Programmes —\n` + j.programmes.map(p => `${p.programme}: ${p.flags && p.flags.length ? p.flags.join('; ') : 'no flags'}`).join('\n');
+        }
+        return text.trim() || 'Nothing generated. There may be no data recorded for this yet.';
+    }
+    async function runAIGenericReport(title, sub, payload) {
+        const seq = ++_aiGenericSeq;
+        document.getElementById('ai-generic-title').textContent = title;
+        document.getElementById('ai-generic-sub').textContent = sub || '';
+        const body = document.getElementById('ai-generic-body');
+        const badge = document.getElementById('ai-generic-badge');
+        badge.style.display = 'none';
+        body.innerHTML = _aiShimmerHTML();
+        _aiGenericText = '';
+        openModal('ai-generic-modal');
+        try {
+            const j = await callAIGenerate(payload, 60000);
+            if (seq !== _aiGenericSeq) return; // a newer report replaced this one
+            _aiGenericText = _aiGenericFormat(payload.type, j);
+            body.textContent = _aiGenericText;
+            badge.style.display = '';
+        } catch (e) {
+            if (seq !== _aiGenericSeq) return;
+            console.error(e);
+            body.innerHTML = '<p style="color:var(--text-muted);">' + escapeHtml(e.message || 'Could not generate this right now.') + '</p>';
+        }
+    }
+    function copyAIGeneric() {
+        if (!_aiGenericText) return;
+        navigator.clipboard.writeText(_aiGenericText).then(() => showToast('success', 'Copied to clipboard'));
+    }
+    const _AI_PROG_INSIGHTS = [
+        ['attendance_analysis', '&#128200; Attendance', 'AI Attendance Analysis'],
+        ['eisa_readiness_check', '&#127891; EISA Readiness', 'AI EISA Readiness Check'],
+        ['poe_gap_analysis', '&#128193; PoE Gaps', 'AI PoE Gap Analysis'],
+    ];
+    function openAIProgrammeInsights(programmeId, type) {
+        const r = state.programmes.find(p => String(p.id) === String(programmeId));
+        if (!r) { showToast('error', 'Programme not found'); return; }
+        const f = r.fields || {};
+        const name = f['Qualification'] || f['Name'] || f['name'] || `Programme ${programmeId}`;
+        const pick = _AI_PROG_INSIGHTS.find(x => x[0] === type) || _AI_PROG_INSIGHTS[0];
+        const tabs = document.getElementById('ai-generic-tabs');
+        tabs.style.display = 'flex';
+        tabs.innerHTML = _AI_PROG_INSIGHTS.map(([t, label]) =>
+            `<button class="btn btn-sm ${t === pick[0] ? 'btn-ai' : 'btn-secondary'}" onclick="openAIProgrammeInsights('${programmeId}','${t}')">${label}</button>`).join('');
+        runAIGenericReport(pick[2], name, { type: pick[0], programme_id: Number(programmeId) });
+    }
+    function generateAIClientRisk(clientId) {
+        const c = (state.clients || []).find(x => String(x.id) === String(clientId));
+        const cf = (c && c.fields) || {};
+        const name = (c && c.client_name) || cf['Client Name'] || cf['Company Name'] || cf['Name'] || `Client ${clientId}`;
+        document.getElementById('ai-generic-tabs').style.display = 'none';
+        runAIGenericReport('AI Client Risk Assessment', name, { type: 'risk_assessment', client_id: Number(clientId) });
+    }
+    function generateAIResolutionSummary() {
+        document.getElementById('ai-generic-tabs').style.display = 'none';
+        runAIGenericReport('AI Recommendation Resolution Summary', 'All recommendations', { type: 'resolution_summary' });
+    }
 
     async function generateAIProgrammeSummary(programmeId) {
                 const r = state.programmes.find(p => String(p.id) === String(programmeId));
