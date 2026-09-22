@@ -6565,6 +6565,10 @@ function handleSignatureUpload(file){
 // fall back silently to the deterministic draft that's already in the textarea.
 async function polishNarrativeAI(fieldKey,draftText,facts){
   try{
+    // Names never leave the browser: learners are swapped for [Learner N] codes.
+    const ps=_aiPseudo(getProgrammeLearners());
+    draftText=ps.code(draftText);
+    try{facts=JSON.parse(ps.code(JSON.stringify(facts??{})));}catch{facts={};}
     const ctrl=new AbortController();
     const t=setTimeout(()=>ctrl.abort(),20000);
     const r=await fetch(`${SB_URL}/functions/v1/ai-generate`,{
@@ -6577,7 +6581,7 @@ async function polishNarrativeAI(fieldKey,draftText,facts){
     if(!r.ok)return null;
     const j=await r.json();
     if(!j.ok||!j.polished)return null;
-    return j.polished;
+    return ps.decode(j.polished);
   }catch(e){
     console.warn('AI narrative polish failed, keeping deterministic draft:',e);
     return null;
@@ -6722,12 +6726,49 @@ function draftNarrative(key, btn){
 
 
 // ── AI Import: pre-fill the report from any file ──────────────────────────────
-// Text is extracted in the browser (the file itself is never uploaded or stored),
-// ID numbers / emails / phone numbers are redacted, then ai-generate `file_extract`
-// maps it onto this report's narrative fields, learner comments and attendance cells.
-// Nothing changes until the user ticks items in the review list and clicks Apply.
+// Text is extracted in the browser (the file itself is never uploaded or stored).
+// Before anything is sent to the AI (Gemini free tier), learner names are swapped
+// for [Learner N] codes and ID numbers / emails / phone numbers / titled names are
+// removed; codes are swapped back when results return. ai-generate `file_extract`
+// maps the text onto this report's narratives, learner comments and attendance
+// cells, with a supporting quote + location for every suggestion. Nothing changes
+// until the user ticks items and clicks Apply; replacements and disagreements with
+// the register are flagged ⚠️ and left unticked. Applied imports are logged.
 const AI_IMPORT_MAX_CHARS=60000;
 let _aiImport=null;
+
+// Shared name pseudonymiser. code(): real names → [Learner N]; decode(): back.
+function _aiPseudo(learners){
+  const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  const list=(learners||[]).map((l,i)=>({id:String(l.id),code:`[Learner ${i+1}]`,first:String(l.first_name||'').trim(),last:String(l.last_name||'').trim()}));
+  const count=(k,v)=>list.filter(x=>x[k].toLowerCase()===v.toLowerCase()).length;
+  const variants=[];
+  list.forEach(x=>{
+    const f=x.first,l=x.last;
+    if(f&&l){variants.push([`${f} ${l}`,x.code],[`${l} ${f}`,x.code],[`${l}, ${f}`,x.code],[`${f[0]}. ${l}`,x.code],[`${f[0]} ${l}`,x.code]);}
+    // Single names only when unique in this programme and not tiny, to avoid false hits.
+    if(f.length>=3&&count('first',f)===1)variants.push([f,x.code]);
+    if(l.length>=3&&count('last',l)===1)variants.push([l,x.code]);
+  });
+  variants.sort((a,b)=>b[0].length-a[0].length);
+  const byCode={};list.forEach(x=>byCode[x.code]=`${x.first} ${x.last}`.trim());
+  return{
+    list,
+    code(t){
+      t=String(t??'');
+      variants.forEach(([v,c])=>{if(v)t=t.replace(new RegExp(`(^|[^\\p{L}])${esc(v)}(?=$|[^\\p{L}])`,'giu'),`$1${c}`);});
+      return t;
+    },
+    decode(t){
+      t=String(t??'');
+      Object.keys(byCode).sort((a,b)=>b.length-a.length).forEach(c=>{
+        const n=c.slice(1,-1).replace(' ','\\s*');
+        t=t.replace(new RegExp(`\\[?${n}\\]?(?!\\d)`,'g'),byCode[c]);
+      });
+      return t;
+    }
+  };
+}
 
 function openAiImportModal(){
   if(!activeProgramme){toast('Select a client and programme first','warn');return;}
@@ -6743,9 +6784,9 @@ function openAiImportModal(){
     <div style="font-size:9pt;color:rgba(255,255,255,.65);line-height:1.6;margin-bottom:12px">
       Upload a facilitator report, attendance register, meeting notes or similar
       (<strong style="color:#fff">.xlsx, .xls, .csv, .pdf, .docx, .txt</strong>).
-      AI suggests values for this month's narratives, learner comments and attendance.
+      AI suggests values for this month's narratives, learner comments and attendance, each with the quote it came from.
       You review every suggestion before anything changes.<br>
-      <span style="color:rgba(255,255,255,.5)">Only the file's text is sent. ID numbers, email addresses and phone numbers are removed first. Scanned PDFs and photos can't be read.</span>
+      <span style="color:rgba(255,255,255,.5)">🔒 Only the file's text is sent. Learner names are replaced with codes, and ID numbers, emails and phone numbers are removed first. Scanned PDFs and photos can't be read.</span>
     </div>
     <div class="modal-field">
       <label>File</label>
@@ -6761,7 +6802,8 @@ function _aiRedact(t){
   return t
     .replace(/\b\d{6}\s?\d{4}\s?\d{2}\s?\d\b/g,'[ID]')                          // SA ID numbers
     .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi,'[email]')
-    .replace(/(\+27|\b0)[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{4}\b/g,'[phone]');
+    .replace(/(\+27|\b0)[\s-]?\d{2}[\s-]?\d{3}[\s-]?\d{4}\b/g,'[phone]')
+    .replace(/\b(Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+[A-Z][\p{L}'-]+(\s+[A-Z][\p{L}'-]+)?/gu,'$1 [name]'); // titled names (staff, mentors)
 }
 
 async function _aiLoadPdfJs(){
@@ -6780,7 +6822,11 @@ async function _aiFileToText(file){
   const ext=(file.name.split('.').pop()||'').toLowerCase();
   if(ext==='xlsx'||ext==='xls'){
     const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:true});
-    return wb.SheetNames.map(n=>`### Sheet: ${n}\n`+XLSX.utils.sheet_to_csv(wb.Sheets[n],{blankrows:false,dateNF:'yyyy-mm-dd'})).join('\n\n');
+    // Row numbers let the AI cite "Sheet X row N" as evidence.
+    return wb.SheetNames.map(n=>{
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[n],{header:1,blankrows:false,raw:false,dateNF:'yyyy-mm-dd'});
+      return `### Sheet: ${n}\n`+rows.map((r,i)=>`row ${i+1}: `+r.map(c=>c==null?'':String(c)).join(' | ')).join('\n');
+    }).join('\n\n');
   }
   if(ext==='docx'){
     const zip=await JSZip.loadAsync(await file.arrayBuffer());
@@ -6795,7 +6841,7 @@ async function _aiFileToText(file){
     const pages=[];
     for(let i=1;i<=Math.min(pdf.numPages,60);i++){
       const c=await (await pdf.getPage(i)).getTextContent();
-      pages.push(c.items.map(it=>it.str+(it.hasEOL?'\n':' ')).join(''));
+      pages.push(`--- Page ${i} ---\n`+c.items.map(it=>it.str+(it.hasEOL?'\n':' ')).join(''));
     }
     return pages.join('\n\n');
   }
@@ -6814,12 +6860,13 @@ async function runAiImport(input){
   if(file.size>25*1024*1024){err.textContent='File is larger than 25 MB';err.style.display='block';return;}
   try{
     st.textContent='⏳ Reading file…';
-    let text=_aiRedact((await _aiFileToText(file)).replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim());
+    const pLearners=getProgrammeLearners();
+    const ps=_aiPseudo(pLearners);
+    let text=ps.code(_aiRedact((await _aiFileToText(file)).replace(/[ \t]+/g,' ').replace(/\n{3,}/g,'\n\n').trim()));
     if(text.length<20)throw new Error('No readable text found. If this is a scanned PDF or photo, it can\'t be read yet');
     const truncated=text.length>AI_IMPORT_MAX_CHARS;
     if(truncated)text=text.slice(0,AI_IMPORT_MAX_CHARS);
 
-    const pLearners=getProgrammeLearners();
     const cells=[...document.querySelectorAll('[data-att]')].map(el=>el.dataset.att).filter(k=>k&&k!==ATT_DATE_SENTINEL);
     const attDates=[...new Set(cells.map(k=>k.split(/_(.+)/)[1]).filter(d=>/^\d{4}-\d{2}-\d{2}$/.test(d||'')))].sort();
     const fields=daKeys().map(k=>({key:k,label:daLabel(k)}));
@@ -6832,14 +6879,21 @@ async function runAiImport(input){
       method:'POST',signal:ctrl.signal,
       headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
       body:JSON.stringify({type:'file_extract',file_name:file.name,text,fields,
-        learners:pLearners.map(l=>({id:l.id,name:`${l.first_name||''} ${l.last_name||''}`.trim()})),
+        learners:ps.list.map(x=>({id:x.id,name:x.code})),
         att_dates:attDates,report_month:document.getElementById('sel-month')?.value||''})
     });
     clearTimeout(t);
     const j=await r.json().catch(()=>({}));
     if(r.status===401)throw new Error('Your session has expired. Please sign in again');
     if(!r.ok||!j.ok)throw new Error(j.error||`AI import failed (${r.status})`);
-    _aiImport={...j,truncated:truncated||j.truncated};
+    // Swap codes back to real names in everything shown to the user.
+    const dec=o=>o&&({...o,text:ps.decode(o.text),source:ps.decode(o.source)});
+    const narr={};Object.entries(j.narratives||{}).forEach(([k,v])=>narr[k]=dec(v));
+    const com={};Object.entries(j.comments||{}).forEach(([k,v])=>com[k]=dec(v));
+    _aiImport={...j,narratives:narr,comments:com,
+      attendance:(j.attendance||[]).map(a=>({...a,source:ps.decode(a.source)})),
+      file_conflicts:(j.file_conflicts||[]).map(c=>ps.decode(c)),
+      notes:ps.decode(j.notes||''),file_name:file.name,truncated:truncated||j.truncated};
     _aiRenderPreview();
     st.textContent='';
   }catch(e){
@@ -6852,30 +6906,37 @@ async function runAiImport(input){
 function _aiRenderPreview(){
   const d=_aiImport,prev=document.getElementById('ai-import-preview');
   const nameById={};getProgrammeLearners().forEach(l=>nameById[String(l.id)]=`${l.first_name||''} ${l.last_name||''}`.trim());
-  const row=(id,title,cur,next)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer;text-transform:none;letter-spacing:0">
-      <input type="checkbox" data-ai-item="${esc(id)}" checked onchange="_aiCount()" style="margin-top:3px;width:15px;height:15px;flex:none">
-      <span style="font-size:8.5pt;line-height:1.5;color:#fff"><strong>${esc(title)}</strong>
+  const src=it=>it&&it.source?`<br><span style="color:rgba(255,255,255,.45);font-style:italic">“${esc(it.source)}”${it.where?` — ${esc(it.where)}`:''}</span>`:'';
+  const row=(id,title,cur,next,evidence,warn)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer;text-transform:none;letter-spacing:0">
+      <input type="checkbox" data-ai-item="${esc(id)}" ${warn?'':'checked'} onchange="_aiCount()" style="margin-top:3px;width:15px;height:15px;flex:none">
+      <span style="font-size:8.5pt;line-height:1.5;color:#fff"><strong>${warn?'⚠️ ':''}${esc(title)}</strong>
       ${cur?`<br><span style="color:#f0b04a">Replaces: </span><span style="color:rgba(255,255,255,.5)">${esc(cur.slice(0,160))}${cur.length>160?'…':''}</span>`:''}
-      <br><span style="color:rgba(255,255,255,.85)">${esc(next)}</span></span></label>`;
+      <br><span style="color:rgba(255,255,255,.85)">${esc(next)}</span>${evidence||''}</span></label>`;
   let html='';
   const nar=Object.entries(d.narratives||{});
   if(nar.length){html+=`<div style="font-weight:700;color:#fff;margin:8px 0 2px">Narratives (${nar.length})</div>`;
-    nar.forEach(([k,v])=>{const cur=(document.querySelector(`[data-nar="${k}"]`)?.value??narratives[k]??'').trim();html+=row('n:'+k,daLabel(k),cur,v);});}
+    nar.forEach(([k,v])=>{const cur=(document.querySelector(`[data-nar="${k}"]`)?.value??narratives[k]??'').trim();html+=row('n:'+k,daLabel(k),cur,v.text,src(v),!!cur);});}
   const com=Object.entries(d.comments||{});
   if(com.length){html+=`<div style="font-weight:700;color:#fff;margin:12px 0 2px">Learner comments (${com.length})</div>`;
-    com.forEach(([lid,v])=>{const cur=(document.querySelector(`[data-comment-lid="${lid}"]`)?.value||'').trim();html+=row('c:'+lid,nameById[lid]||`Learner ${lid}`,cur,v);});}
+    com.forEach(([lid,v])=>{const cur=(document.querySelector(`[data-comment-lid="${lid}"]`)?.value||'').trim();html+=row('c:'+lid,nameById[lid]||`Learner ${lid}`,cur,v.text,src(v),!!cur);});}
+  // Attendance: split empty cells (safe to fill) from cells the file disagrees with.
   const att=(d.attendance||[]).filter(a=>document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`));
-  d.attendance=att;
+  const curOf=a=>document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`).textContent.trim();
+  const blank=v=>!v||v==='—';
+  d.attFill=att.filter(a=>blank(curOf(a)));
+  d.attConflict=att.filter(a=>!blank(curOf(a))&&curOf(a)!==a.status);
+  const same=att.length-d.attFill.length-d.attConflict.length;
+  const attLine=list=>list.slice(0,8).map(a=>`${nameById[a.learner_id]||a.learner_id} ${a.date}: ${blank(curOf(a))?'':curOf(a)+' → '}${a.status}`).join('; ')+(list.length>8?' …':'');
   if(att.length){
-    const changes=att.filter(a=>(document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`).textContent.trim())!==a.status);
-    html+=`<div style="font-weight:700;color:#fff;margin:12px 0 2px">Attendance</div>`+
-      row('a:all',`${changes.length} of ${att.length} register marks would change`,'',
-        changes.slice(0,8).map(a=>`${nameById[a.learner_id]||a.learner_id} ${a.date}: ${a.status}`).join('; ')+(changes.length>8?' …':''));
+    html+=`<div style="font-weight:700;color:#fff;margin:12px 0 2px">Attendance${same?` <span style="font-weight:400;color:rgba(255,255,255,.5)">(${same} already match)</span>`:''}</div>`;
+    if(d.attFill.length)html+=row('a:fill',`Fill ${d.attFill.length} empty register cell${d.attFill.length===1?'':'s'}`,'',attLine(d.attFill),src(d.attFill[0]),false);
+    if(d.attConflict.length)html+=row('a:conflict',`${d.attConflict.length} mark${d.attConflict.length===1?'':'s'} differ from the register`,'',attLine(d.attConflict),src(d.attConflict[0]),true);
   }
   if(!html)html=`<div style="color:rgba(255,255,255,.7);font-size:9pt">Nothing in this file matched the report's fields.</div>`;
+  const conflicts=(d.file_conflicts||[]).length?`<div style="font-size:8.5pt;color:#f0b04a;margin:6px 0;line-height:1.5">⚠️ The file contradicts itself:<br>${d.file_conflicts.map(c=>'• '+esc(c)).join('<br>')}</div>`:'';
   const notes=[d.notes,d.truncated?'Only the first part of this long file was read.':''].filter(Boolean).join(' ');
-  prev.innerHTML=(notes?`<div style="font-size:8.5pt;color:rgba(255,255,255,.6);margin-bottom:6px">ℹ️ ${esc(notes)}</div>`:'')+
-    `<div style="font-size:8pt;color:#f0b04a;margin-bottom:4px">AI suggestions. Check each one against the file before applying.</div>`+html;
+  prev.innerHTML=(notes?`<div style="font-size:8.5pt;color:rgba(255,255,255,.6);margin-bottom:6px">ℹ️ ${esc(notes)}</div>`:'')+conflicts+
+    `<div style="font-size:8pt;color:#f0b04a;margin-bottom:4px">AI suggestions. Check each against its quote. Items marked ⚠️ would overwrite existing data and are unticked.</div>`+html;
   _aiCount();
 }
 function _aiCount(){
@@ -6887,18 +6948,19 @@ function _aiCount(){
 function applyAiImport(){
   if(!_aiImport)return;
   const picked=[...document.querySelectorAll('[data-ai-item]:checked')].map(el=>el.dataset.aiItem);
+  const suggested=document.querySelectorAll('[data-ai-item]').length;
   let nN=0,nC=0,nA=0;
   picked.forEach(id=>{
     const [kind,key]=id.split(/:(.+)/);
     if(kind==='n'){
-      const v=_aiImport.narratives[key];const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
+      const v=_aiImport.narratives[key].text;const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
       if(ta){ta.value=v;syncNar(ta);}else{narratives[key]=v;const pe=document.querySelector(`[data-nar-print="${key}"]`);if(pe)pe.textContent=v;}
       nN++;
     }else if(kind==='c'){
       const ta=document.querySelector(`[data-comment-lid="${key}"]`);
-      if(ta){ta.value=_aiImport.comments[key];onCommentInput(ta);nC++;}
+      if(ta){ta.value=_aiImport.comments[key].text;onCommentInput(ta);nC++;}
     }else if(kind==='a'){
-      _aiImport.attendance.forEach(a=>{
+      (key==='fill'?_aiImport.attFill:_aiImport.attConflict).forEach(a=>{
         const el=document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`);
         if(el&&el.textContent.trim()!==a.status){setAttCell(el,a.status);nA++;}
       });
@@ -6908,6 +6970,13 @@ function applyAiImport(){
   updateProgressPanel();
   closeModal();
   toast(`AI Import applied: ${nN} narrative${nN===1?'':'s'}, ${nC} comment${nC===1?'':'s'}, ${nA} attendance mark${nA===1?'':'s'}`,'success',5000);
+  // Audit trail (no AI call, no names): who applied what from which file.
+  _sbAuth.auth.getSession().then(({data})=>{
+    const tk=data.session?.access_token;if(!tk)return;
+    fetch(`${SB_URL}/functions/v1/ai-generate`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+tk},
+      body:JSON.stringify({type:'log_import',details:{file_name:_aiImport.file_name,programme_id:activeProgramme?.id,report_month:document.getElementById('sel-month')?.value||'',narratives:nN,comments:nC,attendance:nA,suggested}})
+    }).catch(e=>console.warn('AI import audit log failed:',e));
+  });
 }
 
 // ── Draft-All Review Panel ────────────────────────────────────────────────────

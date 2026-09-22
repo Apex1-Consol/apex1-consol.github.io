@@ -972,6 +972,17 @@
                     <span id="expiry-banner-text"><strong>Accreditation expiring soon</strong></span>
                     <a onclick="switchTab('assessors')">View Assessors &rarr;</a>
                 </div>
+                <!-- EARLY WARNINGS (rule-based, no AI, no cost) -->
+                <div class="content-container" id="early-warnings-panel" style="margin-bottom:16px;display:none;">
+                    <div class="container-header" style="cursor:pointer;" onclick="toggleEarlyWarnings()">
+                        <h2>&#9888; Early Warnings <span id="early-warnings-count" style="font-size:11px;color:var(--text-muted);font-weight:400;"></span></h2>
+                        <div class="container-actions">
+                            <button class="btn btn-secondary btn-sm" onclick="event.stopPropagation();loadEarlyWarnings()">&#8635; Refresh</button>
+                            <span id="early-warnings-icon" style="font-size:11px;color:var(--text-muted);">&#9662;</span>
+                        </div>
+                    </div>
+                    <div id="early-warnings-body" style="padding:12px 16px;font-size:12.5px;line-height:1.6;"></div>
+                </div>
                 <!-- AI INSIGHTS PANEL -->
                 <div class="content-container" id="dashboard-ai-panel" style="margin-bottom:16px;">
                     <div class="container-header" style="cursor:pointer;" onclick="toggleDashboardAIPanel()">
@@ -979,6 +990,7 @@
                         <div class="container-actions">
                             <button class="btn btn-ai btn-sm" onclick="event.stopPropagation();generateAIExecutiveSummary()">&#10024; Generate Executive Summary</button>
                             <button class="btn btn-ai btn-sm" onclick="event.stopPropagation();generateAIRiskScan()">&#10024; Scan Risks</button>
+                            <button class="btn btn-secondary btn-sm" data-roles="admin" onclick="event.stopPropagation();showAIUsage()" title="Admin: AI usage over the last 30 days">&#128202; AI Usage</button>
                             <span id="dashboard-ai-collapse-icon" style="font-size:11px;color:var(--text-muted);">&#9662;</span>
                         </div>
                     </div>
@@ -6208,13 +6220,78 @@ async function saveAIRecommendations() {
     }
 }
 
+    // ── Early warnings (Postgres function public.early_warnings, RLS-respecting, no AI) ──
+    let _ewOpen = true;
+    function toggleEarlyWarnings() {
+        _ewOpen = !_ewOpen;
+        document.getElementById('early-warnings-body').style.display = _ewOpen ? '' : 'none';
+        document.getElementById('early-warnings-icon').innerHTML = _ewOpen ? '&#9662;' : '&#9656;';
+    }
+    async function loadEarlyWarnings() {
+        const panel = document.getElementById('early-warnings-panel');
+        const body = document.getElementById('early-warnings-body');
+        if (!panel || !body) return;
+        try {
+            const headers = await supaHeaders();
+            const res = await fetch(`${SUPA_URL}/rest/v1/rpc/early_warnings`, { method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' }, body: '{}' });
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+            const w = await res.json();
+            const sec = (icon, title, items, fmt) => items.length ? `<div style="margin-bottom:10px;"><strong>${icon} ${title} (${items.length})</strong><br>` +
+                items.slice(0, 8).map(x => '&bull; ' + fmt(x)).join('<br>') + (items.length > 8 ? `<br><span style="color:var(--text-muted)">&hellip; and ${items.length - 8} more</span>` : '') + '</div>' : '';
+            const e = escapeHtml;
+            let html = '';
+            html += sec('&#128308;', 'Attendance below 70%', w.low_attendance || [], x => `${e(x.learner)} &mdash; ${e(String(x.pct))}% <span style="color:var(--text-muted)">(${e(x.programme || '')})</span>`);
+            html += sec('&#9200;', 'Overdue recommendations', w.overdue_recommendations || [], x => `${e(x.text)} <span style="color:var(--text-muted)">(due ${e(x.due || '')}${x.programme ? ', ' + e(x.programme) : ''})</span>`);
+            html += sec('&#128196;', 'SETA registrations expired or expiring within 60 days', w.registrations_expiring || [], x => `${e(x.practitioner)} &mdash; ${e(x.seta || '')} ${e(x.role || '')}: ${x.expired ? '<strong style="color:var(--accent-rose)">expired</strong> ' : 'expires '}${e(x.expiry || '')}`);
+            html += sec('&#127891;', 'EISA starting within 30 days', w.eisa_within_30_days || [], x => `${e(x.programme)} &mdash; ${e(x.eisa_start || '')}`);
+            const stale = Number(w.active_programmes_without_recent_visit || 0);
+            if (stale) html += `<div style="margin-bottom:10px;"><strong>&#128269; Active programmes with no monitoring visit in 60+ days: ${stale}</strong></div>`;
+            const total = (w.low_attendance || []).length + (w.overdue_recommendations || []).length + (w.registrations_expiring || []).length + (w.eisa_within_30_days || []).length + (stale ? 1 : 0);
+            document.getElementById('early-warnings-count').textContent = total ? `${total} item group${total === 1 ? '' : 's'} need attention` : 'all clear';
+            body.innerHTML = html || '<span style="color:var(--text-muted)">&#9989; Nothing needs attention right now.</span>';
+            panel.style.display = '';
+        } catch (err) {
+            console.warn('Early warnings unavailable:', err && err.message);
+            panel.style.display = 'none';
+        }
+    }
+
+    // ── Admin: AI usage (ai-generate usage_stats, no AI call) ──
+    async function showAIUsage() {
+        document.getElementById('ai-generic-tabs').style.display = 'none';
+        const seq = ++_aiGenericSeq;
+        document.getElementById('ai-generic-title').textContent = 'AI Usage (last 30 days)';
+        document.getElementById('ai-generic-sub').textContent = 'Free Gemini tier. Names are coded before anything is sent to the AI.';
+        const body = document.getElementById('ai-generic-body');
+        document.getElementById('ai-generic-badge').style.display = 'none';
+        body.innerHTML = _aiShimmerHTML();
+        openModal('ai-generic-modal');
+        try {
+            const j = await callAIGenerate({ type: 'usage_stats' });
+            if (seq !== _aiGenericSeq) return;
+            const lines = [];
+            lines.push(`Daily limits per user: ${j.caps.daily_total_per_user} requests, ${j.caps.daily_by_type.file_extract} file imports.`);
+            lines.push('', 'By feature (7 days / 30 days):');
+            (j.by_type || []).forEach(t => lines.push(`  ${t.type}: ${t.d7} / ${t.d30}`));
+            lines.push('', 'Top users (30 days):');
+            (j.top_users || []).forEach(u => lines.push(`  ${u.user}: ${u.calls_30d}`));
+            lines.push('', 'Requests per day:');
+            (j.by_day || []).forEach(d => lines.push(`  ${d.day}: ${d.calls}`));
+            _aiGenericText = lines.join('\n');
+            body.textContent = _aiGenericText;
+        } catch (e) {
+            if (seq !== _aiGenericSeq) return;
+            body.innerHTML = '<p style="color:var(--text-muted);">' + escapeHtml(e.message || 'Could not load usage.') + '</p>';
+        }
+    }
+
     // ── Generic AI report modal ─────────────────────────────────────────────
     let _aiGenericText = '';
     let _aiGenericSeq = 0;
     function _aiGenericFormat(type, j) {
         const rows = j.per_learner || [];
         const noData = { attendance_analysis: 'No attendance has been captured for this programme yet.', eisa_readiness_check: 'No EISA results have been captured for this programme yet.', poe_gap_analysis: 'No PoE checklist has been captured for this programme yet.' };
-        if (noData[type] && !rows.length) return noData[type];
+        if (noData[type] && (j.no_data || !rows.length)) return noData[type];
         // Plain-text modal: drop markdown markers the model adds (**bold**, ### headings).
         let text = (j.narrative || '').replace(/\*\*/g, '').replace(/^#{1,6}\s*/gm, '');
         if (type === 'attendance_analysis' && rows.length) {
@@ -6226,6 +6303,8 @@ async function saveAIRecommendations() {
         } else if (type === 'risk_assessment' && (j.programmes || []).length) {
             text += `\n\n— Programmes —\n` + j.programmes.map(p => `${p.programme}: ${p.flags && p.flags.length ? p.flags.join('; ') : 'no flags'}`).join('\n');
         }
+        const unv = (j.fact_check && j.fact_check.unverified_numbers) || [];
+        if (unv.length) text += `\n\n⚠ Check these figures — they don't appear in the source data: ${unv.join(', ')}`;
         return text.trim() || 'Nothing generated. There may be no data recorded for this yet.';
     }
     async function runAIGenericReport(title, sub, payload) {
@@ -7358,6 +7437,7 @@ function checkExpiryWarnings() {
 async function refreshAllData() {
     loadData();
     await Promise.all([loadProgrammes(), loadLearners(), fetchDashboardExtras()]);
+    loadEarlyWarnings(); // rule-based, free; runs in the background
     await Promise.all([
         loadEnrolments(),
         loadEisa(), loadProgramModules(), loadMonitoring(), loadRecommendations(), loadClients(), loadAssessors(),
