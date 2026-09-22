@@ -6741,14 +6741,18 @@ let _aiImport=null;
 function _aiPseudo(learners){
   const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const list=(learners||[]).map((l,i)=>({id:String(l.id),code:`[Learner ${i+1}]`,first:String(l.first_name||'').trim(),last:String(l.last_name||'').trim()}));
-  const count=(k,v)=>list.filter(x=>x[k].toLowerCase()===v.toLowerCase()).length;
+  // Every individual name part counts: "Boitumelo Morongoa" may appear as just "Boitumelo".
+  const toks=x=>[...x.first.split(/\s+/),...x.last.split(/\s+/)].filter(t=>t.length>=3);
+  const tokCount={};list.forEach(x=>new Set(toks(x).map(t=>t.toLowerCase())).forEach(t=>tokCount[t]=(tokCount[t]||0)+1));
   const variants=[];
   list.forEach(x=>{
-    const f=x.first,l=x.last;
-    if(f&&l){variants.push([`${f} ${l}`,x.code],[`${l} ${f}`,x.code],[`${l}, ${f}`,x.code],[`${f[0]}. ${l}`,x.code],[`${f[0]} ${l}`,x.code]);}
-    // Single names only when unique in this programme and not tiny, to avoid false hits.
-    if(f.length>=3&&count('first',f)===1)variants.push([f,x.code]);
-    if(l.length>=3&&count('last',l)===1)variants.push([l,x.code]);
+    const f=x.first,l=x.last,given=f.split(/\s+/).filter(Boolean);
+    if(f&&l){
+      variants.push([`${f} ${l}`,x.code],[`${l} ${f}`,x.code],[`${l}, ${f}`,x.code],[`${f[0]}. ${l}`,x.code],[`${f[0]} ${l}`,x.code]);
+      given.forEach(g=>variants.push([`${g} ${l}`,x.code],[`${l} ${g}`,x.code],[`${l}, ${g}`,x.code]));
+    }
+    // Single name parts only when unique in this programme and not tiny, to avoid false hits.
+    toks(x).forEach(t=>{if(tokCount[t.toLowerCase()]===1)variants.push([t,x.code]);});
   });
   variants.sort((a,b)=>b[0].length-a[0].length);
   const byCode={};list.forEach(x=>byCode[x.code]=`${x.first} ${x.last}`.trim());
