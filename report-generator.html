@@ -372,6 +372,8 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .narrative-block{margin-bottom:20px}
 .narrative-label{font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--navy);margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .narrative-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.ai-filled{outline:2px dashed #7c5cff!important;outline-offset:1px}
+@media print{.ai-filled{outline:none!important}}
 .narrative-textarea{
   width:100%;border:1px solid var(--border);border-radius:var(--r);
   padding:12px 14px;font-family:var(--font);font-size:9.5pt;color:var(--dark);
@@ -6732,8 +6734,10 @@ function draftNarrative(key, btn){
 // removed; codes are swapped back when results return. ai-generate `file_extract`
 // maps the text onto this report's narratives, learner comments and attendance
 // cells, with a supporting quote + location for every suggestion. Nothing changes
-// until the user ticks items and clicks Apply; replacements and disagreements with
-// the register are flagged ⚠️ and left unticked. Applied imports are logged.
+// until the user ticks items and clicks Apply; replacements, disagreements with the
+// register and suggestions without a supporting quote are left unticked. Applied
+// values save immediately (autosave) and stay outlined as AI-filled until edited.
+// Applied imports are logged.
 const AI_IMPORT_MAX_CHARS=60000;
 let _aiImport=null;
 
@@ -6911,18 +6915,19 @@ function _aiRenderPreview(){
   const d=_aiImport,prev=document.getElementById('ai-import-preview');
   const nameById={};getProgrammeLearners().forEach(l=>nameById[String(l.id)]=`${l.first_name||''} ${l.last_name||''}`.trim());
   const src=it=>it&&it.source?`<br><span style="color:rgba(255,255,255,.45);font-style:italic">“${esc(it.source)}”${it.where?` — ${esc(it.where)}`:''}</span>`:'';
-  const row=(id,title,cur,next,evidence,warn)=>`<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer;text-transform:none;letter-spacing:0">
-      <input type="checkbox" data-ai-item="${esc(id)}" ${warn?'':'checked'} onchange="_aiCount()" style="margin-top:3px;width:15px;height:15px;flex:none">
-      <span style="font-size:8.5pt;line-height:1.5;color:#fff"><strong>${warn?'⚠️ ':''}${esc(title)}</strong>
+  // Pre-ticked only when "clean": nothing overwritten, no disagreement, and a supporting quote.
+  const row=(id,title,cur,next,evidence,warn,noQuote)=>{const hold=warn||noQuote;return `<label style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-top:1px solid rgba(255,255,255,.08);cursor:pointer;text-transform:none;letter-spacing:0">
+      <input type="checkbox" data-ai-item="${esc(id)}" data-ai-hold="${hold?1:0}" ${hold?'':'checked'} onchange="_aiCount()" style="margin-top:3px;width:15px;height:15px;flex:none">
+      <span style="font-size:8.5pt;line-height:1.5;color:#fff"><strong>${hold?'⚠️ ':''}${esc(title)}</strong>${noQuote&&!warn?' <span style="color:#f0b04a;font-weight:400">(no supporting quote)</span>':''}
       ${cur?`<br><span style="color:#f0b04a">Replaces: </span><span style="color:rgba(255,255,255,.5)">${esc(cur.slice(0,160))}${cur.length>160?'…':''}</span>`:''}
-      <br><span style="color:rgba(255,255,255,.85)">${esc(next)}</span>${evidence||''}</span></label>`;
+      <br><span style="color:rgba(255,255,255,.85)">${esc(next)}</span>${evidence||''}</span></label>`;};
   let html='';
   const nar=Object.entries(d.narratives||{});
   if(nar.length){html+=`<div style="font-weight:700;color:#fff;margin:8px 0 2px">Narratives (${nar.length})</div>`;
-    nar.forEach(([k,v])=>{const cur=(document.querySelector(`[data-nar="${k}"]`)?.value??narratives[k]??'').trim();html+=row('n:'+k,daLabel(k),cur,v.text,src(v),!!cur);});}
+    nar.forEach(([k,v])=>{const cur=(document.querySelector(`[data-nar="${k}"]`)?.value??narratives[k]??'').trim();html+=row('n:'+k,daLabel(k),cur,v.text,src(v),!!cur,!v.source);});}
   const com=Object.entries(d.comments||{});
   if(com.length){html+=`<div style="font-weight:700;color:#fff;margin:12px 0 2px">Learner comments (${com.length})</div>`;
-    com.forEach(([lid,v])=>{const cur=(document.querySelector(`[data-comment-lid="${lid}"]`)?.value||'').trim();html+=row('c:'+lid,nameById[lid]||`Learner ${lid}`,cur,v.text,src(v),!!cur);});}
+    com.forEach(([lid,v])=>{const cur=(document.querySelector(`[data-comment-lid="${lid}"]`)?.value||'').trim();html+=row('c:'+lid,nameById[lid]||`Learner ${lid}`,cur,v.text,src(v),!!cur,!v.source);});}
   // Attendance: split empty cells (safe to fill) from cells the file disagrees with.
   const att=(d.attendance||[]).filter(a=>document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`));
   const curOf=a=>document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`).textContent.trim();
@@ -6933,15 +6938,31 @@ function _aiRenderPreview(){
   const attLine=list=>list.slice(0,8).map(a=>`${nameById[a.learner_id]||a.learner_id} ${a.date}: ${blank(curOf(a))?'':curOf(a)+' → '}${a.status}`).join('; ')+(list.length>8?' …':'');
   if(att.length){
     html+=`<div style="font-weight:700;color:#fff;margin:12px 0 2px">Attendance${same?` <span style="font-weight:400;color:rgba(255,255,255,.5)">(${same} already match)</span>`:''}</div>`;
-    if(d.attFill.length)html+=row('a:fill',`Fill ${d.attFill.length} empty register cell${d.attFill.length===1?'':'s'}`,'',attLine(d.attFill),src(d.attFill[0]),false);
-    if(d.attConflict.length)html+=row('a:conflict',`${d.attConflict.length} mark${d.attConflict.length===1?'':'s'} differ from the register`,'',attLine(d.attConflict),src(d.attConflict[0]),true);
+    if(d.attFill.length)html+=row('a:fill',`Fill ${d.attFill.length} empty register cell${d.attFill.length===1?'':'s'}`,'',attLine(d.attFill),src(d.attFill[0]),false,d.attFill.some(a=>!a.source));
+    if(d.attConflict.length)html+=row('a:conflict',`${d.attConflict.length} mark${d.attConflict.length===1?'':'s'} differ from the register`,'',attLine(d.attConflict),src(d.attConflict[0]),true,false);
   }
   if(!html)html=`<div style="color:rgba(255,255,255,.7);font-size:9pt">Nothing in this file matched the report's fields.</div>`;
   const conflicts=(d.file_conflicts||[]).length?`<div style="font-size:8.5pt;color:#f0b04a;margin:6px 0;line-height:1.5">⚠️ The file contradicts itself:<br>${d.file_conflicts.map(c=>'• '+esc(c)).join('<br>')}</div>`:'';
   const notes=[d.notes,d.truncated?'Only the first part of this long file was read.':''].filter(Boolean).join(' ');
   prev.innerHTML=(notes?`<div style="font-size:8.5pt;color:rgba(255,255,255,.6);margin-bottom:6px">ℹ️ ${esc(notes)}</div>`:'')+conflicts+
-    `<div style="font-size:8pt;color:#f0b04a;margin-bottom:4px">AI suggestions. Check each against its quote. Items marked ⚠️ would overwrite existing data and are unticked.</div>`+html;
+    `<div style="font-size:8pt;color:#f0b04a;margin-bottom:4px">AI suggestions. Check each against its quote. Items marked ⚠️ would overwrite existing data, disagree with the register or have no supporting quote, so they start unticked. Applying saves straight away; applied fields stay outlined until you edit them.</div>`+
+    (html.includes('data-ai-item')?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 2px;font-size:8pt">
+      <button type="button" class="btn btn-ghost" style="padding:3px 10px;font-size:8pt" onclick="_aiSelect('clean')">Clean only</button>
+      <button type="button" class="btn btn-ghost" style="padding:3px 10px;font-size:8pt" onclick="_aiSelect('all')">Select all</button>
+      <button type="button" class="btn btn-ghost" style="padding:3px 10px;font-size:8pt" onclick="_aiSelect('none')">Select none</button></div>`:'')+html;
   _aiCount();
+}
+function _aiSelect(mode){
+  document.querySelectorAll('[data-ai-item]').forEach(cb=>{cb.checked=mode==='all'||(mode==='clean'&&cb.dataset.aiHold!=='1');});
+  _aiCount();
+}
+// Outline a field the AI filled; the outline clears the first time the user edits it.
+function _aiMark(el){
+  if(!el)return;
+  el.classList.add('ai-filled');
+  if(!el.title)el.title='Filled by AI Import. Review it; the outline clears when you edit.';
+  const clear=()=>{el.classList.remove('ai-filled');if(el.title.startsWith('Filled by AI Import'))el.title='';};
+  el.addEventListener(el.tagName==='TEXTAREA'||el.tagName==='INPUT'?'input':'click',clear,{once:true});
 }
 function _aiCount(){
   const n=document.querySelectorAll('[data-ai-item]:checked').length;
@@ -6958,22 +6979,22 @@ function applyAiImport(){
     const [kind,key]=id.split(/:(.+)/);
     if(kind==='n'){
       const v=_aiImport.narratives[key].text;const ta=document.querySelector(`.narrative-textarea[data-nar="${key}"]`);
-      if(ta){ta.value=v;syncNar(ta);}else{narratives[key]=v;const pe=document.querySelector(`[data-nar-print="${key}"]`);if(pe)pe.textContent=v;}
+      if(ta){ta.value=v;syncNar(ta);_aiMark(ta);}else{narratives[key]=v;const pe=document.querySelector(`[data-nar-print="${key}"]`);if(pe)pe.textContent=v;}
       nN++;
     }else if(kind==='c'){
       const ta=document.querySelector(`[data-comment-lid="${key}"]`);
-      if(ta){ta.value=_aiImport.comments[key].text;onCommentInput(ta);nC++;}
+      if(ta){ta.value=_aiImport.comments[key].text;onCommentInput(ta);_aiMark(ta);nC++;}
     }else if(kind==='a'){
       (key==='fill'?_aiImport.attFill:_aiImport.attConflict).forEach(a=>{
         const el=document.querySelector(`[data-att="${a.learner_id}_${a.date}"]`);
-        if(el&&el.textContent.trim()!==a.status){setAttCell(el,a.status);nA++;}
+        if(el&&el.textContent.trim()!==a.status){setAttCell(el,a.status);_aiMark(el);nA++;}
       });
     }
   });
   saveNarratives();
   updateProgressPanel();
   closeModal();
-  toast(`AI Import applied: ${nN} narrative${nN===1?'':'s'}, ${nC} comment${nC===1?'':'s'}, ${nA} attendance mark${nA===1?'':'s'}`,'success',5000);
+  toast(`AI Import applied and saved: ${nN} narrative${nN===1?'':'s'}, ${nC} comment${nC===1?'':'s'}, ${nA} attendance mark${nA===1?'':'s'}. AI-filled fields are outlined until you edit them.`,'success',6000);
   // Audit trail (no AI call, no names): who applied what from which file.
   _sbAuth.auth.getSession().then(({data})=>{
     const tk=data.session?.access_token;if(!tk)return;
