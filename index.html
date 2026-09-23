@@ -6302,6 +6302,8 @@ async function saveAIRecommendations() {
             text += `\n\n— Missing PoE items —\n` + rows.filter(l => l.missing && l.missing.length).map(l => `${l.learner}: ${l.missing.join(', ')}`).join('\n');
         } else if (type === 'risk_assessment' && (j.programmes || []).length) {
             text += `\n\n— Programmes —\n` + j.programmes.map(p => `${p.programme}: ${p.flags && p.flags.length ? p.flags.join('; ') : 'no flags'}`).join('\n');
+            const low = j.programmes.filter(p => (p.learners_below_70 || []).length);
+            if (low.length) text += `\n\n— Learners below 70% attendance —\n` + low.map(p => `${p.programme}:\n` + p.learners_below_70.map(l => `  ${l.learner}: ${l.pct}%`).join('\n')).join('\n');
         }
         const unv = (j.fact_check && j.fact_check.unverified_numbers) || [];
         if (unv.length) text += `\n\n⚠ Check these figures — they don't appear in the source data: ${unv.join(', ')}`;
