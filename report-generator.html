@@ -2254,7 +2254,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     <div style="font-size:7.5pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.4)">Add New Assessor</div>
     <div class="assessor-input-row">
       <input class="assessor-input" id="assessor-new-name" placeholder="Full name…" />
-      <input class="assessor-input" id="assessor-new-role" placeholder="Role (e.g. Facilitator)" style="max-width:130px" />
+      <input class="assessor-input" id="assessor-new-role" placeholder="Role (Assessor / Facilitator)" style="max-width:130px" />
       <button class="btn btn-success" style="font-size:8pt;padding:8px 14px;border-radius:var(--r);flex-shrink:0" onclick="addAssessor()">Add</button>
     </div>
     <div id="assessor-add-error" style="font-size:8pt;color:#f87171;margin-top:6px;display:none"></div>
@@ -3877,7 +3877,11 @@ function applyCloudDraft(){
   }catch{}
   _pendingCloudDraft=null;
   document.getElementById('draft-recovery-banner').classList.remove('show');
-  // Regenerate so the restored narratives populate the report
+  // Regenerate so the restored narratives populate the report. Clear the dirty-flag
+  // first: programme/month are unchanged, so generateReport() would otherwise return
+  // early and never reload narratives (checklist stayed 0/N until a page reload).
+  _lastGenKey=null;
+  narratives=loadNarratives();
   generateReport();
   toast('☁ Cloud draft restored','success',3000);
 }
@@ -4078,7 +4082,7 @@ function downloadAttTemplate(){
   if(!activeProgramme){toast('Load a report first','warn');return;}
   const roster=getProgrammeLearners();
   if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
-  const existing=getAttDates();
+  const existing=getAllAttDates();
   const dateCols=existing.length?existing:['YYYY-MM-DD'];
   const rows=[['ID Number',...dateCols,'Learner (reference only — do not paste this column)']];
   roster.forEach(l=>rows.push([l.id_number||'',...dateCols.map(()=>''),`${l.first_name||''} ${l.last_name||''}`.trim()]));
@@ -4099,11 +4103,41 @@ function downloadUsTemplate(){
   toast(`Downloaded template for ${roster.length} learner${roster.length!==1?'s':''}`,'success');
 }
 
-function getAttDates(){
+// Every attendance date recorded for the programme (entry grids, templates,
+// exports, bulk tools). Reports use getAttDates(), which stops at the end of the
+// selected reporting month — an August report must never count a September session.
+function getAllAttDates(){
   const dates=new Set();
   Object.values(attState).forEach(d=>Object.keys(d).forEach(k=>dates.add(normDateKey(k))));
   return [...dates].sort();
 }
+function getAttDates(){
+  const all=getAllAttDates();
+  const endKey=_reportMonthEndKey();
+  return endKey?all.filter(d=>!d||d<=endKey):all;
+}
+function _reportMonthEnd(){
+  const m=(document.getElementById('sel-month')?.value||'').trim();
+  if(!m)return null;
+  const d=new Date('1 '+m);
+  if(isNaN(d))return null;
+  return new Date(d.getFullYear(),d.getMonth()+1,0);
+}
+function _reportMonthEndKey(){
+  const e=_reportMonthEnd();
+  if(!e)return null;
+  return `${e.getFullYear()}-${String(e.getMonth()+1).padStart(2,'0')}-${String(e.getDate()).padStart(2,'0')}`;
+}
+// A module whose start date is after the reporting month hasn't started yet in
+// this report: no narrative is required and the report prints a standard line.
+function _modNotStarted(prog,n){
+  const e=_reportMonthEnd();
+  if(!e||!prog)return false;
+  const r=parseModDateRange(prog[`module_${n}_dates`]||'');
+  return !!(r&&r.start>e);
+}
+const MOD_NOT_STARTED_TXT='Not yet started. This module begins after this reporting period.';
+function _isNaText(v){return /^\s*(n\/?a|none|nil|-+)\.?\s*$/i.test(String(v||''));}
 
 // ── Shield SVG (inline for print) ──
 function shieldSVG(size=36,prov){
@@ -4478,7 +4512,7 @@ function computeCoverStats(pLearners,prog){
         const ek=`${l.id}_m${m}`;
         const ov=narratives._eisa||{};
         const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
-        const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
+        const vals=_modResultVals(l.id,m,[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)]);
         if(vals.some(isEisaOutstanding)){anyNYC=true;flaggedLearnerIds.add(l.id);}
       });
       if(anyNYC)flaggedModules++;
@@ -4510,7 +4544,7 @@ function buildCoverPage(prog,client,month){
           <div class="cover-divider" style="background:linear-gradient(90deg,${p.accentFrom},${p.accentTo})"></div>
           <div class="cover-doc-type">Monthly Client Progress Report</div>
           <div class="cover-title" style="color:${p.gradFrom}">${esc(prog.programme_name)}</div>
-          <div class="cover-subtitle">SAQA ID: ${esc(prog.saqa_id||'—')} &nbsp;·&nbsp; Qualification: ${esc(prog.qualification_code||'—')}</div>
+          <div class="cover-subtitle">SAQA ID: ${esc(prog.saqa_id||'—')} &nbsp;·&nbsp; Qualification: ${esc(prog.qualification_name||(prog.qualification_code&&prog.qualification_code!==prog.saqa_id?prog.qualification_code:'')||prog.programme_name||'—')}</div>
           <div class="cover-period-pill" style="background:${p.accentFrom}12;border:1px solid ${p.accentFrom}35">
             <span style="color:${p.gradFrom}">📅 &nbsp;Reporting Period: ${esc(month)}</span>
           </div>
@@ -4615,7 +4649,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
       const ek=`${l.id}_m${m}`;
       const ov=narratives._eisa||{};
       const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
-      const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
+      const vals=_modResultVals(l.id,m,[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)]);
       if(vals.some(isEisaOutstanding)){anyNYC=true;nycCount++;}
     });
     nycCountByModule[m]=nycCount;
@@ -4914,7 +4948,7 @@ function buildCohortSummary(pLearners){
       const ek=`${l.id}_m${m}`;
       const ov=narratives._eisa||{};
       const mv=(f,v)=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(v||'');
-      const vals=[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)].filter(v=>v);
+      const vals=_modResultVals(l.id,m,[mv('km',res.km),mv('pm',res.pm),mv('wm',res.wm),mv('examv1',res.examv1),mv('examv2',res.examv2)]);
       if(!vals.length){blank++;return;}
       const allC=vals.every(v=>v==='C');
       const anyNYC=vals.some(isEisaOutstanding);
@@ -4926,7 +4960,7 @@ function buildCohortSummary(pLearners){
     return`<div class="cs-card cs-m${m}">
       <label>Module ${m}</label>
       <div class="cs-big">${comp}<span style="font-size:10pt;font-weight:600;color:var(--muted)">/${total}</span></div>
-      <div class="cs-sub">${comp} competent · ${nyc} outstanding</div>
+      <div class="cs-sub">${_modNotStarted(activeProgramme,m)?'Not yet started':`${comp} competent · ${nyc} outstanding`}</div>
       <div class="cs-bar"><div class="cs-bar-fill" style="width:${pct}%;background:${barCol}"></div></div>
     </div>`;
   }).join('');
@@ -5253,9 +5287,13 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     const key=`feedback_m${n}`;
     const modCls=`m${n}`;
     const label=`Module ${n}`;
+    // Not started yet in this reporting month: print a standard line unless the
+    // PM wrote something real ("na"/"n/a" placeholders are replaced).
+    const _ns=_modNotStarted(prog,n);
+    const _val=(_ns&&(!nar[key]||_isNaText(nar[key])))?MOD_NOT_STARTED_TXT:nar[key];
     body+=`<div class="narrative-block mod-feedback-card" style="--mc:var(--${modCls})">
       <div class="narrative-label">${label} <span class="lbl-sub">Submissions &amp; Competencies</span></div>
-      ${narField(key,`Describe submission status, assessor progress, exam results for ${label}…`,nar[key],'44px')}
+      ${narField(key,`Describe submission status, assessor progress, exam results for ${label}…`,_val,'44px')}
     </div>`;
   });
 
@@ -5515,6 +5553,10 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
       <span class="att-a">A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Absent</span>
       <span class="att-na">N/A</span><span style="font-size:8pt;color:var(--muted);align-self:center">Not Applicable</span>
       <span class="att-r">R</span><span style="font-size:8pt;color:var(--muted);align-self:center">Resigned</span>
+    </div>
+    <div class="narrative-block optional-nar${(nar.att_register_note||'').trim()?'':' no-print'}" style="margin-top:14px">
+      <div class="narrative-label">Attendance Comments <span class="lbl-sub">optional · prints only when filled in</span></div>
+      ${narField('att_register_note','Comments on attendance for this period: absences, reasons, follow-ups…',nar.att_register_note||'','44px')}
     </div>`;
   return pageShell(pn,0,activeClient.client_name,'Attendance Register',body,true);
 }
@@ -5588,7 +5630,11 @@ function addAttDate(){
   rebuildAttendancePage();
   autoSave();
   updateProgressPanel();
-  toast(`Date added: ${key}`,'success',2500);
+  const _endKey=_reportMonthEndKey();
+  if(_endKey&&key>_endKey){
+    const _m=document.getElementById('sel-month')?.value||'this month';
+    toast(`${key} is after ${_m}. It's saved, but it will only show in the report for the month it falls in.`,'warn',6000);
+  }else toast(`Date added: ${key}`,'success',2500);
 }
 
 // ── Bulk Add Session Dates ──
@@ -5654,7 +5700,7 @@ function previewBulkDates(){
     commit.disabled=true;
     return;
   }
-  const existing=new Set(getAttDates());
+  const existing=new Set(getAllAttDates());
   const newDates=dates.filter(d=>!existing.has(d));
   const already=dates.length-newDates.length;
   preview.innerHTML=`<strong style="color:#4ade80">${newDates.length}</strong> new date${newDates.length!==1?'s':''} will be added${already?` · ${already} already on the report`:''} · ${dates.length} total in range<br><span style="font-size:8pt;color:rgba(255,255,255,.4)">${dates.slice(0,10).join(', ')}${dates.length>10?` … +${dates.length-10} more`:''}</span>`;
@@ -5663,7 +5709,7 @@ function previewBulkDates(){
 
 function commitBulkDates(){
   const dates=_bulkDatesCompute();
-  const existing=new Set(getAttDates());
+  const existing=new Set(getAllAttDates());
   const newDates=dates.filter(d=>!existing.has(d));
   if(!newDates.length)return;
   const pLearners=getProgrammeLearners();
@@ -5798,6 +5844,26 @@ function legacyLogbookValue(ov,learnerId,modNum){
   const perModule=(ov||{})[logbookKey(learnerId,modNum)];
   if(perModule!==undefined)return perModule;
   return(ov||{})[logbookKey(learnerId)]||''; // pre-migration single value, carried forward
+}
+// Results that decide a learner's status on a module, for the module cards,
+// cover/exec-summary counts and "Draft from data" text. QCTO programmes use
+// KM/PM/WM/exams. Legacy programmes never fill those — they record Formative,
+// Summative and Logbook per module (narratives._eisa) — so the cards always read
+// "0 competent · 0 outstanding" for Legacy. Legacy rule (same as the credits
+// widget): competent = Formative C AND Summative C, and Logbook not outstanding.
+// A missing Formative/Summative is returned as '-' so the learner counts as
+// in progress, not competent. Returns [] when nothing is captured.
+function _modResultVals(learnerId,m,qctoVals){
+  // A module that starts after the reporting month can't have results yet —
+  // placeholder NYCs typed into it must not count as outstanding or raise flags.
+  if(activeProgramme&&_modNotStarted(activeProgramme,m))return[];
+  if(activeProgramme&&isLegacyProgramme(activeProgramme)){
+    const ov=narratives._eisa||{};
+    const f=legacyFormativeValue(ov,learnerId,m),su=legacySummativeValue(ov,learnerId,m),lb=legacyLogbookValue(ov,learnerId,m);
+    if(!f&&!su&&!lb)return[];
+    return[f||'-',su||'-',...(lb?[lb]:[])];
+  }
+  return(qctoVals||[]).filter(v=>v);
 }
 function legacyFormativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_formative`;}
 function legacySummativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_summative`;}
@@ -6310,7 +6376,7 @@ let _ctxDates=[];
 function openAttCtx(e,el,dateKey){
   e.preventDefault();
   _ctxDate=dateKey;
-  _ctxDates=getAttDates();
+  _ctxDates=getAllAttDates();
   const idx=_ctxDates.indexOf(dateKey);
   const menu=document.getElementById('att-ctx-menu');
   const copyBtn=document.getElementById('att-ctx-copy');
@@ -6390,6 +6456,8 @@ function syncNar(ta){
   const printEl=document.querySelector(`[data-nar-print="${key}"]`);
   if(printEl)printEl.textContent=ta.value;
   narratives[key]=ta.value;
+  const _opt=ta.closest('.optional-nar');
+  if(_opt)_opt.classList.toggle('no-print',!ta.value.trim());
   autoGrowNar(ta);
   autoSave();
 }
@@ -6606,7 +6674,7 @@ function draftNarrative(key, btn){
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
-      const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
+      const vals=_modResultVals(l.id,m,[res.km,res.pm,res.wm,res.examv1,res.examv2]);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
       const anyNYC=vals.some(isEisaOutstanding);
@@ -6645,7 +6713,7 @@ function draftNarrative(key, btn){
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
-  } else if(key==='att_summary'){
+  } else if(key==='att_summary'||key==='att_register_note'){
     if(narratives.no_classes===true||narratives.no_classes==='true'){
       draft='No classes were held during this reporting period.';
     } else if(avgAtt===null){
@@ -6658,6 +6726,17 @@ function draftNarrative(key, btn){
            +(belowThreshold.length
              ?`Learner${belowThreshold.length>1?'s':''} below threshold: ${belowThreshold.map(b=>`${b.name} (${b.pct}%)`).join(', ')}.`
              :'All learners are meeting the attendance threshold.');
+    }
+    // Register comments go one step further than the overview summary: who
+    // missed which sessions (absences only, in this reporting month).
+    if(key==='att_register_note'&&attDates.length&&!(narratives.no_classes===true||narratives.no_classes==='true')){
+      const _abs=pLearners.map(l=>{
+        const miss=attDates.filter(d=>(((narratives._att||{})[`${l.id}_${d}`])||attState[l.id]?.[d]||'')==='A');
+        return{name:`${l.first_name||''} ${l.last_name||''}`.trim(),miss};
+      }).filter(x=>x.miss.length);
+      draft+=_abs.length
+        ?` Absences: ${_abs.map(x=>`${x.name} (${x.miss.length} session${x.miss.length>1?'s':''}: ${x.miss.map(d=>fmtDate(d)).join(', ')})`).join('; ')}.`
+        :' No absences were recorded this period.';
     }
   } else if(key==='interaction'){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
@@ -7005,6 +7084,7 @@ function daLabel(key){
   if(key.startsWith('feedback_m'))return`Module ${key.slice('feedback_m'.length)} — Feedback`;
   return{
     att_summary:'Attendance Summary',
+    att_register_note:'Attendance Comments',
     eisa_summary:'EISA',
     time_keeping:'Time Keeping',
     interaction:'Interaction & Participation',
@@ -7040,7 +7120,7 @@ function _computeDraft(key){
     let comp=0,nyc=0,pending=0;
     pLearners.forEach(l=>{
       const res=(eisaState[l.id]||{})[m]||{};
-      const vals=[res.km,res.pm,res.wm,res.examv1,res.examv2].filter(v=>v);
+      const vals=_modResultVals(l.id,m,[res.km,res.pm,res.wm,res.examv1,res.examv2]);
       if(!vals.length){pending++;return;}
       const allC=vals.every(v=>v==='C');
       const anyNYC=vals.some(isEisaOutstanding);
@@ -7076,7 +7156,7 @@ function _computeDraft(key){
     draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
-  } else if(key==='att_summary'){
+  } else if(key==='att_summary'||key==='att_register_note'){
     if(narratives.no_classes===true||narratives.no_classes==='true'){
       draft='No classes were held during this reporting period.';
     } else if(avgAtt===null){
@@ -7100,6 +7180,17 @@ function _computeDraft(key){
              ?`${eisaBookedCount-eisaCompletedCount} learner${(eisaBookedCount-eisaCompletedCount)!==1?'s':''} booked but not yet complete.`
              :'All booked learners have completed their EISA requirements.');
         })();
+    // Register comments go one step further than the overview summary: who
+    // missed which sessions (absences only, in this reporting month).
+    if(key==='att_register_note'&&attDates.length&&!(narratives.no_classes===true||narratives.no_classes==='true')){
+      const _abs=pLearners.map(l=>{
+        const miss=attDates.filter(d=>(((narratives._att||{})[`${l.id}_${d}`])||attState[l.id]?.[d]||'')==='A');
+        return{name:`${l.first_name||''} ${l.last_name||''}`.trim(),miss};
+      }).filter(x=>x.miss.length);
+      draft+=_abs.length
+        ?` Absences: ${_abs.map(x=>`${x.name} (${x.miss.length} session${x.miss.length>1?'s':''}: ${x.miss.map(d=>fmtDate(d)).join(', ')})`).join('; ')}.`
+        :' No absences were recorded this period.';
+    }
   } else if(key==='interaction'){
     const compAll=modStats.reduce((a,s)=>a+s.comp,0);
     const nycAll=modStats.reduce((a,s)=>a+s.nyc,0);
@@ -7826,7 +7917,7 @@ function triggerPrint(){
   _printReportViaIframe({mode:'print'});
 }
 
-function sendForReview(){
+async function sendForReview(){
   if(IS_ADMIN){toast('Sending for review is disabled in admin review mode','warn',3000);return;}
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length){
@@ -7834,18 +7925,20 @@ function sendForReview(){
     return;
   }
   if(_checklistBlocksFinalize())return;
-  if(!_confirmUneditedComments())return;
+  if(!(await _confirmUneditedComments()))return;
   logReportPrint();
 }
 
 // ── Pre-submit check: warn if observation comments are still the bulk
 // default (unedited placeholder text) for multiple learners. Non-blocking —
 // user confirms once, then submission proceeds (comments are valid user data).
-function _confirmUneditedComments(){
+async function _confirmUneditedComments(){
   const defaults=document.querySelectorAll('.comment-ta.comment-default');
   if(defaults.length<1)return true;
   const n=defaults.length;
-  return confirm(`${n} learner observation comment${n===1?'':'s'} still match${n===1?'es':''} the default preset text and haven't been individually edited. Send for review anyway?`);
+  // showConfirmDialog, not native confirm(): some webviews silently block confirm(),
+  // which made Send for Review do nothing with no message.
+  return showConfirmDialog(`${n} learner observation comment${n===1?'':'s'} still match${n===1?'es':''} the default preset text and haven't been individually edited. Send for review anyway?`);
 }
 
 // ── Download PDF — pure CSS print approach (Session 22) ──
@@ -11938,6 +12031,7 @@ function renderAssessorList(){
   }).join('');
   updateStepsGuide();
 }
+function _splitRoles(r){return String(r||'').split(/\s*(?:&|,|\/|\band\b)\s*/i).map(x=>x.trim()).filter(Boolean);}
 async function addAssessor(){
   const nameEl=document.getElementById('assessor-new-name');
   const roleEl=document.getElementById('assessor-new-role');
@@ -11954,7 +12048,35 @@ async function addAssessor(){
   // e.g. "Assessor" and then tried adding them again as "Facilitator" would hit a
   // dead end here, never realise they just needed to pick that person from the
   // Programme's Facilitator dropdown, and the report would look stuck. Tell them.
-  if(_isDuplicate(assessors,'full_name',name,null)){errEl.textContent=`"${name}" is already in the list — no need to add them again. Open the Programme's edit screen and pick them from the Facilitator dropdown; the same person can cover both Facilitator and Assessor duties.`;errEl.style.display='block';return;}
+  // Same person, new role (e.g. already an Assessor, now also the Facilitator):
+  // don't block with "already exists" — add the role to the existing record so one
+  // person carries both roles and shows in every dropdown. No duplicate rows.
+  const existing=assessors.find(x=>(x.full_name||'').trim().toLowerCase()===name.toLowerCase());
+  if(existing){
+    const roles=_splitRoles(existing.role||'Assessor');
+    const addRoles=_splitRoles(role).filter(r=>!roles.some(x=>x.toLowerCase()===r.toLowerCase()));
+    if(!addRoles.length){
+      errEl.textContent=`"${existing.full_name}" is already listed as ${roles.join(' & ')}. Pick them from the dropdown (Facilitator or Assessor) — one person can cover both roles.`;
+      errEl.style.display='block';return;
+    }
+    const merged=[...roles,...addRoles].join(' & ');
+    errEl.style.display='none';
+    try{
+      if(isOnline&&!isTempId(existing.id)){
+        await sbPatch('assessors',existing.id,{role:merged});
+      }else if(isTempId(existing.id)){
+        _updateQueuedCreate('assessors',existing.id,{role:merged});
+      }else{
+        enqueueWrite('patch','assessors',{role:merged},existing.id);
+      }
+      existing.role=merged;
+      saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+      nameEl.value='';roleEl.value='';
+      renderAssessorList();
+      toast(`"${existing.full_name}" is now ${merged} — pick them from the dropdown for either role.`,'success',5000);
+    }catch(e){_logWriteFailure('direct-failed',{method:'patch',table:'assessors',id:existing.id},e.message);errEl.textContent='Save failed: '+e.message;errEl.style.display='block';}
+    return;
+  }
   errEl.style.display='none';
   const payload={tenant_id:TENANT_DB_ID,full_name:name,role};
   try{
@@ -12451,13 +12573,23 @@ function getDraftMeta(key){
   }catch{return null;}
 }
 
+// Drafts live in this browser's localStorage, which isn't per-user: a shared
+// computer, a previous login, or programmes deleted and re-created all leave
+// drafts behind (a PM saw 25 while the server held 2). Only list drafts for
+// programmes the signed-in user can actually open — `programmes` is already
+// limited by the database to their own (admins: all). Hidden, never deleted.
+function _draftVisible(meta){
+  if(!meta)return false;
+  if(!Array.isArray(programmes)||!programmes.length)return true; // not loaded yet / offline cold start
+  return programmes.some(p=>String(p.id)===String(meta.progId)&&!p.deleted_at);
+}
 function listDrafts(){
   const drafts=[];
   for(let i=0;i<localStorage.length;i++){
     const k=localStorage.key(i);
     if(!k||!k.startsWith(DRAFT_PREFIX))continue;
     const meta=getDraftMeta(k);
-    if(meta)drafts.push({key:k,...meta});
+    if(meta&&_draftVisible(meta))drafts.push({key:k,...meta});
   }
   return drafts.sort((a,b)=>(b.savedAt||0)-(a.savedAt||0));
 }
@@ -13122,7 +13254,7 @@ async function buildProgrammeWorkbook(opts={}){
     // ── Sheet 1: Attendance ──
     if(inclAtt){
     const pLearners=getProgrammeLearners();
-    const allAttDates=getAttDates(); // all sorted date keys
+    const allAttDates=getAllAttDates(); // all sorted date keys
     // Apply date range filter if set
     const attDates=hasRange?allAttDates.filter(d=>d>=from&&d<=to):allAttDates;
     const attHeader=['#','Learner',...attDates.map(d=>{
@@ -14786,7 +14918,7 @@ function _renderLRC(){
 function openExportModal(){
   if(!activeProgramme||!activeClient){toast('Select a client and programme first','warn');return;}
   // Pre-fill date range from attendance dates
-  const dates=getAttDates();
+  const dates=getAllAttDates();
   const fromEl=document.getElementById('efm-from');
   const toEl=document.getElementById('efm-to');
   if(dates.length){
@@ -14812,7 +14944,7 @@ function _efmUpdateSummary(){
   const el=document.getElementById('efm-range-summary');
   if(from&&to&&from<=to){
     const fmtDate=d=>{const p=d.split('-');return p.length===3?`${p[2]}/${p[1]}/${p[0]}`:d;};
-    const dates=getAttDates().filter(d=>d>=from&&d<=to);
+    const dates=getAllAttDates().filter(d=>d>=from&&d<=to);
     el.textContent=`${fmtDate(from)} → ${fmtDate(to)} · ${dates.length} session date${dates.length===1?'':'s'} in range`;
     el.style.display='block';
   } else {
@@ -15620,7 +15752,7 @@ function parseAttPaste(){
   // way to guess a headerless paste, since a bare date can't be told apart
   // from other short strings without one).
   const header=lines[0];
-  const existingDates=new Set(getAttDates());
+  const existingDates=new Set(getAllAttDates());
   _attPasteDateCols=header.slice(1).map((h,i)=>{
     const dateKey=normDateKey(h);
     const looksLikeDate=!!(dateKey&&/^\d{4}-\d{2}-\d{2}$/.test(dateKey));
@@ -15869,7 +16001,7 @@ function _updateProgressPanel(){
   // Formative/Summative unit-standard tracking, not a QCTO EISA process, so
   // there's nothing meaningful for a PM to write here.
   const legacyForNar=isLegacyProgramme(activeProgramme);
-  const narModNums=displayModuleNums(activeProgramme);
+  const narModNums=displayModuleNums(activeProgramme).filter(n=>!_modNotStarted(activeProgramme,n));
   const narKeys=[...narModNums.map(n=>`feedback_m${n}`),'att_summary',...(legacyForNar?[]:['eisa_summary']),'interaction','concerns','time_keeping'];
   const narLabels=Object.fromEntries(narKeys.map(k=>[k,daLabel(k).replace(' — Feedback',' Narrative')]));
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
