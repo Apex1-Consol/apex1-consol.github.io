@@ -4123,6 +4123,16 @@ function _reportMonthEnd(){
   if(isNaN(d))return null;
   return new Date(d.getFullYear(),d.getMonth()+1,0);
 }
+// "As at" date for a report: end of the reporting month, or today if that month
+// hasn't ended yet. Module status/trained labels in an August report written in
+// late September must describe August, not today.
+function _reportRefDate(){
+  const now=new Date();
+  const e=_reportMonthEnd();
+  if(!e)return now;
+  const eod=new Date(e.getFullYear(),e.getMonth(),e.getDate(),23,59,59);
+  return eod<now?eod:now;
+}
 function _reportMonthEndKey(){
   const e=_reportMonthEnd();
   if(!e)return null;
@@ -5075,7 +5085,7 @@ function modStatus(datesStr){
     if(!/\d{4}\s*$/.test(startStr)) startStr+=' '+fullYear;
     const start=new Date(startStr),end=new Date(endStr);
     if(isNaN(start)||isNaN(end)) return null;
-    const now=new Date();
+    const now=_reportRefDate(); // as at the report period, not today
     if(now<start) return 'upcoming';
     if(now>end) return 'done';
     return 'current';
@@ -6175,7 +6185,7 @@ function getModuleTrainingStatus(modNum){
     });
     if(allC)return'trained';
     const r=parseModDateRange(activeProgramme['module_'+modNum+'_dates']);
-    if(r&&r.end&&r.end<new Date())return'completed';
+    if(r&&r.end&&r.end<_reportRefDate())return'completed';
     return any?'progress':'nyt';
   }
   const applies=moduleAppliesTypes(activeProgramme,modNum);
@@ -6198,7 +6208,7 @@ function getModuleTrainingStatus(modNum){
   });
   if(allTrained)return'trained';
   const range=(typeof parseModDateRange==='function')?parseModDateRange(activeProgramme&&activeProgramme['module_'+modNum+'_dates']):null;
-  if(range&&range.end&&range.end<new Date())return'completed';
+  if(range&&range.end&&range.end<_reportRefDate())return'completed';
   if(anyProgress)return'progress';
   return'nyt';
 }
@@ -16324,6 +16334,7 @@ async function runMultiProgExport() {
   const _savedRemoteComments = remoteComments;
   const _savedLrcLearners = _lrcLearners;
   const _savedLrcIdx = _lrcIdx;
+  const _savedNarratives = narratives;
 
   const allSections = [];
   let done = 0;
@@ -16389,6 +16400,20 @@ async function runMultiProgExport() {
     eisaState = progEisaState;
     remoteComments = progRemoteComments;
     _lrcLearners = progLearners;
+    // Legacy Formative/Summative/Logbook results (and attendance overrides) live in
+    // the programme's month draft, not in eisaState. Without swapping it, every
+    // programme's cards used the *currently open* programme's draft — wrong or
+    // blank legacy results. Local draft first, then the cloud copy.
+    let progNar = {};
+    try { const raw = localStorage.getItem(`${DRAFT_PREFIX}${pid}_${month}`); if (raw) progNar = JSON.parse(raw) || {}; } catch {}
+    if (!Object.keys(progNar).length && isOnline && TENANT_DB_ID) {
+      try {
+        const dr = await sb('drafts', `select=payload&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&month=eq.${encodeURIComponent(month)}&limit=1`);
+        const pl = dr && dr[0] && dr[0].payload;
+        if (pl) progNar = typeof pl === 'string' ? JSON.parse(pl) : pl;
+      } catch {}
+    }
+    narratives = progNar;
 
     // Also update sel-month display value so _renderLRC picks it up
     const monthEl = document.getElementById('sel-month');
@@ -16427,6 +16452,7 @@ async function runMultiProgExport() {
   }
 
   // Restore all global state
+  narratives = _savedNarratives;
   activeProgramme = _savedActiveProg;
   learners = _savedLearners;
   enrolments = _savedEnrolments;
