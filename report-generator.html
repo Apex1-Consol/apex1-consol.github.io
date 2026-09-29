@@ -3375,7 +3375,7 @@ let unitStandards=[];  // [{mod,cls,id,title,level,credits}]
 // ── LEGACY MODE (Session 26) ──────────────────────────────────────────────
 // A programme is either 'occupational' (QCTO — Module 1-4 KM/PM/WM + EISA,
 // the app's original behaviour) or 'legacy' (SETA unit-standard based —
-// credit accumulation, per-unit-standard Achieved / Not Yet Achieved).
+// credit accumulation, per-unit-standard Achieved / Not Yet Trained).
 //
 // Reads/writes `programmes.programme_type` (real Supabase column, checked to
 // 'occupational'|'legacy'). Kept synchronous by reading from the in-memory
@@ -5841,7 +5841,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
 // Used instead of buildAssessmentPage(1..4) when isLegacyProgramme(prog) is
 // true. One row per learner, one column per unit standard registered against
 // this programme's SAQA ID (via the existing "Unit Standards" panel), with
-// Achieved / Not Yet Achieved per cell and a running credit total per
+// Achieved / Not Yet Trained per cell and a running credit total per
 // learner — the SETA equivalent of the occupational KM/PM/WM+EISA grid.
 // Paginated in chunks of SPLIT learners per page, same as Participation.
 function usKey(learnerId,usCode){
@@ -5916,8 +5916,8 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
 
   const mkFsCell=(key,val,cls)=>{
     const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
-    const label=val==='C'?'Achieved':val==='NYC'?'Not Yet Achieved':val==='NS'?'Not Yet Started':'&#8212;';
-    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet Achieved</option><option value="NS" ${val==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
+    const label=val==='C'?'Achieved':val==='NYC'?'Not Yet Trained':val==='NS'?'Not Yet Started':'&#8212;';
+    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${val==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
   };
 
   let pn=startPn;
@@ -5947,8 +5947,8 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const lbKey=logbookKey(l.id,modNum);
         const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
         const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
-        const lbLabel=lbVal==='C'?'Achieved':lbVal==='NYC'?'Not Yet Achieved':lbVal==='NS'?'Not Yet Started':'&#8212;';
-        const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet Achieved</option><option value="NS" ${lbVal==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
+        const lbLabel=lbVal==='C'?'Achieved':lbVal==='NYC'?'Not Yet Trained':lbVal==='NS'?'Not Yet Started':'&#8212;';
+        const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${lbVal==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
         const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
         const anyProgress=earned>0||lbVal==='C'||anyAssessed;
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
@@ -5963,7 +5963,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/Logbook results from Excel">📋 Bulk Paste</button>
             <button type="button" id="us-undo-btn-m${modNum}" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoUsPaste(${modNum})" title="Undo last bulk paste for this module">↩ Undo</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','C')">Set all Achieved</button>
-            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet Achieved</button>
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet Trained</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NS')">Set all Not Yet Started</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','')">Clear All</button>
           </span>
@@ -5972,7 +5972,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         <div style="overflow-x:auto">
           <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid">${thead}<tbody>${rows}</tbody></table>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Achieved</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Trained</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
       pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
     });
   });
@@ -5983,7 +5983,7 @@ function syncUsResult(sel){
   if(printSpan&&printSpan.classList.contains('result-print')){
     const v=sel.value;
     printSpan.className='result-print badge '+(v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na');
-    printSpan.textContent=v==='C'?'Achieved':v==='NYC'?'Not Yet Achieved':v==='NS'?'Not Yet Started':'—';
+    printSpan.textContent=v==='C'?'Achieved':v==='NYC'?'Not Yet Trained':v==='NS'?'Not Yet Started':'—';
   }
   if(!narratives._eisa)narratives._eisa={};
   narratives._eisa[sel.dataset.eisa]=sel.value;
@@ -6023,7 +6023,7 @@ function bulkSetLegacyResults(tableId,value){
     sel.value=value;
     syncUsResult(sel);
   });
-  toast(value==='C'?'All set to Achieved':value==='NYC'?'All set to Not Yet Achieved':value==='NS'?'All set to Not Yet Started':'Cleared','success',2000);
+  toast(value==='C'?'All set to Achieved':value==='NYC'?'All set to Not Yet Trained':value==='NS'?'All set to Not Yet Started':'Cleared','success',2000);
 }
 
 const SURVEY_ITEMS=[
@@ -8719,7 +8719,7 @@ function openModal(type,mode,learnerId){
           <option value="occupational">Occupational (QCTO — Modules + EISA)</option>
           <option value="legacy">Legacy (SETA Unit Standards)</option>
         </select>
-        <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Legacy swaps the report's assessment pages to per-unit-standard Achieved / Not Yet Achieved tracking with credit totals, instead of Module 1–4 KM/PM/WM + EISA.</div>
+        <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Legacy swaps the report's assessment pages to per-unit-standard Achieved / Not Yet Trained tracking with credit totals, instead of Module 1–4 KM/PM/WM + EISA.</div>
       </div>
       <div class="modal-grid">
         <div class="modal-field"><label>SAQA ID <span style="color:var(--red)">*</span></label>
@@ -14852,7 +14852,7 @@ function _renderLRC(){
       <td style="text-align:center">${cr}</td>
       <td style="text-align:center">${mkLrcB(fv)}</td>
       <td style="text-align:center">${mkLrcB(sv)}</td>
-      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet Achieved</span>':lbv==='NS'?'<span class="lrc-badge na">Not Started</span>':'<span class="lrc-badge na">—</span>'}</td>
+      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet Trained</span>':lbv==='NS'?'<span class="lrc-badge na">Not Started</span>':'<span class="lrc-badge na">—</span>'}</td>
       <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
     </tr>`;
   }).join('');
@@ -15305,7 +15305,7 @@ function closeUsPaste(){
 function _usNormResult(v){
   const u=(v||'').toUpperCase().trim();
   if(u==='C'||u==='COMPETENT'||u==='ACHIEVED')return'C';
-  if(u==='NYC'||u==='NOT YET'||u==='NOT YET COMPETENT'||u==='NOT YET ACHIEVED')return'NYC';
+  if(u==='NYC'||u==='NOT YET'||u==='NOT YET COMPETENT'||u==='NOT YET ACHIEVED'||u==='NOT YET TRAINED'||u==='NYT')return'NYC';
   if(u==='NS'||u==='NOT YET STARTED'||u==='NOT STARTED')return'NS';
   return''; // blank or unrecognised — left untouched rather than guessed at
 }
