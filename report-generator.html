@@ -3211,7 +3211,9 @@ function applyTenantBranding(t){
   if(t.signoff_name)window._tenantSignoffName=t.signoff_name;
   if(t.signoff_role)window._tenantSignoffRole=t.signoff_role;
   // Apply overrides onto the currently active provider
-  Object.assign(activeProvider,_tenantOverrides);
+  // activeProvider is null until a provider is picked; the picker merges
+  // _tenantOverrides itself, so only patch it here when one is already active.
+  if(activeProvider)Object.assign(activeProvider,_tenantOverrides);
 }
 
 // ── Init ──
@@ -3700,7 +3702,8 @@ function buildAttState(){
   attState={};
   attendance.forEach(r=>{
     if(!attState[r.learner_id])attState[r.learner_id]={};
-    attState[r.learner_id][normDateKey(r.session_date)]=r.status||'P';
+    // DB rows may hold 'Present'/'Absent' — normalise to the P/A codes every counter uses.
+    attState[r.learner_id][normDateKey(r.session_date)]=normAttStatus(r.status)||r.status||'P';
   });
 }
 
