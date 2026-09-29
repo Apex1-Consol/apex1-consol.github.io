@@ -6162,6 +6162,22 @@ function getModuleTrainingStatus(modNum){
   // Returns 'trained' | 'progress' | 'nyt' based on eisaState across all learners
   const pLearners=getProgrammeLearners();
   if(!pLearners.length)return'nyt';
+  // Legacy: KM/PM/WM are never captured, so use Formative/Summative/Logbook via
+  // _modResultVals (trained = every learner Formative C + Summative C). Before
+  // this, Legacy unit standards read "Not Yet Trained" even with all results C.
+  if(activeProgramme&&isLegacyProgramme(activeProgramme)){
+    if(_modNotStarted(activeProgramme,modNum))return'nyt';
+    let allC=true,any=false;
+    pLearners.forEach(l=>{
+      const v=_modResultVals(l.id,modNum,[]);
+      if(v.length)any=true;
+      if(!v.length||!v.every(x=>x==='C'))allC=false;
+    });
+    if(allC)return'trained';
+    const r=parseModDateRange(activeProgramme['module_'+modNum+'_dates']);
+    if(r&&r.end&&r.end<new Date())return'completed';
+    return any?'progress':'nyt';
+  }
   const applies=moduleAppliesTypes(activeProgramme,modNum);
   let allTrained=true,anyProgress=false;
   pLearners.forEach(l=>{
@@ -6200,7 +6216,7 @@ function buildUnitsTable(prog){
   // Memoisation — key: saqa_id + module statuses + per-unit content (id/title/level/credits/mod)
   // so edits to an *existing* unit standard (same count) also invalidate the cache.
   const _unitsSig=units.map(u=>`${u.id}:${u.title}:${u.level}:${u.credits}:${u.mod}`).join(',');
-  const _butKey=`${prog.saqa_id}|${modStatus[1]}|${modStatus[2]}|${modStatus[3]}|${modStatus[4]}|${_unitsSig}`;
+  const _butKey=`${prog.saqa_id}|${modNums.map(m=>modStatus[m]).join(',')}|${_unitsSig}`;
   if(buildUnitsTable._c?.k===_butKey)return buildUnitsTable._c.h;
   if(!units.length){
     const _h=`<div style="padding:20px;text-align:center;color:var(--muted);font-size:9pt;font-style:italic">
