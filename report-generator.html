@@ -4137,6 +4137,9 @@ function _modNotStarted(prog,n){
   return !!(r&&r.start>e);
 }
 const MOD_NOT_STARTED_TXT='Not yet started. This module begins after this reporting period.';
+// Untouched "Draft from data" module text ("Module 2 — 0 of 5 learners (0%) have
+// achieved competency…") — boilerplate, safe to replace on a not-started module.
+function _isAutoModDraft(v){return /^\s*Module \d+ — \d+ of \d+ learners \(\d+%\) have achieved competency across all assessments\./.test(String(v||''));}
 function _isNaText(v){return /^\s*(n\/?a|none|nil|-+)\.?\s*$/i.test(String(v||''));}
 
 // ── Shield SVG (inline for print) ──
@@ -4476,7 +4479,10 @@ function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
 }
 
 function computeCoverStats(pLearners,prog){
-  const totalMods=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))].length;
+  // Only modules that have started by the end of the reporting month count —
+  // placeholder NYCs on upcoming modules mustn't flag learners on the cover,
+  // and "modules on track" is out of the modules actually running.
+  const totalMods=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))].filter(m=>!_modNotStarted(prog,m)).length;
   const attDates=getAttDates().map(normDateKey);
   let attSum=0,attCount=0;
   pLearners.forEach(l=>{
@@ -4489,7 +4495,7 @@ function computeCoverStats(pLearners,prog){
     if(t>0){attSum+=Math.round(pr/t*100);attCount++;}
   });
   const avgAtt=attCount>0?Math.round(attSum/attCount):null;
-  const modNums=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))];
+  const modNums=[...new Set(unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id).map(u=>u.mod||1))].filter(m=>!_modNotStarted(prog,m));
   let flaggedModules=0;const flaggedLearnerIds=new Set();
   const legacy=isLegacyProgramme(prog);
   if(legacy){
@@ -4500,7 +4506,7 @@ function computeCoverStats(pLearners,prog){
       let anyNYC=false;
       pLearners.forEach(l=>{
         const ov=narratives._eisa||{};
-        if(legacyFormativeValue(ov,l.id,m)==='NYC'||legacySummativeValue(ov,l.id,m)==='NYC'){anyNYC=true;flaggedLearnerIds.add(l.id);}
+        if(_modResultVals(l.id,m,[]).some(isEisaOutstanding)){anyNYC=true;flaggedLearnerIds.add(l.id);}
       });
       if(anyNYC)flaggedModules++;
     });
@@ -5290,7 +5296,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     // Not started yet in this reporting month: print a standard line unless the
     // PM wrote something real ("na"/"n/a" placeholders are replaced).
     const _ns=_modNotStarted(prog,n);
-    const _val=(_ns&&(!nar[key]||_isNaText(nar[key])))?MOD_NOT_STARTED_TXT:nar[key];
+    const _val=(_ns&&(!nar[key]||_isNaText(nar[key])||_isAutoModDraft(nar[key])))?MOD_NOT_STARTED_TXT:nar[key];
     body+=`<div class="narrative-block mod-feedback-card" style="--mc:var(--${modCls})">
       <div class="narrative-label">${label} <span class="lbl-sub">Submissions &amp; Competencies</span></div>
       ${narField(key,`Describe submission status, assessor progress, exam results for ${label}…`,_val,'44px')}
@@ -6710,7 +6716,8 @@ function draftNarrative(key, btn){
     const s=modStats.find(x=>x.m===modNum);
     if(!s){btn.disabled=false;btn.textContent='✨ Draft from data';return;}
     const pct=Math.round(s.comp/s.total*100);
-    draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
+    if(_modNotStarted(activeProgramme,modNum))draft=MOD_NOT_STARTED_TXT;
+    else draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'||key==='att_register_note'){
@@ -7153,7 +7160,8 @@ function _computeDraft(key){
     const s=modStats.find(x=>x.m===modNum);
     if(!s)return null;
     const pct=Math.round(s.comp/s.total*100);
-    draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
+    if(_modNotStarted(activeProgramme,modNum))draft=MOD_NOT_STARTED_TXT;
+    else draft=`Module ${s.m} — ${s.comp} of ${s.total} learners (${pct}%) have achieved competency across all assessments. `
          +`${s.nyc>0?`${s.nyc} learner${s.nyc>1?'s are':' is'} currently NYC. `:'All assessed learners are on track. '}`
          +`${s.pending>0?`${s.pending} learner${s.pending>1?'s have':' has'} outstanding assessments.`:'No outstanding assessments.'}`;
   } else if(key==='att_summary'||key==='att_register_note'){
