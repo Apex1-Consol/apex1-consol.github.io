@@ -865,6 +865,7 @@
                 <li class="nav-section-divider" data-roles="admin" style="border-top-color:rgba(244,63,94,0.25);">System</li>
                 <li class="nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')"><span class="nav-num">13</span><span class="nav-icon">&#128279;</span>QCTO / SETA Links <span style="opacity:.55;font-size:.85em;">&#8599;</span></li>
                 <li class="nav-item" data-view="audit" data-roles="admin,head_of_ops,demo" onclick="switchTab('audit')"><span class="nav-num">14</span><span class="nav-icon">&#128203;</span>Audit Events</li>
+                <li class="nav-item" data-view="ops" data-roles="admin,operations,project_manager" onclick="switchTab('ops')"><span class="nav-icon" style="margin-left:28px">&#128736;</span>Data &amp; Sync Health</li>
                 <li class="nav-item" data-view="users" data-roles="admin" onclick="switchTab('users')"><span class="nav-icon" style="margin-left:28px">&#128101;</span>User Management</li>
             </ul>
         </div>
@@ -916,7 +917,7 @@
                     </div>
                 </div>
                 <div class="save-indicator"><div class="save-dot"></div><span id="save-status-text">Saved locally</span> &nbsp;<div id="sync-status-dot" title="Sync status" style="width:8px;height:8px;border-radius:50%;background:var(--text-muted);display:inline-block;cursor:help;"></div></div>
-                <div class="notif-bell-wrap" data-roles="admin" style="position:relative;display:none;">
+                <div class="notif-bell-wrap" data-roles="admin,qa_specialist,etqa,project_manager,operations,pi_specialist" style="position:relative;display:none;">
                     <button class="btn btn-secondary btn-sm" id="notif-bell-btn" onclick="toggleNotifDropdown()" style="position:relative;" title="Notifications">
                         &#128276;
                         <span id="notif-unread-badge" style="display:none;position:absolute;top:-6px;right:-6px;background:var(--accent-rose);color:#fff;font-size:10px;font-weight:700;min-width:16px;height:16px;border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0 4px;">0</span>
@@ -954,6 +955,7 @@
             <div class="mobile-nav-item" data-view="reports" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="switchTab('reports')">Reports</div>
             <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,demo" onclick="openExternalApp('report-generator.html')">Report Generator &#8599;</div>
             <div class="mobile-nav-item" data-roles="admin,qa_specialist,etqa,project_manager,operations,demo,pi_specialist" onclick="openExternalApp('qcto-seta-links.html')">QCTO/SETA Links &#8599;</div>
+            <div class="mobile-nav-item" data-view="ops" data-roles="admin,operations,project_manager" onclick="switchTab('ops')">Data &amp; Sync</div>
             <div class="mobile-nav-item" data-view="users" data-roles="admin" onclick="switchTab('users')">Users</div>
         </div>
 
@@ -1286,6 +1288,19 @@
 
             <!-- REPORTS -->
             <section id="view-reports" class="view-panel">
+                <!-- Monthly report workflow: backed by reports.my_report_queue(),
+                     reports.transition_report() and reports.report_events. -->
+                <div class="content-container" id="rwf-panel" style="margin-bottom:20px;">
+                    <div class="container-header">
+                        <h2>Monthly report reviews</h2>
+                        <div class="container-actions">
+                            <button class="btn btn-secondary btn-sm" id="rwf-filter-open" onclick="rwfSetFilter('open')">Needs action</button>
+                            <button class="btn btn-secondary btn-sm" id="rwf-filter-all" onclick="rwfSetFilter('all')">All</button>
+                            <button class="btn btn-secondary btn-sm" onclick="rwfLoad()">&#8635; Refresh</button>
+                        </div>
+                    </div>
+                    <div id="rwf-body" style="padding:4px 0;"><div style="padding:16px;color:var(--text-muted);">Loading reports&hellip;</div></div>
+                </div>
                 <!-- Top action bar -->
                 <div class="content-container" style="margin-bottom:20px;">
                     <div class="container-header">
@@ -1488,6 +1503,43 @@
             </section>
 
             <!-- USER MANAGEMENT -->
+            <!-- DATA & SYNC HEALTH (admin/operator) -->
+            <section id="view-ops" class="view-panel">
+                <div class="content-container" style="margin-bottom:20px;">
+                    <div class="container-header">
+                        <h2>ClickUp sync queue</h2>
+                        <div class="container-actions" id="opq-filters">
+                            <button class="btn btn-secondary btn-sm" data-f="active" onclick="opqSetFilter('active')">Needs attention</button>
+                            <button class="btn btn-secondary btn-sm" data-f="queued" onclick="opqSetFilter('queued')">Queued</button>
+                            <button class="btn btn-secondary btn-sm" data-f="retrying" onclick="opqSetFilter('retrying')">Retrying</button>
+                            <button class="btn btn-secondary btn-sm" data-f="quarantined" onclick="opqSetFilter('quarantined')">Quarantined</button>
+                            <button class="btn btn-secondary btn-sm" data-f="legacy_failure" onclick="opqSetFilter('legacy_failure')">Legacy failures (30d)</button>
+                            <button class="btn btn-secondary btn-sm" onclick="opqLoad()">&#8635; Refresh</button>
+                        </div>
+                    </div>
+                    <div style="padding:0 20px 8px;color:var(--text-muted);font-size:.9em;">Records are identified only by <code>source_table:source_record_id</code>. ApexOne is the system of record; ClickUp mirrors it.</div>
+                    <div id="opq-summary" style="padding:0 20px 8px;"></div>
+                    <div id="opq-body"><div style="padding:16px;color:var(--text-muted);">Loading&hellip;</div></div>
+                </div>
+                <div class="content-container" data-roles="admin">
+                    <div class="container-header">
+                        <h2>Learner data quality</h2>
+                        <div class="container-actions" id="ldq-filters">
+                            <button class="btn btn-secondary btn-sm" data-f="open" onclick="ldqSetFilter('open')">Not yet reviewed</button>
+                            <button class="btn btn-secondary btn-sm" data-f="missing_id" onclick="ldqSetFilter('missing_id')">Missing ID</button>
+                            <button class="btn btn-secondary btn-sm" data-f="placeholder_id" onclick="ldqSetFilter('placeholder_id')">Placeholder ID</button>
+                            <button class="btn btn-secondary btn-sm" data-f="invalid_id" onclick="ldqSetFilter('invalid_id')">Invalid ID</button>
+                            <button class="btn btn-secondary btn-sm" data-f="possible_duplicate" onclick="ldqSetFilter('possible_duplicate')">Same name</button>
+                            <button class="btn btn-secondary btn-sm" data-f="quarantined" onclick="ldqSetFilter('quarantined')">Quarantined</button>
+                            <button class="btn btn-secondary btn-sm" onclick="ldqLoad()">&#8635; Refresh</button>
+                        </div>
+                    </div>
+                    <div style="padding:0 20px 8px;color:var(--text-muted);font-size:.9em;">Review decisions are recorded only; nothing is deleted or merged automatically. ID numbers are masked.</div>
+                    <div id="ldq-summary" style="padding:0 20px 8px;"></div>
+                    <div id="ldq-body"><div style="padding:16px;color:var(--text-muted);">Loading&hellip;</div></div>
+                </div>
+            </section>
+
             <section id="view-users" class="view-panel">
                 <div class="content-container">
                     <div class="container-header">
@@ -2704,8 +2756,18 @@ const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIs
 // current if Supabase rotates the token mid-session.
 let _cachedAccessToken = null;
 
+function _tokenExpiresSoon(tok) {
+    try {
+        const exp = JSON.parse(atob(tok.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp;
+        return !exp || exp * 1000 - Date.now() < 60000;
+    } catch { return true; }
+}
+
 async function supaHeaders() {
-    if (!_cachedAccessToken) {
+    // A backgrounded tab can miss the TOKEN_REFRESHED event, leaving an expired
+    // cached token (every request then 401s with "JWT expired"). Re-read the
+    // session, which refreshes it, whenever the cached token is near expiry.
+    if (!_cachedAccessToken || _tokenExpiresSoon(_cachedAccessToken)) {
         const { data: { session } } = await supabase.auth.getSession();
         _cachedAccessToken = session ? session.access_token : null;
     }
@@ -3162,6 +3224,293 @@ async function loadAuditLog(filters = {}) {
     }
 }
 
+// ===================== DATA & SYNC HEALTH =====================
+// ClickUp operator queue (public.v_clickup_operator_queue, security_invoker:
+// admin / project_manager / operations only) and learner data-quality review
+// (public.v_learner_data_quality + learner_quality_reviews, admin only).
+let _opqRows = [], _opqFilter = 'active';
+let _ldqRows = [], _ldqFilter = 'open';
+
+function _setFilterButtons(wrapId, active) {
+    document.querySelectorAll(`#${wrapId} [data-f]`).forEach(b => b.classList.toggle('btn-gold', b.dataset.f === active));
+}
+function _chips(counts, labels) {
+    return Object.keys(labels).map(k => `<span style="display:inline-block;margin:0 6px 6px 0;padding:3px 10px;border-radius:999px;background:var(--bg-secondary, rgba(0,0,0,.05));font-size:.85em;"><strong>${counts[k] || 0}</strong> ${labels[k]}</span>`).join('');
+}
+
+async function opqLoad() {
+    const body = document.getElementById('opq-body');
+    if (!body) return;
+    try {
+        const headers = await supaHeaders();
+        const res = await fetch(`${SUPA_URL}/rest/v1/v_clickup_operator_queue?select=*&order=updated_at.desc&limit=500`, { headers });
+        if (!res.ok) throw new Error(`Could not load the sync queue (${res.status})`);
+        _opqRows = await res.json();
+        opqRender();
+    } catch (e) {
+        body.innerHTML = `<div style="padding:16px;color:var(--accent-rose);">${escapeHtml(e.message)}</div>`;
+    }
+}
+function opqSetFilter(f) { _opqFilter = f; opqRender(); }
+function _opqStatus(r) { return r.queue_type === 'legacy_failure' ? 'legacy_failure' : r.queue_status; }
+function opqRender() {
+    const body = document.getElementById('opq-body');
+    if (!body) return;
+    _setFilterButtons('opq-filters', _opqFilter);
+    const counts = {};
+    _opqRows.forEach(r => { const s = _opqStatus(r); counts[s] = (counts[s] || 0) + 1; });
+    document.getElementById('opq-summary').innerHTML = _chips(counts, { queued: 'queued', pending: 'pending', processing: 'processing', retrying: 'retrying', quarantined: 'quarantined', legacy_failure: 'legacy failures (30d)' });
+    const rows = _opqRows.filter(r => {
+        const s = _opqStatus(r);
+        if (_opqFilter === 'active') return s !== 'legacy_failure';
+        if (_opqFilter === 'queued') return s === 'queued' || s === 'pending' || s === 'processing';
+        return s === _opqFilter;
+    });
+    if (!rows.length) {
+        body.innerHTML = `<div style="padding:16px;color:var(--text-muted);">${_opqFilter === 'active' ? 'Nothing is queued, retrying or quarantined. Sync is healthy.' : 'No items in this filter.'}</div>`;
+        return;
+    }
+    const isAdmin = currentRolesInclude('admin');
+    body.innerHTML = `<div class="table-wrapper"><table class="data-table">
+        <thead><tr><th>Record</th><th>Queue</th><th>Status</th><th>Attempts</th><th>Last error</th><th>Next / when</th><th></th></tr></thead>
+        <tbody>${rows.map(r => {
+            const s = _opqStatus(r);
+            const canRequeue = isAdmin && r.queue_type === 'outbox' && (s === 'quarantined' || s === 'retrying');
+            return `<tr>
+                <td><code>${escapeHtml(r.source_table || '?')}:${escapeHtml(r.source_record_id || '?')}</code></td>
+                <td>${escapeHtml(r.queue_type)}</td>
+                <td>${escapeHtml(s)}</td>
+                <td>${Number(r.attempts || 0)}</td>
+                <td style="max-width:380px;white-space:pre-wrap;font-size:.85em;">${escapeHtml(String(r.last_error || '').slice(0, 400)) || '—'}</td>
+                <td style="white-space:nowrap;">${escapeHtml(r.next_action_at ? new Date(r.next_action_at).toLocaleString('en-ZA') : '')}</td>
+                <td>${canRequeue ? `<button class="btn btn-sm btn-gold" onclick="opqRequeue(${Number(r.item_id)}, this)">Retry now</button>` : ''}</td>
+            </tr>`;
+        }).join('')}</tbody></table></div>`;
+}
+async function opqRequeue(id, btn) {
+    if (btn) { btn.disabled = true; btn.textContent = 'Queuing…'; }
+    try {
+        const headers = await supaHeaders();
+        const res = await fetch(`${SUPA_URL}/rest/v1/rpc/requeue_clickup_outbox`, {
+            method: 'POST', headers, body: JSON.stringify({ p_outbox_id: id, p_reason: 'operator retry from Data & Sync Health' })
+        });
+        const j = await res.json().catch(() => null);
+        if (!res.ok) throw new Error((j && j.message) || `Failed (${res.status})`);
+        showToast('success', 'Queued — the live adapter will retry on its next poll.');
+        opqLoad();
+    } catch (e) {
+        showToast('error', 'Not queued: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Retry now'; }
+    }
+}
+
+const LDQ_ISSUES = { missing_id: 'Missing ID', placeholder_id: 'Placeholder ID', invalid_id: 'Invalid SA ID', possible_duplicate: 'Same name as another learner' };
+const LDQ_DECISIONS = {
+    reviewed_ok: 'Reviewed — OK as is',
+    needs_fix: 'Needs fixing (PM to update)',
+    quarantined: 'Quarantine (exclude from reporting review)',
+    not_duplicate: 'Not a duplicate',
+    duplicate_confirmed: 'Duplicate confirmed (merge manually)'
+};
+async function ldqLoad() {
+    const body = document.getElementById('ldq-body');
+    if (!body) return;
+    try {
+        const headers = await supaHeaders();
+        const res = await fetch(`${SUPA_URL}/rest/v1/v_learner_data_quality?select=*&order=enrolment_count.desc,learner_id.asc&limit=1000`, { headers });
+        if (!res.ok) throw new Error(`Could not load learner data quality (${res.status})`);
+        _ldqRows = await res.json();
+        ldqRender();
+    } catch (e) {
+        body.innerHTML = `<div style="padding:16px;color:var(--accent-rose);">${escapeHtml(e.message)}</div>`;
+    }
+}
+function ldqSetFilter(f) { _ldqFilter = f; ldqRender(); }
+function ldqRender() {
+    const body = document.getElementById('ldq-body');
+    if (!body) return;
+    _setFilterButtons('ldq-filters', _ldqFilter);
+    const counts = {}; let open = 0, quarantined = 0;
+    _ldqRows.forEach(r => { counts[r.issue] = (counts[r.issue] || 0) + 1; if (!r.decision) open++; if (r.decision === 'quarantined') quarantined++; });
+    document.getElementById('ldq-summary').innerHTML = _chips({ ...counts, open, quarantined }, { open: 'not yet reviewed', missing_id: 'missing ID', placeholder_id: 'placeholder ID', invalid_id: 'invalid ID', possible_duplicate: 'same name', quarantined: 'quarantined' });
+    const rows = _ldqRows.filter(r => _ldqFilter === 'open' ? !r.decision : _ldqFilter === 'quarantined' ? r.decision === 'quarantined' : r.issue === _ldqFilter);
+    if (!rows.length) { body.innerHTML = '<div style="padding:16px;color:var(--text-muted);">No learners in this filter.</div>'; return; }
+    const shown = rows.slice(0, 300);
+    body.innerHTML = `${rows.length > shown.length ? `<div style="padding:0 20px 8px;color:var(--text-muted);">Showing the first ${shown.length} of ${rows.length}.</div>` : ''}
+        <div class="table-wrapper"><table class="data-table">
+        <thead><tr><th>Learner</th><th>Issue</th><th>ID (masked)</th><th>Enrolments</th><th>Decision</th><th>Record a decision</th></tr></thead>
+        <tbody>${shown.map(r => {
+            const key = `${r.learner_id}-${r.issue}`;
+            const opts = Object.entries(LDQ_DECISIONS)
+                .filter(([k]) => r.issue === 'possible_duplicate' ? true : !['not_duplicate', 'duplicate_confirmed'].includes(k))
+                .map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
+            return `<tr>
+                <td><div style="font-weight:600;">${escapeHtml([r.first_name, r.last_name].filter(Boolean).join(' ') || 'Learner ' + r.learner_id)}</div>
+                    <div style="font-size:.8em;color:var(--text-muted);">learners:${Number(r.learner_id)}${r.same_name_count ? ` · ${r.same_name_count} other row(s) with this name` : ''}</div></td>
+                <td>${escapeHtml(LDQ_ISSUES[r.issue] || r.issue)}</td>
+                <td><code>${escapeHtml(r.id_number_masked || '—')}</code></td>
+                <td>${Number(r.enrolment_count || 0)}${r.programmes ? `<div style="font-size:.8em;color:var(--text-muted);">${escapeHtml(r.programmes)}</div>` : ''}</td>
+                <td>${r.decision ? `<strong>${escapeHtml(LDQ_DECISIONS[r.decision] || r.decision)}</strong><div style="font-size:.8em;color:var(--text-muted);">${escapeHtml(r.reviewed_by || '')} · ${escapeHtml(r.reviewed_at ? new Date(r.reviewed_at).toLocaleDateString('en-ZA') : '')}</div>${r.decision_note ? `<div style="font-size:.85em;white-space:pre-wrap;">${escapeHtml(r.decision_note)}</div>` : ''}` : '<span style="color:var(--text-muted);">Not reviewed</span>'}</td>
+                <td style="min-width:240px;">
+                    <select id="ldq-d-${key}" style="width:100%;margin-bottom:4px;">${opts}</select>
+                    <input id="ldq-n-${key}" type="text" placeholder="Note (optional)" style="width:100%;margin-bottom:4px;">
+                    <button class="btn btn-sm btn-gold" onclick="ldqDecide(${Number(r.learner_id)}, '${r.issue}', this)">Save decision</button>
+                </td>
+            </tr>`;
+        }).join('')}</tbody></table></div>`;
+}
+async function ldqDecide(learnerId, issue, btn) {
+    const key = `${learnerId}-${issue}`;
+    const decision = document.getElementById('ldq-d-' + key).value;
+    const note = document.getElementById('ldq-n-' + key).value.trim();
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        const headers = await supaHeaders();
+        const res = await fetch(`${SUPA_URL}/rest/v1/learner_quality_reviews`, {
+            method: 'POST',
+            headers: { ...headers, 'Prefer': 'return=minimal' },
+            body: JSON.stringify({ learner_id: learnerId, issue, decision, note: note || null })
+        });
+        if (!res.ok) { const j = await res.json().catch(() => null); throw new Error((j && j.message) || `Failed (${res.status})`); }
+        showToast('success', 'Decision recorded.');
+        ldqLoad();
+    } catch (e) {
+        showToast('error', 'Not saved: ' + e.message);
+        if (btn) { btn.disabled = false; btn.textContent = 'Save decision'; }
+    }
+}
+
+// ===================== MONTHLY REPORT WORKFLOW =====================
+// All status changes go through reports.transition_report(); the database checks
+// the caller's role, requires a note for "needs changes", records history in
+// reports.report_events and sends notifications. The buttons shown are exactly
+// the next_actions the database says this user may take.
+const RWF_STATUS = {
+    pending:        { label: 'Pending review',   color: 'var(--accent-amber, #d97706)' },
+    needs_changes:  { label: 'Changes requested', color: 'var(--accent-rose, #e11d48)' },
+    approved:       { label: 'Approved',         color: 'var(--accent-emerald, #059669)' },
+    sent_to_client: { label: 'Sent to client',   color: 'var(--accent-primary, #1d5da6)' },
+    archived:       { label: 'Archived',         color: 'var(--text-muted, #64748b)' }
+};
+const RWF_ACTION = {
+    approved:       '&#10003; Approve',
+    needs_changes:  '&#8617; Request changes',
+    pending:        '&#8634; Resubmit for review',
+    sent_to_client: '&#128228; Mark sent to client',
+    archived:       '&#128230; Archive'
+};
+let _rwfRows = [];
+let _rwfFilter = 'open';
+
+function _rwfNote(n) { return String(n || '').replace(/^\[\[tags:[^\]]*\]\]\n?/, ''); }
+function _rwfDate(d) { return d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''; }
+
+async function _rwfRpc(fn, args) {
+    const headers = await supaHeaders();
+    const res = await fetch(`${SUPA_URL}/rest/v1/rpc/${fn}`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Profile': 'reports', 'Accept-Profile': 'reports' },
+        body: JSON.stringify(args || {})
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) throw new Error((body && (body.message || body.hint)) || `Request failed (${res.status})`);
+    return body;
+}
+
+function rwfSetFilter(f) { _rwfFilter = f; rwfRender(); }
+
+async function rwfLoad() {
+    const body = document.getElementById('rwf-body');
+    if (!body) return;
+    try {
+        _rwfRows = await _rwfRpc('my_report_queue', { p_limit: 100 }) || [];
+        rwfRender();
+    } catch (e) {
+        console.warn('rwfLoad failed:', e && e.message);
+        body.innerHTML = `<div style="padding:16px;color:var(--accent-rose);">Could not load report reviews: ${escapeHtml(e.message || '')}</div>`;
+    }
+}
+
+function rwfRender() {
+    const body = document.getElementById('rwf-body');
+    if (!body) return;
+    ['open', 'all'].forEach(f => {
+        const b = document.getElementById('rwf-filter-' + f);
+        if (b) b.classList.toggle('btn-gold', _rwfFilter === f);
+    });
+    const rows = _rwfFilter === 'open' ? _rwfRows.filter(r => (r.next_actions || []).length) : _rwfRows;
+    if (!rows.length) {
+        body.innerHTML = `<div style="padding:16px;color:var(--text-muted);">${_rwfFilter === 'open' ? 'Nothing needs your action right now.' : 'No monthly reports yet.'}</div>`;
+        return;
+    }
+    body.innerHTML = `<div class="table-wrapper"><table class="data-table">
+        <thead><tr><th>Client / programme</th><th>Month</th><th>Status</th><th>Reviewer note</th><th>Next action</th></tr></thead>
+        <tbody>${rows.map(r => {
+            const st = RWF_STATUS[r.status] || { label: r.status, color: 'var(--text-muted)' };
+            const acts = (r.next_actions || []);
+            const needsNote = acts.includes('needs_changes');
+            return `<tr id="rwf-row-${r.id}">
+                <td><div style="font-weight:600;">${escapeHtml(r.client_name || 'Report ' + r.id)}</div>
+                    <div style="font-size:.85em;color:var(--text-muted);">${escapeHtml(r.programme_name || '')}${r.submitted_by_email ? ' &middot; ' + escapeHtml(r.submitted_by_email) : ''}</div>
+                    <a href="#" style="font-size:.85em;" onclick="rwfToggleHistory(${Number(r.id)});return false;">History</a></td>
+                <td>${escapeHtml(r.month || '')}</td>
+                <td><span style="display:inline-block;padding:2px 10px;border-radius:999px;font-size:.85em;font-weight:600;color:#fff;background:${st.color};">${escapeHtml(st.label)}</span>
+                    <div style="font-size:.8em;color:var(--text-muted);margin-top:4px;">${escapeHtml(r.reviewed_by ? 'Reviewed by ' + r.reviewed_by + ' · ' + _rwfDate(r.reviewed_at) : (r.printed_at ? 'Submitted ' + _rwfDate(r.printed_at) : ''))}</div></td>
+                <td style="max-width:320px;white-space:pre-wrap;">${escapeHtml(_rwfNote(r.reviewer_note)) || '<span style="color:var(--text-muted);">—</span>'}</td>
+                <td>${acts.length ? `
+                    ${needsNote ? `<textarea id="rwf-note-${r.id}" rows="2" placeholder="Note for the PM (required to request changes)" style="width:100%;min-width:200px;margin-bottom:6px;"></textarea>` : ''}
+                    <div style="display:flex;gap:6px;flex-wrap:wrap;">${acts.map(a => `<button class="btn btn-sm ${a === 'needs_changes' ? 'btn-secondary' : 'btn-gold'}" onclick="rwfAct(${Number(r.id)},'${a}',this)">${RWF_ACTION[a] || escapeHtml(a)}</button>`).join('')}</div>`
+                    : '<span style="color:var(--text-muted);">No action for you</span>'}</td>
+            </tr>
+            <tr id="rwf-hist-${r.id}" style="display:none;"><td colspan="5" style="background:var(--bg-secondary, rgba(0,0,0,.03));"></td></tr>`;
+        }).join('')}</tbody></table></div>`;
+}
+
+async function rwfAct(id, to, btn) {
+    const noteEl = document.getElementById('rwf-note-' + id);
+    const note = noteEl ? noteEl.value.trim() : '';
+    if (to === 'needs_changes' && !note) {
+        showToast('info', 'Add a note for the PM before requesting changes.');
+        if (noteEl) noteEl.focus();
+        return;
+    }
+    const orig = btn ? btn.innerHTML : '';
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    try {
+        await _rwfRpc('transition_report', { p_report_id: Number(id), p_to_status: to, p_note: note || null });
+        showToast('success', `Report ${(RWF_STATUS[to] || { label: to }).label.toLowerCase()}.`);
+        await rwfLoad();
+        loadAdminNotifications();
+    } catch (e) {
+        showToast('error', 'Not saved: ' + (e.message || 'unknown error'));
+        if (btn) { btn.disabled = false; btn.innerHTML = orig; }
+    }
+}
+
+async function rwfToggleHistory(id) {
+    const tr = document.getElementById('rwf-hist-' + id);
+    if (!tr) return;
+    if (tr.style.display !== 'none') { tr.style.display = 'none'; return; }
+    tr.style.display = '';
+    const cell = tr.firstElementChild;
+    cell.innerHTML = '<div style="padding:8px;color:var(--text-muted);">Loading history…</div>';
+    try {
+        const headers = await supaHeaders();
+        const res = await fetch(`${SUPA_URL}/rest/v1/report_events?report_id=eq.${encodeURIComponent(id)}&select=from_status,to_status,actor_email,note,created_at&order=created_at.asc`,
+            { headers: { ...headers, 'Accept-Profile': 'reports' } });
+        if (!res.ok) throw new Error('Could not load history');
+        const ev = await res.json();
+        cell.innerHTML = ev.length ? `<ol style="margin:6px 0 6px 18px;padding:0;">${ev.map(e => `<li style="margin:4px 0;">
+            <strong>${escapeHtml((RWF_STATUS[e.to_status] || { label: e.to_status }).label)}</strong>
+            ${e.from_status ? `<span style="color:var(--text-muted);">from ${escapeHtml((RWF_STATUS[e.from_status] || { label: e.from_status }).label)}</span>` : ''}
+            · ${escapeHtml(e.actor_email || 'system')} · ${escapeHtml(_rwfDate(e.created_at))}
+            ${e.note ? `<div style="white-space:pre-wrap;color:var(--text-secondary, inherit);">${escapeHtml(_rwfNote(e.note))}</div>` : ''}</li>`).join('')}</ol>`
+            : '<div style="padding:8px;color:var(--text-muted);">No history recorded.</div>';
+    } catch (e) {
+        cell.innerHTML = `<div style="padding:8px;color:var(--accent-rose);">${escapeHtml(e.message)}</div>`;
+    }
+}
+
 // ===================== ADMIN NOTIFICATIONS =====================
 // Reuses the existing reports.notifications table (already live via
 // report-generator.html) rather than building new infra. RLS already
@@ -3185,7 +3534,9 @@ async function notifyAdmins(type, message) {
 
 let _notifPollTimer = null;
 async function loadAdminNotifications() {
-    if (!currentRolesInclude('admin')) return;
+    // Every signed-in user gets their own notifications; RLS (notifications_read)
+    // returns only rows addressed to them, their role, or everything for admins.
+    if (!_cachedAccessToken && !(await supabase.auth.getSession()).data.session) return;
     try {
         const headers = await supaHeaders();
         const res = await fetch(
@@ -3400,6 +3751,7 @@ function switchTab(viewName) {
         assessors:{title:'Assessors & Moderators',subtitle:'Facilitator and assessor register with accreditation expiry'},
         reports:{title:'Reports & Analytics',subtitle:'Compliance summary, PDF report and CSV exports'},
         users:{title:'User Management',subtitle:'Manage team accounts and roles — admin only'},
+        ops:{title:'Data & Sync Health',subtitle:'ClickUp sync queue and learner data-quality review'},
         attendance:{title:'Attendance Register',subtitle:'Session-by-session learner attendance per programme'},
         poe:{title:'PoE & Document Checklist',subtitle:'Track required documents per learner — ID, logbook, PoE, consent and more'},
         hoo:{title:'Consolidated Overview',subtitle:'Live pull from all team members — Management view'},
@@ -3422,9 +3774,10 @@ function switchTab(viewName) {
     }
     applyActionVisibility();
     if (viewName === 'users') renderUserList();
+    if (viewName === 'ops') { opqLoad(); if (currentRolesInclude('admin')) ldqLoad(); }
     if (viewName === 'attendance') { populateAttendanceProgFilter(); }
     if (viewName === 'poe') { populatePoeProgFilter(); }
-    if (viewName === 'reports') { renderReports(); }
+    if (viewName === 'reports') { renderReports(); rwfLoad(); }
     if (viewName === 'programmes' && pipelineActive) { renderPipelineView(); }
     if (viewName === 'pm-tracker') { renderPmTracker(); }
     if (viewName === 'hoo') { loadHooDashboard(); startHooAutoRefresh(); }
@@ -10251,14 +10604,19 @@ const FAM = (function () {
     fs.loading = true;
     try {
       if (!fs.tenantId) fs.tenantId = await getTenantId();
-      const [assessors, regs, scope, docs, quals, followUps] = await Promise.all([
+      const [assessors, regs, scope, docs, quals, followUps, completeness] = await Promise.all([
         api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
         api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
         api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
         api('fam_documents?select=*'),
         api('qualifications?select=id,name,qualification_code,saqa_id,seta&order=name.asc'),
         api('fam_follow_ups?select=*&status=neq.Done'),
+        // Database-derived completeness per practitioner (security_invoker view).
+        // Non-fatal: the tab still works if the view is unavailable.
+        api('v_fam_completeness?select=assessor_id,registration_count,document_count,missing_or_expired_documents,contract_count,open_follow_ups').catch(e => { console.warn('v_fam_completeness:', e.message); return []; }),
       ]);
+      fs.completeness = {};
+      (completeness || []).forEach(c => { fs.completeness[String(c.assessor_id)] = c; });
       fs.assessors = assessors || [];
       fs.documents = docs || [];
       fs.qualifications = quals || [];
@@ -10295,6 +10653,25 @@ const FAM = (function () {
 
   // ---------- derived helpers ----------
   function regsFor(assessorId) { return fs.registrations.filter(r => String(r.assessor_id) === String(assessorId)); }
+  // Complete = registered, has current documents, none missing/expired, no open follow-ups.
+  // Contracts are shown but not required yet (none are recorded in the registry).
+  function completenessFor(assessorId) {
+    const c = (fs.completeness || {})[String(assessorId)];
+    if (!c) return null;
+    const gaps = [];
+    if (!c.registration_count) gaps.push('no registration');
+    if (!c.document_count) gaps.push('no documents');
+    if (c.missing_or_expired_documents) gaps.push(`${c.missing_or_expired_documents} missing/expired doc${c.missing_or_expired_documents === 1 ? '' : 's'}`);
+    if (c.open_follow_ups) gaps.push(`${c.open_follow_ups} open follow-up${c.open_follow_ups === 1 ? '' : 's'}`);
+    return { ...c, complete: gaps.length === 0, gaps };
+  }
+  function completenessHtml(assessorId) {
+    const c = completenessFor(assessorId);
+    if (!c) return '';
+    return c.complete
+      ? '<div style="font-size:10.5px;color:#8FC463;font-weight:700;">&#10003; Profile complete</div>'
+      : `<div style="font-size:10.5px;color:#E8C468;">${escapeHtml(c.gaps.join(' · '))}</div>`;
+  }
   function regIsActive(r) { return (r.status || 'Active') === 'Active'; }
   function overallStatus(assessorId) {
     const regs = regsFor(assessorId);
@@ -10369,7 +10746,9 @@ const FAM = (function () {
     const due60 = fs.registrations.filter(r => regRiskState(r) === 'due_60').length;
     const pending = fs.registrations.filter(r => regRiskState(r) === 'pending').length;
     const inactive = fs.registrations.filter(r => regRiskState(r) === 'inactive').length;
-    const missingDocs = fs.documents.filter(d => d.status === 'Missing').length;
+    const missingDocs = fs.documents.filter(d => d.status === 'Missing' && d.is_current !== false).length;
+    const compl = Object.values(fs.completeness || {});
+    const completeProfiles = fs.assessors.filter(a => completenessFor(a.id)?.complete).length;
     document.getElementById('fam-stat-row').innerHTML = `
       <div class="stat-card"><div class="stat-label">Practitioners</div><div class="stat-value">${total}</div></div>
       <div class="stat-card"><div class="stat-label">Registrations</div><div class="stat-value">${totalRegs}</div></div>
@@ -10379,7 +10758,8 @@ const FAM = (function () {
       <div class="stat-card"><div class="stat-label">Due 31&ndash;60 days</div><div class="stat-value" style="color:#E8C468;">${due60}</div></div>
       <div class="stat-card"><div class="stat-label">Pending entry</div><div class="stat-value" style="color:var(--text-muted);">${pending}</div></div>
       <div class="stat-card"><div class="stat-label">Inactive</div><div class="stat-value" style="color:#E08585;">${inactive}</div></div>
-      <div class="stat-card"><div class="stat-label">Missing docs</div><div class="stat-value" style="color:#E08585;">${missingDocs}</div></div>`;
+      <div class="stat-card"><div class="stat-label">Missing docs</div><div class="stat-value" style="color:#E08585;">${missingDocs}</div></div>
+      ${compl.length ? `<div class="stat-card"><div class="stat-label">Complete profiles</div><div class="stat-value" style="color:${completeProfiles === total ? '#8FC463' : '#E8C468'};">${completeProfiles}/${total}</div></div>` : ''}`;
     const banner = document.getElementById('fam-renewal-banner');
     const dueSoon = due30 + due60;
     const urgent = expired + dueSoon + missingDocs;
@@ -10440,7 +10820,7 @@ const FAM = (function () {
         <td><div class="name-cell"><div class="avatar">${initials}</div><div><strong>${escapeHtml(a.full_name)}</strong><br><span style="color:var(--text-muted);font-size:10.5px;">${a.id_number ? escapeHtml(a.id_number) : 'ID not captured'}</span></div></div></td>
         <td>${roles.length ? roles.map(roleChipHtml).join('') : '<span class="empty-note">No role yet</span>'}</td>
         <td>${setas.length ? setas.map(s => `<span class="chip chip-plain">${escapeHtml(s)}</span>`).join('') : '<span class="empty-note">Not registered</span>'}</td>
-        <td>${statusPillHtml(overallStatus(a.id))}</td>
+        <td>${statusPillHtml(overallStatus(a.id))}${completenessHtml(a.id)}</td>
         <td><a href="#" onclick="event.preventDefault();event.stopPropagation();FAM.renderDetail(${a.id})">&rarr;</a></td>
       </tr>`;
     }).join('');
@@ -10502,7 +10882,7 @@ const FAM = (function () {
       .filter(x => x.kind !== 'active')
       .map(x => ({ ...x, sortKey: [RISK_PRIORITY[x.kind] ?? 9, x.kind === 'expired' ? -(x.days ?? 0) : (x.kind === 'due_30' || x.kind === 'due_60') ? (x.days ?? 999) : 0] }));
     const docItems = fs.documents
-      .filter(d => d.status === 'Missing')
+      .filter(d => d.status === 'Missing' && d.is_current !== false) // superseded versions are history, not gaps
       .map(d => ({ d, kind: 'missing_doc', sortKey: [RISK_PRIORITY.missing_doc, 0] }));
     let items = [...regItems, ...docItems].sort((a, b) => (a.sortKey[0] - b.sortKey[0]) || (a.sortKey[1] - b.sortKey[1]));
     if (!fs.showDismissedFollowUps) {

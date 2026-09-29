@@ -2667,6 +2667,7 @@ function initRole(){
 // ── Track current report record id (for admin review submission) ──
 let _currentReportId=null;
 let _currentReportSubmitterEmail=null;
+let _currentReportStatus=null; // status of the latest report row for this programme+month
 
 // ── Check for pending feedback on the current programme/month ──
 async function checkReportStatus(){
@@ -2677,8 +2678,9 @@ async function checkReportStatus(){
       `select=id,status,reviewer_note,reviewed_by,reviewed_at,printed_at,sent_at,sent_by,archived_at,archived_by&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${activeProgramme.id}&month=eq.${encodeURIComponent(month)}&order=printed_at.desc&limit=1`
     );
     const r=rows[0];
-    if(!r){_applyReportLock(null);return;}
+    if(!r){_currentReportStatus=null;_applyReportLock(null);return;}
     _currentReportId=r.id;
+    _currentReportStatus=r.status;
     const fb=document.getElementById('feedback-banner');
     if(!IS_ADMIN&&r.status==='needs_changes'&&r.reviewer_note){
       const _m=r.reviewer_note.match(/^\[\[tags:([^\]]*)\]\]\n?([\s\S]*)$/);
@@ -2703,9 +2705,9 @@ async function checkReportStatus(){
       rb.classList.add('show');
       const sub=document.getElementById('review-bar-sub');
       if(r.status==='approved'){
-        sub.innerHTML=`<span style="color:#4ade80">✅ Already approved</span> — you can update this decision below`;
+        sub.innerHTML=`<span style="color:#4ade80">✅ Approved</span> — waiting for the PM to send it to the client`;
       } else if(r.status==='needs_changes'){
-        sub.innerHTML=`<span style="color:#f87171">↩ Changes requested</span> — update decision below`;
+        sub.innerHTML=`<span style="color:#f87171">↩ Changes requested</span> — waiting for the PM to resubmit`;
       } else if(r.status==='sent_to_client'){
         const at=r.sent_at?new Date(r.sent_at).toLocaleString('en-ZA',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
         sub.innerHTML=`<span style="color:#60a5fa">📤 Sent to client</span> by ${r.sent_by||'PM'}${at?' · '+at:''}`;
@@ -2718,14 +2720,13 @@ async function checkReportStatus(){
       // Swap action buttons depending on status
       const actionsWrap=document.querySelector('#review-bar .review-bar-actions > div[style*="flex-direction:column"]');
       if(actionsWrap){
-        if(r.status==='sent_to_client'){
-          actionsWrap.innerHTML=`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`;
-        } else if(r.status==='archived'){
-          actionsWrap.innerHTML=`<span style="font-size:8pt;color:rgba(255,255,255,.35)">No further action needed</span>`;
-        } else {
-          actionsWrap.innerHTML=`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>
-        <button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`;
-        }
+        // Buttons mirror the server's transition rules (reports.report_next_actions).
+        const next=await _reportNextActions(r.id);
+        const btns=[];
+        if(next.includes('approved'))btns.push(`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>`);
+        if(next.includes('needs_changes'))btns.push(`<button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`);
+        if(next.includes('archived'))btns.push(`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`);
+        actionsWrap.innerHTML=btns.join('\n')||`<span style="font-size:8pt;color:rgba(255,255,255,.35)">No action for you at this stage</span>`;
       }
     }
     // Apply lock state based on report status (PM only)
@@ -2760,26 +2761,14 @@ async function submitReview(decision){
     :document.querySelector('.btn-request');
   const origText=btn.textContent;
   btn.disabled=true;btn.textContent='Saving…';
-  const payload={
-    status:decision,
-    reviewer_note:note||null,
-    reviewed_by:ADMIN_NAME,
-    reviewed_at:new Date().toISOString(),
-  };
   try{
-    await sbPatch('reports',_currentReportId,payload);
+    // The PM notification is created by transition_report() in the database.
+    await sbTransitionReport(_currentReportId,decision,note||null);
     const msg=decision==='approved'
       ?'✅ Report approved — PM will be notified next time they open the app'
       :'↩ Changes requested — feedback saved for the PM';
     toast(msg,'success',5000);
     _logAudit(_currentReportId,decision,{newStatus:decision,note,actor:ADMIN_NAME});
-    // Notify PM (non-blocking)
-    _notifyPMAfterReview(
-      _currentReportId, decision, note,
-      activeClient?.client_name||'the client',
-      document.getElementById('sel-month')?.value||'',
-      _currentReportSubmitterEmail
-    );
     // Update the sub-label
     const sub=document.getElementById('review-bar-sub');
     if(sub)sub.innerHTML=decision==='approved'
@@ -2796,9 +2785,7 @@ async function submitReview(decision){
     }
   }catch(e){
     console.warn('submitReview failed:',e.message);
-    enqueueWrite('patch','reports',payload,_currentReportId);
-    updateQueueBadge();
-    toast('Review save failed — queued for retry','warn');
+    toast('Review not saved: '+e.message,'error',6000);
   }finally{
     btn.disabled=false;btn.textContent=origText;
   }
@@ -8249,7 +8236,13 @@ function logReportPrint(){
     printed_at:printedAt,
     status:'pending',submitted_by_email:_authUser?.email||null,
   };
-  sbPost('reports',payload).then(rec=>{
+  // Resubmission after "changes requested": move the SAME report back to pending
+  // through transition_report() instead of inserting a duplicate row for the month.
+  const resubmit=(!IS_ADMIN&&_currentReportId&&_currentReportStatus==='needs_changes')
+    ?sbTransitionReport(_currentReportId,'pending',null)
+        .then(rec=>sbPatch('reports',rec.id,{printed_at:printedAt,learner_count:pLearners.length}).then(()=>rec))
+    :null;
+  (resubmit||sbPost('reports',payload)).then(rec=>{
     if(rec&&rec.id){
       _currentReportId=rec.id;
       _historyFetchedAt=0; // bust cache so next open fetches fresh
@@ -8258,11 +8251,13 @@ function logReportPrint(){
         toast('📋 Report submitted for admin review','info',4000);
         // Lock the report immediately after successful submission
         _applyReportLock('pending', printedAt);
-        _notifyAdminAfterSubmit(rec.id, clientNameAtSubmit, month);
-        _logAudit(rec.id,'submitted',{newStatus:'pending'});
+        _currentReportStatus='pending';
+        // A resubmission is already announced to admins by transition_report().
+        if(!resubmit)_notifyAdminAfterSubmit(rec.id, clientNameAtSubmit, month);
+        _logAudit(rec.id,resubmit?'resubmitted':'submitted',{newStatus:'pending'});
       }
     }
-  }).catch(e=>console.warn('Report log failed:',e.message));
+  }).catch(e=>{console.warn('Report log failed:',e.message);if(resubmit)toast('Resubmission not saved: '+e.message,'error',6000);});
 }
 
 // ── Supabase write helpers ──
@@ -8293,6 +8288,37 @@ async function sbPatch(table,id,body){
   const d=await r.json();
   const rec=Array.isArray(d)?d[0]:d;
   return rec||null;
+}
+// Report workflow changes (status, reviewer, sent, archived) go ONLY through
+// reports.transition_report(): the database rejects direct PATCHes of those
+// fields, checks the caller's role, requires a note for "needs changes", logs
+// report_events and sends the notifications itself. Never queue these offline:
+// a stale transition must be re-decided by a person, not replayed.
+async function _reportNextActions(reportId){
+  try{
+    const r=await fetch(`${SB_URL}/rest/v1/rpc/report_next_actions`,{
+      method:'POST',
+      headers:{...HEADERS,'Content-Profile':'reports','Accept-Profile':'reports'},
+      body:JSON.stringify({p_report_id:Number(reportId)})
+    });
+    if(!r.ok)return[];
+    const d=await r.json();
+    return Array.isArray(d)?d:[];
+  }catch{return[];}
+}
+async function sbTransitionReport(reportId,toStatus,note){
+  if(!isOnline)throw new Error('You are offline — reconnect to change a report status');
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/transition_report`,{
+    method:'POST',
+    headers:{...HEADERS,'Content-Profile':'reports','Accept-Profile':'reports'},
+    body:JSON.stringify({p_report_id:Number(reportId),p_to_status:toStatus,p_note:note||null})
+  });
+  if(!r.ok){
+    let msg=await r.text();
+    try{msg=JSON.parse(msg).message||msg;}catch{}
+    throw new Error(msg);
+  }
+  return r.json();
 }
 
 // A numeric id > 1e12 is a local-only temp id (localId()/Date.now()), meaning the
@@ -12048,21 +12074,19 @@ async function bulkApproveSelected(){
   for(const id of ids){
     const rec=_historyRows.find(r=>String(r.id)===id);
     if(!rec)continue;
-    const payload={status:'approved',reviewer_note:rec.reviewer_note||null,reviewed_by:ADMIN_NAME,reviewed_at:new Date().toISOString()};
     try{
-      await sbPatch('reports',rec.id,payload);
-      rec.status='approved';rec.reviewed_by=ADMIN_NAME;rec.reviewed_at=payload.reviewed_at;
-      _notifyPMAfterReview(rec.id,'approved',rec.reviewer_note||'',rec.client_name_snapshot||'the client',rec.month||'',rec.submitted_by_email||null);
+      // transition_report() keeps the existing reviewer note and notifies the PM.
+      const upd=await sbTransitionReport(rec.id,'approved',null);
+      rec.status='approved';rec.reviewed_by=upd?.reviewed_by||ADMIN_NAME;rec.reviewed_at=upd?.reviewed_at||new Date().toISOString();
       _logAudit(rec.id,'approved',{newStatus:'approved',note:rec.reviewer_note||'',actor:ADMIN_NAME});
       okCount++;
     }catch(e){
       console.warn('bulkApproveSelected failed for',id,e.message);
-      enqueueWrite('patch','reports',payload,rec.id);
       failCount++;
     }
   }
   if(btn){btn.disabled=false;btn.textContent=origText;}
-  toast(failCount?`✅ ${okCount} approved, ${failCount} queued for retry`:`✅ ${okCount} report${okCount===1?'':'s'} approved`,'success',5000);
+  toast(failCount?`✅ ${okCount} approved, ${failCount} not allowed from their current status`:`✅ ${okCount} report${okCount===1?'':'s'} approved`,failCount?'warn':'success',5000);
   _bulkClearSelection();
   _historyVer++;
   renderHistory._c=null;
@@ -13014,6 +13038,13 @@ async function flushWriteQueue(){
       console.warn(`Dropping write after 10 retries: ${entry.method} ${entry.table}`,entry.body,entry.lastError||'(no error captured)');
       _logWriteFailure('dropped',entry,entry.lastError);
       toast(`A change to "${entry.table}" could not be saved after repeated attempts and was discarded. Please re-check and re-enter that data.`,'error',0);
+      continue;
+    }
+    // Report workflow fields can only change via transition_report(); a queued
+    // direct PATCH (from before 2026-09-28) would fail forever. Drop it and tell the user.
+    if(entry.table==='reports'&&entry.method==='patch'&&entry.body&&('status' in entry.body||'reviewed_by' in entry.body||'sent_at' in entry.body||'archived_at' in entry.body)){
+      _logWriteFailure('dropped',entry,'report workflow change must use transition_report');
+      toast(`A queued report status change (${entry.body.status||'update'}) was discarded. Please open the report and apply it again.`,'warn',0);
       continue;
     }
     // Relink a dependent create to the real id its referenced temp record resolved to
@@ -13998,18 +14029,14 @@ async function _notifyAdminAfterClientSend(reportId,clientName,month){
 async function markSentToClient(){
   if(!_currentReportId){toast('No report record found','warn',3500);return;}
   if(!confirm('Confirm this report has been sent to the client? This will notify the admin.'))return;
-  const sentAt=new Date().toISOString();
-  const payload={status:'sent_to_client',sent_at:sentAt,sent_by:ADMIN_NAME};
   try{
-    await sbPatch('reports',_currentReportId,payload);
+    // transition_report() stamps sent_at/sent_by and notifies the admins.
+    const upd=await sbTransitionReport(_currentReportId,'sent_to_client',null);
     toast('📤 Marked as sent to client — admin notified','success',4500);
-    _notifyAdminAfterClientSend(_currentReportId, activeClient?.client_name||'the client', document.getElementById('sel-month')?.value||'');
-    _applyReportLock('sent_to_client', null, null, null, sentAt, ADMIN_NAME);
+    _applyReportLock('sent_to_client', null, null, null, upd?.sent_at||new Date().toISOString(), upd?.sent_by||ADMIN_NAME);
   }catch(e){
     console.warn('markSentToClient failed:',e.message);
-    enqueueWrite('patch','reports',payload,_currentReportId);
-    updateQueueBadge();
-    toast('Save failed — queued for retry','warn');
+    toast('Not saved: '+e.message,'error',6000);
   }
 }
 
@@ -14017,10 +14044,8 @@ async function markSentToClient(){
 async function archiveReport(){
   if(!_currentReportId){toast('No report record found','warn',3500);return;}
   if(!confirm('Archive this report? This closes out the compliance trail.'))return;
-  const archivedAt=new Date().toISOString();
-  const payload={status:'archived',archived_at:archivedAt,archived_by:ADMIN_NAME};
   try{
-    await sbPatch('reports',_currentReportId,payload);
+    await sbTransitionReport(_currentReportId,'archived',null);
     toast('📦 Report archived','success',4000);
     const sub=document.getElementById('review-bar-sub');
     if(sub)sub.innerHTML=`<span style="color:rgba(255,255,255,.4)">📦 Archived</span> by ${ADMIN_NAME}`;
@@ -14029,9 +14054,7 @@ async function archiveReport(){
     _historyFetchedAt=0;
   }catch(e){
     console.warn('archiveReport failed:',e.message);
-    enqueueWrite('patch','reports',payload,_currentReportId);
-    updateQueueBadge();
-    toast('Save failed — queued for retry','warn');
+    toast('Not archived: '+e.message,'error',6000);
   }
 }
 
