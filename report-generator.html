@@ -1,8 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script>/* AI Assistant preview switch: add ?ai=1 to the URL to see it. Off = the four old buttons, unchanged. */try{if(/[?&]ai=1(&|$)/.test(location.search))document.documentElement.classList.add('ai-assist');}catch(e){}</script>
+<script>/* AI Assistant is the default. Add ?ai=0 to the URL to get the four old buttons back. */try{if(!/[?&]ai=0(&|$)/.test(location.search))document.documentElement.classList.add('ai-assist');}catch(e){}</script>
 <style>html:not(.ai-assist) .ai-new{display:none!important}html.ai-assist .ai-old{display:none!important}</style>
+<style>
+.imp-wrap{position:relative;display:inline-block}
+.imp-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:9999;width:330px;background:#1a2233;border:1px solid rgba(255,255,255,.14);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);padding:6px;text-align:left}
+.imp-wrap.open .imp-menu{display:block}
+.imp-opt{display:block;width:100%;background:none;border:0;border-radius:8px;padding:10px 12px;text-align:left;color:rgba(255,255,255,.75);font:inherit;font-size:8.5pt;line-height:1.4;cursor:pointer}
+.imp-opt:hover,.imp-opt:focus{background:rgba(255,255,255,.07);outline:none}
+.imp-opt b{display:block;color:#fff;font-size:9.5pt;margin-bottom:2px}
+.imp-opt i{display:block;color:var(--gold2,#e8c46a);font-style:normal;margin-bottom:2px}
+.imp-rec{font-size:7pt;font-weight:600;background:var(--gold2,#e8c46a);color:#111827;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
+.imp-foot{border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding:8px 12px 4px;color:rgba(255,255,255,.55);font-size:8pt}
+</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>ApexU Report Generator</title>
@@ -1985,7 +1996,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     <span id="status-txt">Loading…</span>
     <span id="queue-badge" title="Writes pending — will sync when online">⏳ <span id="queue-count">0</span> queued</span>
     <button class="btn btn-ghost" onclick="showDashboard()" style="font-size:8.5pt;padding:9px 14px">📊 Dashboard</button>
-    <button class="ai-new btn btn-primary" onclick="openAiAssistant()" id="ai-assistant-btn" title="Drop in any file (facilitator report, register, notes, LMS export, ApexOne Excel) and AI fills as much of this report as it can. You review everything before it changes.">✨ AI Assistant</button>
+    <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openAiAssistant()"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportModal()"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportLmsModal()"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
     <button class="ai-old btn btn-ghost" onclick="openImportModal()">📥 Import Excel</button>
     <button class="ai-old btn btn-ghost" onclick="openImportLmsModal()" title="Import a learner progress export pulled from the LMS">📊 Import LMS Report</button>
     <button class="btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
@@ -2009,7 +2020,9 @@ body.compact-density .progress-bar-wrap{height:6px}
 <div id="mob-nav-drawer">
   <a class="mob-nav-item" href="index.html" style="text-decoration:none;display:block">&#8592; Back to Hub</a>
   <button class="mob-nav-item" onclick="_mobMenuClose();showDashboard()">📊 Dashboard</button>
-  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openAiAssistant()">✨ AI Assistant</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openAiAssistant()">✨ Import data: AI Assistant (recommended)</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openImportModal()">📊 Import data: ApexOne marks template</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">🎓 Import data: LMS results</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportModal()">📥 Import Excel</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">📊 Import LMS Report</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openAiImportModal()">🤖 AI Import from File</button>
@@ -7100,6 +7113,15 @@ function _aiCount(){
 // PDF, free-form Excel/CSV, notes) goes to AI extraction. Every run also drafts
 // empty narratives and learner comments from the report's own data, so one pass
 // fills as many gaps as possible. Nothing changes until the user ticks and applies.
+// Import data menu: AI Assistant first, the two exact importers as manual options.
+function _impMenu(force){
+  const w=document.getElementById('imp-wrap');if(!w)return;
+  const open=force===undefined?!w.classList.contains('open'):force;
+  w.classList.toggle('open',open);
+  w.querySelector('#ai-assistant-btn')?.setAttribute('aria-expanded',open?'true':'false');
+}
+document.addEventListener('click',e=>{const w=document.getElementById('imp-wrap');if(w&&w.classList.contains('open')&&!w.contains(e.target))_impMenu(false);});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')_impMenu(false);});
 function openAiAssistant(){
   if(!activeProgramme){toast('Select a client and programme first.','warn');return;}
   openAiImportModal();
