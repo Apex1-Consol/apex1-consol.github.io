@@ -6858,7 +6858,9 @@ function _aiPseudo(learners){
   const esc=x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
   const list=(learners||[]).map((l,i)=>({id:String(l.id),code:`[Learner ${i+1}]`,first:String(l.first_name||'').trim(),last:String(l.last_name||'').trim()}));
   // Every individual name part counts: "Boitumelo Morongoa" may appear as just "Boitumelo".
-  const toks=x=>[...x.first.split(/\s+/),...x.last.split(/\s+/)].filter(t=>t.length>=3);
+  // Generic words never count as a name on their own (e.g. a learner called "Test Learner" must not code the word "Learner").
+  const STOP=new Set(['learner','learners','name','names','test','student','students','demo','delegate','group','class','the','and']);
+  const toks=x=>[...x.first.split(/\s+/),...x.last.split(/\s+/)].filter(t=>t.length>=3&&!STOP.has(t.toLowerCase()));
   const tokCount={};list.forEach(x=>new Set(toks(x).map(t=>t.toLowerCase())).forEach(t=>tokCount[t]=(tokCount[t]||0)+1));
   const variants=[];
   list.forEach(x=>{
@@ -6876,8 +6878,11 @@ function _aiPseudo(learners){
     list,
     code(t){
       t=String(t??'');
-      variants.forEach(([v,c])=>{if(v)t=t.replace(new RegExp(`(^|[^\\p{L}])${esc(v)}(?=$|[^\\p{L}])`,'giu'),`$1${c}`);});
-      return t;
+      // Single pass: codes already inserted are never re-scanned, so "[Learner 2]" can't be rewritten by a later variant.
+      const vs=variants.filter(([v])=>v);if(!vs.length)return t;
+      const map={};vs.forEach(([v,c])=>{const k=v.toLowerCase();if(!(k in map))map[k]=c;});
+      const re=new RegExp(`(^|[^\\p{L}])(${vs.map(([v])=>esc(v)).join('|')})(?=$|[^\\p{L}])`,'giu');
+      return t.replace(re,(m,pre,name)=>pre+(map[name.toLowerCase()]||name));
     },
     decode(t){
       t=String(t??'');
