@@ -8,7 +8,8 @@
 .imp-menu{display:none;position:absolute;top:calc(100% + 6px);right:0;z-index:9999;width:330px;background:#1a2233;border:1px solid rgba(255,255,255,.14);border-radius:10px;box-shadow:0 12px 32px rgba(0,0,0,.45);padding:6px;text-align:left}
 .imp-wrap.open .imp-menu{display:block}
 .imp-opt{display:block;width:100%;background:none;border:0;border-radius:8px;padding:10px 12px;text-align:left;color:rgba(255,255,255,.75);font:inherit;font-size:8.5pt;line-height:1.4;cursor:pointer}
-.imp-opt:hover,.imp-opt:focus{background:rgba(255,255,255,.07);outline:none}
+.imp-opt:disabled{opacity:.4;cursor:not-allowed}.imp-need{display:none;color:#f87171;font-size:8pt;padding:6px 12px 0}.imp-wrap.need .imp-need{display:block}
+.imp-opt:hover:not(:disabled),.imp-opt:focus:not(:disabled){background:rgba(255,255,255,.07);outline:none}
 .imp-opt b{display:block;color:#fff;font-size:9.5pt;margin-bottom:2px}
 .imp-opt i{display:block;color:var(--gold2,#e8c46a);font-style:normal;margin-bottom:2px}
 .imp-rec{font-size:7pt;font-weight:600;background:var(--gold2,#e8c46a);color:#111827;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
@@ -2002,7 +2003,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     <span id="status-txt">Loading…</span>
     <span id="queue-badge" title="Writes pending — will sync when online">⏳ <span id="queue-count">0</span> queued</span>
     <button class="btn btn-ghost" onclick="showDashboard()" style="font-size:8.5pt;padding:9px 14px">📊 Dashboard</button>
-    <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openAiAssistant()"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportModal()"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportLmsModal()"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
+    <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('ai')"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('template')"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('lms')"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-need">Select a client and programme first.</div><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
     <button class="ai-old btn btn-ghost" onclick="openImportModal()">📥 Import Excel</button>
     <button class="ai-old btn btn-ghost" onclick="openImportLmsModal()" title="Import a learner progress export pulled from the LMS">📊 Import LMS Report</button>
     <button class="ai-old btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
@@ -2026,9 +2027,9 @@ body.compact-density .progress-bar-wrap{height:6px}
 <div id="mob-nav-drawer">
   <a class="mob-nav-item" href="index.html" style="text-decoration:none;display:block">&#8592; Back to Hub</a>
   <button class="mob-nav-item" onclick="_mobMenuClose();showDashboard()">📊 Dashboard</button>
-  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openAiAssistant()">✨ Import data: AI Assistant (recommended)</button>
-  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openImportModal()">📊 Import data: ApexOne marks template</button>
-  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">🎓 Import data: LMS results</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('ai')">✨ Import data: AI Assistant (recommended)</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('template')">📊 Import data: ApexOne marks template</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('lms')">🎓 Import data: LMS results</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportModal()">📥 Import Excel</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">📊 Import LMS Report</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openAiImportModal()">🤖 AI Import from File</button>
@@ -2626,7 +2627,7 @@ function initRole(){
       '#drafts-btn','button[onclick="saveNarratives(true)"]',
       '#export-btn','button[onclick="openModal(\'client\',\'add\')"]',
       'button[onclick="triggerPrint()"]','button[onclick="openReportPreview()"]',
-      'button[onclick="_mobMenuClose();openAiAssistant()"]','button[onclick="_mobMenuClose();saveNarratives(true)"]',
+      'button[onclick="_mobMenuClose();_impPick(\'ai\')"]','button[onclick="_mobMenuClose();saveNarratives(true)"]',
     ];
     editSelectors.forEach(sel=>{
       document.querySelectorAll(sel).forEach(el=>{el.style.display='none';});
@@ -2668,7 +2669,7 @@ function initRole(){
       '#drafts-btn','button[onclick="saveNarratives(true)"]',
       '#export-btn','button[onclick="openModal(\'client\',\'add\')"]',
       'button[onclick="triggerPrint()"]','button[onclick="openReportPreview()"]',
-      'button[onclick="_mobMenuClose();openAiAssistant()"]','button[onclick="_mobMenuClose();saveNarratives(true)"]',
+      'button[onclick="_mobMenuClose();_impPick(\'ai\')"]','button[onclick="_mobMenuClose();saveNarratives(true)"]',
     ];
     editSelectors.forEach(sel=>{
       document.querySelectorAll(sel).forEach(el=>{el.style.display='';});
@@ -7128,6 +7129,15 @@ function _impMenu(force){
   const open=force===undefined?!w.classList.contains('open'):force;
   w.classList.toggle('open',open);
   w.querySelector('#ai-assistant-btn')?.setAttribute('aria-expanded',open?'true':'false');
+  if(open){const ready=!!(activeProgramme&&activeClient);w.classList.toggle('need',!ready);w.querySelectorAll('.imp-opt').forEach(b=>b.disabled=!ready);}
+}
+// One entry point for every Import data option: logs which option PMs pick
+// (import_choice_log, fire-and-forget) so we can decide on a single drop zone later.
+function _impPick(choice){
+  _impMenu(false);
+  if(!activeProgramme||!activeClient){toast('Select a client and programme first.','warn');return;}
+  if(isOnline)sbPost('import_choice_log',{tenant_id:TENANT_DB_ID,programme_id:activeProgramme.id||null,choice}).catch(()=>{});
+  ({ai:openAiAssistant,template:openImportModal,lms:openImportLmsModal})[choice]();
 }
 document.addEventListener('click',e=>{const w=document.getElementById('imp-wrap');if(w&&w.classList.contains('open')&&!w.contains(e.target))_impMenu(false);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')_impMenu(false);});
