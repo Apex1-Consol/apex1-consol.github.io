@@ -1951,6 +1951,12 @@ body.compact-density .progress-bar-wrap{height:6px}
       <button class="settings-signout" onclick="_authSignOut()">Sign out</button>
     </div>
 
+    <div class="settings-section ai-new">
+      <div class="settings-section-title">Display</div>
+      <button class="btn btn-ghost density-toggle" onclick="toggleReportDensity()" style="font-size:8.5pt;padding:8px 14px">⊞ Compact</button>
+      <span style="font-size:8pt;color:rgba(255,255,255,.5);margin-left:8px">Tighter report layout</span>
+    </div>
+
     <!-- Clients -->
     <div class="settings-section" id="sett-clients-section">
       <div class="settings-section-title">Clients <span id="sett-clients-count" style="font-weight:400;opacity:.6"></span></div>
@@ -1999,15 +2005,15 @@ body.compact-density .progress-bar-wrap{height:6px}
     <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openAiAssistant()"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportModal()"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impMenu(false);openImportLmsModal()"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
     <button class="ai-old btn btn-ghost" onclick="openImportModal()">📥 Import Excel</button>
     <button class="ai-old btn btn-ghost" onclick="openImportLmsModal()" title="Import a learner progress export pulled from the LMS">📊 Import LMS Report</button>
-    <button class="btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
-    <button class="btn btn-ghost" id="density-toggle-btn" onclick="toggleReportDensity()" title="Toggle compact/standard view" style="font-size:8pt;padding:9px 12px">⊞ Compact</button>
+    <button class="ai-old btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
+    <button class="ai-old btn btn-ghost density-toggle" id="density-toggle-btn" onclick="toggleReportDensity()" title="Toggle compact/standard view" style="font-size:8pt;padding:9px 12px">⊞ Compact</button>
     <button class="ai-old btn btn-ghost" onclick="openAiImportModal()" id="ai-import-btn" title="Import any file (Excel, CSV, PDF, Word, text) and let AI pre-fill narratives, learner comments and attendance for you to review">🤖 AI Import</button>
     <button class="ai-old btn btn-ghost" onclick="openDraftAllPanel()" id="draft-all-btn" title="Draft all narrative fields from live data, then review one by one">✨ Draft all<span id="draft-all-badge" class="draft-all-badge">0</span></button>
-    <button class="btn btn-ghost" onclick="saveNarratives(true)">💾 Save Draft</button>
+    <button class="ai-old btn btn-ghost" onclick="saveNarratives(true)">💾 Save Draft</button>
     <button class="btn btn-ghost" onclick="openHistoryPanel()">🕓 History<span id="review-pending-badge" class="review-pending-badge">0</span></button>
     <button class="btn btn-ghost" id="export-btn" onclick="openExportModal()" style="display:none">⬇️ Export</button>
-    <button class="btn btn-ghost" id="export-all-nav-btn" onclick="exportAllProgrammes()" title="Export every client and programme in your account as one ZIP of Excel files">📦 Export All</button>
-    <button class="btn btn-primary" onclick="openReportPreview()" title="Preview the report before printing or sending for review">👁 Preview</button>
+    <button class="ai-old btn btn-ghost" id="export-all-nav-btn" onclick="exportAllProgrammes()" title="Export every client and programme in your account as one ZIP of Excel files">📦 Export All</button>
+    <button class="ai-old btn btn-primary" onclick="openReportPreview()" title="Preview the report before printing or sending for review">👁 Preview</button>
     <button class="btn btn-ghost" onclick="sendForReview()" title="Submit this report to the admin for review">📩 Send for Review</button>
     <button class="btn btn-ghost" onclick="openNotificationsPanel()" style="font-size:8.5pt;padding:9px 14px;position:relative" title="Notifications" id="notif-btn">🔔<span id="notif-badge" style="display:none;position:absolute;top:4px;right:4px;width:8px;height:8px;background:#C8272C;border-radius:50%;border:2px solid #111827"></span></button>
     <button class="btn btn-ghost" onclick="openSettingsPanel()" style="font-size:8.5pt;padding:9px 14px" title="Settings & account">⚙</button>
@@ -2027,9 +2033,9 @@ body.compact-density .progress-bar-wrap{height:6px}
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">📊 Import LMS Report</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openAiImportModal()">🤖 AI Import from File</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openDraftAllPanel()">✨ Draft All Narratives</button>
-  <button class="mob-nav-item" onclick="_mobMenuClose();saveNarratives(true)">💾 Save Draft</button>
-  <button class="mob-nav-item" onclick="_mobMenuClose();openDraftsPanel()">📋 Saved Drafts</button>
-  <button class="mob-nav-item" onclick="_mobMenuClose();openHistoryPanel()">🕓 History / Review Queue</button>
+  <button class="ai-old mob-nav-item" onclick="_mobMenuClose();saveNarratives(true)">💾 Save Draft</button>
+  <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openDraftsPanel()">📋 Saved Drafts</button>
+  <button class="mob-nav-item" onclick="_mobMenuClose();openHistoryPanel()">🕓 History, Drafts &amp; Review Queue</button>
   <button class="mob-nav-item" onclick="_mobMenuClose();openNotificationsPanel()">🔔 Notifications</button>
   <button class="mob-nav-item" onclick="_mobMenuClose();openSettingsPanel()">⚙ Settings</button>
 </div>
@@ -2130,8 +2136,8 @@ body.compact-density .progress-bar-wrap{height:6px}
   </div>
     <div class="controls-actions" style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-ghost" id="btn-learners" onclick="openModal('learners','list')" disabled style="font-size:8.5pt;padding:9px 14px">👥 Learners</button>
-      <button class="btn btn-ghost" onclick="openAssessorPanel()" style="font-size:8.5pt;padding:9px 14px">👤 Assessors</button>
-      <button class="btn btn-ghost" onclick="openUsPanel()" style="font-size:8.5pt;padding:9px 14px">📐 Unit Standards<span id="us-count-badge" class="us-count-badge" style="display:none">0</span></button>
+      <button class="ai-old btn btn-ghost" onclick="openAssessorPanel()" style="font-size:8.5pt;padding:9px 14px">👤 Assessors</button>
+      <button class="ai-old btn btn-ghost" onclick="openUsPanel()" style="font-size:8.5pt;padding:9px 14px">📐 Unit Standards<span id="us-count-badge" class="us-count-badge" style="display:none">0</span></button>
       <button class="btn btn-ghost" id="btn-notes" onclick="openNotesPanel()" disabled style="font-size:8.5pt;padding:9px 14px">📝 Notes</button>
       <button class="btn btn-success" onclick="generateReport()" id="gen-btn" disabled>▶ Generate Report</button>
     </div>
@@ -2228,6 +2234,7 @@ body.compact-density .progress-bar-wrap{height:6px}
   <div class="drafts-header">
     <span style="font-size:11pt;font-weight:800;color:#fff">Report History</span>
     <div style="display:flex;align-items:center;gap:8px">
+      <button class="ai-new btn btn-ghost" onclick="closeHistoryPanel();openDraftsPanel()" style="font-size:8pt;padding:5px 12px">📋 Saved drafts<span id="hist-drafts-count" style="display:none;background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:4px"></span></button>
       <button id="hist-clear-btn" onclick="_adminClearHistoryConfirm()" title="Clear all approved history entries" style="display:none;font-size:8pt;padding:5px 12px;background:rgba(200,39,44,.15);border:1px solid rgba(200,39,44,.4);color:#f87171;border-radius:6px;cursor:pointer;font-weight:600;transition:background .15s" onmouseover="this.style.background='rgba(200,39,44,.28)'" onmouseout="this.style.background='rgba(200,39,44,.15)'">🗑 Clear History</button>
       <button class="modal-close" onclick="closeHistoryPanel()">×</button>
     </div>
@@ -2415,6 +2422,7 @@ body.compact-density .progress-bar-wrap{height:6px}
       <h2>📄 Report Preview — <span id="preview-title">—</span></h2>
     </div>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <button class="ai-new btn btn-ghost" style="font-size:8.5pt;padding:9px 16px" onclick="openReportPreview()" title="See the report exactly as the client will">👁 Client view</button>
       <button class="btn btn-ghost" style="font-size:8.5pt;padding:9px 16px" onclick="openLRC(0)">🪪 Learner Cards</button>
       <button class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px" onclick="openEisaPaste()">📋 Bulk EISA</button>
       <button id="eisa-undo-btn" class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoEisaPaste()" title="Undo last bulk paste">↩ Undo Paste</button>
@@ -2422,8 +2430,9 @@ body.compact-density .progress-bar-wrap{height:6px}
         ☑ Report Content <span id="pp-score">—</span>
       </button>
       <div id="preview-pdf-actions">
-        <button id="combined-download-btn" class="btn btn-ghost" onclick="generateCombinedReport()" style="font-size:8.5pt;padding:9px 16px" title="Combine every approved/sent/archived month into one PDF with a clickable index, for the client">📚 Download All Months</button>
+        <button id="combined-download-btn" class="ai-old btn btn-ghost" onclick="generateCombinedReport()" style="font-size:8.5pt;padding:9px 16px" title="Combine every approved/sent/archived month into one PDF with a clickable index, for the client">📚 Download All Months</button>
         <button class="btn btn-primary" onclick="triggerPrint()" style="font-size:8.5pt;padding:9px 16px">🖨 Print / Save PDF</button>
+        <span class="ai-new imp-wrap" id="print-wrap"><button class="btn btn-primary" onclick="document.getElementById('print-wrap').classList.toggle('open')" title="More download options" style="font-size:8.5pt;padding:9px 10px">▾</button><div class="imp-menu" role="menu" style="width:260px"><button type="button" class="imp-opt" role="menuitem" onclick="document.getElementById('print-wrap').classList.remove('open');generateCombinedReport()"><b>📚 Download all months</b>Every approved, sent or archived month in one PDF.</button></div></span>
       </div>
     </div>
   </div>
@@ -3825,7 +3834,7 @@ function saveNarratives(showToast=false){
     toast('Saved on this device only (not yet synced to server)','warn',3500);
   }
 
-  if(showToast)showSaved();
+  showSaved();
 }
 function showSaved(){
   const el=document.getElementById('save-indicator');
@@ -7122,6 +7131,7 @@ function _impMenu(force){
 }
 document.addEventListener('click',e=>{const w=document.getElementById('imp-wrap');if(w&&w.classList.contains('open')&&!w.contains(e.target))_impMenu(false);});
 document.addEventListener('keydown',e=>{if(e.key==='Escape')_impMenu(false);});
+document.addEventListener('click',e=>{const w=document.getElementById('print-wrap');if(w&&w.classList.contains('open')&&!w.contains(e.target))w.classList.remove('open');});
 function openAiAssistant(){
   if(!activeProgramme){toast('Select a client and programme first.','warn');return;}
   openAiImportModal();
@@ -8935,6 +8945,14 @@ function openModal(type,mode,learnerId){
   // Only offered when editing an existing, already-persisted record — never on Add
   // (nothing to delete yet) and never for a local-only temp id (isTempId), since that
   // record isn't on the server to soft-delete and removing it locally is just "Cancel".
+  if(type==='programme'&&isEdit){
+    html+=`<div class="ai-new"><div class="modal-section" style="margin-top:18px">Programme setup</div>
+      <div style="font-size:8pt;color:rgba(255,255,255,.5);margin-bottom:8px">Usually set once per programme.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost" style="font-size:8.5pt;padding:8px 14px" onclick="closeModal();openAssessorPanel()">👤 Assessors</button>
+        <button type="button" class="btn btn-ghost" style="font-size:8.5pt;padding:8px 14px" onclick="closeModal();openUsPanel()">📐 Unit Standards (${(typeof unitStandards!=='undefined'&&unitStandards.length)||0})</button>
+      </div></div>`;
+  }
   if(isEdit&&src&&!isTempId(src.id)){
     const entityLabel=type==='client'?'Client':'Programme';
     html+=`
@@ -11075,8 +11093,7 @@ let _isCompactDensity=false;
 function toggleReportDensity(){
   _isCompactDensity=!_isCompactDensity;
   document.body.classList.toggle('compact-density',_isCompactDensity);
-  const btn=document.getElementById('density-toggle-btn');
-  if(btn)btn.textContent=_isCompactDensity?'⊟ Standard':'⊞ Compact';
+  document.querySelectorAll('.density-toggle').forEach(b=>{b.textContent=_isCompactDensity?'⊟ Standard':'⊞ Compact';});
 }
 
 // ── Dashboard Charts ──
@@ -12797,6 +12814,8 @@ function listDrafts(){
 
 function updateDraftsCount(){
   const drafts=listDrafts();
+  const hb=document.getElementById('hist-drafts-count');
+  if(hb){hb.textContent=drafts.length;hb.style.display=drafts.length?'inline':'none';}
   const badge=document.getElementById('drafts-count');
   if(!badge)return;
   if(drafts.length>0){
