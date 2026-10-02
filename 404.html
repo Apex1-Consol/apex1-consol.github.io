@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ApexOne – Page not found</title>
+<script>
+  // Old/mistyped links like /ApexOne/... -> same page at the site root (keeps ?query and #hash)
+  (function () {
+    var p = location.pathname, m = p.match(/^\/apexone(\/.*)?$/i);
+    if (m) {
+      var rest = (m[1] || '/').replace(/^\/index\.html$/i, '/');
+      location.replace(rest + location.search + location.hash);
+    }
+  })();
+</script>
+<style>
+  :root { --bg:#f4f6f9; --card:#fff; --text:#1f2937; --muted:#6b7280; --accent:#1d4ed8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f172a; --card:#1e293b; --text:#e5e7eb; --muted:#94a3b8; --accent:#60a5fa; } }
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; padding:16px; box-sizing:border-box; }
+  .card { background:var(--card); border-radius:12px; padding:32px 28px; max-width:420px; width:100%;
+          text-align:center; box-shadow:0 4px 20px rgba(0,0,0,.08); }
+  h1 { margin:0 0 8px; font-size:22px; }
+  p { margin:0 0 24px; color:var(--muted); line-height:1.5; }
+  a.btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none;
+          padding:12px 22px; border-radius:8px; font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Page not found</h1>
+    <p>This address doesn't exist in ApexOne. It may be an old or mistyped link.</p>
+    <a class="btn" href="/">Go to ApexOne home</a>
+  </div>
+</body>
+</html>
