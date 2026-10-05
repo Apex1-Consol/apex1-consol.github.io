@@ -6270,7 +6270,7 @@ function buildUnitsTable(prog){
   // Memoisation — key: saqa_id + module statuses + per-unit content (id/title/level/credits/mod)
   // so edits to an *existing* unit standard (same count) also invalidate the cache.
   const _unitsSig=units.map(u=>`${u.id}:${u.title}:${u.level}:${u.credits}:${u.mod}`).join(',');
-  const _butKey=`${prog.saqa_id}|${modNums.map(m=>modStatus[m]).join(',')}|${_unitsSig}`;
+  const _butKey=`${thVars()}|${prog.saqa_id}|${modNums.map(m=>modStatus[m]).join(',')}|${_unitsSig}`;
   if(buildUnitsTable._c?.k===_butKey)return buildUnitsTable._c.h;
   if(!units.length){
     const _h=`<div style="padding:20px;text-align:center;color:var(--muted);font-size:9pt;font-style:italic">
