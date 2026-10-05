@@ -263,6 +263,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 
 /* CONTENT PAGES */
 .content-page{padding:0;min-height:297mm;display:flex;flex-direction:column}
+/* Faint provider shield watermark, bottom-right of every content page (behind content) */
+.page-wm{position:absolute;right:-6mm;bottom:14mm;width:62mm;height:auto;opacity:.06;pointer-events:none;z-index:0}
+.content-page>.page-header,.content-page>.page-body,.content-page>.page-footer{position:relative;z-index:1}
 .page-header{
   background:var(--navy);padding:16px 40px;
   display:flex;align-items:center;justify-content:space-between;
@@ -273,7 +276,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .page-header-right{font-size:7.5pt;color:rgba(255,255,255,.35);font-family:var(--mono)}
 .page-body{padding:28px 40px;flex:1}
 .page-footer{
-  background:var(--surface);border-top:3px solid;border-image:linear-gradient(90deg,#1A365D,#0F6B6B,#5B3A8C,#B84E0A) 1;
+  background:var(--surface);border-top:3px solid;border-image:var(--foot-grad,linear-gradient(90deg,#1A365D,#0F6B6B,#5B3A8C,#B84E0A)) 1;
   padding:9px 40px 8px;display:flex;align-items:center;justify-content:space-between;gap:14px;
 }
 .page-footer-left{display:flex;align-items:center;gap:9px;min-width:0}
@@ -3153,7 +3156,7 @@ function onProviderChange(){
     return;
   }
   // Start from a clean copy of the chosen provider, then re-apply any tenant overrides on top
-  activeProvider=Object.assign({},PROVIDERS[val],_tenantOverrides);
+  activeProvider=Object.assign({},PROVIDERS[val],val==='apex'?_tenantOverrides:{}); // tenant branding is Apex's own; Catalyst/Pulse keep their colours
   // Update topbar
   const nameEl=document.getElementById('topbar-name');
   if(nameEl)nameEl.textContent=activeProvider.name;
@@ -3251,7 +3254,7 @@ function applyTenantBranding(t){
   // Apply overrides onto the currently active provider
   // activeProvider is null until a provider is picked; the picker merges
   // _tenantOverrides itself, so only patch it here when one is already active.
-  if(activeProvider)Object.assign(activeProvider,_tenantOverrides);
+  if(activeProvider&&activeProvider.id==='apex')Object.assign(activeProvider,_tenantOverrides);
 }
 
 // ── Init ──
@@ -4502,13 +4505,18 @@ function generateReport(skipChecklistGate){
 }
 
 // ── PAGE BUILDERS ──
+function pageWatermark(p){
+  const id=`wmg-${p.id||'x'}`;
+  return `<svg class="page-wm" viewBox="0 0 100 115" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.accentFrom}"/><stop offset="1" stop-color="${p.accentTo}"/></linearGradient></defs><path d="M50 3 L95 18 V55 C95 85 72 104 50 112 C28 104 5 85 5 55 V18 Z" fill="url(#${id})"/><text x="50" y="72" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="800" font-size="52" fill="#fff">${esc(p.shieldLetter||'')}</text></svg>`;
+}
 function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
   const p=activeProvider||PROVIDERS.apex;
   const div=document.createElement('div');
   div.className=landscape?'report-page content-page landscape':'report-page content-page';
   div.style.borderTop=`4px solid ${p.accentFrom}`;
-  div.innerHTML=`
-    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
+  div.style.setProperty('--foot-grad',`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`);
+  div.innerHTML=`${pageWatermark(p)}
+    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
         ${logoMark(20,p)}
         <span class="page-header-brand">${esc(p.headerBrand)}</span>
@@ -4767,8 +4775,9 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const div=document.createElement('div');
   div.className='report-page content-page exec-summary-page';
   div.style.borderTop=`5px solid ${p.accentFrom}`;
-  div.innerHTML=`
-    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
+  div.style.setProperty('--foot-grad',`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`);
+  div.innerHTML=`${pageWatermark(p)}
+    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
         ${logoMark(20,p)}
         <span class="page-header-brand">${esc(p.headerBrand)}</span>
