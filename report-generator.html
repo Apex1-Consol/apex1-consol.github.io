@@ -471,8 +471,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 
 /* DATA TABLES */
 .data-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:24px}
+.data-table thead tr{background:var(--th-grad,var(--navy));border:2px solid var(--th-border,transparent)}
 .data-table th{
-  background:var(--th-grad,var(--navy));color:#fff;padding:9px 11px;text-align:left;
+  background:transparent;color:#fff;padding:9px 11px;text-align:left;
   font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
 }
 .data-table th:first-child{border-radius:var(--r) 0 0 0}
@@ -3065,6 +3066,7 @@ const PROVIDERS={
     headerBrand:'APEX ACADEMY',
     gradFrom:'#10223B',gradMid:'#1A365D',gradTo:'#2D4A7A',
     accentFrom:'#E03E15',accentTo:'#D4A017',
+    thFrom:'#4A7BB7',thTo:'#10223B',thBorder:'#E03E15',
     shieldLetter:'A',shieldFrom:'#FACC15',shieldTo:'#CA8A04',
     logoUrl:'https://apexu.co.za/wp-content/uploads/2023/03/logos-01-1024x245.png',
   },
@@ -3076,6 +3078,7 @@ const PROVIDERS={
     headerBrand:'CATALYST AI',
     gradFrom:'#0A1628',gradMid:'#0F2952',gradTo:'#1A3A6B',
     accentFrom:'#00C2FF',accentTo:'#7B2FFF',
+    thFrom:'#2F5C9E',thTo:'#0A1628',thBorder:'#00C2FF',
     shieldLetter:'C',shieldFrom:'#00C2FF',shieldTo:'#7B2FFF',
     logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Catalyst.AI-Logo-C-1024x221.png',
   },
@@ -3087,10 +3090,13 @@ const PROVIDERS={
     headerBrand:'PULSE AFRIKA',
     gradFrom:'#0D1F0F',gradMid:'#14391A',gradTo:'#1C5224',
     accentFrom:'#F59E0B',accentTo:'#10B981',
+    thFrom:'#2E7D3A',thTo:'#0D1F0F',thBorder:'#F59E0B',
     shieldLetter:'P',shieldFrom:'#F59E0B',shieldTo:'#10B981',
     logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Pulse-Afrika-Logo-C-1024x270.png',
   },
 };
+// Table header colours per provider (light -> dark brand colour + accent border)
+function thVars(p){p=p||activeProvider||PROVIDERS.apex;return`--th-grad:linear-gradient(90deg,${p.thFrom||p.accentFrom},${p.thTo||p.accentTo});--th-border:${p.thBorder||'transparent'}`;}
 let activeProvider=null; // set only once the user picks a provider in step 1
 
 function updateStepsGuide(){
@@ -5422,8 +5428,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     return pct===0?'Low':pct<=0.5?'Medium':'High';
   }
   const p=activeProvider||PROVIDERS.apex;
-  const thGrad=`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`;
-  const thead=`<thead><tr style="--th-grad:${thGrad}"><th style="width:110px">First Name</th><th style="width:135px">Surname</th><th>Comments &amp; Observations</th></tr></thead>`;
+  const thead=`<thead><tr style="${thVars(p)}"><th style="width:110px">First Name</th><th style="width:135px">Surname</th><th>Comments &amp; Observations</th></tr></thead>`;
   const narColgroup=`<colgroup><col style="width:110px"><col style="width:135px"><col></colgroup>`;
 
   const makeRow=l=>{
@@ -5597,7 +5602,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
     ${emptyHint}
     ${dates.length>0?`<div style="overflow-x:auto">
       <table class="data-table" id="att-table">
-        <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>First Name</th><th>Surname</th>${headerCols}<th style="text-align:center;white-space:nowrap">% Att</th></tr></thead>
+        <thead><tr style="${thVars()}"><th>First Name</th><th>Surname</th>${headerCols}<th style="text-align:center;white-space:nowrap">% Att</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`:''}
@@ -5868,7 +5873,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
-  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="${thVars()}"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
   return pageShell(pn||4+modNum,0,activeClient.client_name,'Assessment — Module '+modNum,body);
 }
 
@@ -5964,7 +5969,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     // read-only (title/level/credits), for POE/audit reference. Results are
     // no longer captured per unit standard; see below.
     const usListRows=units.map(u=>`<tr><td style="font-family:var(--mono);white-space:nowrap">${esc(u.id)}</td><td>${esc(u.title||'')}</td><td style="text-align:center">${esc(String(u.level||''))}</td><td style="text-align:center">${esc(String(u.credits||0))}</td></tr>`).join('');
-    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
+    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="${thVars()}"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
 
     const chunks=[];
     for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
@@ -5989,7 +5994,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
         return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}${terminatedTag(l.id,modNum)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
-      const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
+      const thead=`<thead style="${thVars()}">
         <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
       const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
@@ -6123,7 +6128,7 @@ function buildSurveyPage(nar,pn=9){
       <div><div class="sec-title">Training Evaluation Survey</div><div class="sec-subtitle">Click circles to toggle rating selections</div></div>
     </div>
     <table class="data-table">
-      <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Criteria / Question</th><th style="text-align:center">Poor</th><th style="text-align:center">Sufficient</th><th style="text-align:center">Above Standard</th><th style="text-align:center;background:${(activeProvider||PROVIDERS.apex).accentTo}">Excellent</th></tr></thead>
+      <thead><tr style="${thVars()}"><th>Criteria / Question</th><th style="text-align:center">Poor</th><th style="text-align:center">Sufficient</th><th style="text-align:center">Above Standard</th><th style="text-align:center;background:${(activeProvider||PROVIDERS.apex).accentTo}">Excellent</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div style="margin-top:12px;break-before:avoid;page-break-before:avoid;break-inside:avoid;page-break-inside:avoid;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;background:#FAFBFD">
@@ -6294,7 +6299,7 @@ function buildUnitsTable(prog){
     return modHeader+`<tr><td style="font-family:var(--mono);font-size:8pt">${esc(u.id)}</td><td>${esc(u.title)}</td><td style="text-align:center">${u.level}</td><td style="text-align:center">${u.credits}</td><td style="text-align:center">${status}</td></tr>`;
   }).join('');
   const _tableH=`<table class="data-table">
-    <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="width:70px">US ID</th><th>Unit Standard Title</th><th style="text-align:center;width:55px">Level</th><th style="text-align:center;width:60px">Credits</th><th style="text-align:center;width:120px">Status</th></tr></thead>
+    <thead><tr style="${thVars()}"><th style="width:70px">US ID</th><th>Unit Standard Title</th><th style="text-align:center;width:55px">Level</th><th style="text-align:center;width:60px">Credits</th><th style="text-align:center;width:120px">Status</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="3" style="text-align:right;padding:8px 11px;font-weight:700;font-size:8.5pt;color:var(--navy)">Total Credits:</td><td style="text-align:center;font-weight:800;font-size:10pt;color:var(--navy)">${totalCredits}</td><td></td></tr></tfoot>
   </table>`;
