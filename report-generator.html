@@ -4729,7 +4729,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const fieldMap=moduleFieldMap(displayModuleNums(activeProgramme));
   const timelineMods=displayModuleNums(activeProgramme).map(n=>{
     const dates=activeProgramme[fieldMap[n]]||'';
-    const st=dates?modStatus(dates):null;
+    let st=dates?modStatus(dates):null;
+    if(st==='done'&&moduleAwaitingResults(activeProgramme,n,getProgrammeLearners()))st='awaiting';
     return{n,dates,status:st};
   }).filter(m=>m.dates);
   // Donut geometry helper (r=50, circumference≈314.16)
@@ -4854,8 +4855,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             const st=(m.status==='done'&&modNyc>0)
               ?{label:`Completed · ${modNyc} outstanding`,fg:'#8A5A00'}
               :(MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'});
-            const pct=m.status==='done'?100:m.status==='current'?55:0;
-            const barCol=(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
+            const pct=(m.status==='done'||m.status==='awaiting')?100:m.status==='current'?55:0;
+            const barCol=m.status==='awaiting'?'#E8A33D':(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
             return`<div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                 <span style="font-size:10.5px;color:#1E2533;font-weight:600">Module ${m.n}</span>
@@ -5180,8 +5181,26 @@ function modStatus(datesStr){
 const MOD_STATUS_STYLE={
   done:{label:'Completed',bg:'#EAF3DE',fg:'#27500A'},
   current:{label:'In progress',bg:'#E6F1FB',fg:'#0C447C'},
-  upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'}
+  upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'},
+  awaiting:{label:'Awaiting results',bg:'#FFF1E0',fg:'#8A4B00'}
 };
+// A module whose dates have passed but still has blank (not captured) results
+// for some learners reads "Awaiting results" instead of "Completed". Blank only:
+// a captured Not Yet Competent result is a result (shown as "outstanding" elsewhere).
+function moduleAwaitingResults(prog,n,pLearners){
+  if(!prog||!pLearners||!pLearners.length)return false;
+  if(!(unitStandards||[]).some(u=>+u.mod===+n&&(!u.saqa_id||u.saqa_id===prog.saqa_id)))return false;
+  const ov=narratives._eisa||{};
+  if(isLegacyProgramme(prog)){
+    return pLearners.some(l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n));
+  }
+  const ap=moduleAppliesTypes(prog,n)||{km:true,pm:true,wm:true};
+  return pLearners.some(l=>{
+    const res=(eisaState[l.id]||{})[n]||{},ek=`${l.id}_m${n}`;
+    const mv=f=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(res[f]||'');
+    return ['km','pm','wm'].some(f=>ap[f]&&!mv(f));
+  });
+}
 // ── EISA result codes (KM/PM/WM/Exam) ──
 // 'NYC' used to be the only non-Competent outcome a facilitator could record.
 // NS (Non-Submission) and RW (Remediation) are two more specific reasons a
@@ -5307,7 +5326,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     }).join('')}</div>
     <div class="module-timeline">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
-      const st=modStatus(m.dates);const stStyle=st?MOD_STATUS_STYLE[st]:null;
+      let st=modStatus(m.dates);if(st==='done'&&moduleAwaitingResults(prog,m.num,pLearners))st='awaiting';const stStyle=st?MOD_STATUS_STYLE[st]:null;
       const needsInput=!m.dates;
       // Calendar icon CTA replaces the free-text placeholder for an empty
       // date field — tinted with this module's own accent colour (--mc)
