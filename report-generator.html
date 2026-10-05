@@ -221,8 +221,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   transform:rotate(-8deg);
 }
 .cover-watermark svg{display:block}
-.cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:space-between;}
-.cover-title-block{flex:1}
+.cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:flex-start;}
+.cover-title-block{flex:0 0 auto}
+.cover-icon{position:absolute;top:40px;right:44px;width:92px;z-index:2}
 .cover-logo-row{display:flex;align-items:center;gap:16px;margin-bottom:44px}
 .cover-shield{display:flex;align-items:center;min-width:68px;min-height:58px}
 .logo-mark{display:inline-flex;align-items:center;background:#fff;border-radius:6px;padding:4px 10px;box-shadow:0 1px 3px rgba(0,0,0,.1);border:1px solid var(--border)}
@@ -238,7 +239,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .cover-stat-num{font-size:19pt;font-weight:800;line-height:1}
 .cover-stat-label{font-size:6.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px}
 .cover-client-block{
-  margin-top:auto;
+  margin-top:22px;
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r2);padding:24px 28px;
   display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;
@@ -249,7 +250,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   padding:20px 48px;
   display:flex;align-items:center;justify-content:space-between;
 }
-.cover-footer-left{font-size:8pt;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase}
+.cover-footer-left{font-size:8pt;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
 .cover-footer-right{font-size:8pt;color:rgba(255,255,255,.6)}
 .cover-period-pill{
   display:inline-flex;align-items:center;gap:8px;
@@ -265,6 +266,12 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .content-page{padding:0;min-height:297mm;display:flex;flex-direction:column}
 /* Faint provider shield watermark, bottom-right of every content page (behind content) */
 .page-wm{position:absolute;right:-6mm;bottom:14mm;width:62mm;height:auto;opacity:.06;pointer-events:none;z-index:0}
+.page-wm-img{width:52mm;right:-4mm}
+.ph-logo-rev{height:24px;width:auto;display:block}
+.mod-section-header .btn-ghost{background:#fff!important;color:var(--mh-ink,#25247B)!important;border:1px solid rgba(37,36,123,.25)!important}
+.mod-rail{display:inline-flex;align-items:center;margin-left:auto}
+.mr-dot{width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:7pt;font-weight:800;letter-spacing:0;background:#fff;color:#9AA5B5;border:1.5px solid #CBD5E0}
+.mr-ln{width:12px;height:2px;background:#CBD5E0}
 .content-page>.page-header,.content-page>.page-body,.content-page>.page-footer{position:relative;z-index:1}
 .page-header{
   background:var(--navy);padding:16px 40px;
@@ -1438,7 +1445,7 @@ body.compact-density .progress-bar-wrap{height:6px}
 .att-page-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:24px}
 .att-page-wrap .report-page{margin-bottom:0}
 .att-toolbar{
-  width:210mm;max-width:100%;background:#1A2744;border:1px solid rgba(255,255,255,.12);
+  width:210mm;max-width:100%;background:var(--brand-band,#1A2744);border-bottom:3px solid var(--brand-acc,transparent)!important;border:1px solid rgba(255,255,255,.12);
   border-bottom:none;border-radius:var(--r) var(--r) 0 0;
   padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;
 }
@@ -3067,11 +3074,12 @@ const PROVIDERS={
     tagline:'Training & Development',
     footer:'Apex Academy · Proprietary & Confidential',
     headerBrand:'APEX ACADEMY',
-    gradFrom:'#10223B',gradMid:'#1A365D',gradTo:'#2D4A7A',
-    accentFrom:'#E03E15',accentTo:'#D4A017',
-    thFrom:'#4A7BB7',thTo:'#10223B',thBorder:'#E03E15',
-    shieldLetter:'A',shieldFrom:'#FACC15',shieldTo:'#CA8A04',
-    logoUrl:'https://apexu.co.za/wp-content/uploads/2023/03/logos-01-1024x245.png',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#E13D18',accentTo:'#25247B',
+    thFrom:'#4746B0',thTo:'#17165A',thBorder:'#E13D18',tint:'#EEEEF7',
+    modShades:['#17165A','#25247B','#3A39A0','#5554C0'],
+    shieldLetter:'A',shieldFrom:'#E13D18',shieldTo:'#25247B',
+    logoUrl:'assets/brand/apex-logo.png',logoRevUrl:'assets/brand/apex-logo-rev.png',iconUrl:'assets/brand/apex-icon.png',
   },
   catalyst:{
     id:'catalyst',
@@ -3079,11 +3087,12 @@ const PROVIDERS={
     tagline:'Intelligent Learning Solutions',
     footer:'Proprietary & Confidential',
     headerBrand:'CATALYST AI',
-    gradFrom:'#0A1628',gradMid:'#0F2952',gradTo:'#1A3A6B',
-    accentFrom:'#00C2FF',accentTo:'#7B2FFF',
-    thFrom:'#2F5C9E',thTo:'#0A1628',thBorder:'#00C2FF',
-    shieldLetter:'C',shieldFrom:'#00C2FF',shieldTo:'#7B2FFF',
-    logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Catalyst.AI-Logo-C-1024x221.png',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#6847EE',accentTo:'#25247B',
+    thFrom:'#6847EE',thTo:'#17165A',thBorder:'#6847EE',tint:'#F0EDFD',
+    modShades:['#17165A','#25247B','#4A36C4','#6847EE'],
+    shieldLetter:'C',shieldFrom:'#6847EE',shieldTo:'#25247B',
+    logoUrl:'assets/brand/catalyst-logo.png',iconUrl:'assets/brand/catalyst-icon.png',
   },
   pulse:{
     id:'pulse',
@@ -3091,10 +3100,12 @@ const PROVIDERS={
     tagline:'Learning. Growing. Leading.',
     footer:'Proprietary & Confidential',
     headerBrand:'PULSE AFRIKA',
-    gradFrom:'#0D1F0F',gradMid:'#14391A',gradTo:'#1C5224',
-    accentFrom:'#F59E0B',accentTo:'#10B981',
-    thFrom:'#2E7D3A',thTo:'#0D1F0F',thBorder:'#F59E0B',
-    shieldLetter:'P',shieldFrom:'#F59E0B',shieldTo:'#10B981',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#8CBC00',accentTo:'#25247B',
+    thFrom:'#4746B0',thTo:'#17165A',thBorder:'#8CBC00',tint:'#F3F8E3',
+    modShades:['#17165A','#25247B','#3A39A0','#5554C0'],
+    shieldLetter:'P',shieldFrom:'#8CBC00',shieldTo:'#25247B',
+    logoRevUrl:'assets/brand/pulse-logo-rev.png',iconUrl:'assets/brand/pulse-icon.png',
     logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Pulse-Afrika-Logo-C-1024x270.png',
   },
 };
@@ -3157,6 +3168,7 @@ function onProviderChange(){
   }
   // Start from a clean copy of the chosen provider, then re-apply any tenant overrides on top
   activeProvider=Object.assign({},PROVIDERS[val],val==='apex'?_tenantOverrides:{}); // tenant branding is Apex's own; Catalyst/Pulse keep their colours
+  applyBrandVars(activeProvider);
   // Update topbar
   const nameEl=document.getElementById('topbar-name');
   if(nameEl)nameEl.textContent=activeProvider.name;
@@ -3247,8 +3259,7 @@ function applyTenantBranding(t){
   // Store overrides without mutating the PROVIDERS objects.
   // Name/headerBrand are NOT overridden — the provider selector controls those.
   if(t.footer_text)_tenantOverrides.footer=t.footer_text;
-  if(t.primary_color)_tenantOverrides.gradMid=t.primary_color;
-  if(t.accent_color)_tenantOverrides.accentFrom=t.accent_color;
+  // primary_color/accent_color no longer override: provider colours are the exact logo colours
   if(t.signoff_name)window._tenantSignoffName=t.signoff_name;
   if(t.signoff_role)window._tenantSignoffRole=t.signoff_role;
   // Apply overrides onto the currently active provider
@@ -3523,7 +3534,7 @@ function displayModuleNums(prog){
   });
 }
 function moduleColor(n){
-  const palette=['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A5B8C','#6B6B0F','#4E0AB8'];
+  const palette=(activeProvider||PROVIDERS.apex).modShades||['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A5B8C','#6B6B0F','#4E0AB8'];
   return palette[(n-1)%palette.length];
 }
 function moduleLabel(n){return`Module ${n}`;}
@@ -4505,7 +4516,33 @@ function generateReport(skipChecklistGate){
 }
 
 // ── PAGE BUILDERS ──
+function applyBrandVars(p){
+  const r=document.documentElement.style;
+  r.setProperty('--brand-band',`linear-gradient(120deg,${p.gradFrom},${p.gradTo})`);
+  r.setProperty('--brand-acc',p.accentFrom);r.setProperty('--brand-ink',p.gradMid);r.setProperty('--brand-tint',p.tint||'#F1F4F9');
+}
+function headerLogo(p){
+  return p.logoRevUrl?`<img class="ph-logo-rev" src="${p.logoRevUrl}" alt="${esc(p.name)}">`:logoMark(20,p);
+}
+function headerBrandText(p){return p.logoRevUrl?'':`<span class="page-header-brand">${esc(p.headerBrand)}</span>
+        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>`;}
+function modTotal(modNum){
+  const prog=activeProgramme;let mx=0;
+  (unitStandards||[]).forEach(u=>{if(!prog||!u.saqa_id||u.saqa_id===prog.saqa_id)mx=Math.max(mx,+u.mod||0);});
+  return Math.max(mx,+modNum||1);
+}
+// Light module bar with accent stripe + progress rail (screen buttons restyled for light bg)
+function modHeaderStyle(){const p=activeProvider||PROVIDERS.apex;return`background:${p.tint||'#F1F4F9'};border-left:5px solid ${p.accentFrom};color:${p.gradMid};--mh-ink:${p.gradMid}`;}
+function modRail(modNum){
+  const p=activeProvider||PROVIDERS.apex,n=Math.min(modTotal(modNum),10);let h='';
+  for(let i=1;i<=n;i++){
+    const st=i===+modNum?`background:${p.accentFrom};color:#fff;border-color:${p.accentFrom}`:i<modNum?`background:${p.gradMid};color:#fff;border-color:${p.gradMid}`:'';
+    h+=`<span class="mr-dot" style="${st}">${i}</span>`+(i<n?`<span class="mr-ln" style="${i<modNum?'background:'+p.gradMid:''}"></span>`:'');
+  }
+  return`<span class="mod-rail">${h}</span>`;
+}
 function pageWatermark(p){
+  if(p.iconUrl)return`<img class="page-wm page-wm-img" src="${p.iconUrl}" alt="" aria-hidden="true">`;
   const id=`wmg-${p.id||'x'}`;
   return `<svg class="page-wm" viewBox="0 0 100 115" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.accentFrom}"/><stop offset="1" stop-color="${p.accentTo}"/></linearGradient></defs><path d="M50 3 L95 18 V55 C95 85 72 104 50 112 C28 104 5 85 5 55 V18 Z" fill="url(#${id})"/><text x="50" y="72" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="800" font-size="52" fill="#fff">${esc(p.shieldLetter||'')}</text></svg>`;
 }
@@ -4518,9 +4555,8 @@ function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
   div.innerHTML=`${pageWatermark(p)}
     <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
-        ${logoMark(20,p)}
-        <span class="page-header-brand">${esc(p.headerBrand)}</span>
-        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>
+        ${headerLogo(p)}
+        ${headerBrandText(p)}
         <span class="page-header-title">${esc(clientName)}</span>
       </div>
       <span class="page-header-right">${esc(sectionTitle)}</span>
@@ -4596,7 +4632,8 @@ function buildCoverPage(prog,client,month){
   div.innerHTML=`
     <div class="cover-hero">
       <div class="cover-corner" style="background:linear-gradient(135deg,transparent 50%,${p.accentFrom}10 50%)"></div>
-      <div class="cover-watermark">${shieldSVG(420,p)}</div>
+      <div class="cover-watermark">${p.iconUrl?`<img src="${p.iconUrl}" alt="" style="width:380px;display:block">`:shieldSVG(420,p)}</div>
+      ${p.iconUrl?`<img class="cover-icon" src="${p.iconUrl}" alt="">`:''}
       <div class="cover-hero-inner">
         <div class="cover-title-block">
           <div class="cover-logo-row">
@@ -4656,7 +4693,7 @@ function buildCoverPage(prog,client,month){
         </div>
       </div>
     </div>
-    <div class="cover-footer" style="background:${p.gradFrom}">
+    <div class="cover-footer" style="background:#F8FAFC;border-top:3px solid;border-image:linear-gradient(90deg,${p.accentFrom},${p.accentTo}) 1">
       <span class="cover-footer-left">${esc(p.footer)}</span>
       <span class="cover-footer-right">Generated ${new Date().toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}</span>
     </div>`;
@@ -4779,9 +4816,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   div.innerHTML=`${pageWatermark(p)}
     <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
-        ${logoMark(20,p)}
-        <span class="page-header-brand">${esc(p.headerBrand)}</span>
-        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>
+        ${headerLogo(p)}
+        ${headerBrandText(p)}
         <span class="page-header-title">${esc(client.client_name)}</span>
       </div>
       <span class="page-header-right">Executive Summary</span>
@@ -5882,7 +5918,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
-  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="${thVars()}"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span>${modRail(modNum)}<span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="${thVars()}"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
   return pageShell(pn||4+modNum,0,activeClient.client_name,'Assessment — Module '+modNum,body);
 }
 
@@ -5943,7 +5979,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     .sort((a,b)=>(a.mod||1)-(b.mod||1)||String(a.id).localeCompare(String(b.id)));
 
   if(!allUnits.length){
-    const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Unit Standards Achieved</span></div>
+    const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}"><span>Unit Standards Achieved</span></div>
       <div style="padding:32px;text-align:center;color:var(--muted);font-size:9pt">
         No unit standards are registered for this programme yet.<br>
         <button type="button" class="btn btn-primary no-print" style="margin-top:12px;font-size:8.5pt;padding:8px 16px" onclick="openUsPanel()">📐 Add Unit Standards</button>
@@ -6006,8 +6042,8 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
       const thead=`<thead style="${thVars()}">
         <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
-      const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
-          <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
+      const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}">
+          <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>${modRail(modNum)}
           <span class="no-print" style="display:flex;gap:6px">
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/Logbook results from Excel">📋 Bulk Paste</button>
             <button type="button" id="us-undo-btn-m${modNum}" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoUsPaste(${modNum})" title="Undo last bulk paste for this module">↩ Undo</button>
@@ -6267,7 +6303,7 @@ function getModuleTrainingStatus(modNum){
 }
 
 function buildUnitsTable(prog){
-  const modColors=['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A8C5B','#8C7A3A','#3A5B8C'];
+  const modColors=(activeProvider||PROVIDERS.apex).modShades||['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A8C5B','#8C7A3A','#3A5B8C'];
   const units=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
   // Pre-compute status per module from actual assessment data. Legacy programmes
   // (e.g. CCI) can have more than 4 modules, so derive the module list from the
