@@ -13,6 +13,7 @@
 .imp-opt b{display:block;color:#fff;font-size:9.5pt;margin-bottom:2px}
 .imp-opt i{display:block;color:var(--gold2,#e8c46a);font-style:normal;margin-bottom:2px}
 .imp-rec{font-size:7pt;font-weight:600;background:var(--gold2,#e8c46a);color:#111827;border-radius:999px;padding:1px 7px;margin-left:6px;vertical-align:1px}
+.imp-tpl{display:flex;align-items:center;flex-wrap:wrap;gap:6px;border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding:8px 12px 2px;color:rgba(255,255,255,.6);font-size:8pt}.imp-tpl button{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.18);border-radius:6px;color:#fff;font:inherit;font-size:8pt;padding:4px 10px;cursor:pointer}.imp-tpl button:hover,.imp-tpl button:focus{background:rgba(255,255,255,.14);outline:none}
 .imp-foot{border-top:1px solid rgba(255,255,255,.1);margin-top:4px;padding:8px 12px 4px;color:rgba(255,255,255,.55);font-size:8pt}
 </style>
 <meta charset="utf-8">
@@ -220,8 +221,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   transform:rotate(-8deg);
 }
 .cover-watermark svg{display:block}
-.cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:space-between;}
-.cover-title-block{flex:1}
+.cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:flex-start;}
+.cover-title-block{flex:0 0 auto}
+.cover-icon{position:absolute;top:40px;right:44px;width:92px;z-index:2}
 .cover-logo-row{display:flex;align-items:center;gap:16px;margin-bottom:44px}
 .cover-shield{display:flex;align-items:center;min-width:68px;min-height:58px}
 .logo-mark{display:inline-flex;align-items:center;background:#fff;border-radius:6px;padding:4px 10px;box-shadow:0 1px 3px rgba(0,0,0,.1);border:1px solid var(--border)}
@@ -237,18 +239,20 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .cover-stat-num{font-size:19pt;font-weight:800;line-height:1}
 .cover-stat-label{font-size:6.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-top:4px}
 .cover-client-block{
-  margin-top:auto;
+  margin-top:22px;
   background:var(--surface);border:1px solid var(--border);
   border-radius:var(--r2);padding:24px 28px;
   display:grid;grid-template-columns:1fr 1fr;gap:16px 32px;
 }
 .cover-field label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
 .cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}.cover-field.full{grid-column:1/-1}
+.cover-field.cover-empty span{color:#B5BEC9;font-weight:400}
+@media print{.cover-field.cover-empty{display:none}}
 .cover-footer{
   padding:20px 48px;
   display:flex;align-items:center;justify-content:space-between;
 }
-.cover-footer-left{font-size:8pt;color:rgba(255,255,255,.5);letter-spacing:.1em;text-transform:uppercase}
+.cover-footer-left{font-size:8pt;color:var(--muted);letter-spacing:.1em;text-transform:uppercase}
 .cover-footer-right{font-size:8pt;color:rgba(255,255,255,.6)}
 .cover-period-pill{
   display:inline-flex;align-items:center;gap:8px;
@@ -262,6 +266,15 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 
 /* CONTENT PAGES */
 .content-page{padding:0;min-height:297mm;display:flex;flex-direction:column}
+/* Faint provider shield watermark, bottom-right of every content page (behind content) */
+.page-wm{position:absolute;right:-6mm;bottom:14mm;width:62mm;height:auto;opacity:.06;pointer-events:none;z-index:0}
+.page-wm-img{width:52mm;right:-4mm}
+.ph-logo-rev{height:24px;width:auto;display:block}
+.mod-section-header .btn-ghost{background:#fff!important;color:var(--mh-ink,#25247B)!important;border:1px solid rgba(37,36,123,.25)!important}
+.mod-rail{display:inline-flex;align-items:center;margin-left:auto}
+.mr-dot{width:17px;height:17px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:7pt;font-weight:800;letter-spacing:0;background:#fff;color:#9AA5B5;border:1.5px solid #CBD5E0}
+.mr-ln{width:12px;height:2px;background:#CBD5E0}
+.content-page>.page-header,.content-page>.page-body,.content-page>.page-footer{position:relative;z-index:1}
 .page-header{
   background:var(--navy);padding:16px 40px;
   display:flex;align-items:center;justify-content:space-between;
@@ -272,7 +285,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .page-header-right{font-size:7.5pt;color:rgba(255,255,255,.35);font-family:var(--mono)}
 .page-body{padding:28px 40px;flex:1}
 .page-footer{
-  background:var(--surface);border-top:3px solid;border-image:linear-gradient(90deg,#1A365D,#0F6B6B,#5B3A8C,#B84E0A) 1;
+  background:var(--surface);border-top:3px solid;border-image:var(--foot-grad,linear-gradient(90deg,#1A365D,#0F6B6B,#5B3A8C,#B84E0A)) 1;
   padding:9px 40px 8px;display:flex;align-items:center;justify-content:space-between;gap:14px;
 }
 .page-footer-left{display:flex;align-items:center;gap:9px;min-width:0}
@@ -362,6 +375,8 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
    "not filled in yet", not "error". */
 .mod-card.needs-input{border-style:dashed;border-color:#cbd5e1;background:#fbfcfd}
 .mod-card.needs-input .mod-dates-input{position:absolute;opacity:0;pointer-events:none;height:0}
+.mod-card.needs-input .mod-dates-input:focus{position:static;opacity:1;pointer-events:auto;height:auto}
+.mod-card.needs-input .mod-dates-input:focus+.cta{display:none}
 .mod-card.needs-input .cta{
   display:inline-flex;align-items:center;gap:6px;font-size:8pt;font-weight:700;
   color:var(--mc,var(--navy2));background:color-mix(in srgb,var(--mc,var(--navy2)) 12%,#fff);
@@ -470,8 +485,9 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 
 /* DATA TABLES */
 .data-table{width:100%;border-collapse:collapse;font-size:8.5pt;margin-bottom:24px}
+.data-table thead tr{background:var(--th-grad,var(--navy));border:2px solid var(--th-border,transparent)}
 .data-table th{
-  background:var(--th-grad,var(--navy));color:#fff;padding:9px 11px;text-align:left;
+  background:transparent;color:#fff;padding:9px 11px;text-align:left;
   font-size:7.5pt;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
 }
 .data-table th:first-child{border-radius:var(--r) 0 0 0}
@@ -1433,7 +1449,7 @@ body.compact-density .progress-bar-wrap{height:6px}
 .att-page-wrap{display:flex;flex-direction:column;align-items:center;margin-bottom:24px}
 .att-page-wrap .report-page{margin-bottom:0}
 .att-toolbar{
-  width:210mm;max-width:100%;background:#1A2744;border:1px solid rgba(255,255,255,.12);
+  width:210mm;max-width:100%;background:var(--brand-band,#1A2744);border-bottom:3px solid var(--brand-acc,transparent)!important;border:1px solid rgba(255,255,255,.12);
   border-bottom:none;border-radius:var(--r) var(--r) 0 0;
   padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;
 }
@@ -2003,7 +2019,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     <span id="status-txt">Loading…</span>
     <span id="queue-badge" title="Writes pending — will sync when online">⏳ <span id="queue-count">0</span> queued</span>
     <button class="btn btn-ghost" onclick="showDashboard()" style="font-size:8.5pt;padding:9px 14px">📊 Dashboard</button>
-    <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('ai')"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('template')"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('lms')"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-need">Select a client and programme first.</div><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
+    <span class="ai-new imp-wrap" id="imp-wrap"><button class="btn btn-primary" id="ai-assistant-btn" onclick="_impMenu()" aria-haspopup="true" aria-expanded="false" title="Fill this report from a file">📥 Import data ▾</button><div class="imp-menu" role="menu"><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('ai')"><b>✨ AI Assistant<span class="imp-rec">Recommended</span></b><i>Use when you have notes, registers, feedback or any other files for the month.</i>Writes learner comments and summaries and fills in attendance. LMS results and the ApexOne marks sheet are recognised and their marks imported exactly.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('template')"><b>📊 ApexOne marks template</b><i>Use when you've filled in the ApexOne Excel marks sheet.</i>Adds formative, summative and logbook marks.</button><button type="button" class="imp-opt" role="menuitem" onclick="_impPick('lms')"><b>🎓 LMS results</b><i>Use when you've downloaded the learner progress file from the LMS.</i>Brings the marks in automatically.</button><div class="imp-need">Select a client and programme first.</div><div class="imp-tpl"><span>⬇ Blank templates:</span><button type="button" role="menuitem" onclick="_impMenu(false);downloadTemplate()" title="QCTO / Occupational: KM, PM, WM and Exam results per module">Occupational</button><button type="button" role="menuitem" onclick="_impMenu(false);downloadLegacyTemplate()" title="Legacy (SETA unit standards): Formative, Summative and Logbook per module">Legacy</button></div><div class="imp-foot">Nothing is saved until you review and click Apply.</div></div></span>
     <button class="ai-old btn btn-ghost" onclick="openImportModal()">📥 Import Excel</button>
     <button class="ai-old btn btn-ghost" onclick="openImportLmsModal()" title="Import a learner progress export pulled from the LMS">📊 Import LMS Report</button>
     <button class="ai-old btn btn-ghost" id="drafts-btn" onclick="openDraftsPanel()">📋 Drafts <span id="drafts-count" style="background:var(--red);border-radius:999px;padding:1px 6px;font-size:7pt;margin-left:2px;display:none">0</span></button>
@@ -2030,6 +2046,8 @@ body.compact-density .progress-bar-wrap{height:6px}
   <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('ai')">✨ Import data: AI Assistant (recommended)</button>
   <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('template')">📊 Import data: ApexOne marks template</button>
   <button class="ai-new mob-nav-item" onclick="_mobMenuClose();_impPick('lms')">🎓 Import data: LMS results</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();downloadTemplate()">⬇ Blank template: Occupational</button>
+  <button class="ai-new mob-nav-item" onclick="_mobMenuClose();downloadLegacyTemplate()">⬇ Blank template: Legacy</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportModal()">📥 Import Excel</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openImportLmsModal()">📊 Import LMS Report</button>
   <button class="ai-old mob-nav-item" onclick="_mobMenuClose();openAiImportModal()">🤖 AI Import from File</button>
@@ -3060,10 +3078,12 @@ const PROVIDERS={
     tagline:'Training & Development',
     footer:'Apex Academy · Proprietary & Confidential',
     headerBrand:'APEX ACADEMY',
-    gradFrom:'#10223B',gradMid:'#1A365D',gradTo:'#2D4A7A',
-    accentFrom:'#E03E15',accentTo:'#D4A017',
-    shieldLetter:'A',shieldFrom:'#FACC15',shieldTo:'#CA8A04',
-    logoUrl:'https://apexu.co.za/wp-content/uploads/2023/03/logos-01-1024x245.png',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#E13D18',accentTo:'#25247B',
+    thFrom:'#4746B0',thTo:'#17165A',thBorder:'#E13D18',tint:'#EEEEF7',
+    modShades:['#17165A','#25247B','#3A39A0','#5554C0'],
+    shieldLetter:'A',shieldFrom:'#E13D18',shieldTo:'#25247B',
+    logoUrl:'assets/brand/apex-logo.png',logoRevUrl:'assets/brand/apex-logo-rev.png',iconUrl:'assets/brand/apex-icon.png',
   },
   catalyst:{
     id:'catalyst',
@@ -3071,10 +3091,12 @@ const PROVIDERS={
     tagline:'Intelligent Learning Solutions',
     footer:'Proprietary & Confidential',
     headerBrand:'CATALYST AI',
-    gradFrom:'#0A1628',gradMid:'#0F2952',gradTo:'#1A3A6B',
-    accentFrom:'#00C2FF',accentTo:'#7B2FFF',
-    shieldLetter:'C',shieldFrom:'#00C2FF',shieldTo:'#7B2FFF',
-    logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Catalyst.AI-Logo-C-1024x221.png',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#6847EE',accentTo:'#25247B',
+    thFrom:'#6847EE',thTo:'#17165A',thBorder:'#6847EE',tint:'#F0EDFD',
+    modShades:['#17165A','#25247B','#4A36C4','#6847EE'],
+    shieldLetter:'C',shieldFrom:'#6847EE',shieldTo:'#25247B',
+    logoUrl:'assets/brand/catalyst-logo.png',iconUrl:'assets/brand/catalyst-icon.png',
   },
   pulse:{
     id:'pulse',
@@ -3082,12 +3104,17 @@ const PROVIDERS={
     tagline:'Learning. Growing. Leading.',
     footer:'Proprietary & Confidential',
     headerBrand:'PULSE AFRIKA',
-    gradFrom:'#0D1F0F',gradMid:'#14391A',gradTo:'#1C5224',
-    accentFrom:'#F59E0B',accentTo:'#10B981',
-    shieldLetter:'P',shieldFrom:'#F59E0B',shieldTo:'#10B981',
+    gradFrom:'#17165A',gradMid:'#25247B',gradTo:'#25247B',
+    accentFrom:'#8CBC00',accentTo:'#25247B',
+    thFrom:'#4746B0',thTo:'#17165A',thBorder:'#8CBC00',tint:'#F3F8E3',
+    modShades:['#17165A','#25247B','#3A39A0','#5554C0'],
+    shieldLetter:'P',shieldFrom:'#8CBC00',shieldTo:'#25247B',
+    logoRevUrl:'assets/brand/pulse-logo-rev.png',iconUrl:'assets/brand/pulse-icon.png',
     logoUrl:'https://apexu.co.za/wp-content/uploads/2024/05/Pulse-Afrika-Logo-C-1024x270.png',
   },
 };
+// Table header colours per provider (light -> dark brand colour + accent border)
+function thVars(p){p=p||activeProvider||PROVIDERS.apex;return`--th-grad:linear-gradient(90deg,${p.thFrom||p.accentFrom},${p.thTo||p.accentTo});--th-border:${p.thBorder||'transparent'}`;}
 let activeProvider=null; // set only once the user picks a provider in step 1
 
 function updateStepsGuide(){
@@ -3144,7 +3171,8 @@ function onProviderChange(){
     return;
   }
   // Start from a clean copy of the chosen provider, then re-apply any tenant overrides on top
-  activeProvider=Object.assign({},PROVIDERS[val],_tenantOverrides);
+  activeProvider=Object.assign({},PROVIDERS[val],val==='apex'?_tenantOverrides:{}); // tenant branding is Apex's own; Catalyst/Pulse keep their colours
+  applyBrandVars(activeProvider);
   // Update topbar
   const nameEl=document.getElementById('topbar-name');
   if(nameEl)nameEl.textContent=activeProvider.name;
@@ -3235,14 +3263,13 @@ function applyTenantBranding(t){
   // Store overrides without mutating the PROVIDERS objects.
   // Name/headerBrand are NOT overridden — the provider selector controls those.
   if(t.footer_text)_tenantOverrides.footer=t.footer_text;
-  if(t.primary_color)_tenantOverrides.gradMid=t.primary_color;
-  if(t.accent_color)_tenantOverrides.accentFrom=t.accent_color;
+  // primary_color/accent_color no longer override: provider colours are the exact logo colours
   if(t.signoff_name)window._tenantSignoffName=t.signoff_name;
   if(t.signoff_role)window._tenantSignoffRole=t.signoff_role;
   // Apply overrides onto the currently active provider
   // activeProvider is null until a provider is picked; the picker merges
   // _tenantOverrides itself, so only patch it here when one is already active.
-  if(activeProvider)Object.assign(activeProvider,_tenantOverrides);
+  if(activeProvider&&activeProvider.id==='apex')Object.assign(activeProvider,_tenantOverrides);
 }
 
 // ── Init ──
@@ -3512,7 +3539,7 @@ function displayModuleNums(prog){
   });
 }
 function moduleColor(n){
-  const palette=['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A5B8C','#6B6B0F','#4E0AB8'];
+  const palette=(activeProvider||PROVIDERS.apex).modShades||['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A5B8C','#6B6B0F','#4E0AB8'];
   return palette[(n-1)%palette.length];
 }
 function moduleLabel(n){return`Module ${n}`;}
@@ -4494,17 +4521,47 @@ function generateReport(skipChecklistGate){
 }
 
 // ── PAGE BUILDERS ──
+function applyBrandVars(p){
+  const r=document.documentElement.style;
+  r.setProperty('--brand-band',`linear-gradient(120deg,${p.gradFrom},${p.gradTo})`);
+  r.setProperty('--brand-acc',p.accentFrom);r.setProperty('--brand-ink',p.gradMid);r.setProperty('--brand-tint',p.tint||'#F1F4F9');
+}
+function headerLogo(p){
+  return p.logoRevUrl?`<img class="ph-logo-rev" src="${p.logoRevUrl}" alt="${esc(p.name)}">`:logoMark(20,p);
+}
+function headerBrandText(p){return p.logoRevUrl?'':`<span class="page-header-brand">${esc(p.headerBrand)}</span>
+        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>`;}
+function modTotal(modNum){
+  const prog=activeProgramme;let mx=0;
+  (unitStandards||[]).forEach(u=>{if(!prog||!u.saqa_id||u.saqa_id===prog.saqa_id)mx=Math.max(mx,+u.mod||0);});
+  return Math.max(mx,+modNum||1);
+}
+// Light module bar with accent stripe + progress rail (screen buttons restyled for light bg)
+function modHeaderStyle(){const p=activeProvider||PROVIDERS.apex;return`background:${p.tint||'#F1F4F9'};border-left:5px solid ${p.accentFrom};color:${p.gradMid};--mh-ink:${p.gradMid}`;}
+function modRail(modNum){
+  const p=activeProvider||PROVIDERS.apex,n=Math.min(modTotal(modNum),10);let h='';
+  for(let i=1;i<=n;i++){
+    const st=i===+modNum?`background:${p.accentFrom};color:#fff;border-color:${p.accentFrom}`:i<modNum?`background:${p.gradMid};color:#fff;border-color:${p.gradMid}`:'';
+    h+=`<span class="mr-dot" style="${st}">${i}</span>`+(i<n?`<span class="mr-ln" style="${i<modNum?'background:'+p.gradMid:''}"></span>`:'');
+  }
+  return`<span class="mod-rail">${h}</span>`;
+}
+function pageWatermark(p){
+  if(p.iconUrl)return`<img class="page-wm page-wm-img" src="${p.iconUrl}" alt="" aria-hidden="true">`;
+  const id=`wmg-${p.id||'x'}`;
+  return `<svg class="page-wm" viewBox="0 0 100 115" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${p.accentFrom}"/><stop offset="1" stop-color="${p.accentTo}"/></linearGradient></defs><path d="M50 3 L95 18 V55 C95 85 72 104 50 112 C28 104 5 85 5 55 V18 Z" fill="url(#${id})"/><text x="50" y="72" text-anchor="middle" font-family="DM Sans,sans-serif" font-weight="800" font-size="52" fill="#fff">${esc(p.shieldLetter||'')}</text></svg>`;
+}
 function pageShell(pageNum,_unused,clientName,sectionTitle,bodyHTML,landscape){
   const p=activeProvider||PROVIDERS.apex;
   const div=document.createElement('div');
   div.className=landscape?'report-page content-page landscape':'report-page content-page';
   div.style.borderTop=`4px solid ${p.accentFrom}`;
-  div.innerHTML=`
-    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
+  div.style.setProperty('--foot-grad',`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`);
+  div.innerHTML=`${pageWatermark(p)}
+    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
-        ${logoMark(20,p)}
-        <span class="page-header-brand">${esc(p.headerBrand)}</span>
-        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>
+        ${headerLogo(p)}
+        ${headerBrandText(p)}
         <span class="page-header-title">${esc(clientName)}</span>
       </div>
       <span class="page-header-right">${esc(sectionTitle)}</span>
@@ -4533,7 +4590,7 @@ function computeCoverStats(pLearners,prog){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){pr++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){pr++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){attSum+=Math.round(pr/t*100);attCount++;}
   });
@@ -4580,7 +4637,8 @@ function buildCoverPage(prog,client,month){
   div.innerHTML=`
     <div class="cover-hero">
       <div class="cover-corner" style="background:linear-gradient(135deg,transparent 50%,${p.accentFrom}10 50%)"></div>
-      <div class="cover-watermark">${shieldSVG(420,p)}</div>
+      <div class="cover-watermark">${p.iconUrl?`<img src="${p.iconUrl}" alt="" style="width:380px;display:block">`:shieldSVG(420,p)}</div>
+      ${p.iconUrl?`<img class="cover-icon" src="${p.iconUrl}" alt="">`:''}
       <div class="cover-hero-inner">
         <div class="cover-title-block">
           <div class="cover-logo-row">
@@ -4632,15 +4690,15 @@ function buildCoverPage(prog,client,month){
         </div>
         <div class="cover-client-block">
           <div class="cover-field"><label>Client</label><span>${esc(client.client_name)}</span></div>
-          <div class="cover-field"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
-          <div class="cover-field"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
+          <div class="cover-field${client.contact_person?'':' cover-empty'}"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
+          <div class="cover-field${client.contact_number?'':' cover-empty'}"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
           <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
           <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
-          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field${client.sales_person?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field${client.project_manager?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
         </div>
       </div>
     </div>
-    <div class="cover-footer" style="background:${p.gradFrom}">
+    <div class="cover-footer" style="background:#F8FAFC;border-top:3px solid;border-image:linear-gradient(90deg,${p.accentFrom},${p.accentTo}) 1">
       <span class="cover-footer-left">${esc(p.footer)}</span>
       <span class="cover-footer-right">Generated ${new Date().toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'})}</span>
     </div>`;
@@ -4656,7 +4714,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){pr++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){pr++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(pr/t*100);
@@ -4676,8 +4734,9 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const fieldMap=moduleFieldMap(displayModuleNums(activeProgramme));
   const timelineMods=displayModuleNums(activeProgramme).map(n=>{
     const dates=activeProgramme[fieldMap[n]]||'';
-    const st=dates?modStatus(dates):null;
-    return{n,dates,status:st};
+    let st=dates?modStatus(dates):null,pend=null;
+    if(st==='done'){pend=moduleResultsPending(activeProgramme,n,getProgrammeLearners());if(pend&&pend.pending>0)st='awaiting';}
+    return{n,dates,status:st,pend};
   }).filter(m=>m.dates);
   // Donut geometry helper (r=50, circumference≈314.16)
   const CIRC=2*Math.PI*50;
@@ -4759,12 +4818,12 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const div=document.createElement('div');
   div.className='report-page content-page exec-summary-page';
   div.style.borderTop=`5px solid ${p.accentFrom}`;
-  div.innerHTML=`
-    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradMid})">
+  div.style.setProperty('--foot-grad',`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`);
+  div.innerHTML=`${pageWatermark(p)}
+    <div class="page-header" style="background:linear-gradient(120deg,${p.gradFrom},${p.gradTo})">
       <div class="page-header-left">
-        ${logoMark(20,p)}
-        <span class="page-header-brand">${esc(p.headerBrand)}</span>
-        <span style="color:rgba(255,255,255,.2);margin:0 6px">|</span>
+        ${headerLogo(p)}
+        ${headerBrandText(p)}
         <span class="page-header-title">${esc(client.client_name)}</span>
       </div>
       <span class="page-header-right">Executive Summary</span>
@@ -4801,13 +4860,13 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             const st=(m.status==='done'&&modNyc>0)
               ?{label:`Completed · ${modNyc} outstanding`,fg:'#8A5A00'}
               :(MOD_STATUS_STYLE[m.status]||{label:'—',fg:'#94A3B8'});
-            const pct=m.status==='done'?100:m.status==='current'?55:0;
-            const barCol=(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
+            const pct=(m.status==='done'||m.status==='awaiting')?100:m.status==='current'?55:0;
+            const barCol=m.status==='awaiting'?'#E8A33D':(m.status==='done'&&modNyc>0)?'#D4A017':m.status==='done'?'#1A365D':m.status==='current'?'#0F6B6B':'#F1F5F9';
             return`<div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                 <span style="font-size:10.5px;color:#1E2533;font-weight:600">Module ${m.n}</span>
-                <span style="font-size:8px;color:#B5BEC9">${esc(m.dates)}</span>
-                <span style="font-size:9px;color:${st.fg};font-weight:700">${st.label}</span>
+                <span style="font-size:8px;color:#B5BEC9">${esc(fmtModDates(m.dates))}</span>
+                <span style="font-size:9px;color:${st.fg};font-weight:700">${m.status==='awaiting'?modStatusLabel('awaiting',m.pend):st.label}</span>
               </div>
               <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px"></div></div>
             </div>`;
@@ -4972,7 +5031,7 @@ function buildCohortSummary(pLearners){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){attSum+=Math.round(p/t*100);attCount++;}
   });
@@ -5127,8 +5186,42 @@ function modStatus(datesStr){
 const MOD_STATUS_STYLE={
   done:{label:'Completed',bg:'#EAF3DE',fg:'#27500A'},
   current:{label:'In progress',bg:'#E6F1FB',fg:'#0C447C'},
-  upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'}
+  upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'},
+  awaiting:{label:'Results pending',bg:'#FFF1E0',fg:'#8A4B00'}
 };
+// A module whose dates have passed but still has blank (not captured) results
+// for some learners reads "Awaiting results" instead of "Completed". Blank only:
+// a captured Not Yet Competent result is a result (shown as "outstanding" elsewhere).
+// Learners who left (terminated/resigned) are not counted: they will never get
+// a result, so they must not keep a module pending forever.
+function moduleResultsPending(prog,n,pLearners){
+  if(!prog||!pLearners||!pLearners.length)return null;
+  if(!(unitStandards||[]).some(u=>+u.mod===+n&&(!u.saqa_id||u.saqa_id===prog.saqa_id)))return null;
+  const act=pLearners.filter(l=>!isLearnerTerminated(l.id)&&!isLearnerResigned(l.id));
+  if(!act.length)return null;
+  const ov=narratives._eisa||{};
+  let blank;
+  if(isLegacyProgramme(prog)){
+    blank=l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n);
+  }else{
+    const ap=moduleAppliesTypes(prog,n)||{km:true,pm:true,wm:true};
+    blank=l=>{
+      const res=(eisaState[l.id]||{})[n]||{},ek=`${l.id}_m${n}`;
+      const mv=f=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(res[f]||'');
+      return ['km','pm','wm'].some(f=>ap[f]&&!mv(f));
+    };
+  }
+  return{pending:act.filter(blank).length,total:act.length};
+}
+function moduleAwaitingResults(prog,n,pLearners){
+  const r=moduleResultsPending(prog,n,pLearners);
+  return!!r&&r.pending>0;
+}
+function modStatusLabel(st,pend){
+  const s=MOD_STATUS_STYLE[st];
+  if(!s)return'';
+  return st==='awaiting'&&pend?`${s.label} · ${pend.pending} of ${pend.total}`:s.label;
+}
 // ── EISA result codes (KM/PM/WM/Exam) ──
 // 'NYC' used to be the only non-Competent outcome a facilitator could record.
 // NS (Non-Submission) and RW (Remediation) are two more specific reasons a
@@ -5254,7 +5347,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     }).join('')}</div>
     <div class="module-timeline">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
-      const st=modStatus(m.dates);const stStyle=st?MOD_STATUS_STYLE[st]:null;
+      let st=modStatus(m.dates),pend=null;if(st==='done'){pend=moduleResultsPending(prog,m.num,pLearners);if(pend&&pend.pending>0)st='awaiting';}const stStyle=st?MOD_STATUS_STYLE[st]:null;
       const needsInput=!m.dates;
       // Calendar icon CTA replaces the free-text placeholder for an empty
       // date field — tinted with this module's own accent colour (--mc)
@@ -5296,7 +5389,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
       }
       return `
       <div class="mod-card ${m.cls}${needsInput?' needs-input':''}" style="--mc:${c}">
-        ${stStyle?`<div class="mod-status-tag" style="background:${stStyle.bg};color:${stStyle.fg}">${stStyle.label}</div>`:''}
+        ${stStyle?`<div class="mod-status-tag" style="background:${stStyle.bg};color:${stStyle.fg}">${modStatusLabel(st,pend)}</div>`:''}
         <div class="mod-num">${m.label}</div>
         <input class="mod-dates-input no-print" type="text"
           value="${esc(m.dates)}"
@@ -5305,7 +5398,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
           onblur="saveModDates(this)"
           onkeydown="if(event.key==='Enter')this.blur()">
         ${needsInput?`<div class="cta no-print" onclick="this.previousElementSibling.focus()">${calIcon}Add dates</div>`:''}
-        <div class="mod-dates-print">${esc(m.dates||'—')}</div>
+        <div class="mod-dates-print">${esc(fmtModDates(m.dates)||'—')}</div>
         <div class="mod-units">${m.units}</div>
         ${progressHtml}
         ${needsInput&&m.num<=4?`<div class="no-print" style="margin-top:6px;text-align:center"><a href="javascript:void(0)" style="font-size:7pt;color:rgba(255,255,255,.35);text-decoration:underline" onclick="if(confirm('Mark Module ${m.num} as not part of this programme? It will stop being required before a report can be sent, and will drop off the report and this timeline. You can restore it later.'))setModuleExcluded(${m.num},true)">Not part of this programme</a></div>`:''}
@@ -5420,8 +5513,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     return pct===0?'Low':pct<=0.5?'Medium':'High';
   }
   const p=activeProvider||PROVIDERS.apex;
-  const thGrad=`linear-gradient(90deg,${p.accentFrom},${p.accentTo})`;
-  const thead=`<thead><tr style="--th-grad:${thGrad}"><th style="width:110px">First Name</th><th style="width:135px">Surname</th><th>Comments &amp; Observations</th></tr></thead>`;
+  const thead=`<thead><tr style="${thVars(p)}"><th style="width:110px">First Name</th><th style="width:135px">Surname</th><th>Comments &amp; Observations</th></tr></thead>`;
   const narColgroup=`<colgroup><col style="width:110px"><col style="width:135px"><col></colgroup>`;
 
   const makeRow=l=>{
@@ -5548,7 +5640,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
       const status=savedAtt||(attState[l.id]?.[d])||'';
       const cls=status==='P'?'att-p':status==='A'?'att-a':status==='R'?'att-r':'att-na';
       if(status==='P'){present++;total++;}
-      else if(status==='A'||status==='R'){total++;}
+      else if(status==='A'){total++;}
       return`<td class="att-cell"><span class="${cls}" data-att="${key}" onclick="cycleAtt(this)" oncontextmenu="openAttCtx(event,this,'${d}')">${status||'—'}</span></td>`;
     }).join('');
     const pct=total>0?Math.round(present/total*100):null;
@@ -5562,7 +5654,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
     let p=0,t=0;
     dates.forEach(d=>{
       const s=((narratives._att||{})[`${l.id}_${d}`])||(attState[l.id]?.[d])||'';
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     const pct=t>0?Math.round(p/t*100):null;
     return n+(pct!==null&&pct<ATT_THRESHOLD?1:0);
@@ -5595,7 +5687,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
     ${emptyHint}
     ${dates.length>0?`<div style="overflow-x:auto">
       <table class="data-table" id="att-table">
-        <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>First Name</th><th>Surname</th>${headerCols}<th style="text-align:center;white-space:nowrap">% Att</th></tr></thead>
+        <thead><tr style="${thVars()}"><th>First Name</th><th>Surname</th>${headerCols}<th style="text-align:center;white-space:nowrap">% Att</th></tr></thead>
         <tbody>${rows}</tbody>
       </table>
     </div>`:''}
@@ -5866,7 +5958,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
   }).join('');
   const headerUnitsLabel=cols.map(c=>c.label).join(' &middot; ');
   const colHeaders=cols.map(c=>`<th style="text-align:center">${c.label}</th>`).join('');
-  const body=`<div class="mod-section-header ${mColor}" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span><span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
+  const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}"><span>Assessment Results &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${headerUnitsLabel}</span>${modRail(modNum)}<span class="no-print" style="display:flex;gap:6px"><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'C')">Set all Competent</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetModuleResults(${modNum},'NYC')">Set all NYC</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv1','C')">Set all V1 = C</button><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetExam(${modNum},'examv2','C')">Set all V2 = C</button><span style="width:1px;background:rgba(255,255,255,.25);margin:0 2px"></span><button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkClearModule(${modNum})">Clear All</button></span></div><table class="data-table" style="break-inside:avoid;page-break-inside:avoid"><thead><tr style="${thVars()}"><th>Learner Name</th>${colHeaders}<th style="text-align:center">Exam V1</th><th style="text-align:center">Exam V2</th><th style="text-align:center">Provisional Status</th></tr></thead><tbody>${rows}</tbody></table><div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">C = Competent</span><span class="badge badge-nyc">NYC = Not Yet Competent</span><span class="badge badge-nyc">NS = Non-Submission</span><span class="badge badge-nyc">RW = Remediation</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span></div>`;
   return pageShell(pn||4+modNum,0,activeClient.client_name,'Assessment — Module '+modNum,body);
 }
 
@@ -5927,7 +6019,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     .sort((a,b)=>(a.mod||1)-(b.mod||1)||String(a.id).localeCompare(String(b.id)));
 
   if(!allUnits.length){
-    const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap"><span>Unit Standards Achieved</span></div>
+    const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}"><span>Unit Standards Achieved</span></div>
       <div style="padding:32px;text-align:center;color:var(--muted);font-size:9pt">
         No unit standards are registered for this programme yet.<br>
         <button type="button" class="btn btn-primary no-print" style="margin-top:12px;font-size:8.5pt;padding:8px 16px" onclick="openUsPanel()">📐 Add Unit Standards</button>
@@ -5948,9 +6040,9 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   });
 
   const mkFsCell=(key,val,cls)=>{
-    const bc=val==='C'?'badge-c':val==='NYC'?'badge-nyc':'badge-na';
-    const label=val==='C'?'Achieved':val==='NYC'?'Not Yet Trained':val==='NS'?'Not Yet Started':'&#8212;';
-    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${val==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
+    const bc=val==='C'?'badge-c':(val==='NYC'||val==='NC')?'badge-nyc':'badge-na';
+    const label=val==='C'?'Achieved':val==='NC'?'Not Yet Competent':val==='NYC'?'Not Yet Trained':val==='NS'?'Not Yet Started':'&#8212;';
+    return`<td style="text-align:center"><div><select class="result-select result-screen ${cls}" data-eisa="${key}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${val==='C'?'selected':''}>Achieved</option><option value="NC" ${val==='NC'?'selected':''}>Not Yet Competent</option><option value="NYC" ${val==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${val==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${bc}">${label}</span></div></td>`;
   };
 
   let pn=startPn;
@@ -5962,7 +6054,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     // read-only (title/level/credits), for POE/audit reference. Results are
     // no longer captured per unit standard; see below.
     const usListRows=units.map(u=>`<tr><td style="font-family:var(--mono);white-space:nowrap">${esc(u.id)}</td><td>${esc(u.title||'')}</td><td style="text-align:center">${esc(String(u.level||''))}</td><td style="text-align:center">${esc(String(u.credits||0))}</td></tr>`).join('');
-    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
+    const usListTable=`<div style="margin-bottom:12px;overflow-x:auto"><table class="data-table" style="font-size:7.5pt"><thead><tr style="${thVars()}"><th style="text-align:left">US ID</th><th style="text-align:left">Unit Standard Title</th><th>Level</th><th>Credits</th></tr></thead><tbody>${usListRows}</tbody></table></div>`;
 
     const chunks=[];
     for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
@@ -5979,19 +6071,19 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         const fsCells=mkFsCell(fKey,fv,'legacy-formative-select')+mkFsCell(sKey,sv,'legacy-summative-select');
         const lbKey=logbookKey(l.id,modNum);
         const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
-        const lbBc=lbVal==='C'?'badge-c':lbVal==='NYC'?'badge-nyc':'badge-na';
-        const lbLabel=lbVal==='C'?'Achieved':lbVal==='NYC'?'Not Yet Trained':lbVal==='NS'?'Not Yet Started':'&#8212;';
-        const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${lbVal==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
+        const lbBc=lbVal==='C'?'badge-c':(lbVal==='NYC'||lbVal==='NC')?'badge-nyc':'badge-na';
+        const lbLabel=lbVal==='C'?'Achieved':lbVal==='NC'?'Not Yet Competent':lbVal==='NYC'?'Not Yet Trained':lbVal==='NS'?'Not Yet Started':'&#8212;';
+        const logbookCell=`<td style="text-align:center;border-left:2px solid var(--border)"><div><select class="result-select result-screen legacy-logbook-select" data-eisa="${lbKey}" onchange="syncUsResult(this)"><option value="">&#8212;</option><option value="C" ${lbVal==='C'?'selected':''}>Achieved</option><option value="NC" ${lbVal==='NC'?'selected':''}>Not Yet Competent</option><option value="NYC" ${lbVal==='NYC'?'selected':''}>Not Yet Trained</option><option value="NS" ${lbVal==='NS'?'selected':''}>Not Yet Started</option></select><span class="result-print badge ${lbBc}">${lbLabel}</span></div></td>`;
         const complete=earned>=modTotalCredits&&modTotalCredits>0&&lbVal==='C';
         const anyProgress=earned>0||lbVal==='C'||anyAssessed;
         const status=complete?'<span class="badge badge-c">Complete</span>':anyProgress?'<span class="badge badge-nyc">In Progress</span>':'<span class="badge badge-pending">Pending</span>';
         return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}${terminatedTag(l.id,modNum)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
-      const thead=`<thead style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})">
+      const thead=`<thead style="${thVars()}">
         <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
-      const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;background:${moduleColor(modNum)}">
-          <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>
+      const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}">
+          <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>${modRail(modNum)}
           <span class="no-print" style="display:flex;gap:6px">
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/Logbook results from Excel">📋 Bulk Paste</button>
             <button type="button" id="us-undo-btn-m${modNum}" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoUsPaste(${modNum})" title="Undo last bulk paste for this module">↩ Undo</button>
@@ -6005,7 +6097,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         <div style="overflow-x:auto">
           <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid">${thead}<tbody>${rows}</tbody></table>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Trained</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Competent</span><span class="badge badge-nyc">Not Yet Trained</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
       pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
     });
   });
@@ -6015,8 +6107,8 @@ function syncUsResult(sel){
   const printSpan=sel.nextElementSibling;
   if(printSpan&&printSpan.classList.contains('result-print')){
     const v=sel.value;
-    printSpan.className='result-print badge '+(v==='C'?'badge-c':v==='NYC'?'badge-nyc':'badge-na');
-    printSpan.textContent=v==='C'?'Achieved':v==='NYC'?'Not Yet Trained':v==='NS'?'Not Yet Started':'—';
+    printSpan.className='result-print badge '+(v==='C'?'badge-c':(v==='NYC'||v==='NC')?'badge-nyc':'badge-na');
+    printSpan.textContent=v==='C'?'Achieved':v==='NC'?'Not Yet Competent':v==='NYC'?'Not Yet Trained':v==='NS'?'Not Yet Started':'—';
   }
   if(!narratives._eisa)narratives._eisa={};
   narratives._eisa[sel.dataset.eisa]=sel.value;
@@ -6056,7 +6148,7 @@ function bulkSetLegacyResults(tableId,value){
     sel.value=value;
     syncUsResult(sel);
   });
-  toast(value==='C'?'All set to Achieved':value==='NYC'?'All set to Not Yet Trained':value==='NS'?'All set to Not Yet Started':'Cleared','success',2000);
+  toast(value==='C'?'All set to Achieved':value==='NC'?'All set to Not Yet Competent':value==='NYC'?'All set to Not Yet Trained':value==='NS'?'All set to Not Yet Started':'Cleared','success',2000);
 }
 
 const SURVEY_ITEMS=[
@@ -6121,7 +6213,7 @@ function buildSurveyPage(nar,pn=9){
       <div><div class="sec-title">Training Evaluation Survey</div><div class="sec-subtitle">Click circles to toggle rating selections</div></div>
     </div>
     <table class="data-table">
-      <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th>Criteria / Question</th><th style="text-align:center">Poor</th><th style="text-align:center">Sufficient</th><th style="text-align:center">Above Standard</th><th style="text-align:center;background:${(activeProvider||PROVIDERS.apex).accentTo}">Excellent</th></tr></thead>
+      <thead><tr style="${thVars()}"><th>Criteria / Question</th><th style="text-align:center">Poor</th><th style="text-align:center">Sufficient</th><th style="text-align:center">Above Standard</th><th style="text-align:center;background:${(activeProvider||PROVIDERS.apex).accentTo}">Excellent</th></tr></thead>
       <tbody>${rows}</tbody>
     </table>
     <div style="margin-top:12px;break-before:avoid;page-break-before:avoid;break-inside:avoid;page-break-inside:avoid;border:1px solid var(--border);border-radius:var(--r);padding:12px 14px;background:#FAFBFD">
@@ -6251,7 +6343,7 @@ function getModuleTrainingStatus(modNum){
 }
 
 function buildUnitsTable(prog){
-  const modColors=['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A8C5B','#8C7A3A','#3A5B8C'];
+  const modColors=(activeProvider||PROVIDERS.apex).modShades||['#1A365D','#0F6B6B','#5B3A8C','#B84E0A','#8C3A5B','#3A8C5B','#8C7A3A','#3A5B8C'];
   const units=unitStandards.filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id);
   // Pre-compute status per module from actual assessment data. Legacy programmes
   // (e.g. CCI) can have more than 4 modules, so derive the module list from the
@@ -6263,7 +6355,7 @@ function buildUnitsTable(prog){
   // Memoisation — key: saqa_id + module statuses + per-unit content (id/title/level/credits/mod)
   // so edits to an *existing* unit standard (same count) also invalidate the cache.
   const _unitsSig=units.map(u=>`${u.id}:${u.title}:${u.level}:${u.credits}:${u.mod}`).join(',');
-  const _butKey=`${prog.saqa_id}|${modNums.map(m=>modStatus[m]).join(',')}|${_unitsSig}`;
+  const _butKey=`${thVars()}|${prog.saqa_id}|${modNums.map(m=>modStatus[m]).join(',')}|${_unitsSig}`;
   if(buildUnitsTable._c?.k===_butKey)return buildUnitsTable._c.h;
   if(!units.length){
     const _h=`<div style="padding:20px;text-align:center;color:var(--muted);font-size:9pt;font-style:italic">
@@ -6292,7 +6384,7 @@ function buildUnitsTable(prog){
     return modHeader+`<tr><td style="font-family:var(--mono);font-size:8pt">${esc(u.id)}</td><td>${esc(u.title)}</td><td style="text-align:center">${u.level}</td><td style="text-align:center">${u.credits}</td><td style="text-align:center">${status}</td></tr>`;
   }).join('');
   const _tableH=`<table class="data-table">
-    <thead><tr style="--th-grad:linear-gradient(90deg,${(activeProvider||PROVIDERS.apex).accentFrom},${(activeProvider||PROVIDERS.apex).accentTo})"><th style="width:70px">US ID</th><th>Unit Standard Title</th><th style="text-align:center;width:55px">Level</th><th style="text-align:center;width:60px">Credits</th><th style="text-align:center;width:120px">Status</th></tr></thead>
+    <thead><tr style="${thVars()}"><th style="width:70px">US ID</th><th>Unit Standard Title</th><th style="text-align:center;width:55px">Level</th><th style="text-align:center;width:60px">Credits</th><th style="text-align:center;width:120px">Status</th></tr></thead>
     <tbody>${rows}</tbody>
     <tfoot><tr><td colspan="3" style="text-align:right;padding:8px 11px;font-weight:700;font-size:8.5pt;color:var(--navy)">Total Credits:</td><td style="text-align:center;font-weight:800;font-size:10pt;color:var(--navy)">${totalCredits}</td><td></td></tr></tfoot>
   </table>`;
@@ -6357,7 +6449,7 @@ function recalcAttPctRow(learnerId){
   row.querySelectorAll('[data-att]').forEach(el=>{
     const status=el.textContent.trim();
     if(status==='P'){present++;total++;}
-    else if(status==='A'||status==='R'){total++;}
+    else if(status==='A'){total++;}
   });
   const pct=total>0?Math.round(present/total*100):null;
   const pctCls=pct===null?'pct-none':pct>=ATT_THRESHOLD?'pct-ok':pct>=60?'pct-warn':'pct-low';
@@ -6728,7 +6820,7 @@ function draftNarrative(key, btn){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(p/t*100);
@@ -7240,7 +7332,7 @@ function _aiAddGapFills(d){
     if(!ta||ta.value.trim())return;
     const a=attState[l.id]||{};
     let p=0,ab=0;dates.forEach(dt=>{if(a[dt]==='P')p++;else if(a[dt]==='A')ab++;});
-    let c=0,n=0;document.querySelectorAll(`select[data-eisa^="${lid}_"]`).forEach(s=>{if(s.value==='C')c++;else if(s.value==='NYC')n++;});
+    let c=0,n=0;document.querySelectorAll(`select[data-eisa^="${lid}_"]`).forEach(s=>{if(s.value==='C')c++;else if(s.value==='NYC'||s.value==='NC')n++;});
     if(!p&&!ab&&!c&&!n)return;
     const first=(l.first_name||'').trim().split(/\s+/)[0]||'The learner';
     const parts=[];
@@ -7327,7 +7419,7 @@ function _computeDraft(key){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(p/t*100);
@@ -7872,6 +7964,14 @@ function syncExamPct(inp){
 // ── Module date validation helpers ──
 const MOD_MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 
+// Module dates shown on the report in one format ("11 May 2026 – 9 Jul 2026"),
+// whatever was typed. Unreadable input is shown as typed, so nothing is lost.
+function fmtModDates(str){
+  const r=str?parseModDateRange(String(str)):null;
+  if(!r)return str||'';
+  const f=d=>`${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getFullYear()}`;
+  return`${f(r.start)} – ${f(r.end)}`;
+}
 function parseModDateRange(str){
   // Accepts "09 Feb 2026 – 04 May 2026" or "09 Feb 2026 - 04 May 2026"
   if(!str||!str.trim())return null;
@@ -7880,9 +7980,9 @@ function parseModDateRange(str){
   const parseOne=s=>{
     s=s.trim();
     // "09 Feb 2026" or the 2-digit-year shorthand PMs often type, "09 Feb 26"
-    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2}|\d{4})$/);
+    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{2}|\d{4})$/);
     if(m1){
-      const mon=MOD_MONTHS[m1[2].toLowerCase()];
+      const mon=MOD_MONTHS[m1[2].slice(0,3).toLowerCase()];
       if(mon===undefined)return null;
       const yr=m1[3].length===2?2000+ +m1[3]:+m1[3];
       return new Date(yr,mon,+m1[1]);
@@ -7963,8 +8063,8 @@ async function saveModDates(inp){
     toast('⚠ Date conflict: '+dateWarns[0],'warn',5000);
   }
   // Sync print sibling
-  const printDiv=inp.nextElementSibling;
-  if(printDiv&&printDiv.classList.contains('mod-dates-print'))
+  const printDiv=inp.parentElement&&inp.parentElement.querySelector('.mod-dates-print');
+  if(printDiv)
     printDiv.textContent=val||'—';
   // Update local state
   activeProgramme[field]=val;
@@ -10241,7 +10341,7 @@ function scanSheet(sheetName,rows){
     if(isAttendanceSheet){
       const sessDate=normDateKey(p(['session date','attendance date','date']));
       const statusRaw=p(['status','attendance status','present','attended']);
-      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'R',r:'R',remediation:'R','n/a':'N/A',na:'N/A'};
+      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'P',r:'R',resigned:'R',remediation:'P','n/a':'N/A',na:'N/A'};
       const status=statusMap[statusRaw.toLowerCase()]||(statusRaw?statusRaw.toUpperCase().slice(0,3):'');
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
       if((resolvedFirst||resolvedLast||idNumber)&&sessDate&&status){
@@ -10280,7 +10380,7 @@ function scanSheet(sheetName,rows){
       const wideName=pick(row.map(normCell),headers,['learner','learner name','full name','fullname','delegate name','name']);
       const wideSplit=splitFullName(wideName);
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
-      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'R',r:'R',remediation:'R','n/a':'N/A',na:'N/A'};
+      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'P',r:'R',resigned:'R',remediation:'P','n/a':'N/A',na:'N/A'};
       dateColIdx.forEach(ci=>{
         const raw=normCell(row[ci]).trim();
         if(!raw)return;
@@ -14935,7 +15035,7 @@ function _renderLRC(){
     else if(v==='R')resigned++;
   });
   const total=attDates.length;
-  const attPct=total>0?Math.round(present/total*100):null;
+  const attPct=(present+absent)>0?Math.round(present/(present+absent)*100):null; // R (Resigned) and N/A excluded, same as every other attendance %
 
   const attChips=attDates.length
     ?attDates.map(d=>{
@@ -14994,7 +15094,7 @@ function _renderLRC(){
   const usTotalCredits=usModNums.reduce((s,m)=>s+usCreditsByMod[m],0);
   let usEarned=0;
   const ovLrc=narratives._eisa||{};
-  const mkLrcB=v=>v?`<span class="lrc-badge ${v==='C'?'c':v==='NYC'?'nyc':'na'}">${v==='NS'?'Not Started':v}</span>`:`<span class="lrc-badge na">—</span>`;
+  const mkLrcB=v=>v?`<span class="lrc-badge ${v==='C'?'c':(v==='NYC'||v==='NC')?'nyc':'na'}">${v==='NS'?'Not Started':v==='NC'?'NYC':v==='NYC'?'NYT':v}</span>`:`<span class="lrc-badge na">—</span>`;
   const usRows=usModNums.map(modNum=>{
     const fv=legacyFormativeValue(ovLrc,l.id,modNum);
     const sv=legacySummativeValue(ovLrc,l.id,modNum);
@@ -15007,7 +15107,7 @@ function _renderLRC(){
       <td style="text-align:center">${cr}</td>
       <td style="text-align:center">${mkLrcB(fv)}</td>
       <td style="text-align:center">${mkLrcB(sv)}</td>
-      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet Trained</span>':lbv==='NS'?'<span class="lrc-badge na">Not Started</span>':'<span class="lrc-badge na">—</span>'}</td>
+      <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NC'?'<span class="lrc-badge nyc">Not Yet Competent</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet Trained</span>':lbv==='NS'?'<span class="lrc-badge na">Not Started</span>':'<span class="lrc-badge na">—</span>'}</td>
       <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
     </tr>`;
   }).join('');
@@ -15390,7 +15490,7 @@ document.getElementById('bulk-dates-modal').addEventListener('click',function(e)
     <div style="padding:20px 24px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:space-between;flex-shrink:0">
       <div>
         <div id="us-paste-title" style="font-size:13pt;font-weight:800;color:#fff;letter-spacing:.04em">📋 Bulk Unit Standards Paste</div>
-        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file). Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent).</div>
+        <div style="font-size:8.5pt;color:rgba(255,255,255,.5);margin-top:3px">Paste from Excel — first row must be this exact header (copy it into row 1 of your sheet), then one row per learner (ID Number, or full name if no ID Number is on file). Valid result codes: <span style="font-family:var(--mono);color:var(--gold2)">C</span> (Achieved) · <span style="font-family:var(--mono);color:var(--gold2)">NYC</span> (Not Yet Competent) · <span style="font-family:var(--mono);color:var(--gold2)">NYT</span> (Not Yet Trained) · <span style="font-family:var(--mono);color:var(--gold2)">NS</span> (Not Yet Started).</div>
         <div id="us-paste-template" style="font-family:var(--mono);font-size:7.5pt;color:var(--gold2);background:rgba(255,255,255,.06);border-radius:6px;padding:6px 10px;margin-top:6px;user-select:all;overflow-x:auto;white-space:nowrap"></div>
       </div>
       <button onclick="closeUsPaste()" style="background:rgba(255,255,255,.1);border:none;color:#fff;border-radius:6px;width:32px;height:32px;cursor:pointer;font-size:16pt;line-height:1;display:flex;align-items:center;justify-content:center;flex-shrink:0">×</button>
@@ -15460,7 +15560,8 @@ function closeUsPaste(){
 function _usNormResult(v){
   const u=(v||'').toUpperCase().trim();
   if(u==='C'||u==='COMPETENT'||u==='ACHIEVED')return'C';
-  if(u==='NYC'||u==='NOT YET'||u==='NOT YET COMPETENT'||u==='NOT YET ACHIEVED'||u==='NOT YET TRAINED'||u==='NYT')return'NYC';
+  if(u==='NYC'||u==='NC'||u==='NOT YET COMPETENT'||u==='NOT COMPETENT')return'NC';
+  if(u==='NOT YET'||u==='NOT YET ACHIEVED'||u==='NOT YET TRAINED'||u==='NYT')return'NYC';
   if(u==='NS'||u==='NOT YET STARTED'||u==='NOT STARTED')return'NS';
   return''; // blank or unrecognised — left untouched rather than guessed at
 }
