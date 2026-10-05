@@ -3374,6 +3374,7 @@ async function init(){
     if(IS_ADMIN)updateReviewPendingBadge();
     if(!IS_ADMIN)checkPMFeedback();
     else checkAdminFeedback();
+    _openReportDeepLink();
   }catch(e){
     if(!cached){
       setStatus(false,'Not Ready - Import or add data manually');
@@ -8639,7 +8640,6 @@ function logReportPrint(){
         _applyReportLock('pending', printedAt);
         _currentReportStatus='pending';
         // A resubmission is already announced to admins by transition_report().
-        if(!resubmit)_notifyAdminAfterSubmit(rec.id, clientNameAtSubmit, month);
         _logAudit(rec.id,resubmit?'resubmitted':'submitted',{newStatus:'pending'});
       }
     }
@@ -12729,6 +12729,19 @@ function _appendLoadMore(list){
   list.appendChild(lm);
 }
 
+// Deep-link: ?report=<id> → open that report (admin: review view; PM: load for editing).
+// Used by report-notify emails. RLS decides whether the user can see the row.
+async function _openReportDeepLink(){
+  const id=new URLSearchParams(window.location.search).get('report');
+  if(!id||!/^\d+$/.test(id))return;
+  try{
+    const rows=await sb('reports',`select=*&tenant_id=eq.${TENANT_DB_ID}&id=eq.${id}&limit=1`);
+    if(!rows||!rows[0]){toast('That report could not be found or you do not have access','warn',4000);return;}
+    if(IS_ADMIN)await adminLoadReport(rows[0]);
+    else await pmLoadReport(rows[0]);
+  }catch(e){console.warn('report deep link failed',e.message);}
+}
+
 // Admin: load a report from the review queue by selecting its client+programme+month
 async function adminLoadReport(reportRecord){
   closeHistoryPanel();
@@ -14406,58 +14419,8 @@ async function _loadMoreHistory(){
 // NOTIFICATIONS — in-app push to PM when admin acts
 // ──────────────────────────────────────────────
 
-// Called after admin submits a review — writes a notification row for the PM
-async function _notifyPMAfterReview(reportId,decision,note,clientName,month,recipientEmail){
-  if(!isOnline)return;
-  try{
-    const payload={
-      tenant_id:TENANT_DB_ID,
-      report_ref:reportId,
-      type:decision,              // 'approved' | 'needs_changes'
-      message:decision==='approved'
-        ?`Your report for ${clientName} (${month}) was approved ✅`
-        :`Changes requested on ${clientName} (${month}): ${note||'See reviewer notes'}`,
-      created_at:new Date().toISOString(),
-      read:false,
-      recipient_email:recipientEmail||null,
-    };
-    await sbPost('notifications',payload).catch(()=>{}); // silent fail — table may not exist yet
-  }catch(e){/* non-critical */}
-}
-
-// Called after a PM submits a report — writes a notification row for admins
-async function _notifyAdminAfterSubmit(reportId,clientName,month){
-  if(!isOnline)return;
-  try{
-    const payload={
-      tenant_id:TENANT_DB_ID,
-      report_ref:reportId,
-      type:'submitted',
-      message:`📋 ${clientName} (${month}) submitted for review`,
-      created_at:new Date().toISOString(),
-      read:false,
-      recipient_role:'admin',
-    };
-    await sbPost('notifications',payload).catch(()=>{}); // silent fail — table may not exist yet
-  }catch(e){/* non-critical */}
-}
-
-// Called after a PM marks a report as sent to client — writes a notification row for admins
-async function _notifyAdminAfterClientSend(reportId,clientName,month){
-  if(!isOnline)return;
-  try{
-    const payload={
-      tenant_id:TENANT_DB_ID,
-      report_ref:reportId,
-      type:'sent_to_client',
-      message:`📤 ${clientName} (${month}) was sent to the client`,
-      created_at:new Date().toISOString(),
-      read:false,
-      recipient_role:'admin',
-    };
-    await sbPost('notifications',payload).catch(()=>{}); // silent fail — table may not exist yet
-  }catch(e){/* non-critical */}
-}
+// Report notifications (submitted/resubmitted/needs_changes/approved/sent_to_client)
+// are written server-side by trigger reports.write_report_notification() and emailed by report-notify.
 
 // ── PM: mark the current report as sent to the client ──
 async function markSentToClient(){
