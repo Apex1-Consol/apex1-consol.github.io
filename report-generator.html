@@ -4654,7 +4654,7 @@ function buildCoverKeyDates(prog,month,p){
   const iso=v=>{if(!v)return null;const d=new Date(v+'T00:00:00');return isNaN(d)?null:d;};
   const nums=displayModuleNums(prog),fm=moduleFieldMap(nums);
   const mods=nums.map(n=>({n,r:parseModDateRange(String(prog[fm[n]]||''))})).filter(m=>m.r);
-  const t=new Date();t.setHours(0,0,0,0);
+  const t=new Date(_reportRefDate());t.setHours(0,0,0,0); // as at the reporting month, not today
   const start=mods.length?new Date(Math.min(...mods.map(m=>m.r.start))):iso(prog.start_date);
   const end=mods.length?new Date(Math.max(...mods.map(m=>m.r.end))):iso(prog.end_date);
   const cur=mods.find(m=>m.r.start<=t&&t<=m.r.end);
