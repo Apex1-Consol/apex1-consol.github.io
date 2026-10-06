@@ -3035,13 +3035,14 @@ function decorateMonthOptions(){
     o.textContent=base+_reportStatusSuffix(programmeReportStatus[o.value]);
   });
 }
+const MAX_MODULES=20; // matches public.programmes module_1_dates … module_20_dates
 const _AUTO_MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 function _programmeMonthWindow(prog){
   // Earliest module start date through the later of (latest module end date,
   // today) — every month the programme has actually been running is a
   // candidate, including the current month even if modules run past it.
   if(!prog)return null;
-  const ranges=[1,2,3,4,5,6,7,8,9,10].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
+  const ranges=Array.from({length:MAX_MODULES},(_,i)=>i+1).map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
   if(!ranges.length)return null;
   const start=new Date(Math.min(...ranges.map(r=>r.start)));
   const latestEnd=new Date(Math.max(...ranges.map(r=>r.end)));
@@ -8075,6 +8076,8 @@ function addModuleDateField(){
   const existing=[...container.querySelectorAll('[data-mod-field-row]')]
     .map(el=>+el.dataset.modFieldRow).filter(n=>!isNaN(n));
   const next=(existing.length?Math.max(...existing):0)+1;
+  // The database has module_1_dates … module_20_dates; a 21st would fail on save.
+  if(next>MAX_MODULES){toast(`Maximum ${MAX_MODULES} modules — contact your admin if a programme needs more`,'warn',5000);return;}
   const row=document.createElement('div');
   row.className='modal-field';
   row.setAttribute('data-mod-field-row',next);
