@@ -3809,6 +3809,9 @@ function loadNarratives(){
 }
 function saveNarratives(showToast=false){
   if(!activeProgramme)return;
+  // Reviewers (admin view) never write drafts: the PM's cloud draft is the source of
+  // truth, and an autosave from a reviewer's stale copy would overwrite the PM's work.
+  if(IS_ADMIN)return;
   const key=narrativeKey();
   const data={};
   // Start from the in-memory narratives store so fields accepted while their
@@ -5301,6 +5304,7 @@ function eisaOverallLabel(allC,vals){
   if(vals.some(v=>v==='NS'))return'Non-Submission';
   if(vals.some(v=>v==='RW'))return'Remediation';
   if(vals.some(v=>v==='NYC'))return'Not Yet Competent';
+  if(!vals.some(v=>v&&v!=='N/A'))return'Not yet assessed';
   return'Pending';
 }
 function eisaOverallBadgeClass(allC,vals){
@@ -6006,7 +6010,7 @@ function buildAssessmentPage(pLearners,modNum,nar,pn){
     const km=mkVal('km',res.km),pm=mkVal('pm',res.pm),wm=mkVal('wm',res.wm),ev1=mkVal('examv1',res.examv1),ev2=mkVal('examv2',res.examv2);
     const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
     const rowVals=[km,pm,wm,ev1,ev2];
-    const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+    const allC=rowVals.some(v=>v&&v!=='N/A')&&rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
     const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
     const resultVals={km,pm,wm};
     const colCells=cols.map(c=>`<td>${mkResult(c.key,resultVals[c.key])}</td>`).join('');
@@ -7956,7 +7960,7 @@ function updateRowStatus(sel){
   const applies=moduleAppliesTypes(activeProgramme,+m[2]);
   const requiredVals=[...(applies.km?[km]:[]),...(applies.pm?[pm]:[]),...(applies.wm?[wm]:[])];
   const rowVals=[km,pm,wm,ev1,ev2];
-  const allC=rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
+  const allC=rowVals.some(v=>v&&v!=='N/A')&&rowVals.filter(v=>v&&v!=='N/A').every(v=>v==='C')&&requiredVals.every(v=>v==='C');
   const overall=`<span class="badge ${eisaOverallBadgeClass(allC,rowVals)}">${eisaOverallLabel(allC,rowVals)}</span>`;
   const statusCell=document.querySelector(`select[data-eisa="${prefix}examv1"]`)?.closest('tr')?.querySelector('td:last-child');
   if(statusCell)statusCell.innerHTML=overall;
@@ -8304,7 +8308,37 @@ async function sendForReview(){
   }
   if(_checklistBlocksFinalize())return;
   if(!(await _confirmUneditedComments()))return;
+  if(!(await _confirmMissingDetails()))return;
+  _stampSignoffDate();
   logReportPrint();
+}
+
+// ── Pre-submit check: cover / sign-off details the reviewer needs ──
+async function _confirmMissingDetails(){
+  const c=activeClient||{},p=activeProgramme||{},missing=[];
+  if(!(c.project_manager||'').trim())missing.push('Project Manager (client details)');
+  if(!(c.sales_person||'').trim())missing.push('Sales Person (client details)');
+  const fac=p.facilitator_id?getAssessor(p.facilitator_id):'';
+  if(!fac||fac==='—')missing.push('Facilitator (programme)');
+  else if(String(fac).trim().split(/\s+/).length<2)missing.push(`Facilitator surname ("${fac}")`);
+  const nm=document.querySelector('[data-nar="signoff_name"]')?.value?.trim();
+  const sig=document.getElementById('sig-data-input')?.value;
+  if(!nm)missing.push('Sign-off name');
+  if(!sig)missing.push('Sign-off signature');
+  if(!missing.length)return true;
+  return showConfirmDialog(`These details are missing and will be blank on the report:\n• ${missing.join('\n• ')}\n\nSend for review anyway?`);
+}
+// Sign-off date = the day the report is sent for review
+function _stampSignoffDate(){
+  const el=document.querySelector('[data-nar="signoff_date"]');
+  if(!el)return;
+  const today=new Date().toLocaleDateString('en-ZA');
+  if(el.value===today)return;
+  el.value=today;
+  try{syncNar(el);}catch{}
+  const pr=document.querySelector('[data-nar-print="signoff_date"]');
+  if(pr)pr.textContent=today;
+  saveNarratives();
 }
 
 // ── Pre-submit check: warn if observation comments are still the bulk
@@ -12827,6 +12861,29 @@ async function _openReportDeepLink(){
 }
 
 // Admin: load a report from the review queue by selecting its client+programme+month
+// Pull the cloud draft for programme+month into this browser before (re)building a
+// report. force=true (reviewer) always replaces the local copy; otherwise the
+// newer copy wins. Returns true when the local copy was replaced.
+async function _pullCloudDraft(progId,month,force){
+  if(!isOnline||!TENANT_DB_ID||!progId||isTempId(progId))return false;
+  try{
+    const rows=await sb('drafts',`select=saved_at,payload&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${progId}&month=eq.${encodeURIComponent(month||'')}&limit=1`);
+    const row=rows&&rows[0];
+    if(!row||!row.payload)return false;
+    const data=typeof row.payload==='string'?JSON.parse(row.payload):row.payload;
+    if(!data||typeof data!=='object')return false;
+    const key=`${DRAFT_PREFIX}${progId}_${month||''}`;
+    if(!force){
+      let localAt=0;
+      try{const raw=localStorage.getItem(key);if(raw)localAt=JSON.parse(raw)?._meta?.savedAt||0;}catch{}
+      const cloudAt=data?._meta?.savedAt||Date.parse(row.saved_at)||0;
+      if(cloudAt<=localAt)return false;
+    }
+    localStorage.setItem(key,JSON.stringify(data));
+    return true;
+  }catch(e){console.warn('_pullCloudDraft failed:',e.message);return false;}
+}
+
 async function adminLoadReport(reportRecord){
   closeHistoryPanel();
   _currentReportId=reportRecord.id;
@@ -12876,6 +12933,9 @@ async function adminLoadReport(reportRecord){
   // Set month
   const selM=document.getElementById('sel-month');
   selM.value=reportRecord.month||selM.value;
+
+  // Always review the PM's latest cloud draft, never an old copy in this browser
+  await _pullCloudDraft(prog.id,reportRecord.month||selM.value,true);
 
   // Generate report (skip checklist gate — this is an existing submitted record, not a fresh draft)
   generateReport(true);
@@ -12936,6 +12996,7 @@ async function pmLoadReport(reportRecord){
   try{ await onProgrammeChange(); }catch(e){ console.warn('pmLoadReport: onProgrammeChange failed',e.message); }
   const selM=document.getElementById('sel-month');
   selM.value=reportRecord.month||selM.value;
+  await _pullCloudDraft(prog.id,reportRecord.month||selM.value,false);
   generateReport(true);
   toast(`Loaded: ${reportRecord.client_name_snapshot||client.client_name} · ${reportRecord.month}`,'info',3000);
 }
@@ -13033,7 +13094,10 @@ async function openDraftsPanel(){
             const meta=content?._meta||{};
             // Synthesise a localStorage key and write it so resume works normally
             const key=`${DRAFT_PREFIX}${row.programme_id}_${row.month||''}`;
-            if(!localStorage.getItem(key)){
+            let _localAt=-1;
+            try{const _raw=localStorage.getItem(key);_localAt=_raw?(JSON.parse(_raw)?._meta?.savedAt||0):-1;}catch{}
+            const _cloudAt=meta.savedAt||Date.parse(row.saved_at)||0;
+            if(_localAt<0||(!IS_ADMIN&&_cloudAt>_localAt)||IS_ADMIN){
               localStorage.setItem(key,typeof row.payload==='string'?row.payload:JSON.stringify(row.payload));
             }
             merged.push({
