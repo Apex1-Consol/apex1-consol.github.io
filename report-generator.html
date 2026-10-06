@@ -224,10 +224,19 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 .cover-hero-inner{position:relative;z-index:1;display:flex;flex-direction:column;flex:1;justify-content:flex-start;}
 .cover-title-block{flex:0 0 auto}
 .cover-icon{position:absolute;top:40px;right:44px;width:92px;z-index:2}
-.cover-logo-row{display:flex;align-items:center;gap:16px;margin-bottom:44px}
+.cover-logo-row{display:flex;align-items:center;gap:16px;margin-bottom:28px;min-height:110px}
 .cover-shield{display:flex;align-items:center;min-width:68px;min-height:58px}
 .logo-mark{display:inline-flex;align-items:center;background:#fff;border-radius:6px;padding:4px 10px;box-shadow:0 1px 3px rgba(0,0,0,.1);border:1px solid var(--border)}
 .logo-mark img{height:100%;width:auto;display:block;object-fit:contain;max-width:210px}
+.cover-brand{display:inline-flex;flex-direction:column;align-items:center}
+.cover-brand-logo{display:block;height:84px}.cover-brand-logo img{height:100%;width:auto;max-width:330px;object-fit:contain;display:block}
+.cover-brand-slogan{margin-top:10px;font-size:8.5pt;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
+.cover-keydates{margin-top:22px}.cover-keydates>label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
+.cover-kd-row{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px}
+.cover-kd{border-left:3px solid;background:#fff;padding:8px 10px;border-radius:0 6px 6px 0;box-shadow:0 1px 2px rgba(23,22,90,.05)}
+.cover-kd span{display:block;font-size:6.8pt;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}.cover-kd b{font-size:8.8pt;color:#17165A}
+.cover-stats-low{margin-top:22px}
+.cover-prepared{margin-top:auto;padding:10px 14px;font-size:8.5pt;color:var(--body);background:var(--surface)}
 .cover-brand-text h1{font-size:20pt;font-weight:800;letter-spacing:.1em;text-transform:uppercase;line-height:1}
 .cover-brand-text span{font-size:8.5pt;color:var(--muted);letter-spacing:.2em;text-transform:uppercase}
 .cover-divider{width:60px;height:4px;border-radius:2px;margin:28px 0 14px}
@@ -4624,9 +4633,35 @@ function computeCoverStats(pLearners,prog){
       if(anyNYC)flaggedModules++;
     });
   }
-  return{avgAtt,flaggedLearners:flaggedLearnerIds.size,flaggedModules,onTrack:Math.max(0,totalMods-flaggedModules),totalMods};
+  return{avgAtt,activeLearners:pLearners.filter(l=>!isLearnerTerminated(l.id)&&!isLearnerResigned(l.id)).length,totalLearners:pLearners.length,flaggedLearners:flaggedLearnerIds.size,flaggedModules,onTrack:Math.max(0,totalMods-flaggedModules),totalMods};
 }
 
+// Cover "Key Dates" strip: programme start/end from module dates (falls back
+// to programme start_date/end_date), current/next module from today, next
+// report = month after the reporting period. Missing values show "—".
+function buildCoverKeyDates(prog,month,p){
+  const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  const FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const dm=d=>`${d.getDate()} ${MN[d.getMonth()]}`,dmy=d=>`${dm(d)} ${d.getFullYear()}`;
+  const iso=v=>{if(!v)return null;const d=new Date(v+'T00:00:00');return isNaN(d)?null:d;};
+  const nums=displayModuleNums(prog),fm=moduleFieldMap(nums);
+  const mods=nums.map(n=>({n,r:parseModDateRange(String(prog[fm[n]]||''))})).filter(m=>m.r);
+  const t=new Date();t.setHours(0,0,0,0);
+  const start=mods.length?new Date(Math.min(...mods.map(m=>m.r.start))):iso(prog.start_date);
+  const end=mods.length?new Date(Math.max(...mods.map(m=>m.r.end))):iso(prog.end_date);
+  const cur=mods.find(m=>m.r.start<=t&&t<=m.r.end);
+  const nxt=mods.filter(m=>m.r.start>t).sort((a,b)=>a.r.start-b.r.start)[0];
+  let nextRep='—';
+  const mm=String(month||'').match(/([A-Za-z]+)\s+(\d{4})/);
+  if(mm){const mi=FULL.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());if(mi>=0){const d=new Date(+mm[2],mi+1,1);nextRep=`${FULL[d.getMonth()]} ${d.getFullYear()}`;}}
+  const items=[
+    ['Programme start',start?dmy(start):'—',p.accentFrom],
+    ['Current module',cur?`Module ${cur.n} · ends ${dm(cur.r.end)}`:'—',p.accentFrom],
+    ['Next module',nxt?`Module ${nxt.n} · ${dm(nxt.r.start)}`:'—',p.accentTo],
+    ['Next report',nextRep,p.accentTo],
+    ['Programme end',end?dmy(end):'—',p.gradFrom]];
+  return`<div class="cover-keydates"><label>Key Dates</label><div class="cover-kd-row">${items.map(([l,v,c])=>`<div class="cover-kd" style="border-left-color:${c}"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`;
+}
 function buildCoverPage(prog,client,month){
   const facilitator=getAssessor(prog.facilitator_id);
   const p=activeProvider||PROVIDERS.apex;
@@ -4642,10 +4677,9 @@ function buildCoverPage(prog,client,month){
       <div class="cover-hero-inner">
         <div class="cover-title-block">
           <div class="cover-logo-row">
-            <div class="cover-shield">${logoMark(44,p)}</div>
-            <div class="cover-brand-text">
-              <h1 style="color:${p.gradFrom}">${esc(p.name)}</h1>
-              <span>${esc(p.tagline)}</span>
+            <div class="cover-brand">
+              ${p.logoUrl?`<span class="cover-brand-logo" data-pid="${p.id}" data-size="84"><img src="${p.logoUrl}" alt="${esc(p.name)}" onerror="logoFallback(this)"></span>`:shieldSVG(84,p)}
+              <span class="cover-brand-slogan">${esc(p.tagline)}</span>
             </div>
           </div>
           <div class="cover-divider" style="background:linear-gradient(90deg,${p.accentFrom},${p.accentTo})"></div>
@@ -4673,7 +4707,17 @@ function buildCoverPage(prog,client,month){
               <div class="cover-progress-label">Month ${prg.elapsed} of programme</div>
             </div>`;
           })()}
-          <div class="cover-stats">
+          ${buildCoverKeyDates(prog,month,p)}
+        </div>
+        <div class="cover-client-block">
+          <div class="cover-field"><label>Client</label><span>${esc(client.client_name)}</span></div>
+          <div class="cover-field${client.contact_person?'':' cover-empty'}"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
+          <div class="cover-field${client.contact_number?'':' cover-empty'}"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
+          <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
+          <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field${client.sales_person?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field${client.project_manager?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
+        </div>
+          <div class="cover-stats cover-stats-low">
             <div class="cover-stat" style="background:${p.accentFrom}0C">
               <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.avgAtt!==null?stats.avgAtt+'%':'—'}</div>
               <div class="cover-stat-label">Avg Attendance</div>
@@ -4686,16 +4730,12 @@ function buildCoverPage(prog,client,month){
               <div class="cover-stat-num" style="color:${p.gradFrom}">${stats.flaggedLearners}</div>
               <div class="cover-stat-label">Flagged NYC</div>
             </div>
+            <div class="cover-stat" style="background:${p.accentFrom}0C">
+              <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.activeLearners}/${stats.totalLearners}</div>
+              <div class="cover-stat-label">Active Learners</div>
+            </div>
           </div>
-        </div>
-        <div class="cover-client-block">
-          <div class="cover-field"><label>Client</label><span>${esc(client.client_name)}</span></div>
-          <div class="cover-field${client.contact_person?'':' cover-empty'}"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
-          <div class="cover-field${client.contact_number?'':' cover-empty'}"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
-          <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
-          <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
-          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field${client.sales_person?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field${client.project_manager?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
-        </div>
+        <div class="cover-prepared" style="border-left:3px solid ${p.accentFrom}">Prepared exclusively for <b>${esc(client.client_name)}</b>. Confidential: not for distribution outside the client organisation.</div>
       </div>
     </div>
     <div class="cover-footer" style="background:#F8FAFC;border-top:3px solid;border-image:linear-gradient(90deg,${p.accentFrom},${p.accentTo}) 1">
