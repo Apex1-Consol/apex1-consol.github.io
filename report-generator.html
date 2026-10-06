@@ -2953,6 +2953,7 @@ let isOnline=navigator.onLine;
 
 // ── State ──
 let clients=[],programmes=[],learners=[],enrolments=[],attendance=[],eisa=[],assessors=[];
+let assessorDirectory=[]; // names of every facilitator/assessor in the tenant (pickers only)
 let activeClient=null,activeProgramme=null;
 let narratives={};  // keyed by prog_id+month
 let surveyState={};
@@ -3366,6 +3367,7 @@ async function init(){
       sb('assessors',`select=*&tenant_id=eq.${TENANT_DB_ID}`),
       sb('tenants',`select=*&id=eq.${TENANT_ID}&limit=1`)
     ]);
+    sb('assessor_directory','select=id,full_name,role&order=full_name').then(d=>{assessorDirectory=d||[];}).catch(()=>{assessorDirectory=[];});
     // Merge in any local-only (never synced to server) clients/programmes from the
     // cached snapshot — otherwise a fresh server fetch wipes them out and anything
     // referencing them (e.g. a saved draft) breaks with "no longer found".
@@ -4026,7 +4028,9 @@ function _throttle(fn,ms){
     }
   };
 }
-function getAssessor(id){return assessors.find(a=>a.id===id)?.full_name||'—';}
+function getAssessor(id){return (assessors.find(a=>a.id===id)||assessorDirectory.find(a=>a.id===id))?.full_name||'—';}
+// Picker list: own records + every other name in the tenant (personal details stay owner/admin-only)
+function assessorPickList(){const m=new Map();assessorDirectory.forEach(a=>m.set(a.id,a));assessors.forEach(a=>m.set(a.id,a));return[...m.values()].sort((x,y)=>String(x.full_name).localeCompare(String(y.full_name)));}
 // ── Learner termination status ──────────────────────────────────────────────
 // Tracked on the enrolment row (per-programme, so a learner terminated on one
 // programme can still be active on another): status ('active'|'terminated')
@@ -9044,7 +9048,7 @@ function openModal(type,mode,learnerId){
       </div>`;
   } else {
     // Build assessor options
-    const aOpts=assessors.map(a=>`<option value="${a.id}" ${isEdit&&src&&src.facilitator_id===a.id?'selected':''}>${esc(a.full_name)}</option>`).join('');
+    const aOpts=assessorPickList().map(a=>`<option value="${a.id}" ${isEdit&&src&&src.facilitator_id===a.id?'selected':''}>${esc(a.full_name)}</option>`).join('');
     html+=`
       <div class="modal-field"><label>Programme Name *</label>
         <input class="modal-input" id="mf-programme_name" placeholder="e.g. OC: Insurance Underwriter NQF Level 5" value="${v('programme_name')}">
