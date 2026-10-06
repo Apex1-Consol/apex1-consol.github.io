@@ -8401,6 +8401,44 @@ function downloadPDF(){
  * Fonts link already in the <head>. Gradients, shadows, and backgrounds
  * all render correctly because it's native browser rendering — not canvas.
  */
+// Shrink-to-fit for the printed/downloaded PDF only. Each .report-page is one
+// section that always starts on a new sheet; a section only slightly taller than
+// its sheet used to spill a few centimetres onto an extra, almost-blank sheet.
+// Such sections are scaled down (never below PRINT_FIT_MIN_SCALE) so they end
+// exactly on a sheet boundary. Sections that already fit are untouched, and
+// genuinely long ones (big registers) keep flowing across sheets as before.
+const PRINT_FIT_MIN_SCALE=0.82;
+function _fitPrintPages(doc){
+  const PX_PER_MM=96/25.4;
+  doc.querySelectorAll('.report-page').forEach(p=>{
+    const land=p.classList.contains('landscape');
+    const sheetH=land?210:297, sheetW=land?297:210;
+    const h=p.getBoundingClientRect().height/PX_PER_MM;
+    if(h<=sheetH+1)return;
+    const sheets=Math.ceil(h/sheetH);
+    const target=(sheets-1)*sheetH-1;           // 1mm safety against rounding
+    let scale=target/h;
+    if(scale<PRINT_FIT_MIN_SCALE)return;         // too much to shrink — let it flow
+    const apply=s=>{
+      p.style.setProperty('zoom',String(s));
+      // Widen/heighten the box so the zoomed page still fills the whole sheet
+      // (zoom scales the box too); the wider box usually reflows shorter.
+      p.style.setProperty('width',(sheetW/s)+'mm','important');
+      p.style.setProperty('min-height',(sheetH/s)+'mm','important');
+    };
+    apply(scale);
+    const after=p.getBoundingClientRect().height/PX_PER_MM;
+    if(after>target+1){
+      scale=Math.max(PRINT_FIT_MIN_SCALE,scale*target/after);
+      apply(scale);
+      if(p.getBoundingClientRect().height/PX_PER_MM>target+1){
+        // Could not make it fit within the limit — restore the original layout.
+        ['zoom','width','min-height'].forEach(k=>p.style.removeProperty(k));
+      }
+    }
+  });
+}
+
 function _printReportViaIframe({mode='print'}={}){
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length)return;
@@ -8524,6 +8562,7 @@ ${styleNodes}
   const _oncePrint=()=>{
     if(_printFired)return;
     _printFired=true;
+    try{_fitPrintPages(iframeDoc);}catch(e){console.warn('Print fit skipped:',e&&e.message);}
     try{
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
