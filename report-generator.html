@@ -4747,8 +4747,8 @@ function buildCoverPage(prog,client,month){
         </div>
           <div class="cover-stats cover-stats-low">
             <div class="cover-stat" style="background:${p.accentFrom}0C">
-              <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.avgAtt!==null?stats.avgAtt+'%':'—'}</div>
-              <div class="cover-stat-label">Avg Attendance</div>
+              <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.avgAtt!==null?stats.avgAtt+'%':'N/A'}</div>
+              <div class="cover-stat-label">${stats.avgAtt!==null?'Avg Attendance':'No attendance recorded'}</div>
             </div>
             <div class="cover-stat" style="background:${p.accentTo}0C">
               <div class="cover-stat-num" style="color:${p.accentTo}">${stats.totalMods>0?`${stats.onTrack}/${stats.totalMods}`:'—'}</div>
@@ -4882,7 +4882,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   }
   const headline=avgAtt!==null
     ?`${nCount} learner${nCount!==1?'s':''} enrolled, averaging ${avgAtt}% attendance across the reporting period.${flaggedModules?` ${flaggedModules} module${flaggedModules!==1?'s':''} flagged with outstanding "Not Yet Competent" results requiring follow-up.`:' No outstanding competency concerns at this time.'}`
-    :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period.`;
+    :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period. No attendance was recorded for this period.`;
   const div=document.createElement('div');
   div.className='report-page content-page exec-summary-page';
   div.style.borderTop=`5px solid ${p.accentFrom}`;
@@ -4906,8 +4906,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
           <svg viewBox="0 0 120 120" width="90" height="90" style="margin:0 auto;display:block">
             <circle cx="60" cy="60" r="50" fill="none" stroke="#F1F5F9" stroke-width="10"/>
             ${avgAtt!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${avgAtt>=ATT_THRESHOLD?'#1B7A4A':avgAtt>=60?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(avgAtt/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
-            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${avgAtt!==null?avgAtt+'%':'—'}</text>
-            <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">ATTENDANCE</text>
+            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${avgAtt!==null?avgAtt+'%':'N/A'}</text>
+            <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">${avgAtt!==null?'ATTENDANCE':'NOT RECORDED'}</text>
           </svg>
           <div style="font-size:8px;color:#94A3B8;margin-top:6px">threshold ${ATT_THRESHOLD}%</div>
         </div>
@@ -5149,8 +5149,8 @@ function buildCohortSummary(pLearners){
     </div>
     <div class="cs-card cs-att">
       <label>Avg Attendance</label>
-      <div class="cs-big ${attCls}">${avgAtt!==null?avgAtt+'%':'—'}</div>
-      <div class="cs-sub">${attCount>0?`across ${attDates.length} session${attDates.length!==1?'s':''}`:attDates.length?'sessions recorded':'no sessions yet'}</div>
+      <div class="cs-big ${attCls}">${avgAtt!==null?avgAtt+'%':'N/A'}</div>
+      <div class="cs-sub">${attCount>0?`across ${attDates.length} session${attDates.length!==1?'s':''}`:attDates.length?'no Present/Absent marks recorded':'no attendance recorded'}</div>
       ${avgAtt!==null?`<div class="cs-bar"><div class="cs-bar-fill" style="width:${avgAtt}%;background:${attBarCol}"></div></div>`:''}
     </div>
     ${modCards}
