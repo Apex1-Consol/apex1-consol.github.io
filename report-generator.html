@@ -4090,6 +4090,7 @@ async function setLearnerTermination(learnerId,status,moduleNum){
     try{await sbPatch('enrolments',e.id,payload);showSaved();}
     catch(err){
       console.warn('Learner status patch failed:',err?.message);
+      if(err?.code==='NO_ROWS_UPDATED'){toast(err.message,'error',8000);return;}
       enqueueWrite('patch','enrolments',payload,e.id);
       updateQueueBadge();
       toast('Change queued for retry when online','warn');
@@ -8157,6 +8158,8 @@ async function saveModDates(inp){
       showSaved();
     }catch(e){
       console.warn('Module dates patch failed:',e.message);
+      // A permission refusal won't succeed on retry — say so instead of queuing it.
+      if(e.code==='NO_ROWS_UPDATED'){toast(e.message,'error',8000);return;}
       enqueueWrite('patch','programmes',{[field]:val},activeProgramme.id);
       updateQueueBadge();
       toast('Module dates queued for retry when online','warn');
@@ -8195,6 +8198,7 @@ async function setModuleExcluded(n,excluded){
       showSaved();
     }catch(e){
       console.warn('Module exclusion patch failed:',e.message);
+      if(e.code==='NO_ROWS_UPDATED'){toast(e.message,'error',8000);return;}
       enqueueWrite('patch','programmes',{excluded_modules:next},activeProgramme.id);
       updateQueueBadge();
       toast('Change queued for retry when online','warn');
@@ -8804,6 +8808,15 @@ async function sbPatch(table,id,body){
   });
   if(!r.ok)throw new Error(await r.text());
   const d=await r.json();
+  // An empty result means the database matched no row it lets this user change —
+  // usually a permission rule. Report it instead of treating it as saved, or the
+  // screen shows edits that were never stored (the PM-programme bug of 6 Oct 2026).
+  if(Array.isArray(d)&&d.length===0){
+    const what={programmes:'programme',clients:'client',assessors:'facilitator',learners:'learner',enrolments:'enrolment',unit_standards:'unit standard',programme_notes:'note',reports:'report'}[table]||'record';
+    const err=new Error(`Not saved — you don't have permission to edit this ${what}, or it no longer exists. Please ask an admin.`);
+    err.code='NO_ROWS_UPDATED';
+    throw err;
+  }
   const rec=Array.isArray(d)?d[0]:d;
   return rec||null;
 }
@@ -9472,7 +9485,7 @@ async function saveModal(){
     const msg=err.message&&err.message.includes('23503')
       ?'A related record (client, facilitator, or programme) was not found in the database. Please re-select and try again, or re-import with "Save to database" checked.'
       :err.message&&err.message.includes('PGRST204')
-      ?'Save failed: the database is missing a column needed for this field (e.g. Start Date / End Date). Ask your admin to add it in Supabase, then try again.'
+      ?`Save failed: the database is missing a column needed for this field${((err.message.match(/Could not find the '([a-zA-Z0-9_]+)' column/)||[])[1])?` (${err.message.match(/Could not find the '([a-zA-Z0-9_]+)' column/)[1]})`:''}. Ask your admin to add it in Supabase, then try again.`
       :'Save failed: '+err.message;
     modalErr(msg);
     toast(msg,'error');
