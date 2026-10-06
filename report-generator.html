@@ -246,6 +246,8 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 }
 .cover-field label{font-size:7.5pt;font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:4px}
 .cover-field span{font-size:10.5pt;font-weight:600;color:var(--dark)}.cover-field.full{grid-column:1/-1}
+.cover-field.cover-empty span{color:#B5BEC9;font-weight:400}
+@media print{.cover-field.cover-empty{display:none}}
 .cover-footer{
   padding:20px 48px;
   display:flex;align-items:center;justify-content:space-between;
@@ -4588,7 +4590,7 @@ function computeCoverStats(pLearners,prog){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){pr++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){pr++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){attSum+=Math.round(pr/t*100);attCount++;}
   });
@@ -4688,11 +4690,11 @@ function buildCoverPage(prog,client,month){
         </div>
         <div class="cover-client-block">
           <div class="cover-field"><label>Client</label><span>${esc(client.client_name)}</span></div>
-          <div class="cover-field"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
-          <div class="cover-field"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
+          <div class="cover-field${client.contact_person?'':' cover-empty'}"><label>Contact Person</label><span>${esc(client.contact_person||'—')}</span></div>
+          <div class="cover-field${client.contact_number?'':' cover-empty'}"><label>Contact Number</label><span>${esc(client.contact_number||'—')}</span></div>
           <div class="cover-field"><label>Facilitator</label><span>${esc(facilitator)}</span></div>
           <div class="cover-field"><label>Group</label><span>${esc(prog.group_name||'One Group')}</span></div>
-          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
+          <div class="cover-field"><label>No. of Delegates</label><span>${pLearners.length} Learners</span></div><div class="cover-field${client.sales_person?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Sales Person</label><span>${esc(client.sales_person||'—')}</span></div><div class="cover-field${client.project_manager?'':' cover-empty'}" data-edit="client" style="cursor:pointer" title="Click to edit client"><label>Project Manager</label><span>${esc(client.project_manager||'—')}</span></div><div class="cover-field full" data-edit="programme" style="cursor:pointer" title="Click to edit programme"><label>Programme</label><span>SAQA ID: ${esc(prog.saqa_id||'—')} (${esc(prog.qualification_code||'—')}) – ${esc(prog.programme_name||'—')}</span></div>
         </div>
       </div>
     </div>
@@ -4712,7 +4714,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){pr++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){pr++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(pr/t*100);
@@ -4732,9 +4734,9 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   const fieldMap=moduleFieldMap(displayModuleNums(activeProgramme));
   const timelineMods=displayModuleNums(activeProgramme).map(n=>{
     const dates=activeProgramme[fieldMap[n]]||'';
-    let st=dates?modStatus(dates):null;
-    if(st==='done'&&moduleAwaitingResults(activeProgramme,n,getProgrammeLearners()))st='awaiting';
-    return{n,dates,status:st};
+    let st=dates?modStatus(dates):null,pend=null;
+    if(st==='done'){pend=moduleResultsPending(activeProgramme,n,getProgrammeLearners());if(pend&&pend.pending>0)st='awaiting';}
+    return{n,dates,status:st,pend};
   }).filter(m=>m.dates);
   // Donut geometry helper (r=50, circumference≈314.16)
   const CIRC=2*Math.PI*50;
@@ -4863,8 +4865,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
             return`<div>
               <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
                 <span style="font-size:10.5px;color:#1E2533;font-weight:600">Module ${m.n}</span>
-                <span style="font-size:8px;color:#B5BEC9">${esc(m.dates)}</span>
-                <span style="font-size:9px;color:${st.fg};font-weight:700">${st.label}</span>
+                <span style="font-size:8px;color:#B5BEC9">${esc(fmtModDates(m.dates))}</span>
+                <span style="font-size:9px;color:${st.fg};font-weight:700">${m.status==='awaiting'?modStatusLabel('awaiting',m.pend):st.label}</span>
               </div>
               <div style="height:5px;border-radius:3px;background:#F1F5F9;overflow:hidden"><div style="height:100%;width:${pct}%;background:${barCol};border-radius:3px"></div></div>
             </div>`;
@@ -5029,7 +5031,7 @@ function buildCohortSummary(pLearners){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){attSum+=Math.round(p/t*100);attCount++;}
   });
@@ -5185,24 +5187,40 @@ const MOD_STATUS_STYLE={
   done:{label:'Completed',bg:'#EAF3DE',fg:'#27500A'},
   current:{label:'In progress',bg:'#E6F1FB',fg:'#0C447C'},
   upcoming:{label:'Upcoming',bg:'#FAEEDA',fg:'#633806'},
-  awaiting:{label:'Awaiting results',bg:'#FFF1E0',fg:'#8A4B00'}
+  awaiting:{label:'Results pending',bg:'#FFF1E0',fg:'#8A4B00'}
 };
 // A module whose dates have passed but still has blank (not captured) results
 // for some learners reads "Awaiting results" instead of "Completed". Blank only:
 // a captured Not Yet Competent result is a result (shown as "outstanding" elsewhere).
-function moduleAwaitingResults(prog,n,pLearners){
-  if(!prog||!pLearners||!pLearners.length)return false;
-  if(!(unitStandards||[]).some(u=>+u.mod===+n&&(!u.saqa_id||u.saqa_id===prog.saqa_id)))return false;
+// Learners who left (terminated/resigned) are not counted: they will never get
+// a result, so they must not keep a module pending forever.
+function moduleResultsPending(prog,n,pLearners){
+  if(!prog||!pLearners||!pLearners.length)return null;
+  if(!(unitStandards||[]).some(u=>+u.mod===+n&&(!u.saqa_id||u.saqa_id===prog.saqa_id)))return null;
+  const act=pLearners.filter(l=>!isLearnerTerminated(l.id)&&!isLearnerResigned(l.id));
+  if(!act.length)return null;
   const ov=narratives._eisa||{};
+  let blank;
   if(isLegacyProgramme(prog)){
-    return pLearners.some(l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n));
+    blank=l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n);
+  }else{
+    const ap=moduleAppliesTypes(prog,n)||{km:true,pm:true,wm:true};
+    blank=l=>{
+      const res=(eisaState[l.id]||{})[n]||{},ek=`${l.id}_m${n}`;
+      const mv=f=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(res[f]||'');
+      return ['km','pm','wm'].some(f=>ap[f]&&!mv(f));
+    };
   }
-  const ap=moduleAppliesTypes(prog,n)||{km:true,pm:true,wm:true};
-  return pLearners.some(l=>{
-    const res=(eisaState[l.id]||{})[n]||{},ek=`${l.id}_m${n}`;
-    const mv=f=>ov[`${ek}_${f}`]!==undefined?ov[`${ek}_${f}`]:(res[f]||'');
-    return ['km','pm','wm'].some(f=>ap[f]&&!mv(f));
-  });
+  return{pending:act.filter(blank).length,total:act.length};
+}
+function moduleAwaitingResults(prog,n,pLearners){
+  const r=moduleResultsPending(prog,n,pLearners);
+  return!!r&&r.pending>0;
+}
+function modStatusLabel(st,pend){
+  const s=MOD_STATUS_STYLE[st];
+  if(!s)return'';
+  return st==='awaiting'&&pend?`${s.label} · ${pend.pending} of ${pend.total}`:s.label;
 }
 // ── EISA result codes (KM/PM/WM/Exam) ──
 // 'NYC' used to be the only non-Competent outcome a facilitator could record.
@@ -5329,7 +5347,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
     }).join('')}</div>
     <div class="module-timeline">${mods.map((m,i)=>{
       const c=hexMix(p.accentFrom,p.accentTo,i/(mods.length-1));
-      let st=modStatus(m.dates);if(st==='done'&&moduleAwaitingResults(prog,m.num,pLearners))st='awaiting';const stStyle=st?MOD_STATUS_STYLE[st]:null;
+      let st=modStatus(m.dates),pend=null;if(st==='done'){pend=moduleResultsPending(prog,m.num,pLearners);if(pend&&pend.pending>0)st='awaiting';}const stStyle=st?MOD_STATUS_STYLE[st]:null;
       const needsInput=!m.dates;
       // Calendar icon CTA replaces the free-text placeholder for an empty
       // date field — tinted with this module's own accent colour (--mc)
@@ -5371,7 +5389,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
       }
       return `
       <div class="mod-card ${m.cls}${needsInput?' needs-input':''}" style="--mc:${c}">
-        ${stStyle?`<div class="mod-status-tag" style="background:${stStyle.bg};color:${stStyle.fg}">${stStyle.label}</div>`:''}
+        ${stStyle?`<div class="mod-status-tag" style="background:${stStyle.bg};color:${stStyle.fg}">${modStatusLabel(st,pend)}</div>`:''}
         <div class="mod-num">${m.label}</div>
         <input class="mod-dates-input no-print" type="text"
           value="${esc(m.dates)}"
@@ -5380,7 +5398,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
           onblur="saveModDates(this)"
           onkeydown="if(event.key==='Enter')this.blur()">
         ${needsInput?`<div class="cta no-print" onclick="this.previousElementSibling.focus()">${calIcon}Add dates</div>`:''}
-        <div class="mod-dates-print">${esc(m.dates||'—')}</div>
+        <div class="mod-dates-print">${esc(fmtModDates(m.dates)||'—')}</div>
         <div class="mod-units">${m.units}</div>
         ${progressHtml}
         ${needsInput&&m.num<=4?`<div class="no-print" style="margin-top:6px;text-align:center"><a href="javascript:void(0)" style="font-size:7pt;color:rgba(255,255,255,.35);text-decoration:underline" onclick="if(confirm('Mark Module ${m.num} as not part of this programme? It will stop being required before a report can be sent, and will drop off the report and this timeline. You can restore it later.'))setModuleExcluded(${m.num},true)">Not part of this programme</a></div>`:''}
@@ -5622,7 +5640,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
       const status=savedAtt||(attState[l.id]?.[d])||'';
       const cls=status==='P'?'att-p':status==='A'?'att-a':status==='R'?'att-r':'att-na';
       if(status==='P'){present++;total++;}
-      else if(status==='A'||status==='R'){total++;}
+      else if(status==='A'){total++;}
       return`<td class="att-cell"><span class="${cls}" data-att="${key}" onclick="cycleAtt(this)" oncontextmenu="openAttCtx(event,this,'${d}')">${status||'—'}</span></td>`;
     }).join('');
     const pct=total>0?Math.round(present/total*100):null;
@@ -5636,7 +5654,7 @@ function buildAttendancePage(pLearners,attDates,nar,pn=4){
     let p=0,t=0;
     dates.forEach(d=>{
       const s=((narratives._att||{})[`${l.id}_${d}`])||(attState[l.id]?.[d])||'';
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     const pct=t>0?Math.round(p/t*100):null;
     return n+(pct!==null&&pct<ATT_THRESHOLD?1:0);
@@ -6431,7 +6449,7 @@ function recalcAttPctRow(learnerId){
   row.querySelectorAll('[data-att]').forEach(el=>{
     const status=el.textContent.trim();
     if(status==='P'){present++;total++;}
-    else if(status==='A'||status==='R'){total++;}
+    else if(status==='A'){total++;}
   });
   const pct=total>0?Math.round(present/total*100):null;
   const pctCls=pct===null?'pct-none':pct>=ATT_THRESHOLD?'pct-ok':pct>=60?'pct-warn':'pct-low';
@@ -6802,7 +6820,7 @@ function draftNarrative(key, btn){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(p/t*100);
@@ -7401,7 +7419,7 @@ function _computeDraft(key){
     attDates.forEach(d=>{
       const raw=attState[l.id]?.[d]||'';
       const s=((narratives._att||{})[`${l.id}_${d}`])||raw;
-      if(s==='P'){p++;t++;}else if(s==='A'||s==='R'){t++;}
+      if(s==='P'){p++;t++;}else if(s==='A'){t++;}
     });
     if(t>0){
       const pct=Math.round(p/t*100);
@@ -7946,6 +7964,14 @@ function syncExamPct(inp){
 // ── Module date validation helpers ──
 const MOD_MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
 
+// Module dates shown on the report in one format ("11 May 2026 – 9 Jul 2026"),
+// whatever was typed. Unreadable input is shown as typed, so nothing is lost.
+function fmtModDates(str){
+  const r=str?parseModDateRange(String(str)):null;
+  if(!r)return str||'';
+  const f=d=>`${d.getDate()} ${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]} ${d.getFullYear()}`;
+  return`${f(r.start)} – ${f(r.end)}`;
+}
 function parseModDateRange(str){
   // Accepts "09 Feb 2026 – 04 May 2026" or "09 Feb 2026 - 04 May 2026"
   if(!str||!str.trim())return null;
@@ -7954,9 +7980,9 @@ function parseModDateRange(str){
   const parseOne=s=>{
     s=s.trim();
     // "09 Feb 2026" or the 2-digit-year shorthand PMs often type, "09 Feb 26"
-    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{2}|\d{4})$/);
+    const m1=s.match(/^(\d{1,2})\s+([A-Za-z]{3,9})\.?\s+(\d{2}|\d{4})$/);
     if(m1){
-      const mon=MOD_MONTHS[m1[2].toLowerCase()];
+      const mon=MOD_MONTHS[m1[2].slice(0,3).toLowerCase()];
       if(mon===undefined)return null;
       const yr=m1[3].length===2?2000+ +m1[3]:+m1[3];
       return new Date(yr,mon,+m1[1]);
@@ -10315,7 +10341,7 @@ function scanSheet(sheetName,rows){
     if(isAttendanceSheet){
       const sessDate=normDateKey(p(['session date','attendance date','date']));
       const statusRaw=p(['status','attendance status','present','attended']);
-      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'R',r:'R',remediation:'R','n/a':'N/A',na:'N/A'};
+      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'P',r:'R',resigned:'R',remediation:'P','n/a':'N/A',na:'N/A'};
       const status=statusMap[statusRaw.toLowerCase()]||(statusRaw?statusRaw.toUpperCase().slice(0,3):'');
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
       if((resolvedFirst||resolvedLast||idNumber)&&sessDate&&status){
@@ -10354,7 +10380,7 @@ function scanSheet(sheetName,rows){
       const wideName=pick(row.map(normCell),headers,['learner','learner name','full name','fullname','delegate name','name']);
       const wideSplit=splitFullName(wideName);
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
-      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'R',r:'R',remediation:'R','n/a':'N/A',na:'N/A'};
+      const statusMap={present:'P',p:'P',yes:'P',absent:'A',a:'A',no:'A',late:'P',r:'R',resigned:'R',remediation:'P','n/a':'N/A',na:'N/A'};
       dateColIdx.forEach(ci=>{
         const raw=normCell(row[ci]).trim();
         if(!raw)return;
@@ -15009,7 +15035,7 @@ function _renderLRC(){
     else if(v==='R')resigned++;
   });
   const total=attDates.length;
-  const attPct=total>0?Math.round(present/total*100):null;
+  const attPct=(present+absent)>0?Math.round(present/(present+absent)*100):null; // R (Resigned) and N/A excluded, same as every other attendance %
 
   const attChips=attDates.length
     ?attDates.map(d=>{
