@@ -2614,7 +2614,7 @@ let TENANT_DB_ID=TENANT_ID;
 // ── Role — read from user metadata; URL param kept as dev fallback ──
 // PM  : full editing access, submits reports for review via Send for Review
 // Admin: read-only review queue, can approve or request changes
-let APP_ROLE=(new URLSearchParams(window.location.search).get('role'))||'pm';
+let APP_ROLE='pm'; // set from the signed-in user's app_metadata only (no URL override)
 let IS_ADMIN=APP_ROLE==='admin';
 let ADMIN_NAME=(new URLSearchParams(window.location.search).get('name'))||'Admin';
 
@@ -2624,7 +2624,11 @@ function _applySession(user){
   if(!user)return;
   const meta=user.user_metadata||{};
   // Role from metadata takes precedence
-  if(meta.role){APP_ROLE=meta.role;IS_ADMIN=APP_ROLE==='admin';}
+  // Role comes from app_metadata (server-controlled, same field the database checks).
+  // user_metadata is editable by the user themselves, so it must not grant admin.
+  const ar=(user.app_metadata||{}).role;
+  const isAdm=Array.isArray(ar)?ar.includes('admin'):ar==='admin';
+  APP_ROLE=isAdm?'admin':'pm';IS_ADMIN=isAdm;
   if(meta.name||user.email){ADMIN_NAME=meta.name||(user.email?.split('@')[0]||'User');}
   if(meta.tenant){TENANT_ID=meta.tenant;TENANT_DB_ID=meta.tenant;}
   // Update Authorization header (token is passed separately when needed)
@@ -14134,7 +14138,7 @@ async function _authSignOut(){
 // Auth is fully end-to-end. The app blocks on a Supabase session check at
 // boot, replaces the anon key with a real access token on sign-in, and handles
 // token refresh and cross-tab sign-out (+ sign-in) via onAuthStateChange.
-// User role, display name, and tenant come from user_metadata.
+// User role comes from app_metadata; display name and tenant from user_metadata.
 // Sign-out clears all local state and is reachable from the Settings panel (⚙).
 //
 // Settings panel — slides in from the right showing the logged-in user's
