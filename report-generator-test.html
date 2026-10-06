@@ -13868,9 +13868,28 @@ function _clearLoginBtnWait(){
     btn.disabled=false;btn.textContent='Sign in';
   }
 }
-function _onTurnstileOk(token){_turnstileToken=token;_clearLoginBtnWait();}
-function _onTurnstileErr(){_turnstileToken='';}
-function _onTurnstileExpired(){_turnstileToken='';}
+// Sign-in no longer dead-ends on "Please complete the security check": if the
+// invisible check hasn't finished, expired or errored, Sign in waits for it
+// (retrying the widget) and then continues automatically.
+let _tsWaiters=[],_tsErrCount=0;
+function _onTurnstileOk(token){_turnstileToken=token;_tsErrCount=0;_clearLoginBtnWait();const w=_tsWaiters;_tsWaiters=[];w.forEach(f=>f(token));}
+function _onTurnstileErr(){_turnstileToken='';_tsErrCount++;if(_tsErrCount<=3)setTimeout(_resetLoginTurnstile,1500);return true;}
+function _onTurnstileExpired(){_turnstileToken='';_resetLoginTurnstile();}
+function _resetLoginTurnstile(){
+  try{
+    if(!window.turnstile)return;
+    if(_loginWidgetId===null){_renderTurnstileWidgets();return;}
+    window.turnstile.reset(_loginWidgetId);
+  }catch(e){console.warn('turnstile reset:',e.message);}
+}
+function _waitForTurnstile(ms){
+  if(_turnstileToken)return Promise.resolve(_turnstileToken);
+  return new Promise(res=>{
+    const t=setTimeout(()=>{_tsWaiters=_tsWaiters.filter(f=>f!==done);res('');},ms);
+    function done(tok){clearTimeout(t);res(tok);}
+    _tsWaiters.push(done);
+  });
+}
 let _resetTurnstileToken='';
 function _onResetTurnstileOk(token){_resetTurnstileToken=token;}
 function _onResetTurnstileErr(){_resetTurnstileToken='';}
@@ -13918,8 +13937,17 @@ async function _authSignIn(){
   const btn=document.getElementById('login-btn');
   const errEl=document.getElementById('login-err');
   if(!email||!pass){_showLoginErr('Please enter your email and password.');return;}
-  if(!_turnstileToken){_showLoginErr('Please complete the security check.');return;}
   errEl.style.display='none';
+  if(!_turnstileToken){
+    btn.disabled=true;btn.textContent='Verifying…';
+    if(!window.turnstile||_loginWidgetId===null)_renderTurnstileWidgets();else if(_tsErrCount>3){_tsErrCount=0;_resetLoginTurnstile();}
+    await _waitForTurnstile(15000);
+    if(!_turnstileToken){
+      btn.disabled=false;btn.textContent='Sign in';
+      _showLoginErr('The security check could not finish. Please refresh the page (Ctrl+F5) and try again. If it keeps happening, try another browser or switch off ad/script blockers for this site.');
+      return;
+    }
+  }
   btn.disabled=true;btn.textContent='Signing in…';
   try{
     if(!_getSbAuth())throw new Error('Still connecting — please wait a moment and try again.');
@@ -13933,10 +13961,8 @@ async function _authSignIn(){
     await init();
   }catch(e){
     _showLoginErr(e.message||'Sign in failed. Please check your credentials.');
-    if(window.turnstile&&document.getElementById('login-turnstile')){
-      window.turnstile.reset('#login-turnstile');
-    }
     _turnstileToken='';
+    _resetLoginTurnstile();
     // Keep the button disabled until turnstile silently re-verifies (avoids
     // "Please complete the security check" if the user retries too fast).
     // Fallback timeout re-enables it regardless, in case verification stalls.
