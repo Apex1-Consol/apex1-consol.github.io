@@ -2972,8 +2972,10 @@ let programmeNotes=[]; // [{id,type,content,created_at}] — fetched from progra
   blank.textContent='— Select month —';
   sel.appendChild(blank);
   // Show previous year, current year + next year so past month reports still work
-  [curYear-1, curYear, curYear+1].forEach(yr=>{
-    months.forEach((m)=>{
+  // Previous year + current year up to the current month (no future months)
+  [curYear-1, curYear].forEach(yr=>{
+    months.forEach((m,mi)=>{
+      if(yr===curYear&&mi>now.getMonth())return;
       const o=document.createElement('option');
       o.value=`${m} ${yr}`;
       o.textContent=`${m} ${yr}`;
@@ -3008,8 +3010,14 @@ function _reportStatusSuffix(info){
 function decorateMonthOptions(){
   const sel=document.getElementById('sel-month');
   if(!sel)return;
+  // Hide months before the programme's first module (kept if currently selected)
+  const win=activeProgramme?_programmeMonthWindow(activeProgramme):null;
+  const firstKey=win?win.start.getFullYear()*12+win.start.getMonth():null;
   [...sel.options].forEach(o=>{
     if(!o.value)return;
+    const mm=o.value.match(/^(\w+) (\d{4})$/);
+    const key=mm?(+mm[2])*12+_AUTO_MONTH_NAMES.indexOf(mm[1]):null;
+    o.hidden=firstKey!==null&&key!==null&&key<firstKey&&o.value!==sel.value;
     const base=o.dataset.base||o.textContent;
     o.dataset.base=base;
     o.textContent=base+_reportStatusSuffix(programmeReportStatus[o.value]);
