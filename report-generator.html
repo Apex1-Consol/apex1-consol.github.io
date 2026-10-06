@@ -6285,14 +6285,13 @@ function buildSurveyPage(nar,pn=9){
 }
 
 function buildSignoffPage(prog,client,month,nar,pn=10){
-  // Auto-populate signoff name from facilitator if not already saved
-  const facilitatorName=getAssessor(prog.facilitator_id);
-  const name=nar.signoff_name||(facilitatorName&&facilitatorName!=='—'?facilitatorName:'')||(window._tenantSignoffName||'');
+  // Never pre-fill someone else's name: only what was saved on THIS report's draft.
+  const name=nar.signoff_name||'';
   const role=window._tenantSignoffRole||'Project Manager';
   const date=nar.signoff_date||new Date().toLocaleDateString('en-ZA');
   // Signature: prefer whatever was already saved on this report, else fall back to
   // this signer's reusable saved signature (drawn once, auto-applied on future reports)
-  const savedSig=nar.signoff_signature||getSavedSignature(name)||'';
+  const savedSig=nar.signoff_signature||'';
 
   // Page 10 — Unit Standards table
   const unitsBody=`
@@ -6312,7 +6311,7 @@ function buildSignoffPage(prog,client,month,nar,pn=10){
     <div class="signoff-block">
       <div class="signoff-field">
         <label>Authorised By</label>
-        <input class="signoff-input nar-screen" type="text" data-nar="signoff_name" value="${esc(name)}" oninput="syncNar(this);onSignoffNameChange(this)" placeholder="Full name">
+        <input class="signoff-input nar-screen" type="text" data-nar="signoff_name" value="${esc(name)}" oninput="syncNar(this);onSignoffNameChange(this)" placeholder="Your full name">
         <div class="nar-print" data-nar-print="signoff_name" style="font-size:10.5pt;font-weight:600;padding:4px 0">${esc(name)}</div>
         <div class="signoff-role">${esc(role)}</div>
       </div>
@@ -6706,15 +6705,20 @@ function saveEisaBooked(inp,total){
 const TRANSPARENT_PX='data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
 const SIG_LIB_KEY='apexu_signature_library';
 function _sigLib(){try{return JSON.parse(localStorage.getItem(SIG_LIB_KEY)||'{}');}catch{return{};}}
+// Reusable signatures are keyed to the SIGNED-IN user's email, never to a typed
+// name, so on a shared computer nobody can pull up another PM's signature.
+function _sigOwnerKey(){const e=(typeof _authUser!=='undefined'&&_authUser?.email)||'';return e?'user:'+e.toLowerCase():'';}
 function getSavedSignature(name){
-  if(!name)return'';
-  return _sigLib()[name.trim().toLowerCase()]||'';
+  const k=_sigOwnerKey();
+  if(!k)return'';
+  return _sigLib()[k]||'';
 }
 function saveSignatureForName(name,dataUrl){
-  if(!name)return;
+  const k=_sigOwnerKey();
+  if(!k)return;
   try{
     const lib=_sigLib();
-    lib[name.trim().toLowerCase()]=dataUrl;
+    lib[k]=dataUrl;
     localStorage.setItem(SIG_LIB_KEY,JSON.stringify(lib));
   }catch{}
 }
