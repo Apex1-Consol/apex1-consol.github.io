@@ -2730,6 +2730,33 @@ let _currentReportSubmitterEmail=null;
 let _currentReportStatus=null; // status of the latest report row for this programme+month
 
 // ── Check for pending feedback on the current programme/month ──
+// What the reviewer should know is missing before approving (shown in the admin
+// review bar). Same checks the PM sees at "Send for Review", plus empty sections.
+function _reportMissingForReview(){
+  const c=activeClient||{},p=activeProgramme||{},nar=(typeof narratives==='object'&&narratives)||{},out=[];
+  if(!(c.project_manager||'').trim())out.push('Project Manager');
+  if(!(c.sales_person||'').trim())out.push('Sales Person');
+  const fac=p.facilitator_id?getAssessor(p.facilitator_id):'';
+  if(!fac||fac==='—')out.push('Facilitator');
+  else if(String(fac).trim().split(/\s+/).length<2)out.push('Facilitator surname');
+  const nm=(document.querySelector('[data-nar="signoff_name"]')?.value||nar.signoff_name||'').trim();
+  const sig=document.getElementById('sig-data-input')?.value||nar.signoff_signature||'';
+  if(!nm)out.push('Sign-off name');
+  if(!sig)out.push('Signature');
+  const empty=[...document.querySelectorAll('#report-pages .nar-print[data-nar-print]')]
+    .filter(el=>el.tagName!=='IMG'&&!(el.dataset.narPrint||'').startsWith('signoff')&&!(el.textContent||'').trim()).length;
+  if(empty)out.push(`${empty} empty text section${empty!==1?'s':''}`);
+  return out;
+}
+function _renderReviewMissing(){
+  const sub=document.getElementById('review-bar-sub');
+  if(!sub)return;
+  let el=document.getElementById('review-bar-missing');
+  if(!el){el=document.createElement('div');el.id='review-bar-missing';el.style.cssText='margin-top:4px;font-size:8pt;color:#fbbf24';sub.insertAdjacentElement('afterend',el);}
+  const m=_reportMissingForReview();
+  el.textContent=m.length?`⚠ Missing on this report: ${m.join(', ')}`:'';
+  el.style.display=m.length?'block':'none';
+}
 async function checkReportStatus(){
   if(!activeProgramme||!activeClient||!isOnline)return;
   const month=document.getElementById('sel-month').value;
@@ -2795,6 +2822,9 @@ async function checkReportStatus(){
         }
         actionsWrap.innerHTML=btns.join('\n')||`<span style="font-size:8pt;color:rgba(255,255,255,.35)">No action for you at this stage</span>`;
       }
+      // The report pages may still be rendering — check now and again shortly.
+      try{_renderReviewMissing();}catch{}
+      setTimeout(()=>{try{_renderReviewMissing();}catch{}},1500);
     }
     // Apply lock state based on report status (PM only)
     if(!IS_ADMIN) _applyReportLock(r.status, r.printed_at, r.reviewed_at, r.reviewed_by, r.sent_at, r.sent_by);
@@ -8224,6 +8254,19 @@ function autoSave(){
 // Returns true (and warns/expands the checklist) if the Report Content checklist
 // isn't done yet — used to gate finalize actions (send for review, print, download)
 // now that generateReport() itself no longer blocks rendering.
+// A client PDF must not go out unsigned. Required at print/download only —
+// a PM can still send an unsigned draft for review.
+function _signoffBlocksDownload(){
+  const nm=(document.querySelector('[data-nar="signoff_name"]')?.value||'').trim();
+  const sig=document.getElementById('sig-data-input')?.value||'';
+  const missing=[];
+  if(!nm)missing.push('sign-off name');
+  if(!sig)missing.push('signature');
+  if(!missing.length)return false;
+  toast(`Add the ${missing.join(' and ')} on the Sign-off page before downloading — client reports must be signed.`,'warn',7000);
+  document.querySelector('#report-pages .signoff-block')?.scrollIntoView({behavior:'smooth',block:'center'});
+  return true;
+}
 function _checklistBlocksFinalize(){
   const genBtn=document.getElementById('gen-btn');
   if(!genBtn||!genBtn.classList.contains('incomplete'))return false;
@@ -8249,6 +8292,20 @@ function _checklistBlocksFinalize(){
 // matches what the client actually receives (mirrors the cleaning done
 // for print/PDF export in _printReportViaIframe). Used by the Preview
 // modal, which shows this clone instead of the live, editable DOM.
+// Empty narrative / comment blocks print as nothing under their heading, which
+// makes a client PDF look unfinished. Fill them with a neutral line instead.
+// Sign-off fields are left alone (they have their own download check).
+function _fillEmptyPrintText(node){
+  node.querySelectorAll('.nar-print').forEach(el=>{
+    if(el.tagName==='IMG')return;
+    if((el.dataset.narPrint||'').startsWith('signoff'))return;
+    if((el.textContent||'').trim())return;
+    el.textContent=el.hasAttribute('data-comment-print')?'No comment recorded.'
+      :el.hasAttribute('data-survey-comment-print')?'No comments recorded.'
+      :'No feedback recorded for this period.';
+    el.style.color='#94A3B8';el.style.fontStyle='italic';
+  });
+}
 function _cleanReportCloneForOutput(node){
   node.querySelectorAll(
     '.att-toolbar,.no-print,#lock-banner,#feedback-banner,#draft-recovery-banner,'+
@@ -8257,6 +8314,7 @@ function _cleanReportCloneForOutput(node){
   ).forEach(el=>el.remove());
   node.querySelectorAll('.nar-screen').forEach(el=>el.remove());
   node.querySelectorAll('.nar-print').forEach(el=>{el.style.display='block';});
+  _fillEmptyPrintText(node);
   node.querySelectorAll('.exam-screen').forEach(el=>el.remove());
   node.querySelectorAll('.exam-print').forEach(el=>{el.style.display='inline';});
   node.querySelectorAll('.result-screen').forEach(el=>el.remove());
@@ -8309,6 +8367,7 @@ function triggerPrint(){
     return;
   }
   if(_checklistBlocksFinalize())return;
+  if(_signoffBlocksDownload())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   // NOTE: printing no longer auto-submits for review — use the
@@ -8382,6 +8441,7 @@ function downloadPDF(){
     return;
   }
   if(_checklistBlocksFinalize())return;
+  if(_signoffBlocksDownload())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   _printReportViaIframe({mode:'download'});
@@ -8466,6 +8526,7 @@ function _printReportViaIframe({mode='print'}={}){
   // Swap nar-screen → nar-print  (mirrors @media print dual-render)
   pagesClone.querySelectorAll('.nar-screen').forEach(el=>el.remove());
   pagesClone.querySelectorAll('.nar-print').forEach(el=>{el.style.display='block';});
+  _fillEmptyPrintText(pagesClone);
   pagesClone.querySelectorAll('.exam-screen').forEach(el=>el.remove());
   pagesClone.querySelectorAll('.exam-print').forEach(el=>{el.style.display='inline';});
   pagesClone.querySelectorAll('.result-screen').forEach(el=>el.remove());
