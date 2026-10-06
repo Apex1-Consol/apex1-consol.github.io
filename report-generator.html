@@ -2783,9 +2783,16 @@ async function checkReportStatus(){
         // Buttons mirror the server's transition rules (reports.report_next_actions).
         const next=await _reportNextActions(r.id);
         const btns=[];
-        if(next.includes('approved'))btns.push(`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>`);
-        if(next.includes('needs_changes'))btns.push(`<button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`);
-        if(next.includes('archived'))btns.push(`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`);
+        if(r.status==='archived'){
+          // Admin-only restore: the server offers exactly one target, the status
+          // the report had before it was archived (reports.archived_restore_status).
+          const tgt=next.find(s=>s!=='archived');
+          if(tgt)btns.push(`<button class="btn-approve" onclick="restoreReport('${tgt}')">♻ Restore Report</button>`);
+        }else{
+          if(next.includes('approved'))btns.push(`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>`);
+          if(next.includes('needs_changes'))btns.push(`<button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`);
+          if(next.includes('archived'))btns.push(`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`);
+        }
         actionsWrap.innerHTML=btns.join('\n')||`<span style="font-size:8pt;color:rgba(255,255,255,.35)">No action for you at this stage</span>`;
       }
     }
@@ -14622,6 +14629,7 @@ async function archiveReport(){
   try{
     await sbTransitionReport(_currentReportId,'archived',null);
     toast('📦 Report archived','success',4000);
+    _logAudit(_currentReportId,'archived',{newStatus:'archived',actor:ADMIN_NAME});
     const sub=document.getElementById('review-bar-sub');
     if(sub)sub.innerHTML=`<span style="color:rgba(255,255,255,.4)">📦 Archived</span> by ${ADMIN_NAME}`;
     const actionsWrap=document.querySelector('#review-bar .review-bar-actions > div[style*="flex-direction:column"]');
@@ -14633,6 +14641,23 @@ async function archiveReport(){
   }
 }
 
+// ── Admin: restore an archived report to the status it had before archiving ──
+async function restoreReport(target){
+  if(!_currentReportId){toast('No report record found','warn',3500);return;}
+  const label={pending:'Pending review',needs_changes:'Needs changes',approved:'Approved',sent_to_client:'Sent to client'}[target]||target;
+  if(!confirm(`Restore this report to "${label}"?\n\nCheck first that it was not replaced by a newer report for the same programme and month — restoring a replaced report puts a duplicate back in the PM's list.`))return;
+  try{
+    await sbTransitionReport(_currentReportId,target,`Restored from archive by ${ADMIN_NAME}`);
+    toast(`♻ Report restored to "${label}"`,'success',4000);
+    _logAudit(_currentReportId,'restored',{newStatus:target,actor:ADMIN_NAME});
+    _historyFetchedAt=0;
+    updateReviewPendingBadge();
+    await checkReportStatus();
+  }catch(e){
+    console.warn('restoreReport failed:',e.message);
+    toast('Not restored: '+e.message,'error',6000);
+  }
+}
 
 async function checkAdminFeedback(){
   if(!isOnline||!IS_ADMIN)return;
