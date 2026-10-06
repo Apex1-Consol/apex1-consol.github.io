@@ -4696,7 +4696,7 @@ function computeCoverStats(pLearners,prog){
 
 // Cover "Key Dates" strip: programme start/end from module dates (falls back
 // to programme start_date/end_date), current/next module from today, next
-// report = month after the reporting period. Missing values show "—".
+// report = month after the reporting period. Absent values say why (e.g. "Final module").
 function buildCoverKeyDates(prog,month,p){
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -4709,15 +4709,27 @@ function buildCoverKeyDates(prog,month,p){
   const end=mods.length?new Date(Math.max(...mods.map(m=>m.r.end))):iso(prog.end_date);
   const cur=mods.find(m=>m.r.start<=t&&t<=m.r.end);
   const nxt=mods.filter(m=>m.r.start>t).sort((a,b)=>a.r.start-b.r.start)[0];
-  let nextRep='—';
+  let nextRep='Not set';
   const mm=String(month||'').match(/([A-Za-z]+)\s+(\d{4})/);
-  if(mm){const mi=FULL.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());if(mi>=0){const d=new Date(+mm[2],mi+1,1);nextRep=`${FULL[d.getMonth()]} ${d.getFullYear()}`;}}
+  if(mm){const mi=FULL.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());if(mi>=0){const d=new Date(+mm[2],mi+1,1);
+    // Programme finished before the next report month → this is the final report.
+    nextRep=(end&&end<d)?'None · final report':`${FULL[d.getMonth()]} ${d.getFullYear()}`;}}
+  // Say why a date is absent instead of printing a bare "—" on the client cover.
+  const curTxt=cur?`Module ${cur.n} · ends ${dm(cur.r.end)}`
+    :!mods.length?'Dates not set'
+    :t<start?`Starts ${dm(start)}`
+    :t>end?'All modules completed'
+    :'Between modules';
+  const nxtTxt=nxt?`Module ${nxt.n} · ${dm(nxt.r.start)}`
+    :!mods.length?'Dates not set'
+    :t>end?'None · programme completed'
+    :'None · final module';
   const items=[
-    ['Programme start',start?dmy(start):'—',p.accentFrom],
-    ['Current module',cur?`Module ${cur.n} · ends ${dm(cur.r.end)}`:'—',p.accentFrom],
-    ['Next module',nxt?`Module ${nxt.n} · ${dm(nxt.r.start)}`:'—',p.accentTo],
+    ['Programme start',start?dmy(start):'Not set',p.accentFrom],
+    ['Current module',curTxt,p.accentFrom],
+    ['Next module',nxtTxt,p.accentTo],
     ['Next report',nextRep,p.accentTo],
-    ['Programme end',end?dmy(end):'—',p.gradFrom]];
+    ['Programme end',end?dmy(end):'Not set',p.gradFrom]];
   return`<div class="cover-keydates"><label>Key Dates</label><div class="cover-kd-row">${items.map(([l,v,c])=>`<div class="cover-kd" style="border-left-color:${c}"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`;
 }
 function buildCoverPage(prog,client,month){
