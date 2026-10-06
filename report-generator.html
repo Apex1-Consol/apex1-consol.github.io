@@ -3034,7 +3034,7 @@ function _programmeMonthWindow(prog){
   // today) — every month the programme has actually been running is a
   // candidate, including the current month even if modules run past it.
   if(!prog)return null;
-  const ranges=[1,2,3,4,5].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
+  const ranges=[1,2,3,4,5,6,7,8,9,10].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
   if(!ranges.length)return null;
   const start=new Date(Math.min(...ranges.map(r=>r.start)));
   const latestEnd=new Date(Math.max(...ranges.map(r=>r.end)));
