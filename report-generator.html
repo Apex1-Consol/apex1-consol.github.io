@@ -9972,6 +9972,14 @@ function openImportModal(){
         style="color:#fff;font-size:9pt;cursor:pointer"
         onchange="previewImport(this)">
     </div>
+    <div class="modal-field" style="margin-top:12px">
+      <label>Add learners to</label>
+      <select id="import-target" style="width:100%;font-size:9pt">
+        <option value="">New programme (or match by client + programme name in the file)</option>
+        ${programmes.filter(p=>!p.deleted_at).map(p=>{const c=clients.find(x=>x.id===p.client_id);return{id:p.id,t:(c?c.client_name+' — ':'')+(p.programme_name||'Programme '+p.id)};}).sort((x,y)=>x.t.localeCompare(y.t)).map(o=>`<option value="${o.id}">${escHtmlImp(o.t)}</option>`).join('')}
+      </select>
+      <div style="font-size:8pt;opacity:.7;margin-top:4px">Pick an existing programme to add the file's learners, attendance and results to it instead of creating a new client/programme.</div>
+    </div>
     <div id="import-preview" style="margin-top:12px"></div>
     <div class="modal-field" style="margin-top:16px;display:flex;align-items:center;gap:10px">
       <input type="checkbox" id="import-sync" style="width:16px;height:16px;cursor:pointer" ${isOnline?'checked':''} ${isOnline?'':'disabled'}>
@@ -11090,8 +11098,18 @@ function previewImport(input){
   reader.readAsArrayBuffer(file);
 }
 
+function escHtmlImp(v){return String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
 async function confirmImport(){
   if(!importData)return;
+  // Target an existing programme: point every programme in the file at it, so the
+  // client/programme matching below finds it instead of creating "Imported Client".
+  const _tgtId=document.getElementById('import-target')?.value;
+  if(_tgtId){
+    const tp=programmes.find(p=>String(p.id)===String(_tgtId));
+    const tc=tp&&clients.find(c=>c.id===tp.client_id);
+    if(!tp||!tc){alert('That programme could not be found (or has no client). Refresh and try again.');return;}
+    Object.values(importData.progMap).forEach(pd=>{pd.client_name=tc.client_name;pd.programme_name=tp.programme_name;pd.saqa_id=tp.saqa_id||'';});
+  }
 
   // ── Confirm if data already exists ──
   const{existingProgs,existingLearners}=importOverwriteWarning(importData.progMap,importData.learnerRows);
