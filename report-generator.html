@@ -4015,6 +4015,7 @@ function applyCloudDraft(silent){
   // Regenerate so the restored narratives populate the report. Clear the dirty-flag
   // first: programme/month are unchanged, so generateReport() would otherwise return
   // early and never reload narratives (checklist stayed 0/N until a page reload).
+  _provSyncedKey=null; // re-apply the provider saved in the restored draft
   narratives=loadNarratives();
   _rerenderKeepingPlace();
   toast(silent===true?'☁ Loaded latest saved version':'☁ Cloud draft restored','success',3000);
@@ -4538,11 +4539,43 @@ function buildNotesPage(notes,client,pn){
   return pageShell(pn,0,client.client_name,`${monLabel} & Recommendations`,body);
 }
 
+// Provider branding (Apex / Catalyst / …) is only stored in each draft's _meta.providerId,
+// so opening a report from the dashboard or Generate kept whatever the dropdown showed —
+// the same programme flipped between Apex and Catalyst branding month to month.
+// When a report (programme+month) is opened, select the provider saved in its draft, or
+// failing that the provider used in this programme's most recent draft. Runs once per
+// opened report, so a provider the PM picks by hand is not overridden.
+let _provSyncedKey=null;
+function _syncProviderForReport(progId,month){
+  const k=`${progId}|${month}`;
+  if(_provSyncedKey===k)return;
+  _provSyncedKey=k;
+  const sel=document.getElementById('sel-provider');
+  if(!sel||typeof PROVIDERS==='undefined')return;
+  let want=null;
+  try{
+    const d=JSON.parse(localStorage.getItem(`${DRAFT_PREFIX}${progId}_${month}`)||'null');
+    want=d&&d._meta&&d._meta.providerId||null;
+    if(!want){
+      let best=0;
+      for(let i=0;i<localStorage.length;i++){
+        const key=localStorage.key(i);
+        if(!key||!key.startsWith(`${DRAFT_PREFIX}${progId}_`)||key.includes('__'))continue;
+        const o=JSON.parse(localStorage.getItem(key)||'null');
+        const pv=o&&o._meta&&o._meta.providerId,t=+(o&&o._meta&&o._meta.savedAt)||0;
+        if(pv&&t>=best){best=t;want=pv;}
+      }
+    }
+  }catch{}
+  if(want&&PROVIDERS[want]&&sel.value!==want){sel.value=want;onProviderChange();}
+}
+
 function generateReport(skipChecklistGate){
   const month=document.getElementById('sel-month').value;
   const prog=activeProgramme;
   const client=activeClient;
   if(!prog||!client)return;
+  _syncProviderForReport(prog.id,month);
 
   // Clear any previous lock state — will be re-applied by checkReportStatus below
   _applyReportLock(null);
