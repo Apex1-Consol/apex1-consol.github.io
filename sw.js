@@ -1,4 +1,4 @@
-const CACHE='apex-report-v10';
+const CACHE='apex-report-v11';
 const STATIC=[
   './',
   './index.html',

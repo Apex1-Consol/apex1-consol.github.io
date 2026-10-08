@@ -12991,6 +12991,9 @@ function _appendLoadMore(list){
 async function _openReportDeepLink(){
   const id=new URLSearchParams(window.location.search).get('report');
   if(!id||!/^\d+$/.test(id))return;
+  // One-shot: drop ?report= from the address bar so a refresh goes back to the
+  // dashboard instead of reopening this report every time.
+  try{const u=new URL(window.location.href);u.searchParams.delete('report');window.history.replaceState({},document.title,u.pathname+u.search+u.hash);}catch{}
   try{
     const rows=await sb('reports',`select=*&tenant_id=eq.${TENANT_DB_ID}&id=eq.${id}&limit=1`);
     if(!rows||!rows[0]){toast('That report could not be found or you do not have access','warn',4000);return;}
