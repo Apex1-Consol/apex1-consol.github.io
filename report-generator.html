@@ -149,7 +149,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
   transition:max-height .3s ease,padding .3s ease;
   max-height:0;
 }
-#progress-panel.open{max-height:200px;padding:14px 32px;}
+#progress-panel.open{max-height:260px;padding:14px 32px;}
 #progress-panel-toggle{
   display:none;
   align-items:center;gap:8px;
@@ -161,6 +161,20 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 }
 #progress-panel-toggle:hover{color:rgba(255,255,255,.8)}
 #progress-panel-toggle.visible{display:flex}
+#pp-asof{display:none;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:var(--r);font-size:8pt;padding:7px 10px;cursor:pointer;white-space:nowrap;font-family:inherit}
+#pp-asof:hover{color:#fff;border-color:rgba(255,255,255,.35)}
+#pp-asof.stale{color:#fbbf24;border-color:rgba(251,191,36,.5)}
+#pp-asof:disabled{opacity:.6;cursor:wait}
+#finalize-dlg{position:fixed;inset:0;z-index:99998;background:rgba(5,12,25,.55);display:flex;align-items:center;justify-content:center;padding:16px}
+#finalize-dlg .fd-card{background:#fff;color:#1a2233;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.35);padding:20px 22px}
+#finalize-dlg h3{margin:0 0 4px;font-size:12.5pt}
+#finalize-dlg .fd-sub{font-size:9pt;color:#5a6478;margin:0 0 14px}
+#finalize-dlg .fd-row{display:flex;gap:12px;align-items:flex-start;border:1px solid #e6e9ef;border-radius:8px;padding:10px 12px;margin-bottom:8px}
+#finalize-dlg .fd-row b{font-size:10pt}
+#finalize-dlg .fd-row div{flex:1;font-size:9pt;color:#4a5468;line-height:1.4}
+#finalize-dlg .fd-miss{display:block;color:#b42318;margin-top:3px}
+#finalize-dlg .fd-go{white-space:nowrap;font-size:8.5pt;padding:6px 12px}
+#finalize-dlg .fd-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:12px;font-size:8.5pt;color:#5a6478}
 #pp-score{
   font-size:8pt;font-weight:700;
   background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
@@ -2457,6 +2471,7 @@ body.compact-density .progress-bar-wrap{height:6px}
       <button id="progress-panel-toggle" onclick="toggleProgressPanel()" title="Report content checklist — separate from the setup steps above">
         ☑ Report Content <span id="pp-score">—</span>
       </button>
+      <button id="pp-asof" type="button" onclick="manualDataRefresh()" title="Re-load learners, attendance and EISA from the server">↻ Data</button>
       <div id="preview-pdf-actions">
         <button id="combined-download-btn" class="ai-old btn btn-ghost" onclick="generateCombinedReport()" style="font-size:8.5pt;padding:9px 16px" title="Combine every approved/sent/archived month into one PDF with a clickable index, for the client">📚 Download All Months</button>
         <button class="btn btn-primary" onclick="triggerPrint()" style="font-size:8.5pt;padding:9px 16px">🖨 Print / Save PDF</button>
@@ -3078,6 +3093,9 @@ function _pickAutoMonth(prog){
   const neverSent=months.find(m=>!programmeReportStatus[m]||!programmeReportStatus[m].status);
   return neverSent||null;
 }
+// A real user change of client/programme ends the "page-load auto-pick" mode (capture
+// phase, so it runs before the select's own onchange handler).
+document.addEventListener('change',e=>{const id=e.target&&e.target.id;if(id==='sel-client'||id==='sel-programme'||id==='sel-month')window._initAutoPick=false;},true);
 function autoSelectReportMonth(){
   const sel=document.getElementById('sel-month');
   if(!sel||!activeProgramme)return;
@@ -3088,7 +3106,8 @@ function autoSelectReportMonth(){
   const opt=[...sel.options].find(o=>o.value===target);
   if(!opt)return;
   sel.value=target;
-  if(activeClient)generateReport();
+  if(activeClient&&!window._initAutoPick)generateReport();
+  window._initAutoPick=false;
   updateStepsGuide();
 }
 
@@ -3599,7 +3618,9 @@ function populateClients(){
     o.value=c.id;o.textContent=c.client_name;
     sel.appendChild(o);
   });
-  if(clients.length===1){sel.value=clients[0].id;onClientChange();}
+  // Single client: pre-select it (and its programme/month if only one), but leave the
+  // PM on the dashboard — the report opens when they click Generate or a dashboard card.
+  if(clients.length===1){window._initAutoPick=true;setTimeout(()=>{window._initAutoPick=false;},15000);sel.value=clients[0].id;onClientChange();}
   // Multiple clients: nothing gets auto-selected, so surface a hint explaining why
   // the steps guide looks stuck on "client" rather than leaving it unexplained.
   const hint=document.getElementById('client-import-hint');
@@ -3678,6 +3699,7 @@ async function onProgrammeChange(){
         sb('learner_comments',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`).catch(()=>[])
       ]);
       attendance=att;eisa=ei;
+      window._dataLoadedAt=Date.now();
       // Build remoteComments map: {learner_id_month: comment} — keyed by month too,
       // so an older/different month's row can't clobber the current month's draft.
       remoteComments={};
@@ -4024,9 +4046,9 @@ async function refreshOnFocus(force){
   const pid=activeProgramme.id;
   if(isTempId(pid))return;
   // Queued offline writes not yet on the server — server data would be behind this device
-  if(loadWriteQueue().length)return;
+  if(loadWriteQueue().length)return 'queued';
   const now=Date.now();
-  if(!force&&now-_lastFocusRefresh<60000)return;
+  if(!force&&now-_lastFocusRefresh<60000)return 'skip';
   _lastFocusRefresh=now;
   const month=document.getElementById('sel-month').value;
   try{
@@ -4035,7 +4057,8 @@ async function refreshOnFocus(force){
       sb('attendance',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`),
       sb('eisa',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`)
     ]);
-    if(!activeProgramme||activeProgramme.id!==pid||document.getElementById('sel-month').value!==month)return;
+    if(!activeProgramme||activeProgramme.id!==pid||document.getElementById('sel-month').value!==month)return 'skip';
+    window._dataLoadedAt=Date.now();
     const newEnr=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
     const newLrn=enrolled.map(e=>e.learner).filter(Boolean);
     const sig=(en,ln,a,x)=>JSON.stringify([en,ln,a,x]);
@@ -4053,7 +4076,34 @@ async function refreshOnFocus(force){
       checkDraftConflict(pid,month);
     }
     _updateProgressPanel();
-  }catch(e){console.warn('refreshOnFocus failed:',e?.message||e);}
+    return changed?'changed':'same';
+  }catch(e){console.warn('refreshOnFocus failed:',e?.message||e);return 'error';}
+}
+
+function _ppAsOfUpdate(){
+  const b=document.getElementById('pp-asof');
+  if(!b)return;
+  b.style.display=activeProgramme&&activeClient?'inline-block':'none';
+  const t=window._dataLoadedAt;
+  if(!t){b.textContent='↻ Data';b.classList.remove('stale');return;}
+  const hhmm=new Date(t).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+  b.textContent='↻ Data as of '+hhmm;
+  b.classList.toggle('stale',Date.now()-t>30*60000);
+  b.title='Learners, attendance and EISA last loaded at '+hhmm+'. Click to load the latest from the server.';
+}
+setInterval(_ppAsOfUpdate,60000);
+
+async function manualDataRefresh(){
+  const b=document.getElementById('pp-asof');
+  if(!activeProgramme)return;
+  if(!isOnline){toast('You are offline — data will refresh when you reconnect','warn',3500);return;}
+  if(b){b.disabled=true;b.textContent='↻ Checking…';}
+  let r;
+  try{r=await refreshOnFocus(true);}finally{if(b)b.disabled=false;_ppAsOfUpdate();}
+  if(r==='changed')toast('✓ Updated with the latest learners, attendance and EISA','success',3000);
+  else if(r==='same')toast('✓ Already up to date','success',2000);
+  else if(r==='queued')toast('Your offline changes are still uploading — try again in a moment','warn',3500);
+  else if(r==='error')toast('Could not reach the server — try again shortly','warn',3500);
 }
 // ── New-version check ────────────────────────────────────────────────────────
 // Tabs left open for days keep running old code even after a deploy. The page records
@@ -8335,7 +8385,7 @@ async function _finalizeGate(){
   const genBtn=document.getElementById('gen-btn');
   if(!genBtn||!genBtn.classList.contains('incomplete'))return false;
   if(isOnline&&activeProgramme){
-    toast('Checking latest data…','info',1500);
+    toast('Checking the latest data before continuing…','info',1500);
     try{await refreshOnFocus(true);}catch{}
     try{_updateProgressPanel();}catch{}
   }
@@ -8354,12 +8404,39 @@ function _checklistBlocksFinalize(){
     el.style.background='rgba(200,39,44,.18)';
     setTimeout(()=>el.style.background='',900);
   });
-  const missing=window._checklistIncompleteLabels;
-  const msg=(missing&&missing.length)
-    ?`Still needed before finalizing: ${missing.join(', ')}.`
-    :'Finish the "Report Content" checklist first.';
-  toast(msg,'warn',5000);
+  _showFinalizeBlockDialog();
   return true;
+}
+
+function _showFinalizeBlockDialog(){
+  document.getElementById('finalize-dlg')?.remove();
+  const items=(window._checklistItems||[]).filter(i=>i.state!=='done');
+  if(!items.length){toast('Finish the "Report Content" checklist first.','warn',5000);return;}
+  const d=document.createElement('div');
+  d.id='finalize-dlg';
+  d.setAttribute('role','dialog');d.setAttribute('aria-modal','true');
+  const rows=items.map(it=>{
+    const miss=it.missing&&it.missing.length?`<span class="fd-miss">Missing: ${esc(it.missing.slice(0,8).join(', '))}${it.missing.length>8?` and ${it.missing.length-8} more`:''}</span>`:'';
+    return`<div class="fd-row"><div><b>${esc(it.label)}</b>${it.state==='partial'?' <span style="color:#b7791f">(partly done)</span>':''}<br>${esc(it.hint||'')}${miss}</div>
+      <button class="btn btn-primary fd-go" data-go="${esc(it.id)}">Go to →</button></div>`;
+  }).join('');
+  const t=window._dataLoadedAt?new Date(window._dataLoadedAt).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'}):'';
+  d.innerHTML=`<div class="fd-card">
+    <h3>Almost there — ${items.length} item${items.length>1?'s':''} still needed</h3>
+    <p class="fd-sub">The report can't be sent for review, printed or downloaded until these are done.</p>
+    ${rows}
+    <div class="fd-foot"><span>${t?'Data checked at '+t:''}</span><button class="btn btn-ghost fd-close" style="font-size:8.5pt;padding:6px 14px;color:#1a2233;border-color:#cfd5e0">Close</button></div>
+  </div>`;
+  const close=()=>{d.remove();document.removeEventListener('keydown',onKey);};
+  const onKey=e=>{if(e.key==='Escape')close();};
+  d.addEventListener('click',e=>{
+    if(e.target===d||e.target.classList.contains('fd-close')){close();return;}
+    const go=e.target.closest('[data-go]');
+    if(go){close();_ppGo(go.dataset.go);}
+  });
+  document.addEventListener('keydown',onKey);
+  document.body.appendChild(d);
+  d.querySelector('.fd-go')?.focus();
 }
 
 // Reveals the report preview panel only — no checklist gate, no print dialog.
@@ -11626,6 +11703,7 @@ function showDashboard(){
   renderDashboard();
 }
 function hideDashboard(){
+  window._initAutoPick=false;
   document.getElementById('dashboard').classList.remove('show');
 }
 
@@ -16532,7 +16610,8 @@ function _updateProgressPanel(){
 
   // 1. Learners enrolled
   const hasLearners=pLearners.length>0;
-  items.push({id:'learners',label:`Learners (${pLearners.length})`,state:hasLearners?'done':'',anchor:null});
+  items.push({id:'learners',label:`Learners (${pLearners.length})`,state:hasLearners?'done':'',anchor:null,
+    hint:'Add or import the learners for this programme with the 👥 Learners button.'});
 
   // 2. Attendance — any session dates with data
   const attFilled=attDates.length>0&&pLearners.some(l=>{
@@ -16544,7 +16623,8 @@ function _updateProgressPanel(){
     return attDates.every(d=>a[d]&&a[d]!=='');
   });
   const noClassesThisMonth=narratives.no_classes===true||narratives.no_classes==='true';
-  items.push({id:'att',label:'Attendance',state:noClassesThisMonth?'done':(allAttFilled?'done':attFilled?'partial':''),anchor:'att'});
+  items.push({id:'att',label:'Attendance',state:noClassesThisMonth?'done':(allAttFilled?'done':attFilled?'partial':''),anchor:'att',
+    hint:attDates.length?'Mark every learner present/absent for each session date in the Attendance register.':'No session dates for this month yet — add the class dates in the Attendance register, or tick "No classes held this month".'});
 
   // 2b. Module dates — every module card needs a date range before send,
   // so a report can never go out showing an unfilled "Add dates" card to
@@ -16554,7 +16634,9 @@ function _updateProgressPanel(){
     const modNumsForCheck=displayModuleNums(activeProgramme);
     const fieldMapForCheck=moduleFieldMap(modNumsForCheck);
     const modsWithDates=modNumsForCheck.filter(n=>activeProgramme[fieldMapForCheck[n]]);
-    items.push({id:'moddates',label:'Module Dates',state:modsWithDates.length===modNumsForCheck.length?'done':modsWithDates.length>0?'partial':'',anchor:null});
+    items.push({id:'moddates',label:'Module Dates',state:modsWithDates.length===modNumsForCheck.length?'done':modsWithDates.length>0?'partial':'',anchor:null,
+      hint:'Add start and end dates for every module (✏ Edit programme).',
+      missing:modNumsForCheck.filter(n=>!activeProgramme[fieldMapForCheck[n]]).map(n=>'Module '+n)});
   }
 
   // NOTE: EISA is a single qualification-level assessment, not administered
@@ -16573,7 +16655,13 @@ function _updateProgressPanel(){
     const lc=(narratives._comments||{})[l.id]||(remoteComments||{})[`${l.id}_${month}`];
     return lc&&lc.trim().length>0;
   });
-  items.push({id:'comments',label:'Facilitator Observations',state:allComments?'done':hasComments?'partial':'',anchor:'comments'});
+  const _noComment=pLearners.filter(l=>{
+    const lc=(narratives._comments||{})[l.id]||(remoteComments||{})[`${l.id}_${month}`];
+    return !(lc&&lc.trim().length>0);
+  });
+  items.push({id:'comments',label:'Facilitator Observations',state:allComments?'done':hasComments?'partial':'',anchor:'comments',
+    hint:'Write a short observation for every learner in the Facilitator Observations section.',
+    missing:_noComment.map(l=>[l.first_name,l.last_name].filter(Boolean).join(' ')||('Learner '+l.id))});
 
   // 8. Narrative fields — Overview page text blocks
   // Only require a Module N narrative for modules this programme actually
@@ -16589,7 +16677,10 @@ function _updateProgressPanel(){
   const narLabels=Object.fromEntries(narKeys.map(k=>[k,daLabel(k).replace(' — Feedback',' Narrative')]));
   const narFilled=narKeys.filter(k=>narratives[k]&&narratives[k].trim().length>0);
   const narState=narFilled.length===narKeys.length?'done':narFilled.length>0?'partial':'';
-  items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives'});
+  const _narEmpty=narKeys.filter(k=>!(narratives[k]&&narratives[k].trim().length>0));
+  items.push({id:'narratives',label:`Overview Narratives (${narFilled.length}/${narKeys.length})`,state:narState,anchor:'overview-narratives',
+    hint:'Fill in each Overview narrative box — the Draft buttons can write a first version for you.',
+    missing:_narEmpty.map(k=>narLabels[k]),firstEmpty:_narEmpty[0]||null});
 
   // Discoverability nudge for "Draft from data" / "Draft all": badge the
   // toolbar button with how many narrative fields are still empty, and put a
@@ -16613,6 +16704,8 @@ function _updateProgressPanel(){
   const total=items.length;
   const allComplete=doneCount===total&&total>0;
   window._checklistIncompleteLabels=items.filter(i=>i.state!=='done').map(i=>i.label);
+  window._checklistItems=items;
+  _ppAsOfUpdate();
 
   score.textContent=`${doneCount}/${total}`;
   score.className=allComplete?'complete':doneCount>0?'partial':'';
@@ -16638,13 +16731,34 @@ function _updateProgressPanel(){
     const cls=it.state==='done'?'done':it.state==='partial'?'partial':'';
     const tick=it.state==='done'?'✓':it.state==='partial'?'~':'';
     const colorStyle=it.color&&!cls?`border-left:3px solid ${it.color};padding-left:9px`:'';
-    return`<div class="pp-item ${cls}" style="${colorStyle}" onclick="ppScrollTo('${it.anchor}')">
+    const tip=it.state==='done'?'Done':(it.hint||'')+(it.missing&&it.missing.length?' Missing: '+it.missing.slice(0,6).join(', ')+(it.missing.length>6?'…':''):'')+' — click to go there.';
+    return`<div class="pp-item ${cls}" style="${colorStyle}" title="${esc(tip)}" onclick="_ppGo('${it.id}')">
       <div class="pp-check">${tick}</div>
       <span>${it.label}</span>
     </div>`;
   }).join('');
 }
 const updateProgressPanel=_throttle(_updateProgressPanel,300);
+
+// Jump to where a checklist item is fixed: opens the right modal for learners /
+// module dates, otherwise makes sure the report is showing and scrolls to (and
+// focuses) the first thing still missing.
+function _ppGo(id){
+  const it=(window._checklistItems||[]).find(i=>i.id===id);
+  if(!it)return;
+  if(id==='learners'){openModal('learners','list');return;}
+  if(id==='moddates'){openModal('programme','edit');return;}
+  const preview=document.getElementById('report-preview');
+  const go=()=>{
+    let el=null;
+    if(id==='narratives'&&it.firstEmpty)el=document.querySelector(`[data-nar="${it.firstEmpty}"]`);
+    if(id==='comments')el=[...document.querySelectorAll('[data-comment-lid]')].find(t=>!t.value.trim())||null;
+    if(el){el.scrollIntoView({behavior:'smooth',block:'center'});try{el.focus({preventScroll:true});}catch{}return;}
+    ppScrollTo(it.anchor);
+  };
+  if(preview&&!preview.classList.contains('show')){generateReport(true);setTimeout(go,350);}
+  else go();
+}
 
 function ppScrollTo(anchor){
   if(!anchor)return;
