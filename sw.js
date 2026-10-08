@@ -1,4 +1,4 @@
-const CACHE='apex-report-v16';
+const CACHE='apex-report-v17';
 const STATIC=[
   './',
   './index.html',
@@ -48,8 +48,13 @@ self.addEventListener('fetch',e=>{
   }
 
   // HTML (index.html / root) — network first, fall back to cache
+  // Same-origin GETs (the pages themselves, sw.js checks): always revalidate with the
+  // server instead of reusing the browser's HTTP cache (GitHub Pages sends max-age=600),
+  // so a normal refresh right after a deploy gets the new page, not a 10-minute-old copy.
+  const sameOrigin=url.origin===self.location.origin&&e.request.method==='GET';
+  const net=sameOrigin?fetch(e.request.url,{cache:'no-cache',credentials:'same-origin'}):fetch(e.request);
   e.respondWith(
-    fetch(e.request)
+    net
       .then(res=>{
         const clone=res.clone();
         caches.open(CACHE).then(c=>c.put(e.request,clone));
