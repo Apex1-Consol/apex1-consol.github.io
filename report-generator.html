@@ -3879,7 +3879,7 @@ function saveNarratives(showToast=false){
     progId:activeProgramme.id,
     progName:activeProgramme.programme_name||'',
     month:document.getElementById('sel-month').value,
-    providerId:document.getElementById('sel-provider')?.value||'',
+    providerId:document.getElementById('sel-provider')?.value||activeProgramme.provider||'', // never save a blank over the programme's provider
     savedAt:Date.now(),
   };
   // If client/programme are local-only (never synced to server, temp id), embed a full
@@ -4554,8 +4554,11 @@ function _syncProviderForReport(progId,month){
   _provSyncedKey=k;
   const sel=document.getElementById('sel-provider');
   if(!sel||typeof PROVIDERS==='undefined')return;
-  let want=null;
+  // Programme-level provider (programmes.provider) wins — set once in Edit programme,
+  // so every month / device shows the same branding. Drafts are only the fallback.
+  let want=(activeProgramme&&activeProgramme.id==progId&&activeProgramme.provider)||null;
   try{
+    if(want)throw 0;
     const d=JSON.parse(localStorage.getItem(`${DRAFT_PREFIX}${progId}_${month}`)||'null');
     want=d&&d._meta&&d._meta.providerId||null;
     if(!want){
@@ -9383,6 +9386,13 @@ function openModal(type,mode,learnerId){
         </select>
         <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Legacy swaps the report's assessment pages to per-unit-standard Achieved / Not Yet Trained tracking with credit totals, instead of Module 1–4 KM/PM/WM + EISA.</div>
       </div>
+      <div class="modal-field"><label>Report Provider (branding)</label>
+        <select class="modal-select" id="mf-provider">
+          <option value="">— Choose —</option>
+          ${Object.entries(PROVIDERS).map(([k,o])=>`<option value="${k}">${esc(o.name)}</option>`).join('')}
+        </select>
+        <div style="font-size:7.5pt;color:var(--muted);margin-top:4px">Used on every monthly report for this programme, on every device.</div>
+      </div>
       <div class="modal-grid">
         <div class="modal-field"><label>SAQA ID <span style="color:var(--red)">*</span></label>
           <input class="modal-input" id="mf-saqa_id" placeholder="e.g. 117329" value="${v('saqa_id')}">
@@ -9459,6 +9469,8 @@ function openModal(type,mode,learnerId){
   if(type==='programme'){
     const ptSel=document.getElementById('mf-programme_type');
     if(ptSel)ptSel.value=getProgrammeType(isEdit&&src?src.id:null);
+    const pvSel=document.getElementById('mf-provider');
+    if(pvSel)pvSel.value=(isEdit&&src&&src.provider)||document.getElementById('sel-provider')?.value||'';
   }
   document.getElementById('modal-overlay').classList.add('open');
   restoreModalDraft();
@@ -9657,6 +9669,7 @@ async function saveModal(){
         end_date:mval('mf-end_date')||null,
         report_due_date:mval('mf-report_due_date')||null,
         };
+  {const _pv=document.getElementById('mf-provider')?.value;if(_pv)payload.provider=_pv;}
   // Collect however many module date fields are actually present in the modal
   // (not a fixed 4), so extra modules added via "+ Add Module" get saved too.
   const modDateInputs=[...document.querySelectorAll('[id^="mf-module_"][id$="_dates"]')];
@@ -9707,6 +9720,7 @@ async function saveModal(){
       } else {
         if(modalMode==='edit'){
           Object.assign(activeProgramme,payload);saved=activeProgramme;
+          if(payload.provider){const _sp=document.getElementById('sel-provider');if(_sp&&_sp.value!==payload.provider){_sp.value=payload.provider;onProviderChange();}}
         } else {
           saved={...payload,id:Date.now()};
         }
@@ -12174,7 +12188,7 @@ async function renderDashboard(){
       const dupTag=isDupName?`<div class="dash-prog-client" style="color:#f0c040" title="Another programme in this client has the same name — check this isn't an accidental duplicate before reporting on it">⚠ same name as another below${addedDate?' · added '+addedDate:''}</div>`:'';
       const progressLabel=pMonths.length?`<div class="dash-prog-client">${pReported}/${pMonths.length} months reported</div>`:'';
       return`<tr class="dash-prog-row" onclick="dashGoTo(${cid||'null'},${p.id})">
-        <td><div class="dash-prog-name">${esc(p.programme_name||'—')}</div>${progressLabel}${dupTag}</td>
+        <td><div class="dash-prog-name">${esc(p.programme_name||'—')}${p.provider&&PROVIDERS[p.provider]?` <span title="Report branding for this programme (set in Edit programme)" style="font-size:7pt;padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.25);color:rgba(255,255,255,.75);font-weight:500;vertical-align:middle">${esc(PROVIDERS[p.provider].name)}</span>`:''}</div>${progressLabel}${dupTag}</td>
         <td>${esc(p.saqa_id||'—')}</td>
         <td>${mkFill(attPct)}</td>
         <td>${isLegacyProgramme(p)?`<span style="color:rgba(255,255,255,.35);font-size:7.5pt" title="EISA is a QCTO occupational assessment — Legacy qualifications don't have one, so there's nothing to track here">n/a – Legacy</span>`:mkFill(eisaPct)}</td>
@@ -13525,9 +13539,10 @@ async function resumeDraft(key){
   // Restore provider (branding) — older drafts saved before this was tracked
   // won't have providerId, so leave whatever's currently selected in that case
   // rather than blanking it out.
-  if(meta.providerId){
+  const _pv=prog.provider||meta.providerId;
+  if(_pv){
     const selProv=document.getElementById('sel-provider');
-    if(selProv){selProv.value=meta.providerId;onProviderChange();}
+    if(selProv){selProv.value=_pv;onProviderChange();}
   }
   // Set dropdowns
   const selC=document.getElementById('sel-client');
