@@ -12172,7 +12172,7 @@ async function renderDashboard(){
         <td><div class="dash-prog-name">${esc(p.programme_name||'—')}</div>${progressLabel}${dupTag}</td>
         <td>${esc(p.saqa_id||'—')}</td>
         <td>${mkFill(attPct)}</td>
-        <td>${mkFill(eisaPct)}</td>
+        <td>${isLegacyProgramme(p)?`<span style="color:rgba(255,255,255,.35);font-size:7.5pt" title="EISA is a QCTO occupational assessment — Legacy qualifications don't have one, so there's nothing to track here">n/a – Legacy</span>`:mkFill(eisaPct)}</td>
         <td>${mkReportBadge(rep)}</td>
         <td>${mkDueBadge(p,rep)}</td>
         <td onclick="event.stopPropagation()"><div style="display:flex;gap:6px;align-items:center">
