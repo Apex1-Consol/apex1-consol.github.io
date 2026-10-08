@@ -1111,12 +1111,14 @@ body.compact-density .progress-bar-wrap{height:6px}
   padding:3px 7px;cursor:pointer;font-family:var(--font);transition:.12s;letter-spacing:.02em;
 }
 .dash-month-chip:hover{border-color:rgba(255,255,255,.35);color:#fff;transform:translateY(-1px)}
-.dash-month-chip.current{box-shadow:0 0 0 1.5px var(--gold2) inset}
+.dash-month-chip.current{border-color:rgba(255,255,255,.4);color:rgba(255,255,255,.75)}
 .dash-month-chip.approved{background:rgba(27,122,74,.18);border-color:rgba(74,222,128,.3);color:#4ade80}
 .dash-month-chip.pending{background:rgba(212,160,23,.14);border-color:rgba(212,160,23,.3);color:#F0C040}
 .dash-month-chip.changes{background:rgba(200,39,44,.15);border-color:rgba(200,39,44,.35);color:#f87171}
 .dash-month-chip.draft{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.55)}
-.dash-month-chip.next-due{border-style:dashed;border-color:rgba(240,192,64,.6);box-shadow:0 0 0 1px rgba(240,192,64,.25) inset}
+.dash-month-chip.next-due{background:#F0C040;border-color:#F0C040;color:#412402}
+.dash-month-chip.next-due:hover{background:#f5cf5e;border-color:#f5cf5e;color:#412402}
+.dash-chip-key{display:flex;flex-wrap:wrap;gap:12px;margin:-8px 0 16px;font-size:7.5pt;color:rgba(255,255,255,.45)}
 .dash-del-btn{
   background:none;border:1px solid rgba(200,39,44,.3);border-radius:6px;
   color:rgba(248,113,113,.5);font-size:11pt;cursor:pointer;
@@ -12140,9 +12142,10 @@ async function renderDashboard(){
       const isCur=m===curMonthStr?' current':'';
       const isPastOrCur=new Date(m+' 1')<=new Date(curMonthStr+' 1');
       const isNextDue=!rep&&isPastOrCur&&!nextDueFlagged.flagged?(nextDueFlagged.flagged=true,' next-due'):'';
+      if(isNextDue)icon='● ';
       const shortLabel=m.split(' ')[0].slice(0,3)+' '+m.split(' ')[1].slice(2);
       const mEsc=m.replace(/'/g,"\\'");
-      return`<button type="button" class="dash-month-chip ${cls}${isCur}${isNextDue}" title="${esc(m)}${rep?' — '+esc(rep.status||''):isNextDue?' — next due':' — no report yet'}" onclick="event.stopPropagation();dashGoTo(${cid},${p.id},'${mEsc}')">${icon}${shortLabel}</button>`;
+      return`<button type="button" class="dash-month-chip ${cls}${isCur}${isNextDue}" title="${esc(m)}${rep?' — '+esc(rep.status||''):isNextDue?' — next due':' — no report yet'}" onclick="event.stopPropagation();dashGoTo(${cid},${p.id},'${mEsc}')">${icon}${shortLabel}${isNextDue?' · due':''}</button>`;
     }).join('');
     return`<tr class="dash-month-strip-row"><td colspan="7"><div class="dash-month-strip">${chips}</div></td></tr>`;
   };
@@ -12225,6 +12228,14 @@ async function renderDashboard(){
       <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ROLLUP_COLOR.overdue};margin-right:5px"></span>Overdue</span>
       <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ROLLUP_COLOR.soon};margin-right:5px"></span>Due within 7 days</span>
       <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ROLLUP_COLOR.ok};margin-right:5px"></span>On track</span>
+    </div>
+    <div class="dash-chip-key" title="What the month buttons under each programme mean">
+      <span>Months:</span>
+      <span style="color:#F0C040">● due — do this one next</span>
+      <span>⏳ in review</span>
+      <span style="color:#4ade80">✓ approved</span>
+      <span style="color:#f87171">↩ changes needed</span>
+      <span>outline = this month</span>
     </div>`:'';
 
   // ── Unassigned programmes — rows with no client_id at all. Never blended into the
