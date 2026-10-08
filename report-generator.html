@@ -153,13 +153,18 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 #progress-panel-toggle{
   display:none;
   align-items:center;gap:8px;
-  background:none;border:none;cursor:pointer;
+  background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.18);border-radius:var(--r);cursor:pointer;
   font-family:var(--font);font-size:8pt;font-weight:700;
   letter-spacing:.12em;text-transform:uppercase;
-  color:rgba(255,255,255,.5);padding:8px 0;
+  color:rgba(255,255,255,.65);padding:6px 10px 6px 12px;
   transition:.15s;
 }
-#progress-panel-toggle:hover{color:rgba(255,255,255,.8)}
+#progress-panel-toggle:hover{color:#fff;border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.07)}
+#progress-panel-toggle:focus-visible{outline:2px solid rgba(255,255,255,.6);outline-offset:2px}
+#progress-panel-toggle.pp-complete{border-color:rgba(74,222,128,.45)}
+#progress-panel-toggle.pp-incomplete{border-color:rgba(251,191,36,.6)}
+#pp-caret{display:inline-block;font-size:9pt;line-height:1;transition:transform .2s;letter-spacing:0}
+#progress-panel-toggle.open #pp-caret{transform:rotate(180deg)}
 #progress-panel-toggle.visible{display:flex}
 #pp-asof{display:none;background:transparent;border:1px solid rgba(255,255,255,.15);color:rgba(255,255,255,.6);border-radius:var(--r);font-size:8pt;padding:7px 10px;cursor:pointer;white-space:nowrap;font-family:inherit}
 #pp-asof:hover{color:#fff;border-color:rgba(255,255,255,.35)}
@@ -2468,8 +2473,8 @@ body.compact-density .progress-bar-wrap{height:6px}
       <button class="btn btn-ghost" style="font-size:8.5pt;padding:9px 16px" onclick="openLRC(0)">🪪 Learner Cards</button>
       <button class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px" onclick="openEisaPaste()">📋 Bulk EISA</button>
       <button id="eisa-undo-btn" class="btn btn-ghost eisa-occupational-only" style="font-size:8.5pt;padding:9px 16px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoEisaPaste()" title="Undo last bulk paste">↩ Undo Paste</button>
-      <button id="progress-panel-toggle" onclick="toggleProgressPanel()" title="Report content checklist — separate from the setup steps above">
-        ☑ Report Content <span id="pp-score">—</span>
+      <button id="progress-panel-toggle" onclick="toggleProgressPanel()" aria-expanded="false" aria-controls="progress-panel" title="Show / hide the report content checklist">
+        ☑ Report Content <span id="pp-score">—</span><span id="pp-caret" aria-hidden="true">▾</span>
       </button>
       <button id="pp-asof" type="button" onclick="manualDataRefresh()" title="Re-load learners, attendance and EISA from the server">↻ Data</button>
       <div id="preview-pdf-actions">
@@ -16592,6 +16597,8 @@ let _ppOpen=false;
 function toggleProgressPanel(){
   _ppOpen=!_ppOpen;
   document.getElementById('progress-panel').classList.toggle('open',_ppOpen);
+  const t=document.getElementById('progress-panel-toggle');
+  if(t){t.classList.toggle('open',_ppOpen);t.setAttribute('aria-expanded',String(_ppOpen));}
 }
 
 function _updateProgressPanel(){
@@ -16709,6 +16716,8 @@ function _updateProgressPanel(){
 
   score.textContent=`${doneCount}/${total}`;
   score.className=allComplete?'complete':doneCount>0?'partial':'';
+  toggle.classList.toggle('pp-complete',allComplete);
+  toggle.classList.toggle('pp-incomplete',!allComplete);
 
   // ── Lock / unlock Generate button ──
   const genBtn=document.getElementById('gen-btn');
