@@ -170,6 +170,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 #pp-asof:hover{color:#fff;border-color:rgba(255,255,255,.35)}
 #pp-asof.stale{color:#fbbf24;border-color:rgba(251,191,36,.5)}
 #pp-asof:disabled{opacity:.6;cursor:wait}
+#pp-asof .pp-asof-t{font-size:7.5pt;opacity:.65;font-weight:400;margin-left:2px}
 #finalize-dlg{position:fixed;inset:0;z-index:99998;background:rgba(5,12,25,.55);display:flex;align-items:center;justify-content:center;padding:16px}
 #finalize-dlg .fd-card{background:#fff;color:#1a2233;border-radius:12px;max-width:520px;width:100%;max-height:85vh;overflow:auto;box-shadow:0 12px 40px rgba(0,0,0,.35);padding:20px 22px}
 #finalize-dlg h3{margin:0 0 4px;font-size:12.5pt}
@@ -2476,7 +2477,7 @@ body.compact-density .progress-bar-wrap{height:6px}
       <button id="progress-panel-toggle" onclick="toggleProgressPanel()" aria-expanded="false" aria-controls="progress-panel" title="Show / hide the report content checklist">
         ☑ Report Content <span id="pp-score">—</span><span id="pp-caret" aria-hidden="true">▾</span>
       </button>
-      <button id="pp-asof" type="button" onclick="manualDataRefresh()" title="Re-load learners, attendance and EISA from the server">↻ Data</button>
+      <button id="pp-asof" type="button" onclick="manualDataRefresh()" title="Get the latest information for this report">↻ Refresh data</button>
       <div id="preview-pdf-actions">
         <button id="combined-download-btn" class="ai-old btn btn-ghost" onclick="generateCombinedReport()" style="font-size:8.5pt;padding:9px 16px" title="Combine every approved/sent/archived month into one PDF with a clickable index, for the client">📚 Download All Months</button>
         <button class="btn btn-primary" onclick="triggerPrint()" style="font-size:8.5pt;padding:9px 16px">🖨 Print / Save PDF</button>
@@ -4046,10 +4047,11 @@ function _rerenderKeepingPlace(){
 // Narrative text is flushed to the draft first and never overwritten by this refresh.
 let _lastFocusRefresh=0;
 async function refreshOnFocus(force){
-  force=force===true; // event listeners pass an Event object
-  if(document.visibilityState==='hidden'||!activeProgramme||!activeClient||!isOnline||!TENANT_DB_ID)return;
+  // force=true: the "↻ Refresh data" button / finalize gate. Event listeners pass an Event.
+  force=force===true;
+  if(document.visibilityState==='hidden'||!activeProgramme||!activeClient||!isOnline||!TENANT_DB_ID)return 'skip';
   const pid=activeProgramme.id;
-  if(isTempId(pid))return;
+  if(isTempId(pid))return 'skip';
   // Queued offline writes not yet on the server — server data would be behind this device
   if(loadWriteQueue().length)return 'queued';
   const now=Date.now();
@@ -4057,28 +4059,56 @@ async function refreshOnFocus(force){
   _lastFocusRefresh=now;
   const month=document.getElementById('sel-month').value;
   try{
-    const [enrolled,att,ei]=await Promise.all([
+    const [enrolled,att,ei,lc,progRows]=await Promise.all([
       sb('enrolments',`select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`),
       sb('attendance',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`),
-      sb('eisa',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`)
+      sb('eisa',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`),
+      sb('learner_comments',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`).catch(()=>null),
+      sb('programmes',`select=*&tenant_id=eq.${TENANT_DB_ID}&id=eq.${pid}&limit=1`).catch(()=>null)
     ]);
     if(!activeProgramme||activeProgramme.id!==pid||document.getElementById('sel-month').value!==month)return 'skip';
     window._dataLoadedAt=Date.now();
+    const J=JSON.stringify;
+    // Learners / attendance / EISA
     const newEnr=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
     const newLrn=enrolled.map(e=>e.learner).filter(Boolean);
-    const sig=(en,ln,a,x)=>JSON.stringify([en,ln,a,x]);
-    const changed=sig(newEnr,newLrn,att,ei)!==sig(enrolments,learners,attendance,eisa);
+    const dataChanged=J([newEnr,newLrn,att,ei])!==J([enrolments,learners,attendance,eisa]);
+    // Facilitator observations saved from another device (keyed learner_month, as in onProgrammeChange)
+    let newRc=null;
+    if(Array.isArray(lc)){newRc={};lc.forEach(r=>{newRc[`${r.learner_id}_${r.month||''}`]=r.comment||'';});}
+    const commentsChanged=!!newRc&&J(newRc)!==J(remoteComments||{});
+    // Programme details (dates, module dates, group size, facilitator…)
+    const progRow=Array.isArray(progRows)&&progRows[0]?progRows[0]:null;
+    const progChanged=!!progRow&&Object.keys(progRow).some(k=>J(progRow[k])!==J(activeProgramme[k]));
+    const changed=dataChanged||commentsChanged||progChanged;
     const previewVisible=document.getElementById('report-preview').classList.contains('show');
+    // Only flush the draft if there is unsaved typing — saving an unchanged local copy
+    // would stamp it "newer" than the cloud and hide a newer cloud draft.
+    const flushTyping=()=>{if(autoSaveTimer&&!IS_ADMIN){clearTimeout(autoSaveTimer);autoSaveTimer=null;saveNarratives();}};
     if(changed){
-      // Flush any typed narrative text to the draft before re-rendering
-      if(previewVisible&&!IS_ADMIN){clearTimeout(autoSaveTimer);autoSaveTimer=null;saveNarratives();}
-      enrolments=newEnr;learners=newLrn;attendance=att;eisa=ei;
-      saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
-      buildEisaState();
-      buildAttState();
-      if(previewVisible)_rerenderKeepingPlace(); // also runs checkDraftConflict
+      flushTyping();
+      if(dataChanged){
+        enrolments=newEnr;learners=newLrn;attendance=att;eisa=ei;
+        saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+        buildEisaState();
+        buildAttState();
+      }
+      if(commentsChanged)remoteComments=newRc;
+      if(progChanged){
+        Object.assign(activeProgramme,progRow);
+        const i=programmes.findIndex(p=>String(p.id)===String(pid));
+        if(i>=0&&programmes[i]!==activeProgramme)Object.assign(programmes[i],progRow);
+        saveSnapshot({clients,programmes,assessors});
+      }
+    }
+    if(previewVisible&&(changed||force)){
+      // Re-render also re-reads programme notes, the review status/feedback and
+      // the cloud draft (auto-loads it if newer and there's no unsaved typing).
+      flushTyping();
+      _rerenderKeepingPlace();
     }else if(previewVisible){
       checkDraftConflict(pid,month);
+      try{checkReportStatus();}catch{}
     }
     _updateProgressPanel();
     return changed?'changed':'same';
@@ -4090,11 +4120,13 @@ function _ppAsOfUpdate(){
   if(!b)return;
   b.style.display=activeProgramme&&activeClient?'inline-block':'none';
   const t=window._dataLoadedAt;
-  if(!t){b.textContent='↻ Data';b.classList.remove('stale');return;}
+  const what='learners, attendance, results, dates, observations, notes and review status';
+  if(!t){b.textContent='↻ Refresh data';b.classList.remove('stale');b.title='Get the latest '+what+' for this report.';return;}
   const hhmm=new Date(t).toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
-  b.textContent='↻ Data as of '+hhmm;
-  b.classList.toggle('stale',Date.now()-t>30*60000);
-  b.title='Learners, attendance and EISA last loaded at '+hhmm+'. Click to load the latest from the server.';
+  const stale=Date.now()-t>30*60000;
+  b.innerHTML='↻ Refresh data <span class="pp-asof-t">· '+(stale?'last updated ':'updated ')+hhmm+'</span>';
+  b.classList.toggle('stale',stale);
+  b.title='Get the latest '+what+' for this report. Last updated at '+hhmm+'. Anything you have typed is saved first.';
 }
 setInterval(_ppAsOfUpdate,60000);
 
@@ -4102,11 +4134,12 @@ async function manualDataRefresh(){
   const b=document.getElementById('pp-asof');
   if(!activeProgramme)return;
   if(!isOnline){toast('You are offline — data will refresh when you reconnect','warn',3500);return;}
-  if(b){b.disabled=true;b.textContent='↻ Checking…';}
+  if(b){b.disabled=true;b.textContent='↻ Refreshing…';}
   let r;
   try{r=await refreshOnFocus(true);}finally{if(b)b.disabled=false;_ppAsOfUpdate();}
-  if(r==='changed')toast('✓ Updated with the latest learners, attendance and EISA','success',3000);
+  if(r==='changed')toast('✓ Report updated with the latest information','success',3000);
   else if(r==='same')toast('✓ Already up to date','success',2000);
+  else if(r==='skip')toast('Open a report first, then refresh','info',2500);
   else if(r==='queued')toast('Your offline changes are still uploading — try again in a moment','warn',3500);
   else if(r==='error')toast('Could not reach the server — try again shortly','warn',3500);
 }
