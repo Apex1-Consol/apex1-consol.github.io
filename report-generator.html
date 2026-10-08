@@ -3987,15 +3987,29 @@ function applyCloudDraft(silent){
   // Regenerate so the restored narratives populate the report. Clear the dirty-flag
   // first: programme/month are unchanged, so generateReport() would otherwise return
   // early and never reload narratives (checklist stayed 0/N until a page reload).
-  _lastGenKey=null;
   narratives=loadNarratives();
-  generateReport();
+  _rerenderKeepingPlace();
   toast(silent===true?'☁ Loaded latest saved version':'☁ Cloud draft restored','success',3000);
 }
 
 function dismissDraftRecovery(){
   _pendingCloudDraft=null;
   document.getElementById('draft-recovery-banner').classList.remove('show');
+}
+
+// Re-render the report without losing the PM's place: keeps page scroll and, if a
+// narrative/comment field had focus, puts the caret back in the same field.
+function _rerenderKeepingPlace(){
+  const y=window.scrollY;
+  const a=document.activeElement;
+  const sel=a&&a.dataset?(a.dataset.nar?`[data-nar="${a.dataset.nar}"]`:a.dataset.commentLid?`[data-comment-lid="${a.dataset.commentLid}"]`:null):null;
+  const caret=sel&&typeof a.selectionStart==='number'?a.selectionStart:null;
+  _lastGenKey=null;
+  generateReport(true);
+  requestAnimationFrame(()=>{
+    window.scrollTo(0,y);
+    if(sel){const el=document.querySelector(sel);if(el){try{el.focus({preventScroll:true});if(caret!=null)el.setSelectionRange(caret,caret);}catch{}}}
+  });
 }
 
 // ── Refresh on tab focus ─────────────────────────────────────────────────────
@@ -4008,6 +4022,8 @@ async function refreshOnFocus(){
   if(document.visibilityState==='hidden'||!activeProgramme||!activeClient||!isOnline||!TENANT_DB_ID)return;
   const pid=activeProgramme.id;
   if(isTempId(pid))return;
+  // Queued offline writes not yet on the server — server data would be behind this device
+  if(loadWriteQueue().length)return;
   const now=Date.now();
   if(now-_lastFocusRefresh<60000)return;
   _lastFocusRefresh=now;
@@ -4031,7 +4047,7 @@ async function refreshOnFocus(){
       saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
       buildEisaState();
       buildAttState();
-      if(previewVisible){_lastGenKey=null;generateReport(true);return;} // also runs checkDraftConflict
+      if(previewVisible){_rerenderKeepingPlace();return;} // also runs checkDraftConflict
       _updateProgressPanel();
     }else if(previewVisible){
       checkDraftConflict(pid,month);
