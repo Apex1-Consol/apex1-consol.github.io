@@ -4055,6 +4055,45 @@ async function refreshOnFocus(force){
     _updateProgressPanel();
   }catch(e){console.warn('refreshOnFocus failed:',e?.message||e);}
 }
+// ── New-version check ────────────────────────────────────────────────────────
+// Tabs left open for days keep running old code even after a deploy. The page records
+// the sw.js cache version it loaded with; on focus (max every 5 min) and every 30 min it
+// re-reads sw.js and, if the version changed, saves the draft and offers a reload
+// (or reloads straight away when no report is open).
+let _loadedAppVersion=null,_lastVerCheck=0,_verBannerShown=false;
+async function _fetchAppVersion(){
+  try{
+    const t=await (await fetch('./sw.js?v='+Date.now(),{cache:'no-store'})).text();
+    const m=t.match(/CACHE\s*=\s*['"]([^'"]+)['"]/);
+    return m?m[1]:null;
+  }catch{return null;}
+}
+_fetchAppVersion().then(v=>{_loadedAppVersion=v;});
+function _reloadForNewVersion(){
+  try{if(activeProgramme&&!IS_ADMIN){clearTimeout(autoSaveTimer);autoSaveTimer=null;saveNarratives();}}catch{}
+  setTimeout(()=>location.reload(),1200); // give the cloud draft save a moment
+}
+async function checkForNewVersion(force){
+  if(_verBannerShown||document.visibilityState==='hidden'||!navigator.onLine)return;
+  const now=Date.now();
+  if(force!==true&&now-_lastVerCheck<5*60000)return;
+  _lastVerCheck=now;
+  const v=await _fetchAppVersion();
+  if(!v||!_loadedAppVersion||v===_loadedAppVersion)return;
+  if(!activeProgramme){location.reload();return;}
+  _verBannerShown=true;
+  try{if(!IS_ADMIN){clearTimeout(autoSaveTimer);autoSaveTimer=null;saveNarratives();}}catch{}
+  const b=document.createElement('div');
+  b.style.cssText='position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:99999;background:#1f3a5f;color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.3);font-size:9.5pt;display:flex;gap:12px;align-items:center;max-width:calc(100vw - 32px)';
+  b.innerHTML='<span>A newer version of the report generator is available. Your draft is saved.</span>';
+  const btn=document.createElement('button');
+  btn.textContent='Reload now';btn.className='btn btn-primary';btn.style.cssText='font-size:9pt;padding:6px 12px;white-space:nowrap';
+  btn.onclick=()=>{btn.disabled=true;btn.textContent='Reloading…';_reloadForNewVersion();};
+  b.appendChild(btn);document.body.appendChild(b);
+}
+setInterval(()=>checkForNewVersion(true),30*60000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkForNewVersion();});
+window.addEventListener('focus',()=>checkForNewVersion());
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshOnFocus();});
 window.addEventListener('focus',refreshOnFocus);
 window.addEventListener('online',()=>setTimeout(refreshOnFocus,3000));
