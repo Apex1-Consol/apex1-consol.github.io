@@ -1118,7 +1118,7 @@ body.compact-density .progress-bar-wrap{height:6px}
 .dash-month-chip.draft{background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.2);color:rgba(255,255,255,.55)}
 .dash-month-chip.next-due{background:#F0C040;border-color:#F0C040;color:#412402}
 .dash-month-chip.next-due:hover{background:#f5cf5e;border-color:#f5cf5e;color:#412402}
-.dash-chip-key{display:flex;flex-wrap:wrap;gap:12px;margin:-8px 0 16px;font-size:7.5pt;color:rgba(255,255,255,.45)}
+.dash-chip-key{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;margin:-8px 0 16px;font-size:7.5pt;color:rgba(255,255,255,.45)}
 .dash-del-btn{
   background:none;border:1px solid rgba(200,39,44,.3);border-radius:6px;
   color:rgba(248,113,113,.5);font-size:11pt;cursor:pointer;
@@ -12229,13 +12229,18 @@ async function renderDashboard(){
       <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ROLLUP_COLOR.soon};margin-right:5px"></span>Due within 7 days</span>
       <span><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${ROLLUP_COLOR.ok};margin-right:5px"></span>On track</span>
     </div>
-    <div class="dash-chip-key" title="What the month buttons under each programme mean">
+    <div class="dash-chip-key" title="How each month moves along: what the month buttons under each programme mean">
       <span>Months:</span>
-      <span style="color:#F0C040">● due — do this one next</span>
-      <span>⏳ in review</span>
+      <span><span style="display:inline-block;padding:0 5px;border:1px solid rgba(255,255,255,.4);border-radius:4px;color:rgba(255,255,255,.75)">Oct</span> this month (not due yet)</span>
+      <span aria-hidden="true">→</span>
+      <span style="color:#F0C040">● due</span>
+      <span aria-hidden="true">→</span>
+      <span style="color:rgba(255,255,255,.6)">draft saved</span>
+      <span aria-hidden="true">→</span>
+      <span style="color:#F0C040">⏳ in review</span>
+      <span aria-hidden="true">→</span>
       <span style="color:#4ade80">✓ approved</span>
-      <span style="color:#f87171">↩ changes needed</span>
-      <span>outline = this month (not due yet)</span>
+      <span style="margin-left:6px;color:#f87171">↩ changes needed <span style="color:rgba(255,255,255,.45)">— fix and resend, goes back to review</span></span>
     </div>`:'';
 
   // ── Unassigned programmes — rows with no client_id at all. Never blended into the
