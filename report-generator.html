@@ -4018,14 +4018,15 @@ function _rerenderKeepingPlace(){
 // added doesn't show stale lists or checklist ("Learners (0)"). Max once per 60 s.
 // Narrative text is flushed to the draft first and never overwritten by this refresh.
 let _lastFocusRefresh=0;
-async function refreshOnFocus(){
+async function refreshOnFocus(force){
+  force=force===true; // event listeners pass an Event object
   if(document.visibilityState==='hidden'||!activeProgramme||!activeClient||!isOnline||!TENANT_DB_ID)return;
   const pid=activeProgramme.id;
   if(isTempId(pid))return;
   // Queued offline writes not yet on the server — server data would be behind this device
   if(loadWriteQueue().length)return;
   const now=Date.now();
-  if(now-_lastFocusRefresh<60000)return;
+  if(!force&&now-_lastFocusRefresh<60000)return;
   _lastFocusRefresh=now;
   const month=document.getElementById('sel-month').value;
   try{
@@ -4047,11 +4048,11 @@ async function refreshOnFocus(){
       saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
       buildEisaState();
       buildAttState();
-      if(previewVisible){_rerenderKeepingPlace();return;} // also runs checkDraftConflict
-      _updateProgressPanel();
+      if(previewVisible)_rerenderKeepingPlace(); // also runs checkDraftConflict
     }else if(previewVisible){
       checkDraftConflict(pid,month);
     }
+    _updateProgressPanel();
   }catch(e){console.warn('refreshOnFocus failed:',e?.message||e);}
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshOnFocus();});
@@ -8288,6 +8289,20 @@ function autoSave(){
 }
 
 // ── Print guard ──
+// Async finalize gate: if the checklist looks incomplete, first re-fetch learners /
+// attendance / EISA from the server (the page may have been opened before they were
+// added — "Learners (0)") and re-check; only block if still incomplete.
+async function _finalizeGate(){
+  const genBtn=document.getElementById('gen-btn');
+  if(!genBtn||!genBtn.classList.contains('incomplete'))return false;
+  if(isOnline&&activeProgramme){
+    toast('Checking latest data…','info',1500);
+    try{await refreshOnFocus(true);}catch{}
+    try{_updateProgressPanel();}catch{}
+  }
+  return _checklistBlocksFinalize();
+}
+
 // Returns true (and warns/expands the checklist) if the Report Content checklist
 // isn't done yet — used to gate finalize actions (send for review, print, download)
 // now that generateReport() itself no longer blocks rendering.
@@ -8368,14 +8383,14 @@ function openReportPreview(){
   rp.classList.add('show','client-preview-mode');
 }
 
-function triggerPrint(){
+async function triggerPrint(){
   if(IS_ADMIN){toast('Printing is disabled in admin review mode','warn',3000);return;}
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length){
     toast('Please generate the report first before printing','warn',4000);
     return;
   }
-  if(_checklistBlocksFinalize())return;
+  if(await _finalizeGate())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   // NOTE: printing no longer auto-submits for review — use the
@@ -8391,7 +8406,7 @@ async function sendForReview(){
     toast('Please generate the report first before sending for review','warn',4000);
     return;
   }
-  if(_checklistBlocksFinalize())return;
+  if(await _finalizeGate())return;
   if(!(await _confirmUneditedComments()))return;
   if(!(await _confirmMissingDetails()))return;
   _stampSignoffDate();
@@ -8442,13 +8457,13 @@ async function _confirmUneditedComments(){
 // Clones the report into a hidden iframe, triggers window.print() inside it.
 // The browser's "Save as PDF" dialog handles the rest — no html2canvas artifacts,
 // no font rendering issues, no gradient loss.
-function downloadPDF(){
+async function downloadPDF(){
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length){
     toast('Please generate the report first before downloading','warn',4000);
     return;
   }
-  if(_checklistBlocksFinalize())return;
+  if(await _finalizeGate())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   _printReportViaIframe({mode:'download'});
