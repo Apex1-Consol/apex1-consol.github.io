@@ -2730,33 +2730,6 @@ let _currentReportSubmitterEmail=null;
 let _currentReportStatus=null; // status of the latest report row for this programme+month
 
 // ── Check for pending feedback on the current programme/month ──
-// What the reviewer should know is missing before approving (shown in the admin
-// review bar). Same checks the PM sees at "Send for Review", plus empty sections.
-function _reportMissingForReview(){
-  const c=activeClient||{},p=activeProgramme||{},nar=(typeof narratives==='object'&&narratives)||{},out=[];
-  if(!(c.project_manager||'').trim())out.push('Project Manager');
-  if(!(c.sales_person||'').trim())out.push('Sales Person');
-  const fac=p.facilitator_id?getAssessor(p.facilitator_id):'';
-  if(!fac||fac==='—')out.push('Facilitator');
-  else if(String(fac).trim().split(/\s+/).length<2)out.push('Facilitator surname');
-  const nm=(document.querySelector('[data-nar="signoff_name"]')?.value||nar.signoff_name||'').trim();
-  const sig=document.getElementById('sig-data-input')?.value||nar.signoff_signature||'';
-  if(!nm)out.push('Sign-off name');
-  if(!sig)out.push('Signature');
-  const empty=[...document.querySelectorAll('#report-pages .nar-print[data-nar-print]')]
-    .filter(el=>el.tagName!=='IMG'&&!(el.dataset.narPrint||'').startsWith('signoff')&&!(el.textContent||'').trim()).length;
-  if(empty)out.push(`${empty} empty text section${empty!==1?'s':''}`);
-  return out;
-}
-function _renderReviewMissing(){
-  const sub=document.getElementById('review-bar-sub');
-  if(!sub)return;
-  let el=document.getElementById('review-bar-missing');
-  if(!el){el=document.createElement('div');el.id='review-bar-missing';el.style.cssText='margin-top:4px;font-size:8pt;color:#fbbf24';sub.insertAdjacentElement('afterend',el);}
-  const m=_reportMissingForReview();
-  el.textContent=m.length?`⚠ Missing on this report: ${m.join(', ')}`:'';
-  el.style.display=m.length?'block':'none';
-}
 async function checkReportStatus(){
   if(!activeProgramme||!activeClient||!isOnline)return;
   const month=document.getElementById('sel-month').value;
@@ -2810,21 +2783,11 @@ async function checkReportStatus(){
         // Buttons mirror the server's transition rules (reports.report_next_actions).
         const next=await _reportNextActions(r.id);
         const btns=[];
-        if(r.status==='archived'){
-          // Admin-only restore: the server offers exactly one target, the status
-          // the report had before it was archived (reports.archived_restore_status).
-          const tgt=next.find(s=>s!=='archived');
-          if(tgt)btns.push(`<button class="btn-approve" onclick="restoreReport('${tgt}')">♻ Restore Report</button>`);
-        }else{
-          if(next.includes('approved'))btns.push(`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>`);
-          if(next.includes('needs_changes'))btns.push(`<button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`);
-          if(next.includes('archived'))btns.push(`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`);
-        }
+        if(next.includes('approved'))btns.push(`<button class="btn-approve" onclick="submitReview('approved')">✅ Approve Report</button>`);
+        if(next.includes('needs_changes'))btns.push(`<button class="btn-request" onclick="submitReview('needs_changes')">↩ Request Changes</button>`);
+        if(next.includes('archived'))btns.push(`<button class="btn-approve" onclick="archiveReport()">📦 Archive Report</button>`);
         actionsWrap.innerHTML=btns.join('\n')||`<span style="font-size:8pt;color:rgba(255,255,255,.35)">No action for you at this stage</span>`;
       }
-      // The report pages may still be rendering — check now and again shortly.
-      try{_renderReviewMissing();}catch{}
-      setTimeout(()=>{try{_renderReviewMissing();}catch{}},1500);
     }
     // Apply lock state based on report status (PM only)
     if(!IS_ADMIN) _applyReportLock(r.status, r.printed_at, r.reviewed_at, r.reviewed_by, r.sent_at, r.sent_by);
@@ -3065,14 +3028,13 @@ function decorateMonthOptions(){
     o.textContent=base+_reportStatusSuffix(programmeReportStatus[o.value]);
   });
 }
-const MAX_MODULES=20; // matches public.programmes module_1_dates … module_20_dates
 const _AUTO_MONTH_NAMES=['January','February','March','April','May','June','July','August','September','October','November','December'];
 function _programmeMonthWindow(prog){
   // Earliest module start date through the later of (latest module end date,
   // today) — every month the programme has actually been running is a
   // candidate, including the current month even if modules run past it.
   if(!prog)return null;
-  const ranges=Array.from({length:MAX_MODULES},(_,i)=>i+1).map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
+  const ranges=[1,2,3,4,5,6,7,8,9,10].map(n=>(typeof parseModDateRange==='function')?parseModDateRange(prog[`module_${n}_dates`]):null).filter(Boolean);
   if(!ranges.length)return null;
   const start=new Date(Math.min(...ranges.map(r=>r.start)));
   const latestEnd=new Date(Math.max(...ranges.map(r=>r.end)));
@@ -3914,6 +3876,8 @@ function saveNarratives(showToast=false){
       saved_at:new Date().toISOString(),
     };
     sbUpsert('drafts',dbPayload).then(()=>{
+      // Mark this local copy as in sync with the cloud (used by checkDraftConflict auto-load)
+      try{localStorage.setItem(key+'__synced',String(data._meta.savedAt));}catch{}
       if(showToast)toast('✓ Saved to cloud','success',2000);
     }).catch(e=>{
       console.warn('Cloud draft sync failed:',e?.message||e);
@@ -3974,12 +3938,27 @@ async function checkDraftConflict(progId, month){
     const hasContent=Object.keys(cloudData).some(k=>!k.startsWith('_')&&cloudData[k]&&String(cloudData[k]).trim().length>0);
     if(!hasContent&&!cloudData._meta)return;
 
+    // Ignore stale results if the PM switched programme/month while this was in flight
+    if(!activeProgramme||String(activeProgramme.id)!==String(progId)||document.getElementById('sel-month').value!==month)return;
+
+    // No unsaved local edits since the last cloud sync → load the cloud copy silently.
+    // The local copy is backed up to <key>__backup first.
+    let syncedAt=0;
+    try{syncedAt=+(localStorage.getItem(localKey+'__synced')||0);}catch{}
+    const localClean=(!localSavedAt||syncedAt>=localSavedAt)&&!autoSaveTimer;
+    if(localClean){
+      try{const old=localStorage.getItem(localKey);if(old)localStorage.setItem(localKey+'__backup',old);}catch{}
+      _pendingCloudDraft={key:localKey, data:cloudData, cloudSavedAt};
+      applyCloudDraft(true);
+      return;
+    }
+
     // Store cloud draft for later application. The local draft is left untouched in
     // localStorage until the user explicitly accepts the cloud version — applyCloudDraft()
     // overwrites it then. Deleting it here (old behaviour) meant dismissing the banner,
     // or just closing the tab, permanently destroyed the local draft with nothing loaded
     // to replace it.
-    _pendingCloudDraft={key:localKey, data:cloudData};
+    _pendingCloudDraft={key:localKey, data:cloudData, cloudSavedAt};
 
     // Format timestamps for the detail message
     const fmtTs=ms=>ms>0?new Date(ms).toLocaleString('en-ZA',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'unknown';
@@ -3994,10 +3973,14 @@ async function checkDraftConflict(progId, month){
   }
 }
 
-function applyCloudDraft(){
+function applyCloudDraft(silent){
   if(!_pendingCloudDraft)return;
   try{
-    localStorage.setItem(_pendingCloudDraft.key, JSON.stringify(_pendingCloudDraft.data));
+    const d=_pendingCloudDraft.data;
+    // Align local savedAt with the cloud row so the same draft isn't re-loaded on every check
+    if(d._meta&&_pendingCloudDraft.cloudSavedAt)d._meta.savedAt=Math.max(+d._meta.savedAt||0,_pendingCloudDraft.cloudSavedAt);
+    localStorage.setItem(_pendingCloudDraft.key, JSON.stringify(d));
+    localStorage.setItem(_pendingCloudDraft.key+'__synced',String(d._meta?.savedAt||_pendingCloudDraft.cloudSavedAt||Date.now()));
   }catch{}
   _pendingCloudDraft=null;
   document.getElementById('draft-recovery-banner').classList.remove('show');
@@ -4007,13 +3990,57 @@ function applyCloudDraft(){
   _lastGenKey=null;
   narratives=loadNarratives();
   generateReport();
-  toast('☁ Cloud draft restored','success',3000);
+  toast(silent===true?'☁ Loaded latest saved version':'☁ Cloud draft restored','success',3000);
 }
 
 function dismissDraftRecovery(){
   _pendingCloudDraft=null;
   document.getElementById('draft-recovery-banner').classList.remove('show');
 }
+
+// ── Refresh on tab focus ─────────────────────────────────────────────────────
+// Re-fetch learners (via enrolments), attendance and EISA for the selected programme
+// when the tab regains focus / comes back online, so a page opened before data was
+// added doesn't show stale lists or checklist ("Learners (0)"). Max once per 60 s.
+// Narrative text is flushed to the draft first and never overwritten by this refresh.
+let _lastFocusRefresh=0;
+async function refreshOnFocus(){
+  if(document.visibilityState==='hidden'||!activeProgramme||!activeClient||!isOnline||!TENANT_DB_ID)return;
+  const pid=activeProgramme.id;
+  if(isTempId(pid))return;
+  const now=Date.now();
+  if(now-_lastFocusRefresh<60000)return;
+  _lastFocusRefresh=now;
+  const month=document.getElementById('sel-month').value;
+  try{
+    const [enrolled,att,ei]=await Promise.all([
+      sb('enrolments',`select=*,learner:learners(*)&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}&order=learner(last_name)`),
+      sb('attendance',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`),
+      sb('eisa',`select=*&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${pid}`)
+    ]);
+    if(!activeProgramme||activeProgramme.id!==pid||document.getElementById('sel-month').value!==month)return;
+    const newEnr=enrolled.map(e=>({id:e.id,programme_id:e.programme_id,learner_id:e.learner_id,status:e.status,fields:e.fields||{}}));
+    const newLrn=enrolled.map(e=>e.learner).filter(Boolean);
+    const sig=(en,ln,a,x)=>JSON.stringify([en,ln,a,x]);
+    const changed=sig(newEnr,newLrn,att,ei)!==sig(enrolments,learners,attendance,eisa);
+    const previewVisible=document.getElementById('report-preview').classList.contains('show');
+    if(changed){
+      // Flush any typed narrative text to the draft before re-rendering
+      if(previewVisible&&!IS_ADMIN){clearTimeout(autoSaveTimer);autoSaveTimer=null;saveNarratives();}
+      enrolments=newEnr;learners=newLrn;attendance=att;eisa=ei;
+      saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+      buildEisaState();
+      buildAttState();
+      if(previewVisible){_lastGenKey=null;generateReport(true);return;} // also runs checkDraftConflict
+      _updateProgressPanel();
+    }else if(previewVisible){
+      checkDraftConflict(pid,month);
+    }
+  }catch(e){console.warn('refreshOnFocus failed:',e?.message||e);}
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')refreshOnFocus();});
+window.addEventListener('focus',refreshOnFocus);
+window.addEventListener('online',()=>setTimeout(refreshOnFocus,3000));
 
 // Auto-save is debounced per-keystroke via autoSave(); interval removed as redundant.
 
@@ -4120,7 +4147,6 @@ async function setLearnerTermination(learnerId,status,moduleNum){
     try{await sbPatch('enrolments',e.id,payload);showSaved();}
     catch(err){
       console.warn('Learner status patch failed:',err?.message);
-      if(err?.code==='NO_ROWS_UPDATED'){toast(err.message,'error',8000);return;}
       enqueueWrite('patch','enrolments',payload,e.id);
       updateQueueBadge();
       toast('Change queued for retry when online','warn');
@@ -4696,7 +4722,7 @@ function computeCoverStats(pLearners,prog){
 
 // Cover "Key Dates" strip: programme start/end from module dates (falls back
 // to programme start_date/end_date), current/next module from today, next
-// report = month after the reporting period. Absent values say why (e.g. "Final module").
+// report = month after the reporting period. Missing values show "—".
 function buildCoverKeyDates(prog,month,p){
   const MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   const FULL=['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -4709,27 +4735,15 @@ function buildCoverKeyDates(prog,month,p){
   const end=mods.length?new Date(Math.max(...mods.map(m=>m.r.end))):iso(prog.end_date);
   const cur=mods.find(m=>m.r.start<=t&&t<=m.r.end);
   const nxt=mods.filter(m=>m.r.start>t).sort((a,b)=>a.r.start-b.r.start)[0];
-  let nextRep='Not set';
+  let nextRep='—';
   const mm=String(month||'').match(/([A-Za-z]+)\s+(\d{4})/);
-  if(mm){const mi=FULL.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());if(mi>=0){const d=new Date(+mm[2],mi+1,1);
-    // Programme finished before the next report month → this is the final report.
-    nextRep=(end&&end<d)?'None · final report':`${FULL[d.getMonth()]} ${d.getFullYear()}`;}}
-  // Say why a date is absent instead of printing a bare "—" on the client cover.
-  const curTxt=cur?`Module ${cur.n} · ends ${dm(cur.r.end)}`
-    :!mods.length?'Dates not set'
-    :t<start?`Starts ${dm(start)}`
-    :t>end?'All modules completed'
-    :'Between modules';
-  const nxtTxt=nxt?`Module ${nxt.n} · ${dm(nxt.r.start)}`
-    :!mods.length?'Dates not set'
-    :t>end?'None · programme completed'
-    :'None · final module';
+  if(mm){const mi=FULL.findIndex(x=>x.toLowerCase()===mm[1].toLowerCase());if(mi>=0){const d=new Date(+mm[2],mi+1,1);nextRep=`${FULL[d.getMonth()]} ${d.getFullYear()}`;}}
   const items=[
-    ['Programme start',start?dmy(start):'Not set',p.accentFrom],
-    ['Current module',curTxt,p.accentFrom],
-    ['Next module',nxtTxt,p.accentTo],
+    ['Programme start',start?dmy(start):'—',p.accentFrom],
+    ['Current module',cur?`Module ${cur.n} · ends ${dm(cur.r.end)}`:'—',p.accentFrom],
+    ['Next module',nxt?`Module ${nxt.n} · ${dm(nxt.r.start)}`:'—',p.accentTo],
     ['Next report',nextRep,p.accentTo],
-    ['Programme end',end?dmy(end):'Not set',p.gradFrom]];
+    ['Programme end',end?dmy(end):'—',p.gradFrom]];
   return`<div class="cover-keydates"><label>Key Dates</label><div class="cover-kd-row">${items.map(([l,v,c])=>`<div class="cover-kd" style="border-left-color:${c}"><span>${l}</span><b>${esc(v)}</b></div>`).join('')}</div></div>`;
 }
 function buildCoverPage(prog,client,month){
@@ -4789,8 +4803,8 @@ function buildCoverPage(prog,client,month){
         </div>
           <div class="cover-stats cover-stats-low">
             <div class="cover-stat" style="background:${p.accentFrom}0C">
-              <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.avgAtt!==null?stats.avgAtt+'%':'N/A'}</div>
-              <div class="cover-stat-label">${stats.avgAtt!==null?'Avg Attendance':'No attendance recorded'}</div>
+              <div class="cover-stat-num" style="color:${p.accentFrom}">${stats.avgAtt!==null?stats.avgAtt+'%':'—'}</div>
+              <div class="cover-stat-label">Avg Attendance</div>
             </div>
             <div class="cover-stat" style="background:${p.accentTo}0C">
               <div class="cover-stat-num" style="color:${p.accentTo}">${stats.totalMods>0?`${stats.onTrack}/${stats.totalMods}`:'—'}</div>
@@ -4924,7 +4938,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
   }
   const headline=avgAtt!==null
     ?`${nCount} learner${nCount!==1?'s':''} enrolled, averaging ${avgAtt}% attendance across the reporting period.${flaggedModules?` ${flaggedModules} module${flaggedModules!==1?'s':''} flagged with outstanding "Not Yet Competent" results requiring follow-up.`:' No outstanding competency concerns at this time.'}`
-    :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period. No attendance was recorded for this period.`;
+    :`${nCount} learner${nCount!==1?'s':''} enrolled for this reporting period.`;
   const div=document.createElement('div');
   div.className='report-page content-page exec-summary-page';
   div.style.borderTop=`5px solid ${p.accentFrom}`;
@@ -4948,8 +4962,8 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
           <svg viewBox="0 0 120 120" width="90" height="90" style="margin:0 auto;display:block">
             <circle cx="60" cy="60" r="50" fill="none" stroke="#F1F5F9" stroke-width="10"/>
             ${avgAtt!==null?`<circle cx="60" cy="60" r="50" fill="none" stroke="${avgAtt>=ATT_THRESHOLD?'#1B7A4A':avgAtt>=60?'#CC6B00':'#C8272C'}" stroke-width="10" stroke-linecap="round" stroke-dasharray="${(avgAtt/100*CIRC).toFixed(1)} ${CIRC.toFixed(1)}" transform="rotate(-90 60 60)"/>`:''}
-            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${avgAtt!==null?avgAtt+'%':'N/A'}</text>
-            <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">${avgAtt!==null?'ATTENDANCE':'NOT RECORDED'}</text>
+            <text x="60" y="57" text-anchor="middle" font-size="25" font-weight="800" fill="#1E2533" font-family="DM Sans">${avgAtt!==null?avgAtt+'%':'—'}</text>
+            <text x="60" y="73" text-anchor="middle" font-size="7.5" fill="#94A3B8" font-family="DM Sans" letter-spacing="0.5">ATTENDANCE</text>
           </svg>
           <div style="font-size:8px;color:#94A3B8;margin-top:6px">threshold ${ATT_THRESHOLD}%</div>
         </div>
@@ -5191,8 +5205,8 @@ function buildCohortSummary(pLearners){
     </div>
     <div class="cs-card cs-att">
       <label>Avg Attendance</label>
-      <div class="cs-big ${attCls}">${avgAtt!==null?avgAtt+'%':'N/A'}</div>
-      <div class="cs-sub">${attCount>0?`across ${attDates.length} session${attDates.length!==1?'s':''}`:attDates.length?'no Present/Absent marks recorded':'no attendance recorded'}</div>
+      <div class="cs-big ${attCls}">${avgAtt!==null?avgAtt+'%':'—'}</div>
+      <div class="cs-sub">${attCount>0?`across ${attDates.length} session${attDates.length!==1?'s':''}`:attDates.length?'sessions recorded':'no sessions yet'}</div>
       ${avgAtt!==null?`<div class="cs-bar"><div class="cs-bar-fill" style="width:${avgAtt}%;background:${attBarCol}"></div></div>`:''}
     </div>
     ${modCards}
@@ -8119,8 +8133,6 @@ function addModuleDateField(){
   const existing=[...container.querySelectorAll('[data-mod-field-row]')]
     .map(el=>+el.dataset.modFieldRow).filter(n=>!isNaN(n));
   const next=(existing.length?Math.max(...existing):0)+1;
-  // The database has module_1_dates … module_20_dates; a 21st would fail on save.
-  if(next>MAX_MODULES){toast(`Maximum ${MAX_MODULES} modules — contact your admin if a programme needs more`,'warn',5000);return;}
   const row=document.createElement('div');
   row.className='modal-field';
   row.setAttribute('data-mod-field-row',next);
@@ -8200,8 +8212,6 @@ async function saveModDates(inp){
       showSaved();
     }catch(e){
       console.warn('Module dates patch failed:',e.message);
-      // A permission refusal won't succeed on retry — say so instead of queuing it.
-      if(e.code==='NO_ROWS_UPDATED'){toast(e.message,'error',8000);return;}
       enqueueWrite('patch','programmes',{[field]:val},activeProgramme.id);
       updateQueueBadge();
       toast('Module dates queued for retry when online','warn');
@@ -8240,7 +8250,6 @@ async function setModuleExcluded(n,excluded){
       showSaved();
     }catch(e){
       console.warn('Module exclusion patch failed:',e.message);
-      if(e.code==='NO_ROWS_UPDATED'){toast(e.message,'error',8000);return;}
       enqueueWrite('patch','programmes',{excluded_modules:next},activeProgramme.id);
       updateQueueBadge();
       toast('Change queued for retry when online','warn');
@@ -8259,26 +8268,13 @@ async function setModuleExcluded(n,excluded){
 let autoSaveTimer=null;
 function autoSave(){
   clearTimeout(autoSaveTimer);
-  autoSaveTimer=setTimeout(()=>saveNarratives(),1500);
+  autoSaveTimer=setTimeout(()=>{autoSaveTimer=null;saveNarratives();},1500);
 }
 
 // ── Print guard ──
 // Returns true (and warns/expands the checklist) if the Report Content checklist
 // isn't done yet — used to gate finalize actions (send for review, print, download)
 // now that generateReport() itself no longer blocks rendering.
-// A client PDF must not go out unsigned. Required at print/download only —
-// a PM can still send an unsigned draft for review.
-function _signoffBlocksDownload(){
-  const nm=(document.querySelector('[data-nar="signoff_name"]')?.value||'').trim();
-  const sig=document.getElementById('sig-data-input')?.value||'';
-  const missing=[];
-  if(!nm)missing.push('sign-off name');
-  if(!sig)missing.push('signature');
-  if(!missing.length)return false;
-  toast(`Add the ${missing.join(' and ')} on the Sign-off page before downloading — client reports must be signed.`,'warn',7000);
-  document.querySelector('#report-pages .signoff-block')?.scrollIntoView({behavior:'smooth',block:'center'});
-  return true;
-}
 function _checklistBlocksFinalize(){
   const genBtn=document.getElementById('gen-btn');
   if(!genBtn||!genBtn.classList.contains('incomplete'))return false;
@@ -8304,20 +8300,6 @@ function _checklistBlocksFinalize(){
 // matches what the client actually receives (mirrors the cleaning done
 // for print/PDF export in _printReportViaIframe). Used by the Preview
 // modal, which shows this clone instead of the live, editable DOM.
-// Empty narrative / comment blocks print as nothing under their heading, which
-// makes a client PDF look unfinished. Fill them with a neutral line instead.
-// Sign-off fields are left alone (they have their own download check).
-function _fillEmptyPrintText(node){
-  node.querySelectorAll('.nar-print').forEach(el=>{
-    if(el.tagName==='IMG')return;
-    if((el.dataset.narPrint||'').startsWith('signoff'))return;
-    if((el.textContent||'').trim())return;
-    el.textContent=el.hasAttribute('data-comment-print')?'No comment recorded.'
-      :el.hasAttribute('data-survey-comment-print')?'No comments recorded.'
-      :'No feedback recorded for this period.';
-    el.style.color='#94A3B8';el.style.fontStyle='italic';
-  });
-}
 function _cleanReportCloneForOutput(node){
   node.querySelectorAll(
     '.att-toolbar,.no-print,#lock-banner,#feedback-banner,#draft-recovery-banner,'+
@@ -8326,7 +8308,6 @@ function _cleanReportCloneForOutput(node){
   ).forEach(el=>el.remove());
   node.querySelectorAll('.nar-screen').forEach(el=>el.remove());
   node.querySelectorAll('.nar-print').forEach(el=>{el.style.display='block';});
-  _fillEmptyPrintText(node);
   node.querySelectorAll('.exam-screen').forEach(el=>el.remove());
   node.querySelectorAll('.exam-print').forEach(el=>{el.style.display='inline';});
   node.querySelectorAll('.result-screen').forEach(el=>el.remove());
@@ -8379,7 +8360,6 @@ function triggerPrint(){
     return;
   }
   if(_checklistBlocksFinalize())return;
-  if(_signoffBlocksDownload())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   // NOTE: printing no longer auto-submits for review — use the
@@ -8453,7 +8433,6 @@ function downloadPDF(){
     return;
   }
   if(_checklistBlocksFinalize())return;
-  if(_signoffBlocksDownload())return;
   if(document.activeElement&&document.activeElement.blur)document.activeElement.blur();
   document.getElementById('report-preview').classList.add('show');
   _printReportViaIframe({mode:'download'});
@@ -8473,44 +8452,6 @@ function downloadPDF(){
  * Fonts link already in the <head>. Gradients, shadows, and backgrounds
  * all render correctly because it's native browser rendering — not canvas.
  */
-// Shrink-to-fit for the printed/downloaded PDF only. Each .report-page is one
-// section that always starts on a new sheet; a section only slightly taller than
-// its sheet used to spill a few centimetres onto an extra, almost-blank sheet.
-// Such sections are scaled down (never below PRINT_FIT_MIN_SCALE) so they end
-// exactly on a sheet boundary. Sections that already fit are untouched, and
-// genuinely long ones (big registers) keep flowing across sheets as before.
-const PRINT_FIT_MIN_SCALE=0.82;
-function _fitPrintPages(doc){
-  const PX_PER_MM=96/25.4;
-  doc.querySelectorAll('.report-page').forEach(p=>{
-    const land=p.classList.contains('landscape');
-    const sheetH=land?210:297, sheetW=land?297:210;
-    const h=p.getBoundingClientRect().height/PX_PER_MM;
-    if(h<=sheetH+1)return;
-    const sheets=Math.ceil(h/sheetH);
-    const target=(sheets-1)*sheetH-1;           // 1mm safety against rounding
-    let scale=target/h;
-    if(scale<PRINT_FIT_MIN_SCALE)return;         // too much to shrink — let it flow
-    const apply=s=>{
-      p.style.setProperty('zoom',String(s));
-      // Widen/heighten the box so the zoomed page still fills the whole sheet
-      // (zoom scales the box too); the wider box usually reflows shorter.
-      p.style.setProperty('width',(sheetW/s)+'mm','important');
-      p.style.setProperty('min-height',(sheetH/s)+'mm','important');
-    };
-    apply(scale);
-    const after=p.getBoundingClientRect().height/PX_PER_MM;
-    if(after>target+1){
-      scale=Math.max(PRINT_FIT_MIN_SCALE,scale*target/after);
-      apply(scale);
-      if(p.getBoundingClientRect().height/PX_PER_MM>target+1){
-        // Could not make it fit within the limit — restore the original layout.
-        ['zoom','width','min-height'].forEach(k=>p.style.removeProperty(k));
-      }
-    }
-  });
-}
-
 function _printReportViaIframe({mode='print'}={}){
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length)return;
@@ -8538,7 +8479,6 @@ function _printReportViaIframe({mode='print'}={}){
   // Swap nar-screen → nar-print  (mirrors @media print dual-render)
   pagesClone.querySelectorAll('.nar-screen').forEach(el=>el.remove());
   pagesClone.querySelectorAll('.nar-print').forEach(el=>{el.style.display='block';});
-  _fillEmptyPrintText(pagesClone);
   pagesClone.querySelectorAll('.exam-screen').forEach(el=>el.remove());
   pagesClone.querySelectorAll('.exam-print').forEach(el=>{el.style.display='inline';});
   pagesClone.querySelectorAll('.result-screen').forEach(el=>el.remove());
@@ -8635,7 +8575,6 @@ ${styleNodes}
   const _oncePrint=()=>{
     if(_printFired)return;
     _printFired=true;
-    try{_fitPrintPages(iframeDoc);}catch(e){console.warn('Print fit skipped:',e&&e.message);}
     try{
       iframe.contentWindow.focus();
       iframe.contentWindow.print();
@@ -8920,15 +8859,6 @@ async function sbPatch(table,id,body){
   });
   if(!r.ok)throw new Error(await r.text());
   const d=await r.json();
-  // An empty result means the database matched no row it lets this user change —
-  // usually a permission rule. Report it instead of treating it as saved, or the
-  // screen shows edits that were never stored (the PM-programme bug of 6 Oct 2026).
-  if(Array.isArray(d)&&d.length===0){
-    const what={programmes:'programme',clients:'client',assessors:'facilitator',learners:'learner',enrolments:'enrolment',unit_standards:'unit standard',programme_notes:'note',reports:'report'}[table]||'record';
-    const err=new Error(`Not saved — you don't have permission to edit this ${what}, or it no longer exists. Please ask an admin.`);
-    err.code='NO_ROWS_UPDATED';
-    throw err;
-  }
   const rec=Array.isArray(d)?d[0]:d;
   return rec||null;
 }
@@ -9597,7 +9527,7 @@ async function saveModal(){
     const msg=err.message&&err.message.includes('23503')
       ?'A related record (client, facilitator, or programme) was not found in the database. Please re-select and try again, or re-import with "Save to database" checked.'
       :err.message&&err.message.includes('PGRST204')
-      ?`Save failed: the database is missing a column needed for this field${((err.message.match(/Could not find the '([a-zA-Z0-9_]+)' column/)||[])[1])?` (${err.message.match(/Could not find the '([a-zA-Z0-9_]+)' column/)[1]})`:''}. Ask your admin to add it in Supabase, then try again.`
+      ?'Save failed: the database is missing a column needed for this field (e.g. Start Date / End Date). Ask your admin to add it in Supabase, then try again.'
       :'Save failed: '+err.message;
     modalErr(msg);
     toast(msg,'error');
@@ -9971,14 +9901,6 @@ function openImportModal(){
       <input type="file" id="import-file" accept=".xlsx,.xls"
         style="color:#fff;font-size:9pt;cursor:pointer"
         onchange="previewImport(this)">
-    </div>
-    <div class="modal-field" style="margin-top:12px">
-      <label>Add learners to</label>
-      <select id="import-target" style="width:100%;font-size:9pt">
-        <option value="">New programme (or match by client + programme name in the file)</option>
-        ${programmes.filter(p=>!p.deleted_at).map(p=>{const c=clients.find(x=>x.id===p.client_id);return{id:p.id,t:(c?c.client_name+' — ':'')+(p.programme_name||'Programme '+p.id)};}).sort((x,y)=>x.t.localeCompare(y.t)).map(o=>`<option value="${o.id}">${escHtmlImp(o.t)}</option>`).join('')}
-      </select>
-      <div style="font-size:8pt;opacity:.7;margin-top:4px">Pick an existing programme to add the file's learners, attendance and results to it instead of creating a new client/programme.</div>
     </div>
     <div id="import-preview" style="margin-top:12px"></div>
     <div class="modal-field" style="margin-top:16px;display:flex;align-items:center;gap:10px">
@@ -11098,18 +11020,8 @@ function previewImport(input){
   reader.readAsArrayBuffer(file);
 }
 
-function escHtmlImp(v){return String(v).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"})[c]);}
 async function confirmImport(){
   if(!importData)return;
-  // Target an existing programme: point every programme in the file at it, so the
-  // client/programme matching below finds it instead of creating "Imported Client".
-  const _tgtId=document.getElementById('import-target')?.value;
-  if(_tgtId){
-    const tp=programmes.find(p=>String(p.id)===String(_tgtId));
-    const tc=tp&&clients.find(c=>c.id===tp.client_id);
-    if(!tp||!tc){alert('That programme could not be found (or has no client). Refresh and try again.');return;}
-    Object.values(importData.progMap).forEach(pd=>{pd.client_name=tc.client_name;pd.programme_name=tp.programme_name;pd.saqa_id=tp.saqa_id||'';});
-  }
 
   // ── Confirm if data already exists ──
   const{existingProgs,existingLearners}=importOverwriteWarning(importData.progMap,importData.learnerRows);
@@ -14775,7 +14687,6 @@ async function archiveReport(){
   try{
     await sbTransitionReport(_currentReportId,'archived',null);
     toast('📦 Report archived','success',4000);
-    _logAudit(_currentReportId,'archived',{newStatus:'archived',actor:ADMIN_NAME});
     const sub=document.getElementById('review-bar-sub');
     if(sub)sub.innerHTML=`<span style="color:rgba(255,255,255,.4)">📦 Archived</span> by ${ADMIN_NAME}`;
     const actionsWrap=document.querySelector('#review-bar .review-bar-actions > div[style*="flex-direction:column"]');
@@ -14787,23 +14698,6 @@ async function archiveReport(){
   }
 }
 
-// ── Admin: restore an archived report to the status it had before archiving ──
-async function restoreReport(target){
-  if(!_currentReportId){toast('No report record found','warn',3500);return;}
-  const label={pending:'Pending review',needs_changes:'Needs changes',approved:'Approved',sent_to_client:'Sent to client'}[target]||target;
-  if(!confirm(`Restore this report to "${label}"?\n\nCheck first that it was not replaced by a newer report for the same programme and month — restoring a replaced report puts a duplicate back in the PM's list.`))return;
-  try{
-    await sbTransitionReport(_currentReportId,target,`Restored from archive by ${ADMIN_NAME}`);
-    toast(`♻ Report restored to "${label}"`,'success',4000);
-    _logAudit(_currentReportId,'restored',{newStatus:target,actor:ADMIN_NAME});
-    _historyFetchedAt=0;
-    updateReviewPendingBadge();
-    await checkReportStatus();
-  }catch(e){
-    console.warn('restoreReport failed:',e.message);
-    toast('Not restored: '+e.message,'error',6000);
-  }
-}
 
 async function checkAdminFeedback(){
   if(!isOnline||!IS_ADMIN)return;
