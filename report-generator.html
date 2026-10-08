@@ -3682,6 +3682,11 @@ async function onProgrammeChange(){
   if(exportBtn)exportBtn.style.display=activeProgramme?'':'none';
   updateProgTypeBadge();
   if(!activeProgramme)return;
+  // Programme's saved provider (programmes.provider) drives branding as soon as the
+  // programme is picked — so the dashboard/top bar never shows "Select provider" or the
+  // previous programme's brand. Programmes without one keep whatever is selected.
+  {const _pv=activeProgramme.provider,_sp=document.getElementById('sel-provider');
+   if(_pv&&_sp&&typeof PROVIDERS!=='undefined'&&PROVIDERS[_pv]&&_sp.value!==_pv){_sp.value=_pv;onProviderChange();}}
 
   // Always clear stale learner/enrolment/attendance/eisa data from previous programme
   learners=[];enrolments=[];attendance=[];eisa=[];
