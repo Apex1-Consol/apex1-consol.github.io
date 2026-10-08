@@ -2417,8 +2417,8 @@ body.compact-density .progress-bar-wrap{height:6px}
       <div style="font-size:8.5pt;color:rgba(255,255,255,.4);margin-top:3px">Overview across all programmes</div>
     </div>
     <div style="display:flex;gap:8px;align-items:center">
-      <button id="dash-attention-toggle" class="btn btn-ghost" onclick="toggleAttentionFilter()" style="font-size:8.5pt;padding:8px 14px">⚠ Needs Attention</button>
-      <button class="btn btn-ghost" onclick="renderDashboard()" style="font-size:8.5pt;padding:8px 14px">↻ Refresh</button>
+      <button id="dash-attention-toggle" class="btn btn-ghost" onclick="toggleAttentionFilter()" aria-pressed="false" title="Show only programmes that need action: a report past its due date, or a month up to now with no report started. Click again to show all." style="font-size:8.5pt;padding:8px 14px">⚠ Needs Attention</button>
+      <button class="btn btn-ghost" onclick="renderDashboard()" title="Reload the dashboard from the server: clients, programmes, attendance, EISA and report statuses (e.g. to see a report a reviewer just approved)." style="font-size:8.5pt;padding:8px 14px">↻ Refresh</button>
     </div>
   </div>
   <div id="dash-alerts"></div>
@@ -11788,6 +11788,11 @@ function toggleAttentionFilter(){
     btn.style.background=dashFilterAttention?'rgba(248,113,113,.18)':'';
     btn.style.borderColor=dashFilterAttention?'rgba(248,113,113,.4)':'';
     btn.style.color=dashFilterAttention?'#f87171':'';
+    btn.setAttribute('aria-pressed',String(dashFilterAttention));
+    btn.textContent=dashFilterAttention?'⚠ Needs Attention ✕':'⚠ Needs Attention';
+    btn.title=dashFilterAttention
+      ?'Filter on: showing only programmes that need action. Click to show all programmes again.'
+      :'Show only programmes that need action: a report past its due date, or a month up to now with no report started. Click again to show all.';
   }
   renderDashboard();
 }
