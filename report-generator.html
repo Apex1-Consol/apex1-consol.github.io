@@ -12145,7 +12145,7 @@ async function renderDashboard(){
       if(isNextDue)icon='● ';
       const shortLabel=m.split(' ')[0].slice(0,3)+' '+m.split(' ')[1].slice(2);
       const mEsc=m.replace(/'/g,"\\'");
-      return`<button type="button" class="dash-month-chip ${cls}${isCur}${isNextDue}" title="${esc(m)}${rep?' — '+esc(rep.status||''):isNextDue?' — next due':' — no report yet'}" onclick="event.stopPropagation();dashGoTo(${cid},${p.id},'${mEsc}')">${icon}${shortLabel}${isNextDue?' · due':''}</button>`;
+      return`<button type="button" class="dash-month-chip ${cls}${isCur}${isNextDue}" title="${esc(m)}${rep?' — '+esc(({approved:'approved',pending:'in review',needs_changes:'changes needed'})[rep.status]||'draft saved'):isNextDue?' — due now: do this one next':isCur?' — this month, report due once the month ends':' — no report yet'}" onclick="event.stopPropagation();dashGoTo(${cid},${p.id},'${mEsc}')">${icon}${shortLabel}${isNextDue?' · due':''}</button>`;
     }).join('');
     return`<tr class="dash-month-strip-row"><td colspan="7"><div class="dash-month-strip">${chips}</div></td></tr>`;
   };
@@ -12235,7 +12235,7 @@ async function renderDashboard(){
       <span>⏳ in review</span>
       <span style="color:#4ade80">✓ approved</span>
       <span style="color:#f87171">↩ changes needed</span>
-      <span>outline = this month</span>
+      <span>outline = this month (not due yet)</span>
     </div>`:'';
 
   // ── Unassigned programmes — rows with no client_id at all. Never blended into the
