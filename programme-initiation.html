@@ -326,8 +326,8 @@ table.subject-table input.narrow{min-width:55px}
   <div class="modal-box" style="max-width:480px">
     <div class="modal-box-head">
       <div>
-        <h2>Hand over to PM</h2>
-        <p>This writes the programme, learners, and enrolments to the live database and reassigns ownership to the PM.</p>
+        <h2>Submit for sign-off</h2>
+        <p>This writes the programme, learners and enrolments to the live database and opens its three-step sign-off (Programme Initiator, Compliance, Head of Operations) on the programme's Sign-off / Handover tab in ApexOne. The PM takes ownership when the Head of Operations approves.</p>
       </div>
       <button class="btn small" id="handoverModalClose">Close ✕</button>
     </div>
@@ -339,7 +339,7 @@ table.subject-table input.narrow{min-width:55px}
       <div id="handoverError" style="display:none;color:#c0392b;font-size:13px;margin-top:8px"></div>
       <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:16px">
         <button class="btn" id="handoverCancelBtn">Cancel</button>
-        <button class="btn primary" id="handoverConfirmBtn">Confirm Hand Over</button>
+        <button class="btn primary" id="handoverConfirmBtn">Submit for sign-off</button>
       </div>
     </div>
   </div>
@@ -1681,7 +1681,7 @@ function openHandoverModal(rec){
   document.getElementById('handoverPmEmail').value = '';
   document.getElementById('handoverError').style.display = 'none';
   document.getElementById('handoverConfirmBtn').disabled = false;
-  document.getElementById('handoverConfirmBtn').textContent = 'Confirm Hand Over';
+  document.getElementById('handoverConfirmBtn').textContent = 'Submit for sign-off';
   document.getElementById('handoverModalOverlay').classList.add('open');
 }
 function closeHandoverModal(){
@@ -1704,21 +1704,29 @@ document.getElementById('handoverConfirmBtn').addEventListener('click', async ()
   const d = handoverRec.data;
   const roster = (d.learnerRoster || '').split('\n').map(s=>s.trim()).filter(Boolean);
   const btn = document.getElementById('handoverConfirmBtn');
-  btn.disabled = true; btn.textContent = 'Handing over…';
+  btn.disabled = true; btn.textContent = 'Submitting…';
   try{
     const { data, error } = await supabaseClient.rpc('submit_and_handover_programme', {
-      p_data: d,
+      // the intake record id lets the database refuse a second submit of the same record
+      p_data: { ...d, intakeId: String(handoverRec.id || '') },
       p_roster: roster,
       p_pm_email: pmEmail
     });
     if(error) throw error;
     closeHandoverModal();
-    showToast(`Handed over to ${pmEmail} — programme #${data.id} is now live in the Programme Ledger.`);
+    // Once the sign-off guard is live the programme stays 'initiated' until the
+    // Head of Operations approves; before that the old one-step hand-over still runs.
+    // Sign-off is the next step of initiation: go straight to it in ApexOne.
+    if (data && data.status === 'initiated') {
+      showToast(`Programme #${data.id} submitted. Opening its sign-off; ${pmEmail} takes over once it is approved.`);
+      setTimeout(() => { window.location.href = 'index.html#view=programmes&signoff=' + encodeURIComponent(data.id); }, 1500);
+    }
+    else showToast(`Handed over to ${pmEmail} — programme #${data.id} is now live in the Programme Ledger.`);
   }catch(e){
     errEl.textContent = e.message || 'Hand over failed.';
     errEl.style.display = 'block';
   }finally{
-    btn.disabled = false; btn.textContent = 'Confirm Hand Over';
+    btn.disabled = false; btn.textContent = 'Submit for sign-off';
   }
 });
 
@@ -1803,7 +1811,7 @@ function renderTabsEl(){
   const summaryEl = document.getElementById('summary');
   if(done === stages.length){
     summaryEl.style.display='block';
-    summaryEl.innerHTML = `<span>✓ All stages complete — this programme initiation record is ready.</span><button class="btn primary small" id="summaryDownloadBtn" style="background:var(--navy3)">Preview & Download</button><button class="btn gold small" id="summaryHandoverBtn">Hand Over to PM</button>`;
+    summaryEl.innerHTML = `<span>✓ All stages complete — this programme initiation record is ready.</span><button class="btn primary small" id="summaryDownloadBtn" style="background:var(--navy3)">Preview & Download</button><button class="btn gold small" id="summaryHandoverBtn">Submit for sign-off</button>`;
     const sdb = document.getElementById('summaryDownloadBtn');
     if(sdb) sdb.addEventListener('click', ()=>downloadRolloutSchedule(rec));
     const shb = document.getElementById('summaryHandoverBtn');
