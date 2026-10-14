@@ -2643,6 +2643,11 @@ async function doForgotVerify() {
 // 'admin' before touching Supabase Auth — this page just calls it.
 const USER_ROLE_OPTIONS = ['admin','qa_specialist','etqa','project_manager','operations','head_of_ops','pi_specialist','compliance_officer','demo'];
 
+function toRoleList(r) {
+    if (Array.isArray(r)) return r.filter(Boolean).map(String);
+    return r ? [String(r)] : [];
+}
+
 async function callUserAdmin(action, payload) {
     const { data, error } = await supabase.functions.invoke('user-admin', { body: { action, ...payload } });
     if (error) {
@@ -2662,7 +2667,16 @@ async function renderUserList() {
     container.innerHTML = `<div style="padding:16px;color:var(--text-muted);font-size:13px;">Loading users…</div>`;
     try {
         const { users } = await callUserAdmin('list', {});
-        const roleOpts = r => USER_ROLE_OPTIONS.map(o => `<option value="${o}"${o===r?' selected':''}>${o}</option>`).join('');
+        // A user's role is a string or an array of roles (e.g. ["admin","compliance_officer"]).
+        // Render every role as a checkbox so saving never collapses an array to one role.
+        const roleBoxes = r => {
+            const have = toRoleList(r);
+            const extra = have.filter(x => !USER_ROLE_OPTIONS.includes(x)); // keep unknown roles visible
+            return `<details class="role-picker"><summary style="cursor:pointer;font-size:12px;">${escapeHtml(have.join(', ') || 'no role')}</summary>
+                <div style="display:flex;flex-direction:column;gap:2px;padding:6px 0;">
+                ${[...USER_ROLE_OPTIONS, ...extra].map(o => `<label style="font-size:12px;white-space:nowrap;"><input type="checkbox" data-field="role" value="${escapeHtml(o)}"${have.includes(o)?' checked':''}> ${escapeHtml(o)}</label>`).join('')}
+                </div></details>`;
+        };
         container.innerHTML = `
             <div class="table-wrapper">
                 <table class="data-table">
@@ -2672,7 +2686,7 @@ async function renderUserList() {
                         <tr data-user-id="${u.id}">
                             <td>${escapeHtml(u.email||'')}</td>
                             <td><input type="text" class="filter-input" data-field="name" value="${escapeHtml(u.name||'')}" style="width:140px;"></td>
-                            <td><select class="filter-select" data-field="role">${roleOpts(u.role)}</select></td>
+                            <td>${roleBoxes(u.role)}</td>
                             <td><input type="text" class="filter-input" data-field="tenant" value="${escapeHtml(u.tenant||'')}" style="width:120px;"></td>
                             <td>${u.last_sign_in_at ? new Date(u.last_sign_in_at).toLocaleDateString('en-ZA') : '<span class="blank-cell">never</span>'}</td>
                             <td>
@@ -2698,7 +2712,13 @@ async function renderUserList() {
 async function saveUserRow(userId) {
     const tr = document.querySelector(`#user-list-container tr[data-user-id="${userId}"]`);
     if (!tr) return;
-    const role = tr.querySelector('[data-field="role"]').value;
+    const roles = [...tr.querySelectorAll('input[data-field="role"]:checked')].map(i => i.value);
+    if (!roles.length) { showToast('error', 'Pick at least one role.'); return; }
+    // One role stays a plain string (as before); several are saved as an array.
+    const role = roles.length === 1 ? roles[0] : roles;
+    const me = (await supabase.auth.getUser())?.data?.user;
+    if (me?.id === userId && !roles.includes('admin')
+        && !confirm('This removes your own admin role. You will lose access to User Management. Continue?')) return;
     const name = tr.querySelector('[data-field="name"]').value.trim();
     const tenant = tr.querySelector('[data-field="tenant"]').value.trim();
     try {
