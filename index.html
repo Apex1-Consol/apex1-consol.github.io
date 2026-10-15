@@ -11531,7 +11531,10 @@ const HO = (() => {
     'pack.sites':   { type: 'lines', keys: ['name', 'address', 'learners'], hint: 'One site per line: name | address | learners' },
     'pack.modules': { type: 'lines', keys: ['module', 'kind', 'start', 'end'], hint: 'One module per line: module | knowledge, practical or workplace | start | end' },
     'pack.notes':   { type: 'area', hint: 'Notes on the checklist' },
-    'pack.clickup_url': { type: 'url' }, 'pack.evidence_folder': { type: 'url' }
+    'pack.clickup_url': { type: 'url' }, 'pack.evidence_folder': { type: 'url' },
+    // printed on the hand-over record PDF (migration 20261015090623)
+    'pack.mou_status':  { opts: ['Draft', 'Signed', 'Expired', 'Not required'] },
+    'pack.handover_notes': { type: 'area', hint: 'Anything the Project Manager should know; printed on the hand-over record' }
   };
   const packLines = (v, keys) => Array.isArray(v) ? v.map(o => keys.map(k => (o || {})[k] ?? '').join(' | ').replace(/( \| )+$/, '')).join('\n') : (v || '');
   const DATES = [['signed', 'Learner agreements signed'], ['start', 'Training start'], ['eisa', 'EISA date']];
