@@ -10,6 +10,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     :root {
       --indigo:#1B3B5D; --deep-indigo:#001C38; --yellow:#FBDC00; --yellow-tint-ink:#5C4A00;
@@ -302,6 +303,7 @@
       <input type="email" id="authEmail" autocomplete="username">
       <label for="authPassword">Password</label>
       <input type="password" id="authPassword" autocomplete="current-password">
+      <div id="authTurnstile" class="cf-turnstile" data-sitekey="0x4AAAAAAE4gMGMxYC7Zn1qJ" data-callback="onAuthCaptcha" data-expired-callback="onAuthCaptchaExpired" data-error-callback="onAuthCaptchaExpired" style="margin-top:12px;"></div>
       <div id="authError" class="auth-err"></div>
       <button type="button" id="authSignInBtn" class="auth-primary">Sign in</button>
       <button type="button" id="authForgotBtn" class="auth-link">Forgot password?</button>
@@ -524,20 +526,31 @@ function authStatus(msg){
   const el = document.getElementById('authStatus');
   el.textContent = msg; el.style.display = msg ? 'block' : 'none';
 }
+/* Supabase Auth requires a Cloudflare Turnstile token (same site key as index.html). Tokens are single-use. */
+let _authCaptchaToken = null;
+window.onAuthCaptcha = function(token){ _authCaptchaToken = token; };
+window.onAuthCaptchaExpired = function(){ _authCaptchaToken = null; };
+function takeAuthCaptcha(){
+  const t = _authCaptchaToken; _authCaptchaToken = null;
+  if(window.turnstile){ try{ turnstile.reset('#authTurnstile'); }catch(e){} }
+  return t;
+}
 document.getElementById('authSignInBtn').addEventListener('click', async ()=>{
   authErr(''); authStatus('');
   const email = document.getElementById('authEmail').value.trim();
   const password = document.getElementById('authPassword').value;
   if(!email || !password){ authErr('Enter email and password.'); return; }
-  const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-  if(error){ authErr(error.message); return; }
+  if(!_authCaptchaToken){ authErr('Please complete the verification check.'); return; }
+  const { error } = await supabaseClient.auth.signInWithPassword({ email, password, options: { captchaToken: takeAuthCaptcha() } });
+  if(error){ authErr(/invalid login credentials/i.test(error.message) ? 'Incorrect email or password.' : error.message); return; }
   showApp();
 });
 document.getElementById('authForgotBtn').addEventListener('click', async ()=>{
   authErr(''); authStatus('');
   const email = document.getElementById('authEmail').value.trim();
   if(!email){ authErr('Enter your email above, then tap "Forgot password?" again.'); return; }
-  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname });
+  if(!_authCaptchaToken){ authErr('Please complete the verification check, then tap "Forgot password?" again.'); return; }
+  const { error } = await supabaseClient.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + window.location.pathname, captchaToken: takeAuthCaptcha() });
   if(error){ authErr(error.message); return; }
   authStatus('Check your email for a password reset link.');
 });
