@@ -1,0 +1,991 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ApexOne Preview</title>
+<meta name="robots" content="noindex,nofollow">
+<link rel="icon" href="data:image/png;base64,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">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Open+Sans:wght@400;600&display=swap">
+<style>
+:root{--navy:#002C5B;--navy2:#1D4A7A;--yellow:#FBDC00;--ground:#F4F5F6;--ink:#0E1E33;--muted:#4B5A6E;--line:#DCE1E7;--line2:#EEF1F4;--soft:#E8EDF3;
+--ok:#0F6B45;--okbg:#E2F4EA;--warn:#8A5100;--warnbg:#FFF3D6;--bad:#B42318;--badbg:#FDE8E7;--surface:#fff;--surface2:var(--surface2);--border2:var(--border2);--paperbg:#E3E8EE;--accent:#002C5B;--accent2:#1D4A7A}
+:root[data-theme="dark"]{--ground:#0B1726;--ink:#E7EDF4;--muted:#9FB0C4;--line:#24364D;--line2:#1C2D42;--soft:#1E3350;--surface:#12233A;--surface2:#183150;--border2:#34506F;--paperbg:#0E1C2E;--accent:#FBDC00;--accent2:#8DB8E8;--ok:#5FD39A;--okbg:#123A2A;--warn:#F5C451;--warnbg:#3A2E0E;--bad:#FF8A80;--badbg:#3D1A1A;color-scheme:dark}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--ground:#0B1726;--ink:#E7EDF4;--muted:#9FB0C4;--line:#24364D;--line2:#1C2D42;--soft:#1E3350;--surface:#12233A;--surface2:#183150;--border2:#34506F;--paperbg:#0E1C2E;--accent:#FBDC00;--accent2:#8DB8E8;--ok:#5FD39A;--okbg:#123A2A;--warn:#F5C451;--warnbg:#3A2E0E;--bad:#FF8A80;--badbg:#3D1A1A;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:'Open Sans',system-ui,sans-serif;font-size:14px}
+h1,h2,h3,.disp{font-family:'Poppins',sans-serif;font-weight:600;margin:0}
+a{color:var(--accent2)}a:hover{color:var(--accent)}
+button{font:inherit;cursor:pointer}
+.app{display:flex;flex-wrap:wrap;min-height:100vh}
+.side{flex:1 1 248px;max-width:100%;background:var(--navy);color:#fff;padding:24px 16px;display:flex;flex-direction:column;gap:22px}
+.content{flex:999 1 560px;min-width:0;display:flex;flex-direction:column}
+.wordmark{font-family:'Poppins';font-weight:700;font-size:26px;letter-spacing:.04em;color:#fff;text-decoration:none}
+.wordmark span{color:var(--yellow)}
+.logo{display:flex;align-items:center;gap:12px;text-decoration:none}.logo img{width:auto;border-radius:4px;display:block}
+.side small{display:block;font-size:12px;color:#C9D3DF;letter-spacing:.08em;text-transform:uppercase;font-family:'Open Sans'}
+.navgroup{display:flex;flex-direction:column;gap:2px}
+.navgroup>span{font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#9FB0C4;padding:0 12px 6px}
+.navlink{display:flex;align-items:center;gap:10px;min-height:40px;padding:0 12px;border-radius:8px;text-decoration:none;color:#D6DEE8}
+.navlink::before{content:"";width:6px;height:6px;border-radius:50%;background:#5D7591;flex-shrink:0}
+.navlink:hover{color:#fff;background:#0B3A6E}
+.navlink.on{background:var(--navy2);color:#fff;font-weight:600}
+.navlink.on::before{background:var(--yellow)}
+.navlink.dim{opacity:.7}
+.me{margin-top:auto;border-top:1px solid var(--navy2);padding:16px 8px 0;display:flex;align-items:center;gap:10px}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--yellow);color:var(--navy);font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.top{background:var(--surface);border-bottom:1px solid var(--line);padding:14px 32px;display:flex;flex-wrap:wrap;align-items:center;gap:16px;min-height:76px}
+.top .t{flex-grow:1;min-width:180px}.top .t small{display:block;font-size:12px;color:var(--muted)}.top .t b{font-family:'Poppins';font-weight:600;font-size:18px}
+.search{display:flex;align-items:center;gap:8px;height:44px;padding:0 14px;border:1px solid var(--line);border-radius:10px;background:var(--ground);flex:0 1 380px;min-width:220px}
+.search input{border:0;background:transparent;outline:none;font:inherit;width:100%}
+.iconbtn{width:44px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--surface);display:flex;align-items:center;justify-content:center}
+.pill{font-size:13px;font-weight:600;padding:8px 12px;border-radius:999px;background:var(--soft);color:var(--accent2)}
+main{padding:28px 32px 48px;display:flex;flex-direction:column;gap:20px;max-width:1240px;width:100%}
+.row{display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px;min-width:0}
+.card h2{font-size:17px}
+.dark{background:var(--navy);color:#fff;border-radius:14px;padding:22px;min-width:0}
+.btn{height:44px;padding:0 16px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--ink);font-weight:600;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
+.btn.y{background:var(--yellow);border:0;color:var(--navy);font-weight:700}
+.btn.n{background:var(--navy);border:0;color:#fff;font-weight:700}
+.btn.ghost{background:transparent;border:1px solid #5A7BA3;color:#fff}
+.btn.sm{height:36px;padding:0 12px;font-size:13px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;gap:8px;text-decoration:none;color:var(--ink)}
+.kpi:hover{border-color:var(--accent2)}
+.kpi .l{font-size:13px;color:var(--muted);font-weight:600}.kpi .v{font-family:'Poppins';font-size:32px;font-weight:600;line-height:1}.kpi .n{font-size:12px}
+.tag{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:var(--yellow);color:var(--navy);padding:4px 8px;border-radius:6px}
+.badge{font-size:12px;font-weight:700;padding:4px 8px;border-radius:6px;display:inline-block}
+.b-ok{background:var(--okbg);color:var(--ok)}.b-warn{background:var(--warnbg);color:var(--warn)}.b-bad{background:var(--badbg);color:var(--bad)}.b-n{background:var(--soft);color:var(--accent2)}
+.list a,.list .it{display:flex;align-items:center;gap:14px;min-height:56px;padding:6px 4px;border-top:1px solid var(--line2);text-decoration:none;color:var(--ink)}
+.count{min-width:44px;height:32px;border-radius:8px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.sub{font-size:13px;color:var(--muted)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:560px}
+th{text-align:left;font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:600;padding:10px 12px}
+td{padding:12px;border-top:1px solid var(--line2)}
+th:first-child,td:first-child{padding-left:20px}
+tr.sel td{background:var(--surface2)}
+.bar{width:80px;height:7px;border-radius:999px;background:var(--soft);display:inline-block;vertical-align:middle;overflow:hidden}
+.bar i{display:block;height:100%;border-radius:999px}
+.date{width:48px;height:48px;border-radius:10px;background:var(--soft);color:var(--accent2);display:flex;flex-direction:column;align-items:center;justify-content:center;flex-shrink:0;font-size:11px;font-weight:700}
+.date b{font-family:'Poppins';font-size:16px}
+.seg{display:flex;gap:4px;background:var(--ground);border-radius:10px;padding:4px}
+.seg button{flex:1;height:36px;border:0;border-radius:8px;background:transparent;color:var(--muted);font-weight:600;font-size:13px}
+.seg button.on{background:var(--surface);color:var(--accent)}
+.tabs{display:flex;flex-wrap:wrap;gap:4px;border-bottom:1px solid var(--line)}
+.tabs button{height:44px;padding:0 14px;border:0;background:transparent;font-weight:600;color:var(--muted);border-bottom:3px solid transparent}
+.tabs button.on{color:var(--accent);border-bottom-color:var(--yellow)}
+.pick{text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:4px;width:100%}
+.pick.on{border-color:var(--accent2);background:var(--surface2)}
+.steps{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}
+.steps li{display:flex;flex-direction:column;gap:8px}
+.steps .line{height:6px;border-radius:999px}
+.dot{width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.att{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:6px}.att span{height:22px;border-radius:4px;background:var(--soft)}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:13px;color:var(--muted)}.legend span{display:flex;align-items:center;gap:6px}.legend i{width:12px;height:12px;border-radius:3px}
+.kma{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line2)}
+.kma .nm{flex:1 1 220px}.kma .nm small{display:block;font-size:12px;font-weight:700;color:var(--muted)}.kma .nm b{font-size:15px}
+.score{width:44px;height:44px;border-radius:10px;border:1px solid var(--border2);background:var(--surface);color:var(--muted);font-weight:700;font-size:15px}
+.score.on.lo{border-color:var(--bad);background:var(--badbg);color:var(--bad)}
+.score.on.hi{border-color:var(--accent2);background:var(--soft);color:var(--accent)}
+.draftbtn{height:44px;padding:0 12px;border-radius:10px;border:1px dashed var(--bad);background:var(--badbg);color:var(--bad);font-weight:700;font-size:13px}
+.kv{display:flex;gap:10px;min-height:28px;align-items:center}.kv span:first-child{color:var(--muted);flex:0 0 130px}.kv span:last-child{font-weight:600}
+.chk{display:flex;align-items:center;gap:10px;min-height:44px;border-top:1px solid var(--line2)}
+.chk .dot{width:22px;height:22px}
+label.f{display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600}
+label.f input,label.f select{height:44px;border:1px solid var(--border2);border-radius:10px;padding:0 12px;font:inherit;font-weight:400;font-size:14px;background:var(--surface)}
+.secrow{display:flex;align-items:center;gap:12px;min-height:48px;border-top:1px solid var(--line2);cursor:pointer}
+.secrow input{width:20px;height:20px;accent-color:var(--accent2)}
+.paper{background:#fff;color:#0E1E33;max-width:640px;margin:0 auto;border-radius:4px;overflow:hidden;box-shadow:0 1px 3px rgba(0,44,91,.12)}
+.paper header{background:var(--navy);color:#fff;padding:28px 36px;display:flex;flex-direction:column;gap:10px}
+.rule{width:40px;height:4px;border-radius:2px;background:var(--yellow)}
+.login{display:flex;flex-wrap:wrap;min-height:100vh}
+.login .brand{flex:1 1 420px;background:var(--navy);color:#fff;padding:56px;display:flex;flex-direction:column;gap:28px}
+.login .formside{flex:1 1 420px;display:flex;align-items:center;justify-content:center;padding:48px 24px}
+.login form{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:32px;display:flex;flex-direction:column;gap:18px}
+.chips{display:flex;flex-wrap:wrap;gap:10px}.chips span{font-size:13px;padding:8px 12px;border-radius:999px;background:var(--navy2)}
+.ts{height:64px;border:1px dashed var(--border2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--muted);background:var(--surface2)}
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:12px 18px;border-radius:10px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+[hidden]{display:none!important}
+@media (max-width:640px){main{padding:20px 16px 40px}.top{padding:12px 16px}.login .brand{padding:32px 24px}}
+.paper .btn{background:#fff;color:#1D4A7A;border-color:#C5CDD7}
+.iconbtn{position:relative;color:var(--ink)}
+.sw{position:relative}.sw.s{flex:0 1 380px;min-width:220px}.sw.s .search{width:100%}
+.pop{position:absolute;top:calc(100% + 6px);left:0;min-width:320px;max-width:min(420px,calc(100vw - 32px));background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,20,45,.18);padding:6px;z-index:20;max-height:440px;overflow:auto}
+.pop.right{left:auto;right:0}
+.pop a,.pop button.it{display:flex;gap:10px;align-items:center;min-height:44px;padding:6px 10px;border-radius:8px;text-decoration:none;color:var(--ink);width:100%;border:0;background:none;text-align:left}
+.pop a:hover,.pop a:focus-visible,.pop button.it:hover{background:var(--surface2)}
+.pop h4{margin:8px 10px 4px;font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.dotn{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 4px}
+button.pill{border:0;height:44px;padding:0 14px}
+.sk{display:block;border-radius:6px;height:12px;background:linear-gradient(90deg,var(--soft) 25%,var(--surface2) 50%,var(--soft) 75%);background-size:200% 100%;animation:sh 1.2s infinite linear}
+.dark .sk{background:linear-gradient(90deg,#17406E 25%,#235287 50%,#17406E 75%);background-size:200% 100%}
+@keyframes sh{to{background-position:-200% 0}}
+@media (prefers-reduced-motion:reduce){.sk{animation:none}}
+.empty{display:flex;flex-direction:column;align-items:center;gap:8px;text-align:center;padding:40px 20px;color:var(--muted)}.empty b{color:var(--ink);font-size:15px}
+.err{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--badbg);color:var(--bad);border-radius:10px;padding:12px 14px;font-weight:600}
+.pager{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:12px 20px;border-top:1px solid var(--line2)}
+.pager button:disabled{opacity:.45;cursor:default}
+.back{font-weight:600;font-size:13px;text-decoration:none;align-self:flex-start}
+.trunc{max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+
+.savest{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
+.savest i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
+.savest.dirty i{background:var(--warn)}.savest.busy i{background:var(--accent2);animation:pl 1s infinite}
+@keyframes pl{50%{opacity:.3}}
+@media (prefers-reduced-motion:reduce){.savest.busy i{animation:none}}
+.tw.tall{max-height:min(640px,70vh);overflow:auto}
+.tw.tall thead th{position:sticky;top:0;z-index:2;background:var(--surface);box-shadow:inset 0 -1px 0 var(--line)}
+.navcount{margin-left:auto;min-width:22px;height:20px;border-radius:10px;background:var(--yellow);color:var(--navy);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
+.note{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:10px;background:var(--soft);color:var(--ink);font-size:13px}
+.dqpair{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 20px;border-top:1px solid var(--line2)}
+.dqpair .who{flex:1 1 260px;min-width:0}
+label.f input,label.f select,label.f textarea{color:var(--ink)}
+label.f textarea{border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font:inherit;font-weight:400;font-size:14px;background:var(--surface);resize:vertical}
+.btn:disabled{opacity:.45;cursor:default}
+.famas{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);background:var(--ground);border:1px dashed var(--line);border-radius:999px;padding:4px 10px;align-self:flex-start}
+.famas b{color:var(--ink)}
+table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px}
+.cellsel,.fsel{height:34px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;padding:0 6px;background:var(--surface);color:var(--ink)}
+.cellsel.b-ok{background:var(--okbg);color:var(--ok)}.cellsel.b-warn{background:var(--warnbg);color:var(--warn)}.cellsel.b-bad{background:var(--badbg);color:var(--bad)}
+.kv>span:last-child{margin-left:auto;text-align:right;min-width:0;overflow-wrap:anywhere}
+#form3,#leisa,#eisaready{display:flex;flex-direction:column;gap:16px}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="view-login" class="login">
+  <section class="brand">
+    <span class="logo"><img src="data:image/png;base64,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" alt="" style="height:72px"><span class="wordmark" style="font-size:34px">APEX<span>U</span></span></span>
+    <div style="margin-top:auto;display:flex;flex-direction:column;gap:16px;max-width:520px">
+      <span style="width:56px;height:6px;border-radius:3px;background:var(--yellow)"></span>
+      <h1 style="font-size:44px;line-height:1.15">Unlimited Potential</h1>
+      <p style="margin:0;font-size:17px;line-height:1.6;color:#D6DEE8">ApexOne brings programmes, learners, monitoring and practitioner compliance into one workspace.</p>
+    </div>
+    <div class="chips"><span>Programmes</span><span>Monitoring</span><span>FAM Registry</span><span>Reporting</span></div>
+  </section>
+  <section class="formside">
+    <form onsubmit="event.preventDefault();location.hash='dashboard'">
+      <div><h2 style="font-size:24px">Sign in</h2><p class="sub" style="margin:6px 0 0;font-size:14px">Use your APEXU work email.</p></div>
+      <label class="f">Email<input type="email" placeholder="name@apexu.co.za"></label>
+      <label class="f">Password<input type="password"></label>
+      <div class="ts">Security check (Turnstile)</div>
+      <button class="btn n" style="height:48px">Sign in</button>
+      <a href="#" style="font-weight:600;text-align:center" onclick="toast('Reset link flow');return false">Forgot password?</a>
+    </form>
+  </section>
+</div>
+
+<!-- APP SHELL -->
+<div id="shell" class="app" hidden>
+  <nav class="side" aria-label="Main">
+    <a href="#dashboard" class="logo"><img src="data:image/png;base64,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" alt="" style="height:52px"><span class="wordmark">APEX<span>U</span><small>ApexOne · Skills platform</small></span></a>
+    <div id="nav" style="display:flex;flex-direction:column;gap:18px"></div>
+    <div class="me"><span class="avatar">S</span><div><div style="font-weight:600;font-size:13px">Stavros</div><div style="font-size:12px;color:#C9D3DF">Admin · Apex Academy</div></div>
+      <a href="#login" style="margin-left:auto;color:#C9D3DF;font-size:12px">Sign out</a></div>
+  </nav>
+  <div class="content">
+    <header class="top">
+      <div class="t"><small id="crumb">Overview</small><b id="heading">Dashboard</b></div>
+      <span class="savest" id="savest" role="status" title="Changes save automatically to ApexOne"><i></i><span>All changes saved</span></span>
+      <div class="sw s"><label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4B5A6E" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr">Search</span><input type="search" id="q" autocomplete="off" placeholder="Search learners, practitioners, visits, screens…" oninput="doSearch()" onfocus="doSearch()" onkeydown="if(event.key==='Enter'){const a=$('qres').querySelector('a');if(a)a.click()}if(event.key==='Escape')closePops()" aria-controls="qres"></label><div class="pop" id="qres" hidden></div></div>
+      <div class="sw"><button class="iconbtn" id="bellbtn" aria-label="Notifications" aria-expanded="false" onclick="togglePop('bell')"><span class="dotn" id="dotn">4</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><div class="pop right" id="bell" hidden></div></div><button class="iconbtn" id="themebtn" aria-label="Switch colour theme" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <div class="sw"><button class="pill" id="orgbtn" aria-haspopup="true" aria-expanded="false" onclick="togglePop('org')"><span id="orgname">Apex Academy</span> ▾</button><div class="pop right" id="org" hidden style="min-width:260px"></div></div>
+    </header>
+
+    <!-- DASHBOARD -->
+    <main id="view-dashboard" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px">
+        <div style="flex-grow:1"><p class="sub" style="margin:0">Wednesday, 21 October 2026</p><h1 style="font-size:30px;margin-top:4px">Good morning, Stavros</h1></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="toast('Snapshot exported')">Export snapshot</button><a class="btn y" href="#programmes">+ New programme</a></div>
+      </div>
+      <div class="grid" id="kpis"></div>
+      <div class="row" style="align-items:stretch">
+        <section class="card list" style="flex:3 1 420px"><h2 style="margin-bottom:8px">Needs attention</h2><div id="alerts"></div></section>
+        <section class="dark" style="flex:2 1 320px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:center;gap:10px"><span class="tag">AI</span><h2 style="font-size:17px">Executive summary</h2></div>
+          <p id="aisum" style="margin:0;line-height:1.6;color:#E3E9F0">The largest current risk is the backlog of open audit recommendations. A secondary data issue: many learners on record are not linked to an active enrolment, which understates delivery figures in reports.</p>
+          <span style="font-size:12px;color:#9FB0C4">Generated from live data · review before sharing</span>
+          <div style="display:flex;gap:8px;margin-top:auto;flex-wrap:wrap"><button class="btn y" onclick="regen()">Regenerate</button><button class="btn ghost" onclick="toast('Copied')">Copy text</button></div>
+        </section>
+      </div>
+      <div class="row">
+        <section class="card" style="flex:3 1 480px;padding:0">
+          <div style="display:flex;align-items:center;padding:18px 20px"><h2 style="flex-grow:1">Active programmes</h2><a href="#programmes" style="font-weight:600">View all</a></div>
+          <div class="tw"><table><thead><tr><th>Programme</th><th>Learners</th><th>Attendance</th><th>EISA ready</th></tr></thead><tbody id="progrows"></tbody></table></div>
+        </section>
+        <section class="card list" style="flex:2 1 300px"><h2 style="margin-bottom:8px">Upcoming monitoring visits</h2><div id="visitlist"></div></section>
+      </div>
+    </main>
+
+    <!-- PROGRAMMES -->
+    <main id="view-programmes" hidden>
+      <div class="row">
+        <section class="card" style="flex:1 1 280px;padding:16px;display:flex;flex-direction:column;gap:10px">
+          <div class="seg" id="pstatus"></div>
+          <div id="plist" style="display:flex;flex-direction:column;gap:10px"></div>
+          <button class="btn" style="border-style:dashed;color:var(--navy2)" onclick="toast('New programme form')">+ New programme</button>
+        </section>
+        <section style="flex:3 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
+          <div class="dark" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
+            <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px">
+              <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow)">Active · [Learnership / Skills programme]</span>
+              <h1 style="font-size:26px">[Programme name]</h1>
+              <span style="color:#D6DEE8">[Client] · [SETA / QCTO] · [Start date] → [End date]</span>
+            </div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" onclick="toast('AI summary')">AI summary</button><button class="btn ghost">Edit</button></div>
+          </div>
+          <div class="tabs" role="tablist" id="ptabs"></div>
+          <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))" id="pstats"></div>
+          <div class="card" style="padding:0" id="pmodcard">
+            <div style="display:flex;align-items:center;padding:16px 20px"><h2 style="flex-grow:1">Cohort progress by module</h2><a href="#reports" style="font-weight:600">Build report</a></div>
+            <div class="tw"><table><thead><tr><th>Module</th><th>Sessions</th><th>Attendance</th><th>PoE complete</th></tr></thead><tbody id="modrows"></tbody></table></div>
+          </div>
+          <div id="form3" hidden></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- LEARNER -->
+    <main id="view-learners" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Learners <span class="sub" style="font-size:15px;font-family:'Open Sans';font-weight:400">273 on record · sample data</span></h1><button class="btn" onclick="toast('Import from Excel')">Import</button><button class="btn y" onclick="toast('Add learner')">+ Add learner</button></div>
+      <div class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
+          <div class="seg" id="lfilter" style="flex:0 1 380px"></div><span style="flex-grow:1"></span>
+          <label class="search" style="flex:0 1 300px;height:40px;min-width:200px"><span class="sr">Filter learners</span><input type="search" id="lq" placeholder="Filter by name or ID" oninput="lPage=0;renderLearners()"></label>
+        </div>
+        <div class="tw tall"><table style="min-width:760px"><thead><tr><th>Learner</th><th>ID number</th><th>Programme</th><th>Attendance</th><th>Status</th></tr></thead><tbody id="lrows"></tbody></table></div>
+        <div class="pager" id="lpager"></div>
+      </div>
+    </main>
+
+    <main id="view-learner" hidden>
+      <a class="back" href="#learners">← All learners</a>
+      <div class="card" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center">
+        <span style="width:64px;height:64px;border-radius:50%;background:var(--navy);color:var(--yellow);font-family:Poppins;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center">LN</span>
+        <div style="flex-grow:1"><h1 style="font-size:24px">[Learner name]</h1><span class="sub" style="font-size:14px">ID ••••••••[1234] · [Programme name] · [Client]</span></div>
+        <span class="badge b-ok" style="font-size:13px;padding:6px 12px;border-radius:999px">Active enrolment</span>
+        <button class="btn y" onclick="toast('AI progress report')">AI progress report</button>
+      </div>
+      <section class="card"><h2 style="margin-bottom:18px">Journey</h2><ol class="steps" id="steps"></ol></section>
+      <div id="lrules"></div>
+      <div class="row">
+        <section class="card" style="flex:1 1 340px;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;align-items:baseline"><h2 style="flex-grow:1">Attendance</h2><span class="sub">Threshold [75%]</span></div>
+          <span class="disp" style="font-size:40px;line-height:1">[—%]</span>
+          <div class="att" id="att" aria-label="Last 20 sessions"></div>
+          <div class="legend"><span><i style="background:var(--navy2)"></i>Present</span><span><i style="background:#E0A100"></i>Reason given</span><span><i style="background:var(--bad)"></i>Absent</span></div>
+        </section>
+        <section class="card" style="flex:1 1 340px">
+          <div style="display:flex;align-items:baseline;margin-bottom:8px"><h2 style="flex-grow:1">Portfolio of evidence</h2><a href="#" onclick="toast('Gap analysis');return false" style="font-weight:600">Gap analysis</a></div>
+          <div id="poe"></div>
+        </section>
+      </div>
+    </main>
+
+    <!-- VISITS -->
+    <main id="view-visits" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Monitoring visits</h1><button class="btn y" onclick="toast('Schedule visit')">+ Schedule visit</button></div>
+      <div class="grid" id="vkpis"></div>
+      <div class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)"><div class="seg" id="vfilter" style="flex:0 1 420px"></div></div>
+        <div class="tw"><table style="min-width:760px"><thead><tr><th>Visit</th><th>Programme · Site</th><th>Date</th><th>Monitor</th><th>Judgement</th><th>Status</th></tr></thead><tbody id="vrows"></tbody></table></div>
+      </div>
+    </main>
+
+    <main id="view-visit" hidden>
+      <a class="back" href="#visits">← All visits</a>
+      <div class="row">
+        <section class="card" style="flex:3 1 560px">
+          <div style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:18px"><div class="seg" id="vtype" style="flex:1 1 320px" aria-label="QCTO visit type"></div><div class="seg" id="vann" style="flex:0 1 240px"></div></div>
+          <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:12px;margin-bottom:10px"><h2 style="flex-grow:1;font-size:18px">Key monitoring areas</h2><span class="sub">1 Non-compliant · 2 Partially · 3 Mostly · 4 Fully</span></div>
+          <div id="kmas"></div>
+        </section>
+        <aside style="flex:1 1 300px;min-width:0;display:flex;flex-direction:column;gap:16px">
+          <div class="dark" style="display:flex;flex-direction:column;gap:12px">
+            <span style="font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--yellow)">Overall judgement</span>
+            <span class="disp" style="font-size:26px" id="judge"></span>
+            <span style="font-size:13px;color:#C9D3DF" id="lowc"></span>
+            <span style="font-size:13px;color:var(--yellow);font-weight:600" id="qfind"></span>
+            <button class="btn y" onclick="toast('Generating AI visit report…')">Generate AI visit report</button>
+            <button class="btn ghost" onclick="window.print()">Print report</button>
+          </div>
+          <div class="card"><h2 style="font-size:16px;margin-bottom:10px">Visit details</h2><div id="vdetails"></div></div>
+          <div class="card" id="vevid"></div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- FAM -->
+    <main id="view-fam" hidden>
+      <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">
+        <div id="famkpis" style="display:flex;flex-wrap:wrap;gap:10px;flex-grow:1"></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="toast('Scope Import')">Scope Import</button><button class="btn" onclick="toast('Bulk Intake')">Bulk Intake</button><button class="btn y" onclick="toast('Add practitioner')">+ Add practitioner</button></div>
+      </div>
+      <div class="row">
+        <section class="card" style="flex:999 1 560px;padding:0">
+          <div class="tw tall"><table style="min-width:620px"><thead><tr><th>Practitioner</th><th>Roles</th><th>Documents</th><th>Status</th></tr></thead><tbody id="famrows"></tbody></table></div>
+        </section>
+        <aside class="card" style="flex:1 1 320px;padding:0;overflow:hidden">
+          <div style="background:var(--navy);color:#fff;padding:20px;display:flex;flex-direction:column;gap:4px">
+            <span class="disp" style="font-size:20px" id="famname"></span><span style="font-size:13px;color:#C9D3DF" id="famroles"></span>
+            <button class="btn y sm" style="margin-top:10px;align-self:flex-start" onclick="toast('AI compliance summary')">AI compliance summary</button>
+          </div>
+          <div style="padding:18px 20px">
+            <div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub" id="famdocs"></span></div>
+            <div id="famcheck"></div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <!-- CLIENTS -->
+    <main id="view-clients" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Clients</h1><button class="btn y" onclick="toast('Add client')">+ Add client</button></div>
+      <div class="row">
+        <section style="flex:999 1 560px;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px" id="clientcards"></section>
+        <aside class="card" style="flex:1 1 300px;display:flex;flex-direction:column;gap:10px">
+          <h2>[Client name]</h2><span class="sub">[Sector] · [City]</span>
+          <div id="clientkv"></div>
+          <h2 style="font-size:15px;margin-top:8px">Programmes</h2>
+          <div class="list"><a href="#programmes"><span style="flex-grow:1"><b style="display:block">[Programme name]</b><span class="sub">[n] learners · Active</span></span></a><a href="#programmes"><span style="flex-grow:1"><b style="display:block">[Programme name]</b><span class="sub">[n] learners · Completed</span></span></a></div>
+          <button class="btn y" onclick="toast('AI risk assessment')">AI risk assessment</button>
+        </aside>
+      </div>
+    </main>
+
+    <!-- ENROLMENTS -->
+    <main id="view-enrolments" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Enrolments</h1><button class="btn" onclick="toast('Import from Excel')">Import</button><button class="btn y" onclick="toast('Enrol learners')">+ Enrol learners</button></div>
+      <div class="card" style="background:var(--warnbg);border-color:var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <span class="count b-warn" style="background:var(--surface)">174</span><span style="flex-grow:1"><b>Learners without an active enrolment</b><span class="sub" style="display:block;color:var(--warn)">Link them to a programme or archive them so reports stay accurate.</span></span>
+        <a class="btn" href="#learners" onclick="lF='Unlinked';lPage=0">See unlinked</a><a class="btn n" href="#dq">Check duplicates first</a>
+      </div>
+      <div class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
+          <div class="seg" id="enfilter" style="flex:0 1 460px"></div><span style="flex-grow:1"></span>
+          <label class="f" style="flex-direction:row;align-items:center;gap:8px">Programme<select style="height:36px"><option>All programmes</option></select></label>
+        </div>
+        <div class="tw"><table><thead><tr><th>Learner</th><th>Programme</th><th>Enrolled</th><th>Status</th><th></th></tr></thead><tbody id="enrows"></tbody></table></div>
+      </div>
+    </main>
+
+    <!-- ATTENDANCE -->
+    <main id="view-attendance" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <h1 style="font-size:26px;flex-grow:1">Attendance &amp; PoE</h1>
+        <label class="f" style="flex-direction:row;align-items:center;gap:8px">Programme<select style="height:40px"><option>[Programme name]</option></select></label>
+        <button class="btn y" onclick="toast('AI attendance analysis')">AI analysis</button>
+      </div>
+      <div class="tabs" id="atabs"></div>
+      <section class="card" style="padding:0" id="regcard">
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 20px"><h2 style="flex-grow:1">Session register</h2><span class="legend"><span><i style="background:var(--navy2)"></i>P Present</span><span><i style="background:#E0A100"></i>R Reason</span><span><i style="background:var(--bad)"></i>A Absent</span></span></div>
+        <p class="sub" style="margin:0 20px 10px">Tap a cell to cycle Present → Reason → Absent. Changes save automatically.</p>
+        <div class="tw tall"><table id="register" style="min-width:720px"></table></div>
+      </section>
+      <section class="card" style="padding:0" id="poecard" hidden>
+        <div style="padding:16px 20px"><h2>PoE tracker</h2></div>
+        <div class="tw"><table id="poetable" style="min-width:720px"></table></div>
+      </section>
+    </main>
+
+    <!-- EISA -->
+    <main id="view-eisa" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">EISA readiness</h1><span class="famas">LEISA file follows the <b>QCTO Learner Enrolment and Readiness for EISA</b> template</span></div>
+        <label class="f" style="flex-direction:row;align-items:center;gap:8px">Programme<select style="height:40px"><option>[Programme name]</option></select></label>
+        <button class="btn y" onclick="toast('AI readiness check')">AI readiness check</button>
+      </div>
+      <div class="tabs" role="tablist" id="etabs"></div>
+      <div id="eisaready">
+      <div class="grid" id="eisakpis"></div>
+      <section class="card" style="padding:0">
+        <div style="padding:16px 20px;display:flex;align-items:center"><h2 style="flex-grow:1">Readiness by learner</h2><span class="sub">QCTO EISA-readiness criteria · all six must be met</span></div>
+        <div class="tw"><table><thead><tr><th>Learner</th><th>Knowledge modules</th><th>Practical modules</th><th>Workplace modules (logbook)</th><th>Internal assessment</th><th>Internal moderation</th><th>SoR issued</th><th>Ready</th></tr></thead><tbody id="eisarows"></tbody></table></div>
+      </section>
+      </div>
+      <div id="leisa" hidden></div>
+    </main>
+
+    <!-- RECOMMENDATIONS -->
+    <main id="view-recs" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Recommendations</h1><button class="btn y" onclick="toast('Add recommendation')">+ Add recommendation</button></div>
+      <div class="seg" id="recfilter" style="max-width:420px"></div>
+      <div id="reclist" style="display:flex;flex-direction:column;gap:12px"></div>
+    </main>
+
+    <!-- QCTO PROJECTS TRACKER -->
+    <main id="view-qcto" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">QCTO Projects Tracker</h1><span class="famas">Same columns and statuses as <b>QCTO Projects Tracker.xlsx</b></span></div>
+        <button class="btn" onclick="toast('Import: columns matched by heading from QCTO Projects Tracker.xlsx')">Import tracker</button>
+        <button class="btn y" onclick="toast('Exported QCTO Projects Tracker.xlsx (same column order)')">Export as tracker (.xlsx)</button>
+      </div>
+      <div class="grid" id="qkpis"></div>
+      <div class="row" style="align-items:stretch">
+        <section class="card" style="flex:1 1 320px"><h2 style="margin-bottom:8px">Next official EISA windows</h2><div id="qwin"></div></section>
+        <section class="card list" style="flex:2 1 420px"><h2 style="margin-bottom:8px">Flags raised from the tracker</h2><div id="qflags"></div></section>
+      </div>
+      <section class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
+          <div class="seg" id="qview" style="flex:0 1 320px"></div>
+          <select id="qclient" class="fsel" onchange="renderQ()"></select><select id="qpm" class="fsel" onchange="renderQ()"></select><select id="qstat" class="fsel" onchange="renderQ()"></select>
+          <span class="sub" id="qcount" style="margin-left:auto"></span>
+        </div>
+        <div class="tw tall"><table class="dense" id="qtable"></table></div>
+      </section>
+    </main>
+
+    <!-- MODERATION & VERIFICATION (legacy SETA programmes) -->
+    <main id="view-modver" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">Moderation &amp; Verification</h1><span class="famas">Same sheets as <b>External Moderation – 2026.xlsx</b></span></div>
+        <button class="btn" onclick="toast('Add programme to the moderation list')">+ Add programme</button>
+        <button class="btn y" onclick="toast('Exported External Moderation – 2026.xlsx (all sheets)')">Export workbook (.xlsx)</button>
+      </div>
+      <div class="grid" id="mkpis"></div>
+      <div class="tabs" role="tablist" id="mtabs"></div>
+      <section class="card" style="padding:0">
+        <div style="padding:12px 20px;border-bottom:1px solid var(--line2)" class="sub" id="mnote"></div>
+        <div class="tw tall"><table class="dense" id="mtable"></table></div>
+      </section>
+    </main>
+
+    <!-- ACCREDITATION -->
+    <main id="view-accred" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
+        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">QCTO Accreditation</h1><span class="famas">Same as the <b>Accreditation</b> sheet, with its colour legend as statuses</span></div>
+        <button class="btn y" onclick="toast('Add qualification to accreditation pipeline')">+ Add qualification</button>
+      </div>
+      <div class="grid" id="akpis"></div>
+      <section class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)"><div class="seg" id="afilter" style="flex:0 1 640px"></div></div>
+        <div class="tw"><table class="dense" id="atable"></table></div>
+      </section>
+      <section class="card" style="display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;flex-wrap:wrap;align-items:baseline;gap:8px"><h2 style="flex-grow:1">Legacy qualification check</h2><span class="famas">From <b>Consolidated List: Pre-2009 qualifications and NATED</b> (631 qualifications, 419 extended)</span></div>
+        <label class="f" style="max-width:360px">Qualification ID<input id="legq" inputmode="numeric" placeholder="e.g. 57918" oninput="renderLeg()"></label>
+        <div id="legres"></div>
+      </section>
+    </main>
+
+    <!-- DATA QUALITY -->
+    <main id="view-dq" hidden>
+      <a class="back" href="#learners">← All learners</a>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Data quality review</h1><button class="btn" onclick="toast('Review log exported')">Export review log</button></div>
+      <div class="grid" id="dqkpis"></div>
+      <div class="card" style="padding:0">
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)"><div class="seg" id="dqfilter" style="flex:0 1 640px;flex-wrap:wrap"></div></div>
+        <p class="note" style="margin:14px 20px 6px">Review decisions are recorded only. Nothing is deleted or merged automatically: "Same person" sends a merge request to the Sign-off queue. ID numbers are masked (POPIA).</p>
+        <div id="dqlist"></div>
+        <div class="pager" id="dqpager"></div>
+      </div>
+    </main>
+
+    <!-- SIGN-OFF QUEUE -->
+    <main id="view-signoff" hidden>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Sign-off queue</h1><span class="sub">Items waiting for an admin decision</span></div>
+      <div class="seg" id="sofilter" style="max-width:420px"></div>
+      <div id="solist" style="display:flex;flex-direction:column;gap:12px"></div>
+    </main>
+
+    <!-- REPORTS -->
+    <main id="view-reports" hidden>
+      <div class="row">
+        <section style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:16px">
+          <div class="card" style="display:flex;flex-direction:column;gap:14px">
+            <h2>Setup</h2>
+            <label class="f">Programme<select><option>[Programme name]</option></select></label>
+            <label class="f">Report type<select><option>Monthly progress report</option><option>Close-out report</option></select></label>
+            <label class="f">Period<input type="month" value="2026-10"></label>
+          </div>
+          <div class="card">
+            <div style="display:flex;align-items:center;margin-bottom:8px"><h2 style="flex-grow:1">Sections</h2><button class="btn sm" style="color:var(--navy2)" onclick="toast('Drafting all sections…')">Draft all</button></div>
+            <div id="secs"></div>
+          </div>
+          <div class="card"><h2 style="margin-bottom:4px">Familiar formats</h2><span class="sub">Same layout QA and ETQA use today</span>
+            <div class="chk"><span style="flex-grow:1">QCTO Projects Tracker (.xlsx)</span><button class="btn sm" onclick="toast('Exported QCTO Projects Tracker (.xlsx)')">Export</button></div><div class="chk"><span style="flex-grow:1">External Moderation List 2026 (.xlsx)</span><button class="btn sm" onclick="toast('Exported External Moderation List 2026 (.xlsx)')">Export</button></div><div class="chk"><span style="flex-grow:1">LEISA file, QCTO template (.xlsx)</span><button class="btn sm" onclick="toast('Exported LEISA file, QCTO template (.xlsx)')">Export</button></div><div class="chk"><span style="flex-grow:1">Form 3 Programme Implementation (.docx)</span><button class="btn sm" onclick="toast('Exported Form 3 Programme Implementation (.docx)')">Export</button></div><div class="chk"><span style="flex-grow:1">QCTO monitoring visit report (.docx)</span><button class="btn sm" onclick="toast('Exported QCTO monitoring visit report (.docx)')">Export</button></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn n" style="flex:1 1 140px;height:48px" onclick="toast('Exporting PDF')">Export PDF</button><button class="btn" style="flex:1 1 140px;height:48px" onclick="toast('Exporting Word')">Export Word</button></div>
+        </section>
+        <section style="flex:2 1 480px;min-width:0;background:var(--paperbg);border-radius:14px;padding:24px">
+          <article class="paper">
+            <header><span class="logo"><img src="data:image/png;base64,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" alt="" style="height:40px"><span class="wordmark" style="font-size:20px">APEX<span>U</span></span></span><span class="rule"></span><h1 style="font-size:24px">Monthly progress report</h1><span style="font-size:13px;color:#C9D3DF">[Programme name] · [Client] · October 2026</span></header>
+            <div id="preview" style="padding:28px 36px 36px;display:flex;flex-direction:column;gap:22px"></div>
+          </article>
+        </section>
+      </div>
+    </main>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let tt;function toast(m){const t=$('toast');t.textContent=m+' (mock)';t.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>t.classList.remove('show'),1600)}
+
+const ROUTES={dashboard:['Dashboard','Overview'],programmes:['Programmes','Delivery'],learners:['Learner profile','Delivery / Learners'],visits:['VIS-015','Quality / Monitoring visits'],fam:['FAM Registry','Quality / Facilitators, Assessors & Moderators'],reports:['Report Generator','Outputs']};
+Object.assign(ROUTES,{learners:['Learners','Delivery'],learner:['[Learner name]','Delivery / Learners'],visits:['Monitoring visits','Quality'],visit:['VIS-015','Quality / Monitoring visits'],clients:['Clients','Delivery'],enrolments:['Enrolments','Delivery'],attendance:['Attendance & PoE','Delivery'],eisa:['EISA Readiness','Delivery'],recs:['Recommendations','Quality']});
+const NAV=[['Overview',[['Dashboard','dashboard']]],['Delivery',[['Clients','clients'],['Programmes','programmes'],['Learners','learners'],['Enrolments','enrolments'],['Data quality','dq'],['Attendance & PoE','attendance'],['EISA Readiness','eisa']]],['Quality',[['Sign-off queue','signoff'],['QCTO Tracker','qcto'],['Monitoring Visits','visits'],['Recommendations','recs'],['Moderation & Verification','modver'],['Accreditation','accred'],['FAM Registry','fam']]],['Outputs',[['Report Generator','reports']]]];
+
+function renderNav(cur){curNav=cur;
+  $('nav').innerHTML=NAV.map(([g,items])=>`<div class="navgroup"><span>${g}</span>${items.map(([l,r])=>r?`<a class="navlink${r===cur?' on':''}" href="#${r}"${r===cur?' aria-current="page"':''}>${esc(l)}${NC[r]&&NC[r]()?`<span class="navcount" aria-label="${NC[r]()} waiting">${NC[r]()}</span>`:''}</a>`:`<a class="navlink dim" href="#" onclick="toast('${esc(l)} not mocked yet');return false">${esc(l)}</a>`).join('')}</div>`).join('');
+}
+function route(){
+  const r=location.hash.slice(1)||'login';
+  const isLogin=r==='login'||!ROUTES[r];
+  $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
+  document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);
+  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO()}
+}
+addEventListener('hashchange',route);
+
+/* Dashboard */
+$('kpis').innerHTML=[['Learners','273','on record','var(--muted)','learners'],['Active enrolments','99','174 learners unlinked','var(--warn)','enrolments'],['Active programmes','2','in delivery','var(--muted)','programmes'],['Open recommendations','8','from monitoring visits','var(--bad)','recs'],['FAM registrations','16 / 23','active / total','var(--muted)','fam']]
+ .map(([l,v,n,c,h])=>`<a class="kpi" href="#${h}"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${c}">${n}</span></a>`).join('');
+$('alerts').innerHTML=[['8','Open audit recommendations','Assign owners and due dates','bad','recs'],['174','Learners without an active enrolment','Link or archive to keep reports accurate','warn','enrolments'],['7','Inactive FAM registrations','Renew or confirm with practitioners','warn','fam'],['0','Registrations expiring in 60 days','Nothing due right now','ok','fam']]
+ .map(([c,t,s,k,h])=>`<a href="#${h}"><span class="count b-${k}">${c}</span><span style="flex-grow:1"><b style="display:block">${t}</b><span class="sub">${s}</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4B5A6E" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>`).join('');
+$('progrows').innerHTML=[1,2].map(()=>`<tr><td><a href="#programmes" style="font-weight:600;color:var(--ink);text-decoration:none">[Programme name]</a><div class="sub">[Client]</div></td><td>[n]</td><td>[—%]</td><td>[n of n]</td></tr>`).join('');
+$('visitlist').innerHTML=[1,2,3].map(()=>`<a href="#visit"><span class="date">[Mon]<b>[DD]</b></span><span><b style="display:block">[Programme] · [Site]</b><span class="sub">Monitor: [Name]</span></span></a>`).join('');
+
+/* Programmes */
+let pStatus='Active',pTab='Overview';
+function renderProg(){
+  $('pstatus').innerHTML=['Active','Planned','Completed'].map(s=>`<button class="${s===pStatus?'on':''}" onclick="pStatus='${s}';renderProg()">${s}</button>`).join('');
+  $('plist').innerHTML=[0,1].map(i=>`<button class="pick${i===0?' on':''}"><b>[Programme name]</b><span class="sub">[Client] · [n] learners</span></button>`).join('');
+  $('ptabs').innerHTML=['Overview','Learners','Attendance','PoE','EISA readiness','Visits'].map(t=>`<button role="tab" aria-selected="${t===pTab}" class="${t===pTab?'on':''}" onclick="pTab='${t}';renderProg()">${t}</button>`).join('');
+}
+$('pstats').innerHTML=['Learners enrolled','Average attendance','EISA ready','Open recommendations'].map((l,i)=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="font-size:26px">${i===1?'[—%]':'[n]'}</span></div>`).join('');
+$('modrows').innerHTML=[1,2,3,4].map(n=>`<tr><td style="font-weight:600">[Module ${n}]</td><td>[n]</td><td><span class="bar"><i style="width:0;background:var(--navy2)"></i></span> [—%]</td><td>[n of n]</td></tr>`).join('');
+renderProg();
+
+/* Learner */
+$('steps').innerHTML=['Enrolled','Attending','PoE submitted','EISA ready','Certified'].map((l,i)=>{const d=i<2,c=i===2;const bg=d?'var(--navy2)':c?'var(--yellow)':'var(--soft)';
+ return `<li><span class="line" style="background:${bg}"></span><span style="display:flex;align-items:center;gap:8px;font-weight:600;color:${d||c?'var(--ink)':'var(--muted)'}"><span class="dot" style="background:${bg};color:${d?'#fff':'var(--navy)'}">${i+1}</span>${l}</span><span class="sub">${d?'Done · [date]':c?'In progress':'Not started'}</span></li>`}).join('');
+$('att').innerHTML='<span></span>'.repeat(20);
+$('poe').innerHTML=['[Module 1] knowledge test','[Module 1] practical','[Module 2] knowledge test','[Module 2] practical','Workplace logbook'].map(p=>`<div class="chk"><span style="flex-grow:1">${p}</span><span class="badge b-n">[Status]</span></div>`).join('');
+
+/* Visits */
+const KMAS=[['KMA1','Programme Implementation'],['KMA2','Human Resources'],['KMA3','Assessment Strategy'],['KMA4','Progress on Implementation'],['KMA5','General Responsiveness'],['KMA6','E-learning']];
+const scores={KMA1:0,KMA2:0,KMA3:2,KMA4:0,KMA5:0,KMA6:2};
+function renderKma(){
+  let low=0,sum=0,n=0;
+  $('kmas').innerHTML=KMAS.map(([c,l])=>{const s=scores[c];if(s){sum+=s;n++;if(s<3)low++}
+   return `<div class="kma"><div class="nm"><small>${c}</small><b>${l}</b></div><div role="group" aria-label="${l} score" style="display:flex;gap:6px">${[1,2,3,4].map(v=>`<button class="score${v===s?' on '+(v<3?'lo':'hi'):''}" aria-pressed="${v===s}" onclick="scores.${c}=${v};renderKma();markSaved(1)">${v}</button>`).join('')}</div>${s&&s<3?`<button class="draftbtn" onclick="toast('Drafting recommendation for ${l}')">Draft recommendation</button>`:''}</div>`}).join('');
+  const a=n?sum/n:0;$('judge').textContent=(!n?'Not scored':a<1.75?'Unacceptable':a<2.5?'Not Yet Adequate':a<3.5?'Adequate':'Outstanding')+' (draft)';
+  $('lowc').textContent=low+' area(s) scored below 3';
+}
+$('vdetails').innerHTML=[['Programme','[Programme name]'],['Visit date','[Date]'],['Monitor','[Name]'],['Learners on course','[n]'],['MOU','Not signed',1],['Next visit','[Date]']].map(([k,v,b])=>`<div class="kv"><span>${k}</span><span style="${b?'color:var(--bad)':''}">${v}</span></div>`).join('');
+renderKma();
+
+/* FAM */
+const TYPES=['CV','ID','Highest Qualification','QUAL','SLA','AFFIDAVIT'];
+const PEOPLE=[['Thendo Bakali','Facilitator · Assessor',['CV']],['Lionel Smith','Facilitator · Assessor · Moderator',['CV']],['Blessing Kachere','Facilitator',['CV','ID','QUAL','Highest Qualification']],['Gideon Manyusa','Facilitator',['CV','ID','QUAL']],['Sositina Gurajena','Facilitator',['CV']],['Tatenda Chingoriwo','Facilitator',['CV','QUAL']],['Nancy Bhunu','Facilitator',['CV','QUAL']],['Martha Madzingira','Facilitator',['CV','ID']],['Mutinta Kandeke','Facilitator',['CV']],['Gizelle Schiavini','Facilitator',['CV']]];
+let famSel=0;
+$('famkpis').innerHTML=[['Practitioners','18','var(--ink)'],['Registrations','23','var(--ink)'],['Active','16','var(--ok)'],['Inactive','7','var(--warn)']].map(([l,v,c])=>`<div class="kpi" style="min-width:150px;padding:12px 16px;gap:2px"><span class="l" style="font-size:12px">${l}</span><span class="v" style="font-size:24px;color:${c}">${v}</span></div>`).join('');
+function renderFam(){
+  $('famrows').innerHTML=PEOPLE.map(([n,r,d],i)=>{const k=d.length,c=k>=4?'var(--navy2)':k>=2?'#E0A100':'var(--bad)';
+   return `<tr class="${i===famSel?'sel':''}"><td><button onclick="famSel=${i};renderFam()" style="border:0;background:none;font-weight:600;color:var(--ink);padding:6px 0;min-height:36px;text-align:left">${n}</button></td><td class="sub" style="font-size:14px">${r}</td><td><span class="bar"><i style="width:${Math.round(k/6*100)}%;background:${c}"></i></span> <span class="sub">${k} of 6</span></td><td><span class="badge b-ok">Active</span></td></tr>`}).join('');
+  const [n,r,d]=PEOPLE[famSel];$('famname').textContent=n;$('famroles').textContent=r;$('famdocs').textContent=d.length+' of 6 on file';
+  $('famcheck').innerHTML=TYPES.map(t=>{const h=d.includes(t);return `<div class="chk"><span class="dot ${h?'b-ok':'b-bad'}">${h?'✓':'!'}</span><span style="flex-grow:1">${t}</span><a href="#" onclick="toast('${h?'Opening':'Upload'} ${t}');return false" style="font-weight:600;font-size:13px;${h?'':'color:var(--bad)'}">${h?'View':'Upload'}</a></div>`}).join('');
+}
+renderFam();
+
+/* Reports */
+const SECS=[['Executive summary',1,'[Drafted from live programme data — a short overview of delivery status this period.]'],['Attendance',1,'Average attendance was [—%] across [n] sessions for [n] learners, against a [75%] threshold.'],['Assessment & PoE',0,'[Not drafted yet]'],['EISA readiness',0,'[Not drafted yet]'],['Risks & recommendations',1,'[Open recommendations from monitoring visits, with owners and due dates.]']];
+const off={};
+function renderRep(){
+  $('secs').innerHTML=SECS.map(([l,d],i)=>`<label class="secrow"><input type="checkbox" ${off[i]?'':'checked'} onchange="off[${i}]=!this.checked;renderRep()"><span style="flex-grow:1;font-weight:600">${l}</span><span class="badge ${d?'b-ok':'b-n'}">${d?'Drafted':'Empty'}</span></label>`).join('');
+  $('preview').innerHTML=SECS.filter((s,i)=>!off[i]).map(([l,,b])=>`<div style="display:flex;flex-direction:column;gap:8px"><div style="display:flex;align-items:center;gap:10px"><h2 style="font-size:16px;color:var(--navy);flex-grow:1">${l}</h2><button class="btn sm" style="height:32px;color:var(--navy2)" onclick="toast('Polishing with AI')">Polish with AI</button></div><p style="margin:0;line-height:1.65;color:#2A3A50">${b}</p></div>`).join('');
+}
+renderRep();
+
+/* Clients */
+$('clientcards').innerHTML=[0,1,2,3].map(i=>`<button class="pick${i===0?' on':''}" style="gap:10px"><span style="display:flex;align-items:center;gap:10px"><span class="avatar" style="background:var(--navy);color:var(--yellow);border-radius:10px">C${i+1}</span><b style="font-size:15px">[Client name]</b></span><span class="sub">[Sector] · [City]</span><span style="display:flex;gap:16px;font-size:13px"><span><b>[n]</b> programmes</span><span><b>[n]</b> learners</span></span></button>`).join('');
+$('clientkv').innerHTML=[['Contact','[Name]'],['Email','[email]'],['Phone','[phone]'],['SDF','[Name]']].map(([k,v])=>`<div class="kv"><span>${k}</span><span>${v}</span></div>`).join('');
+
+/* Enrolments */
+let enF='All';
+const EN=[['Active','b-ok'],['Active','b-ok'],['Completed','b-n'],['Withdrawn','b-bad'],['Active','b-ok'],['Completed','b-n']];
+function renderEn(){
+  $('enfilter').innerHTML=['All','Active','Completed','Withdrawn'].map(s=>`<button class="${s===enF?'on':''}" onclick="enF='${s}';renderEn()">${s}</button>`).join('');
+  $('enrows').innerHTML=EN.filter(e=>enF==='All'||e[0]===enF).map(([s,c])=>`<tr><td><a href="#learner" style="font-weight:600;color:var(--ink);text-decoration:none">[Learner name]</a></td><td>[Programme name]</td><td>[Date]</td><td><span class="badge ${c}">${s}</span></td><td><a href="#learner" style="font-weight:600;font-size:13px">Open</a></td></tr>`).join('');
+}
+renderEn();
+
+/* Attendance & PoE */
+let aTab='Register';
+const STATES=['P','R','A'],SC={P:['var(--navy2)','#fff'],R:['#E0A100','#3A2600'],A:['var(--bad)','#fff']};
+const reg=[...Array(6)].map((_,r)=>[...Array(8)].map((_,c)=>(r*3+c*5)%11===0?'A':(r+c)%9===0?'R':'P'));
+function renderAtt(){
+  $('atabs').innerHTML=['Register','PoE tracker'].map(t=>`<button class="${t===aTab?'on':''}" onclick="aTab='${t}';renderAtt()">${t}</button>`).join('');
+  $('regcard').hidden=aTab!=='Register';$('poecard').hidden=aTab==='Register';
+  $('register').innerHTML=`<thead><tr><th>Learner</th>${[...Array(8)].map((_,i)=>`<th style="text-align:center">S${i+1}</th>`).join('')}<th>Rate</th></tr></thead><tbody>${reg.map((row,r)=>{const p=row.filter(x=>x!=='A').length;
+    return `<tr><td style="font-weight:600">[Learner ${r+1}]</td>${row.map((v,c)=>`<td style="text-align:center;padding:8px 4px"><button aria-label="Learner ${r+1} session ${c+1}: ${v}" onclick="reg[${r}][${c}]=STATES[(STATES.indexOf(reg[${r}][${c}])+1)%3];renderAtt();markSaved(1)" style="width:36px;height:36px;border:0;border-radius:8px;font-weight:700;background:${SC[v][0]};color:${SC[v][1]}">${v}</button></td>`).join('')}<td style="font-weight:600">${Math.round(p/8*100)}%</td></tr>`}).join('')}</tbody>`;
+  $('poetable').innerHTML=`<thead><tr><th>Learner</th>${['M1 knowledge','M1 practical','M2 knowledge','M2 practical','Logbook'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${[...Array(6)].map((_,r)=>`<tr><td style="font-weight:600">[Learner ${r+1}]</td>${[...Array(5)].map((_,c)=>{const k=(r+c)%4;const[t,cl]=[['Competent','b-ok'],['Submitted','b-n'],['Not yet','b-bad'],['Outstanding','b-warn']][k];return `<td><span class="badge ${cl}">${t}</span></td>`}).join('')}</tr>`).join('')}</tbody>`;
+}
+renderAtt();
+
+/* EISA */
+const EI=[[1,1,1,1,1,1],[1,1,0,1,1,0],[1,0,1,0,0,0],[0,1,1,1,1,0],[1,1,1,1,1,1],[1,0,0,0,0,0]];
+const ready=EI.filter(r=>r.every(Boolean)).length;
+$('eisakpis').innerHTML=[['Ready for EISA',ready,'var(--ok)'],['One criterion short',EI.filter(r=>r.filter(x=>!x).length===1).length,'var(--warn)'],['Two or more short',EI.filter(r=>r.filter(x=>!x).length>=2).length,'var(--bad)'],['EISA booked','[n]','var(--ink)']]
+ .map(([l,v,c])=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span><span class="n sub">of ${EI.length} learners (sample)</span></div>`).join('');
+$('eisarows').innerHTML=EI.map((r,i)=>{const ok=r.every(Boolean);return `<tr><td style="font-weight:600">[Learner ${i+1}]</td>${r.map(x=>`<td><span class="dot ${x?'b-ok':'b-bad'}" style="width:24px;height:24px" aria-label="${x?'Met':'Not met'}">${x?'✓':'✕'}</span></td>`).join('')}<td>${ok?'<span class="badge b-ok">Ready</span>':'<span class="badge b-warn">Not yet</span>'}</td></tr>`}).join('');
+
+/* Recommendations */
+let rF='Open';
+const RECS=[['KMA3','Assessment Strategy','High',0,1],['KMA6','E-learning','Medium',0,1],['KMA2','Human Resources','Medium',0,0],['KMA1','Programme Implementation','Low',1,0]];
+function renderRecs(){
+  $('recfilter').innerHTML=['Open','Resolved','All'].map(s=>`<button class="${s===rF?'on':''}" onclick="rF='${s}';renderRecs()">${s}</button>`).join('');
+  $('reclist').innerHTML=RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3]).map(([c,d,p,res,ai],i)=>`<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
+    <div style="flex:1 1 380px;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span class="badge b-n">${c} · ${d}</span><span class="badge ${p==='High'?'b-bad':p==='Medium'?'b-warn':'b-n'}">${p} priority</span>${ai?'<span class="tag" style="font-size:10px">AI drafted</span>':''}</div>
+      <b style="font-size:15px">[Recommendation text — what the provider must put right, in one or two sentences.]</b>
+      <span class="sub">From <a href="#visit">VIS-015</a> · [Programme name] · Due [Date]</span>
+    </div>
+    <div style="display:flex;gap:8px">${res?'<span class="badge b-ok" style="font-size:13px;padding:8px 12px">Resolved</span>':`<button class="btn sm" onclick="RECS[${RECS.indexOf(RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3])[i])}][3]=1;renderRecs();toast('Marked resolved')">Mark resolved</button>`}</div>
+  </article>`).join('')||'<p class="sub">Nothing here.</p>';
+}
+renderRecs();
+
+const PARENT={learner:'learners',visit:'visits'};
+
+/* Learners — 273 sample rows to test real density */
+const FN=['Nomvuyiseko Thandekile','Sipho','Ayanda','Lerato','Tshepo','Precious','Johannes Petrus','Thandiwe','Kagiso','Zanele','Mohammed Yusuf','Naledi','Bongani','Charmaine','Tatenda','Lindiwe','Pieter','Ntombizodwa','Rudo','Themba'];
+const LN=['Mabaso-Dlamini','Nkosi','van der Westhuizen','Mokoena','Chinyamakobvu','Naidoo','Botha','Mthembu','Pillay','Khumalo','Moyo','Le Roux','Ndlovu','Govender','Sithole','Mahlangu-Shabalala','Zulu','Radebe'];
+const PROGS=['[Programme A] · National Certificate: Generic Management NQF 5','[Programme B] · Occupational Certificate: Contact Centre Manager'];
+const LEARNERS=[...Array(273)].map((_,i)=>{const act=(i*37)%273<99;return{n:FN[i%FN.length]+' '+LN[(i*7+3)%LN.length],id:'••••••••'+String(1000+(i*7919)%9000),p:act?PROGS[i%2]:'',a:act?55+(i*13)%45:null,s:act?'Active':'Unlinked'}});
+let lF='All',lPage=0,lLoaded=false;const PER=25;
+function loadLearners(){if(lLoaded){renderLearners();return}
+  $('lfilter').innerHTML='';$('lpager').innerHTML='';
+  $('lrows').innerHTML=[...Array(6)].map(()=>`<tr>${[180,90,220,80,60].map(w=>`<td><span class="sk" style="width:${w}px"></span></td>`).join('')}</tr>`).join('');
+  setTimeout(()=>{lLoaded=true;renderLearners()},450)}
+function renderLearners(){
+  const q=($('lq').value||'').trim().toLowerCase();
+  $('lfilter').innerHTML=[['All',273],['Active',99],['Unlinked',174]].map(([f,c])=>`<button class="${f===lF?'on':''}" onclick="lF='${f}';lPage=0;renderLearners()">${f} · ${c}</button>`).join('');
+  const rows=LEARNERS.filter(l=>(lF==='All'||l.s===lF)&&(!q||l.n.toLowerCase().includes(q)||l.id.includes(q)));
+  const pages=Math.max(1,Math.ceil(rows.length/PER));if(lPage>=pages)lPage=pages-1;
+  const pg=rows.slice(lPage*PER,lPage*PER+PER);
+  $('lrows').innerHTML=pg.length?pg.map(l=>`<tr><td><a href="#learner" class="trunc" title="${esc(l.n)}" style="font-weight:600;color:var(--ink);text-decoration:none">${esc(l.n)}</a></td><td class="sub" style="font-size:14px">${l.id}</td><td>${l.p?`<span class="trunc" title="${esc(l.p)}">${esc(l.p)}</span>`:'<span class="sub">Not enrolled</span>'}</td><td>${l.a==null?'<span class="sub">—</span>':`<span class="bar"><i style="width:${l.a}%;background:${l.a<75?'var(--bad)':'var(--navy2)'}"></i></span> ${l.a}%`}</td><td>${l.s==='Active'?'<span class="badge b-ok">Active</span>':'<button class="badge b-warn" style="border:0" onclick="toast(\'Link to programme\')">Unlinked · Link</button>'}</td></tr>`).join('')
+   :`<tr><td colspan="5"><div class="empty"><b>No learners match “${esc(q)}”</b><span>Check the spelling, or clear the filter to see all ${lF==='All'?'':lF.toLowerCase()+' '}learners.</span><button class="btn sm" onclick="$('lq').value='';renderLearners()">Clear filter</button></div></td></tr>`;
+  $('lpager').innerHTML=rows.length?`<span class="sub" style="flex-grow:1">Showing ${lPage*PER+1}–${lPage*PER+pg.length} of ${rows.length}</span><button class="btn sm" ${lPage?'':'disabled'} onclick="lPage--;renderLearners()">Previous</button><span class="sub">Page ${lPage+1} of ${pages}</span><button class="btn sm" ${lPage<pages-1?'':'disabled'} onclick="lPage++;renderLearners()">Next</button>`:'';
+}
+
+/* Monitoring visits list */
+const VISITS=[['VIS-018','Scheduled','—'],['VIS-017','Scheduled','—'],['VIS-016','Scheduled','—'],['VIS-015','Draft','Not Yet Adequate'],['VIS-014','Final','Adequate'],['VIS-013','Final','Adequate'],['VIS-012','Final','Outstanding']];
+let vF='All';
+$('vkpis').innerHTML=[['Scheduled',3,'next 60 days','var(--muted)'],['Drafts to finalise',1,'VIS-015','var(--warn)'],['Finalised this year',3,'reports issued','var(--muted)'],['Open recommendations',8,'across all visits','var(--bad)','recs']]
+ .map(([l,v,n,c,h])=>`<${h?`a href="#${h}"`:'div'} class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${c}">${n}</span></${h?'a':'div'}>`).join('');
+function renderVisits(){
+  $('vfilter').innerHTML=['All','Scheduled','Draft','Final'].map(f=>`<button class="${f===vF?'on':''}" onclick="vF='${f}';renderVisits()">${f}</button>`).join('');
+  const J={'Not Yet Adequate':'b-bad','Adequate':'b-n','Outstanding':'b-ok','Unacceptable':'b-bad'},S={Scheduled:'b-n',Draft:'b-warn',Final:'b-ok'};
+  const rows=VISITS.filter(v=>vF==='All'||v[1]===vF);
+  $('vrows').innerHTML=rows.length?rows.map(([id,st,j])=>`<tr><td><a href="#visit" style="font-weight:600">${id}</a></td><td>[Programme name] · [Site]</td><td>[Date]</td><td>[Monitor]</td><td>${j==='—'?'<span class="sub">Not scored</span>':`<span class="badge ${J[j]}">${j}</span>`}</td><td><span class="badge ${S[st]}">${st}</span></td></tr>`).join('')
+   :'<tr><td colspan="6"><div class="empty"><b>No visits here</b><span>Nothing with this status yet.</span></div></td></tr>';
+}
+renderVisits();
+
+/* AI summary: loading → error (first try) → success */
+const AISUM=$('aisum').innerHTML;let regenN=0;
+function regen(){regenN++;
+  $('aisum').innerHTML='<span class="sk" style="width:100%;margin:6px 0"></span><span class="sk" style="width:92%;margin:6px 0"></span><span class="sk" style="width:70%;margin:6px 0"></span>';
+  setTimeout(()=>{$('aisum').innerHTML=regenN===1
+    ?'<span class="err" style="display:flex"><span style="flex-grow:1">Couldn’t reach the AI service. Your data is unchanged.</span><button class="btn sm" onclick="regen()">Retry</button></span>'
+    :AISUM;if(regenN>1)toast('Summary regenerated')},900)}
+
+/* Popovers */
+function closePops(){['qres','bell','org'].forEach(i=>$(i).hidden=true);['bellbtn','orgbtn'].forEach(i=>$(i).setAttribute('aria-expanded','false'))}
+function togglePop(id){const was=$(id).hidden;closePops();if(!was)return;$(id).hidden=false;const b={bell:'bellbtn',org:'orgbtn'}[id];if(b)$(b).setAttribute('aria-expanded','true')}
+document.addEventListener('click',e=>{if(!e.target.closest('.sw'))closePops()});
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closePops()});
+
+/* Global search */
+function doSearch(){
+  const q=$('q').value.trim().toLowerCase();const box=$('qres');
+  if(q.length<2){box.hidden=true;return}
+  const screens=NAV.flatMap(([,it])=>it).filter(([l])=>l.toLowerCase().includes(q)).map(([l,r])=>`<a href="#${r}"><b>${esc(l)}</b><span class="sub" style="margin-left:auto">Screen</span></a>`);
+  const lrn=LEARNERS.filter(l=>l.n.toLowerCase().includes(q)).slice(0,5).map(l=>`<a href="#learner"><span class="trunc" style="max-width:240px">${esc(l.n)}</span><span class="badge ${l.s==='Active'?'b-ok':'b-warn'}" style="margin-left:auto">${l.s}</span></a>`);
+  const fam=PEOPLE.map((p,i)=>[p,i]).filter(([p])=>p[0].toLowerCase().includes(q)).slice(0,4).map(([p,i])=>`<a href="#fam" onclick="famSel=${i};renderFam()">${esc(p[0])}<span class="sub" style="margin-left:auto">${esc(p[1].split(' · ')[0])}</span></a>`);
+  const vis=VISITS.filter(v=>v[0].toLowerCase().includes(q)).map(v=>`<a href="#visit"><b>${v[0]}</b><span class="sub" style="margin-left:auto">${v[1]}</span></a>`);
+  const g=(t,a)=>a.length?`<h4>${t}</h4>${a.join('')}`:'';
+  const html=g('Screens',screens)+g('Learners',lrn)+g('Practitioners',fam)+g('Monitoring visits',vis);
+  box.innerHTML=html||`<div class="empty" style="padding:20px"><b>No matches for “${esc(q)}”</b><span>Search covers screens, learners, practitioners and visits.</span></div>`;
+  box.hidden=false;
+}
+addEventListener('hashchange',()=>{$('q').value=''});
+
+/* Notifications */
+let unread=4;
+function renderBell(){
+  const N=[['bad','3 recommendations due this week','Recommendations','recs'],['n','VIS-016 is in 3 days','Monitoring visits','visit'],['ok','2 FAM documents uploaded','FAM Registry','fam'],['warn','October report draft ready for review','Report Generator','reports']];
+  $('bell').innerHTML=`<div style="display:flex;align-items:center;padding:6px 10px"><b style="flex-grow:1">Notifications</b>${unread?'<button class="btn sm" style="height:32px" onclick="unread=0;renderBell()">Mark all read</button>':''}</div>`+
+   N.map(([k,t,s,h],i)=>`<a href="#${h}"><span class="dot b-${k}" style="width:10px;height:10px;${i<unread?'':'opacity:.25'}"></span><span><span style="display:block;${i<unread?'font-weight:600':''}">${t}</span><span class="sub">${s}</span></span></a>`).join('');
+  $('dotn').hidden=!unread;$('dotn').textContent=unread;
+}
+renderBell();
+
+/* Workspace switcher */
+let org='Apex Academy';
+function renderOrg(){$('orgname').textContent=org;$('org').innerHTML='<h4>Switch workspace</h4>'+['Apex Academy','[Second entity]'].map(o=>`<button class="it" onclick="org='${o}';renderOrg();closePops();toast('Switched to ${o}')"><span style="flex-grow:1;${o===org?'font-weight:700':''}">${o}</span>${o===org?'✓':''}</button>`).join('')}
+renderOrg();
+
+/* Theme */
+function toggleTheme(){const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;r.dataset.theme=dark?'light':'dark';try{localStorage.setItem('ao-theme',r.dataset.theme)}catch(e){}}
+try{const t=localStorage.getItem('ao-theme');if(t)document.documentElement.dataset.theme=t}catch(e){}
+
+/* Save status */
+var curNav='dashboard';let saveT;
+const hhmm=()=>new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
+function markSaved(dirty){const s=$('savest'),t=s.lastChild;clearTimeout(saveT);
+  if(dirty){s.className='savest dirty';t.textContent='Unsaved changes';saveT=setTimeout(()=>markSaved(),1500);return}
+  s.className='savest busy';t.textContent='Saving…';saveT=setTimeout(()=>{s.className='savest';t.textContent='Saved '+hhmm()},600)}
+Object.assign(ROUTES,{dq:['Data quality review','Delivery / Learners'],signoff:['Sign-off queue','Quality']});
+const NC={signoff:()=>soWaiting()};
+
+/* Data quality review: same-name groups from the learner sample */
+const DQG=(()=>{const m={};LEARNERS.forEach((l,i)=>(m[l.n]=m[l.n]||[]).push(i));
+  return Object.entries(m).filter(([,a])=>a.length>1).map(([n,a])=>({n,a,t:new Set(a.map(i=>LEARNERS[i].s)).size>1?'Possible duplicate':'Same name'}))
+   .sort((x,y)=>(x.t===y.t?0:x.t==='Possible duplicate'?-1:1)||x.n.localeCompare(y.n))})();
+const DQD={},DQL={same:'Same person',diff:'Different people',quar:'Quarantined'};let dqF='Needs review',dqPage=0;
+function dqMatch(g,f){const d=DQD[g.n];return f==='Needs review'?!d:f==='Quarantined'?!!d&&d.k==='quar':f==='Decided'?!!d:g.t===f}
+function dqDecide(gi,k){const n=DQG[gi].n;if(k)DQD[n]={k,t:hhmm()};else delete DQD[n];renderDQ();renderNav(curNav);markSaved();
+  toast(k==='same'?'Recorded. Merge request sent to Sign-off queue':k?'Decision recorded':'Decision undone')}
+function renderDQ(){
+  const c=f=>DQG.filter(g=>dqMatch(g,f)).length;
+  $('dqkpis').innerHTML=[['Needs review',c('Needs review'),'name groups to check','var(--warn)'],['Possible duplicates',c('Possible duplicate'),'same name, one active + one unlinked','var(--bad)'],['Same name only',c('Same name'),'often different people','var(--muted)'],['Quarantined',c('Quarantined'),'held out of reports','var(--muted)']]
+   .map(([l,v,n,col])=>`<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${col}">${n}</span></div>`).join('');
+  $('dqfilter').innerHTML=['Needs review','Possible duplicate','Same name','Quarantined','Decided'].map(f=>`<button class="${f===dqF?'on':''}" onclick="dqF='${f}';dqPage=0;renderDQ()">${f} · ${c(f)}</button>`).join('');
+  const rows=DQG.filter(g=>dqMatch(g,dqF)),per=10,pages=Math.max(1,Math.ceil(rows.length/per));if(dqPage>=pages)dqPage=pages-1;
+  const pg=rows.slice(dqPage*per,dqPage*per+per);
+  $('dqlist').innerHTML=pg.length?pg.map(g=>{const gi=DQG.indexOf(g),d=DQD[g.n];
+    return `<div class="dqpair"><div class="who"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"><b class="trunc" title="${esc(g.n)}">${esc(g.n)}</b><span class="badge ${g.t==='Possible duplicate'?'b-warn':'b-n'}">${g.t}</span></div>
+     <div style="display:flex;flex-direction:column;gap:2px;margin-top:6px">${g.a.map(i=>{const l=LEARNERS[i];return `<span class="sub">ID ${l.id} · ${l.s==='Active'?'Active · '+esc(l.p.split(' · ')[0]):'Unlinked, not enrolled'}</span>`}).join('')}</div></div>
+     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${d?`<span class="badge ${d.k==='quar'?'b-bad':'b-ok'}">${DQL[d.k]} · Stavros ${d.t}</span><button class="btn sm" onclick="dqDecide(${gi})">Undo</button>`
+      :`<button class="btn sm" onclick="dqDecide(${gi},'same')">Same person</button><button class="btn sm" onclick="dqDecide(${gi},'diff')">Different people</button><button class="btn sm" style="color:var(--bad)" onclick="dqDecide(${gi},'quar')">Quarantine</button>`}</div></div>`}).join('')
+   :'<div class="empty"><b>Nothing here</b><span>No name groups match this filter.</span></div>';
+  $('dqpager').innerHTML=rows.length>per?`<span class="sub" style="flex-grow:1">Showing ${dqPage*per+1}–${dqPage*per+pg.length} of ${rows.length}</span><button class="btn sm" ${dqPage?'':'disabled'} onclick="dqPage--;renderDQ()">Previous</button><span class="sub">Page ${dqPage+1} of ${pages}</span><button class="btn sm" ${dqPage<pages-1?'':'disabled'} onclick="dqPage++;renderDQ()">Next</button>`:'';
+}
+
+/* Sign-off queue */
+const SO=[['VIS-015','Visit report','VIS-015 · Not Yet Adequate (draft)','[Programme name] · 2 areas scored below 3 · 2 recommendations drafted','#visit','[Monitor]','2 days ago'],
+ ['REP-OCT','Monthly report','October monthly progress report','[Programme name] · 3 of 5 sections drafted','#reports','[Programme manager]','today'],
+ ['FAM-REN','FAM registration','Lionel Smith · Moderator registration renewal','1 of 6 documents on file','#fam','[Admin]','yesterday'],
+ ['REC-CLOSE','Recommendation closure','KMA1 Programme Implementation · closure evidence submitted','From VIS-015 · Low priority','#recs','[Facilitator manager]','3 days ago']];
+const SOD={};let soF='Waiting',soOpen=null;
+function soItems(){return SO.concat(Object.entries(DQD).filter(([,d])=>d.k==='same').map(([n])=>['MRG-'+n,'Learner merge','Merge duplicate learner records: '+n,'Marked "Same person" in Data quality review. Records merge only after approval.','#dq','Stavros','today']))}
+function soWaiting(){return soItems().filter(x=>!SOD[x[0]]).length}
+function soAct(i,s){const id=soItems()[i][0];
+  if(s)SOD[id]={s,t:hhmm(),c:s==='returned'?$('socmt').value.trim():''};else delete SOD[id];
+  soOpen=null;renderSO();renderNav(curNav);markSaved();toast(s==='approved'?'Approved':s?'Sent back with comment':'Decision undone')}
+function renderSO(){const it=soItems(),m=(x,f)=>f==='All'||(f==='Done')===!!SOD[x[0]];
+  $('sofilter').innerHTML=['Waiting','Done','All'].map(f=>`<button class="${f===soF?'on':''}" onclick="soF='${f}';renderSO()">${f} · ${it.filter(x=>m(x,f)).length}</button>`).join('');
+  $('solist').innerHTML=it.map((x,i)=>[x,i]).filter(([x])=>m(x,soF)).map(([[id,ty,ti,de,href,by,when],i])=>{const d=SOD[id],open=soOpen===id&&!d;
+   return `<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
+    <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:6px">
+      <div style="display:flex;flex-wrap:wrap;gap:6px"><span class="badge b-n">${ty}</span>${d?`<span class="badge ${d.s==='approved'?'b-ok':'b-warn'}">${d.s==='approved'?'Approved':'Returned'} · Stavros ${d.t}</span>`:''}</div>
+      <b style="font-size:15px">${esc(ti)}</b><span class="sub">${esc(de)}</span>
+      <span class="sub">Submitted by ${esc(by)} · ${when} · <a href="${href}">Open</a></span>
+      ${d&&d.c?`<span class="sub">Comment: “${esc(d.c)}”</span>`:''}
+      ${open?`<label class="f" style="margin-top:6px">What needs to change?<textarea id="socmt" rows="3" oninput="$('sosend').disabled=!this.value.trim()"></textarea></label><div style="display:flex;gap:8px"><button class="btn sm n" id="sosend" disabled onclick="soAct(${i},'returned')">Send back</button><button class="btn sm" onclick="soOpen=null;renderSO()">Cancel</button></div>`:''}
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">${d?`<button class="btn sm" onclick="soAct(${i})">Undo</button>`:open?'':`<button class="btn sm" onclick="soOpen=soItems()[${i}][0];renderSO()">Return…</button><button class="btn sm y" onclick="soAct(${i},'approved')">Approve</button>`}</div>
+  </article>`}).join('')||'<div class="empty"><b>Queue is clear</b><span>Nothing is waiting for sign-off.</span></div>';
+  if(soOpen&&$('socmt'))$('socmt').focus();
+}
+/* ===== QA / ETQA familiarity layer (rev48) ===== */
+Object.assign(ROUTES,{qcto:['QCTO Projects Tracker','Quality'],modver:['Moderation & Verification','Quality'],accred:['QCTO Accreditation','Quality']});
+const fmtD=s=>s?s.split('-').reverse().join('/'):'';
+const BADGE=v=>({'Completed':'b-ok','Issued':'b-ok','Booked':'b-ok','Competent':'b-ok','Delayed':'b-bad','Not Yet Competent':'b-bad','Absent':'b-bad','Not Eligible':'b-bad','Pending':'b-warn','Pending Booking':'b-warn'}[v]||'b-n');
+const QV={cur:['Not Started','In Progress','Completed'],mon:['Not Due','Completed','Delayed'],sor:['Training In Progress','Pending','Issued','Not Applicable'],book:['Pending Booking','Booked','Delayed','Not Eligible'],out:['','Pending','Competent','Not Yet Competent','Absent']};
+
+/* Sample learner rows: one row per learner, exactly like the tracker */
+const QCO=[
+ {c:'[Client A]',pm:'[PM 1]',f:'[Facilitator 1]',a:'[Assessor 1]',p:'101869 - Project Manager NQF 5',d:'24 Months',s:'2026-06-05',e:'2028-05-05',n:6,st:i=>['In Progress','Not Due','','Training In Progress','','Pending Booking','To be confirmed','',"EISA dates only available in 2027"]},
+ {c:'[Client B]',pm:'[PM 2]',f:'[Facilitator 2]',a:'[Assessor 2]',p:'94222 - Organisational Risk Practitioner NQF 6',d:'24 Months',s:'2024-03-11',e:'2026-05-22',n:6,st:i=>i===4?['Completed','Delayed','','Pending','','Delayed','','','SoR complete, outstanding PoE items']:['Completed','Completed','2026-04-14','Issued','2026-05-29','Booked','2026-11-12','Pending','']},
+ {c:'[Client C]',pm:'[PM 3]',f:'[Facilitator 3]',a:'[Assessor 3]',p:'118708 - Data Science Practitioner NQF 5',d:'24 Months',s:'2023-08-07',e:'2025-07-09',n:5,st:i=>['Completed','Completed','2025-06-18','Issued','2025-10-25','Booked','2026-06-10',['Competent','Not Yet Competent','Competent','Absent','Competent'][i],i===1?'Re-write next window':'']},
+ {c:'[Client D]',pm:'[PM 1]',f:'[Facilitator 4]',a:'[Assessor 4]',p:'117329 - Insurance Underwriter NQF 5',d:'18 Months',s:'2025-04-01',e:'2026-09-30',n:5,st:i=>i<2?['In Progress','Delayed','','Pending','','Not Eligible','','','Workplace modules outstanding']:['Completed','Completed','2026-08-20','Issued','2026-10-02','Pending Booking','','','']}];
+const QT=[];QCO.forEach((k,ci)=>{for(let i=0;i<k.n;i++){const v=k.st(i);QT.push({ci,c:k.c,pm:k.pm,f:k.f,a:k.a,ln:`[Learner ${QT.length+1}]`,id:'•••••••••'+(1080+QT.length*7),p:k.p,d:k.d,s:k.s,e:k.e,cur:v[0],mon:v[1],monD:v[2],sor:v[3],sorD:v[4],book:v[5],eD:v[6],out:v[7],cm:v[8]})}});
+const QWIN=[['Next official EISA date 1','2026-11-12','Registration closing date 1','2026-10-30'],['Next official EISA date 2','2027-03-10','Registration closing date 2','2027-01-29']];
+const TODAY=new Date('2026-10-21');const dDays=s=>Math.round((new Date(s)-TODAY)/864e5);
+let qV='Learner rows';
+function qOpts(id,lab,vals){const el=$(id),cur=el.value;el.innerHTML=`<option value="">${lab}: All</option>`+[...new Set(vals)].map(v=>`<option${v===cur?' selected':''}>${esc(v)}</option>`).join('')}
+function qSet(i,k,v){QT[i][k]=v;markSaved(1);renderQ()}
+function renderQ(){
+  const n=k=>v=>QT.filter(r=>r[k]===v).length;
+  $('qkpis').innerHTML=[['Learners on tracker',QT.length,'one row per learner','var(--muted)'],['In Progress',n('cur')('In Progress'),'Current Status','var(--muted)'],['Monitoring Delayed',n('mon')('Delayed'),'Monitoring Status','var(--bad)'],['SOR Pending',n('sor')('Pending'),'SOR Status','var(--warn)'],['Pending Booking',n('book')('Pending Booking'),'EISA Booking Status','var(--warn)'],['Not Yet Competent / Absent',n('out')('Not Yet Competent')+n('out')('Absent'),'EISA Outcome','var(--bad)']]
+   .map(([l,v,s,c])=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c==='var(--muted)'?'var(--ink)':c}">${v}</span><span class="n" style="color:var(--muted)">${s}</span></div>`).join('');
+  $('qwin').innerHTML=QWIN.map(([a,ad,b,bd])=>{const dd=dDays(bd);return `<div class="kv"><span>${a}</span><span style="font-weight:600">${fmtD(ad)}</span></div><div class="kv"><span>${b}</span><span style="font-weight:600;color:${dd<=30?'var(--bad)':'var(--ink)'}">${fmtD(bd)} · ${dd} days</span></div>`}).join('<hr style="border:0;border-top:1px solid var(--line2);margin:6px 0">');
+  const rdy=QT.filter(r=>r.sor==='Issued'&&r.book==='Pending Booking').length,del=n('mon')('Delayed'),pend=n('sor')('Pending'),nyc=n('out')('Not Yet Competent')+n('out')('Absent');
+  $('qflags').innerHTML=[[rdy,'SOR Issued but EISA still Pending Booking','Registration closes '+fmtD(QWIN[0][3])+' · book before the window closes',rdy?'bad':'ok'],[del,'Monitoring Delayed','Schedule a visit and record the date in Monitoring Date','bad'],[pend,'SOR Pending after training end date','Usually outstanding PoE or workplace items','warn'],[nyc,'Not Yet Competent or Absent at EISA','Plan the re-write for the next official EISA date','warn']]
+   .map(([c,t,s,k])=>`<a href="#qcto" onclick="return false"><span class="count b-${k}">${c}</span><span style="flex-grow:1"><b style="display:block">${t}</b><span class="sub">${s}</span></span></a>`).join('');
+  $('qview').innerHTML=['Learner rows','Cohort summary'].map(v=>`<button class="${v===qV?'on':''}" onclick="qV='${v}';renderQ()">${v}</button>`).join('');
+  qOpts('qclient','Client',QT.map(r=>r.c));qOpts('qpm','Project Manager',QT.map(r=>r.pm));qOpts('qstat','Current Status',QV.cur);
+  const fc=$('qclient').value,fp=$('qpm').value,fs=$('qstat').value;
+  const rows=QT.map((r,i)=>[r,i]).filter(([r])=>(!fc||r.c===fc)&&(!fp||r.pm===fp)&&(!fs||r.cur===fs));
+  const sel=(i,k,v)=>`<select class="cellsel ${BADGE(v)}" aria-label="${k}" onchange="qSet(${i},'${k}',this.value)">${QV[k].map(o=>`<option${o===v?' selected':''}>${o}</option>`).join('')}</select>`;
+  if(qV==='Learner rows'){
+    $('qcount').textContent=rows.length+' of '+QT.length+' learners';
+    $('qtable').innerHTML=`<thead><tr>${['No','Client Name','Project Manager','Facilitator','Assessor','Learner Name','Learner Surname','Learner ID Number','Programme Name','Duration','Start Date','End Date','Current Status','Monitoring Status','Monitoring Date','SOR Status','SOR Issued Date','EISA Booking Status','EISA Date','EISA Outcome','Comments'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`+
+     rows.map(([r,i])=>`<tr><td>${i+1}</td><td>${r.c}</td><td>${r.pm}</td><td>${r.f}</td><td>${r.a}</td><td><a href="#learner" style="font-weight:600">${r.ln}</a></td><td>[Surname]</td><td>${r.id}</td><td>${r.p}</td><td>${r.d}</td><td>${fmtD(r.s)}</td><td>${fmtD(r.e)}</td><td>${sel(i,'cur',r.cur)}</td><td>${sel(i,'mon',r.mon)}</td><td>${fmtD(r.monD)}</td><td>${sel(i,'sor',r.sor)}</td><td>${fmtD(r.sorD)}</td><td>${sel(i,'book',r.book)}</td><td>${r.eD&&r.eD[0]==='2'?fmtD(r.eD):r.eD}</td><td>${sel(i,'out',r.out)}</td><td class="sub" style="white-space:normal;min-width:200px">${esc(r.cm)}</td></tr>`).join('')+'</tbody>';
+  }else{
+    const g=QCO.map((k,ci)=>[k,ci,QT.filter(r=>r.ci===ci)]).filter(([,,a])=>rows.some(([r])=>r.ci===a[0].ci));
+    $('qcount').textContent=g.length+' cohorts';
+    $('qtable').innerHTML=`<thead><tr>${['Entity','Project Manager','Client','Type','Qualification','NQF','Group','No. of learners','Employment status','Start date','End date','Enrolment requested','Enrolment received','EISA Jun 2026','EISA Nov 2026','Facilitator','Assessor','Certification'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`+
+     g.map(([k,ci,a])=>{const eJ=a.filter(r=>r.eD&&r.eD.startsWith('2026-06')).length,eN=a.filter(r=>r.eD&&r.eD.startsWith('2026-11')).length,cert=a.filter(r=>r.out==='Competent').length;
+      return `<tr><td>[Entity]</td><td>${k.pm}</td><td>${k.c}</td><td>Learnership</td><td>${k.p}</td><td>${k.p.match(/NQF (\d)/)[1]}</td><td>${ci+1}</td><td>${a.length}</td><td>Employed</td><td>${fmtD(k.s)}</td><td>${fmtD(k.e)}</td><td>[Date]</td><td>[Date]</td><td>${eJ||''}</td><td>${eN||''}</td><td>${k.f}</td><td>${k.a}</td><td>${cert?`<span class="badge b-ok">${cert} competent</span>`:'<span class="sub">—</span>'}</td></tr>`}).join('')+'</tbody>';
+  }
+}
+
+/* EISA readiness: QCTO criteria + LEISA two-stage file */
+let eTab='Readiness';
+const LEI=[['[Learner 1]',[],[ 'AssessmentCentreCode']],['[Learner 2]',['LearnerEmailAddress: contains a space'],['AssessmentCentreCode']],['[Learner 3]',['LearnerPhoneNumber: 11 digits','LearnerCellPhoneNumber: 11 digits'],['AssessmentCentreCode']],['[Learner 4]',['NationalId does not match LearnerBirthDate'],['AssessmentCentreCode']],['[Learner 5]',[],['AssessmentCentreCode']],['[Learner 6]',[],[]]];
+function renderE(){
+  $('etabs').innerHTML=['Readiness','LEISA file'].map(t=>`<button role="tab" aria-selected="${t===eTab}" class="${t===eTab?'on':''}" onclick="eTab='${t}';renderE()">${t}</button>`).join('');
+  $('eisaready').hidden=eTab!=='Readiness';$('leisa').hidden=eTab==='Readiness';
+  const s1=LEI.filter(l=>l[1].length).length,s2=LEI.filter(l=>l[2].length).length;
+  $('leisa').innerHTML=`<div class="row" style="align-items:stretch">
+   ${[['Stage 1 · Learner enrolment','Columns A–AJ + DateStamp','Within 21 days after training start','Learnerenrolments@qcto.org.za','[Start date + 21 days]',s1,'learners with field errors'],['Stage 2 · EISA readiness','Columns AK–AP + DateStamp','At least 3 months before the EISA date','EISAreadiness@qcto.org.za',fmtD('2026-08-12')+' for the '+fmtD('2026-11-12')+' EISA',s2,'learners missing stage 2 fields']].map(([t,c,w,m,due,k,lab])=>`
+    <section class="card" style="flex:1 1 320px;display:flex;flex-direction:column;gap:8px"><h2>${t}</h2>
+     <div class="kv"><span>Columns</span><span>${c}</span></div><div class="kv"><span>When</span><span>${w}</span></div><div class="kv"><span>Due</span><span style="font-weight:600">${due}</span></div><div class="kv"><span>Send to</span><span>${m}</span></div>
+     <span class="badge ${k?'b-warn':'b-ok'}" style="align-self:flex-start">${k?k+' '+lab:'Ready to submit'}</span></section>`).join('')}
+   <section class="card" style="flex:1 1 320px;display:flex;flex-direction:column;gap:8px"><h2>File</h2>
+     <div class="kv"><span>Name (QCTO convention)</span><span style="font-weight:600">LEISA20261021-Apex Business Academy.xlsx</span></div>
+     <div class="kv"><span>Template</span><span>QCTO, 2 sheets, 43 columns</span></div>
+     <div class="kv"><span>Compiler</span><span>[Name] · [Email] · [Number]</span></div>
+     <span class="sub">Exported as .xlsx only. The QCTO instructions say not to PDF this file.</span>
+     <button class="btn y" onclick="toast('Exported LEISA20261021-Apex Business Academy.xlsx')">Export LEISA file</button></section></div>
+   <section class="card" style="padding:0"><div style="padding:16px 20px;display:flex;flex-wrap:wrap;gap:8px;align-items:baseline"><h2 style="flex-grow:1">Field check before submission</h2><span class="sub">Codes (EquityCode, HomeLanguageCode, ProvinceCode…) are picked from QCTO lists, so they are always valid</span></div>
+   <div class="tw"><table class="dense"><thead><tr><th>Learner</th><th>Stage 1 (A–AJ)</th><th>Stage 2 (AK–AP)</th></tr></thead><tbody>${LEI.map(([n,a,b])=>`<tr><td style="font-weight:600">${n}</td><td style="white-space:normal">${a.length?a.map(x=>`<span class="badge b-bad" style="margin:2px">${esc(x)}</span>`).join(''):'<span class="badge b-ok">Complete</span>'}</td><td style="white-space:normal">${b.length?b.map(x=>`<span class="badge b-warn" style="margin:2px">Missing ${esc(x)}</span>`).join(''):'<span class="badge b-ok">Complete</span>'}</td></tr>`).join('')}</tbody></table></div>
+   <div style="padding:12px 20px" class="sub">Also fixed on export: LearnerFaxNumber is written the same way for everyone (the March file mixed “NA” and “N/A”).</div></section>`;
+}
+
+/* Moderation & Verification: three sheets from the workbook */
+let mTab='External moderation';
+const LEG={57918:['INSETA','National Certificate: Short Term Insurance','Yes','24 Months'],57608:['INSETA','National Certificate: Wealth Management','Yes','24 Months'],59201:['SERVICES SETA / MQA','National Certificate: Generic Management','Yes','24 / 12 Months'],23655:['SERVICES SETA','National Certificate: Business Administration Services','Yes','24 Months'],49648:['SERVICES SETA','National Certificate: New Venture Creation (SMME)','Yes','24 Months'],66249:['SERVICES SETA','FETC: New Venture Creation','Yes','12 Months'],58206:['W&RSETA','National Certificate: Wholesale and Retail Operations','Yes','12 Months']};
+const legB=q=>{const id=(String(q).match(/\d{5}/)||[])[0];return id&&LEG[id]?`<span class="badge b-warn" title="Pre-2009 list: ${LEG[id][0]}">Legacy · extended ${LEG[id][3]}</span>`:''};
+const MSTAGE=['Documents requested','Online documents submitted','Follow-up sent','Exit verification application in progress','Exit verification booked','Exit verification done','Awaiting verification report','SoRs received','Certificates received','Submitted to PM','On hold'];
+const MOD=[['Apex Business Academy','[PM 1]','[Client A]','Learnership','57608: NC: Wealth Management','5',5,'Group 1','Employed','2024-01-01','2025-02-01','Online','[Facilitator]','[Assessor]','[Moderator]','INSETA',3,'2026-09-30'],
+ ['Catalyst AI (Pty) Ltd','[PM 2]','[Client B]','Skills Programme','SP: Cyber Security (12891, 13107)','5',15,'Cohort 1','Employed','2024-01-01','2024-04-01','Online','[Facilitator]','[Assessor]','[Moderator]','MICT SETA',2,'2026-01-06'],
+ ['Apex Business Academy','[PM 3]','[Client C]','Learnership','61591 - NC: IT End User Computing','3',9,'Group 1','Unemployed','2024-11-01','2025-10-01','Face-to-face','[Facilitator]','[Assessor]','[Moderator]','MICT SETA',1,'2025-11-10'],
+ ['Catalyst AI (Pty) Ltd','[PM 2]','[Client D]','Learnership','NC: Customer Management Banking','5',9,'Group 1','Unemployed','2024-05-01','2025-12-01','Online','[Facilitator]','[Assessor]','[Moderator]','BANKSETA',5,'2026-04-15'],
+ ['Apex Business Academy','[PM 4]','[Client E]','Learnership','67464 - NC: Marketing','4',13,'Cohort 1','Employed','2024-10-01','2026-01-01','Online','[Facilitator]','[Assessor]','[Moderator]','Services SETA',3,'2026-02-27'],
+ ['Apex Business Academy','[PM 4]','[Client F]','Skills Programme','Innovative Thinking - 114600','5',3,'Group 1','Unemployed','2025-09-01','2025-12-01','Online','[Facilitator]','[Assessor]','[Moderator]','Services SETA',10,'2026-03-02']];
+const VER=[['Apex Business Academy','[PM 1]','[Client G]','Skills Programme','Business Analysis - 114050, 258837, 115367','5',15,'Group 1','MICT SETA','[Verifier]','2025-10-29',6],
+ ['Apex Business Academy','[PM 3]','[Client H]','Learnership','57918: Short Term Insurance','5',33,'Cohort 1-2','INSETA','[Verifier]','2025-05-12',7],
+ ['Catalyst AI (Pty) Ltd','[PM 2]','[Client C]','Skills Programme','Advance Excel - 114052, 114076','5',7,'Group 1','MICT SETA','[Verifier]','2026-03-12',6],
+ ['Apex Business Academy','[PM 4]','[Client I]','Learnership','57608 - NC: Wealth Management','5',10,'Public group','INSETA','[Verifier]','2026-02-13',7]];
+const DONE=[['Catalyst AI (Pty) Ltd','[PM 5]','[Client J]','Skills Programme','SP: New Venture (US: 114600)','4',5,'Group 1&2','Services SETA','2025-12-12','2025-12-12','2026-01-30'],
+ ['Apex Business Academy','[PM 3]','[Client K]','Learnership','59201: Generic Management','5',11,'Group 6','Services SETA','2025-12-12','2025-12-12','2026-01-30'],
+ ['Catalyst AI (Pty) Ltd','[PM 4]','[Client L]','Skills Programme','Customer Experience Management (CEM) - 10067','5',3,'Group 1','BANKSETA','2026-02-12','2026-02-25','2026-02-25'],
+ ['Apex Business Academy','[PM 3]','[Client M]','Learnership','61591 - NC: IT End User Computing','3',16,'Group 1','MICT SETA','2026-06-26','2026-04-08','2026-04-08']];
+function mSet(arr,i,v){(arr==='MOD'?MOD:VER)[i][arr==='MOD'?16:11]=+v;markSaved(1);renderM()}
+function renderM(){
+  const sum=a=>a.reduce((t,r)=>t+r[6],0);
+  $('mkpis').innerHTML=[['On moderation list',MOD.length,'programmes','var(--ink)'],['Exit verification 2026',sum(VER),'learners','var(--ink)'],['Awaiting SoRs or report',VER.filter(r=>r[11]<7).length,'programmes','var(--warn)'],['Completed 2026',sum(DONE),'learners certified','var(--ok)']]
+   .map(([l,v,s,c])=>`<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span><span class="n" style="color:var(--muted)">${s}</span></div>`).join('');
+  $('mtabs').innerHTML=['External moderation','Exit verification stats','Projects completed'].map(t=>`<button role="tab" aria-selected="${t===mTab}" class="${t===mTab?'on':''}" onclick="mTab='${t}';renderM()">${t}</button>`).join('');
+  const st=(a,i,v)=>`<select class="cellsel" aria-label="Stage" onchange="mSet('${a}',${i},this.value)">${MSTAGE.map((s,k)=>`<option value="${k}"${k===v?' selected':''}>${s}</option>`).join('')}</select>`;
+  const H=h=>`<thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead>`;
+  if(mTab==='External moderation'){
+    $('mnote').innerHTML='FEEDBACK is now a stage you pick plus a date, so it can be filtered and counted. Notes still go in Comments. Legacy qualifications are flagged from the Pre-2009 list.';
+    $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification (OFO / ID)','NQF','Learners','Groups','Employment','Start','End','Face-to-face or Online','Facilitator','Assessor','Moderator','SETA','Feedback stage','Stage date'])+'<tbody>'+MOD.map((r,i)=>`<tr>${r.slice(0,16).map((v,k)=>`<td>${k===4?esc(v)+' '+legB(v):k===9||k===10?fmtD(v):esc(v)}</td>`).join('')}<td>${st('MOD',i,r[16])}</td><td>${fmtD(r[17])}</td></tr>`).join('')+'</tbody>';
+  }else if(mTab==='Exit verification stats'){
+    $('mnote').innerHTML='Same columns as the VERIFICATION STATS 2026 sheet. The last column is now a stage, not free text.';
+    $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification','NQF','Learners','Groups','SETA','Verifier','Exit verification date','Certificate / SoR submission'])+'<tbody>'+VER.map((r,i)=>`<tr>${r.slice(0,11).map((v,k)=>`<td>${k===4?esc(v)+' '+legB(v):k===10?fmtD(v):esc(v)}</td>`).join('')}<td>${st('VER',i,r[11])}</td></tr>`).join('')+'</tbody>';
+  }else{
+    $('mnote').innerHTML='Same columns as the PROJECTS COMPLETED 2026 sheet. Programmes move here when certificates are submitted to the PM.';
+    $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification','NQF','Learners','Groups','SETA','Exit verification date','Certificate / SoR submission date','Date submitted to PM'])+'<tbody>'+DONE.map(r=>`<tr>${r.map((v,k)=>`<td>${k>=9?fmtD(v):k===4?esc(v)+' '+legB(v):esc(v)}</td>`).join('')}</tr>`).join('')+'</tbody>';
+  }
+}
+
+/* Accreditation */
+const AST={g:['Accreditation granted','b-ok'],ok:['Desktop application successful','b-n'],sv:['Site visit scheduled','b-warn'],svd:['Site visit done','b-n'],sub:['Desktop application to be submitted','b-bad']};
+const ACC=[[118699,'Occupational Certificate: Cloud Administrator',4,149,'Occupational Certificate','Catalyst AI (Pty) Ltd','MICT (DHET)','g','29/08/2025 – 28/08/2030'],
+ [117329,'Occupational Certificate: Insurance Underwriter',5,163,'Occupational Certificate','Catalyst AI (Pty) Ltd','INSETA','sv','Site visit 20/04/2026'],
+ [99111,'Occupational Certificate: Supply Chain Practitioner',5,145,'Occupational Certificate','Apex Business Academy Pty Ltd','TETA','ok','Desktop successful 29/01/2026'],
+ [111357,'Occupational Certificate: Supply Chain Manager',6,180,'Occupational Certificate','Apex Business Academy Pty Ltd','TETA','ok','Desktop successful 29/01/2026'],
+ [121927,'Higher Occupational Certificate: Business Banking Officer',5,146,'Higher Occupational Certificate','Catalyst AI (Pty) Ltd','BANKSETA','sv','Site visit 22/04/2026'],
+ [121911,'Advanced Occupational Diploma: Business Banker',7,592,'Advanced Occupational Diploma','Catalyst AI (Pty) Ltd','BANKSETA','sv','Site visit 22/04/2026'],
+ [118986,'Occupational Certificate: Cybersecurity Analyst',5,173,'Occupational Certificate','Catalyst AI (Pty) Ltd','MICT (DHET)','svd','Site visit 18/02/2026 – done'],
+ [121792,'Occupational Certificate: Sales Representative',4,155,'Occupational Certificate','Apex Business Academy Pty Ltd','W&RSETA','sub','—']];
+let aF='All';
+function renderA(){
+  const c=k=>ACC.filter(r=>r[7]===k).length;
+  $('akpis').innerHTML=Object.entries(AST).map(([k,[l,b]])=>`<div class="kpi"><span class="l">${l}</span><span class="v">${c(k)}</span><span class="n"><span class="badge ${b}">${b==='b-bad'?'Action needed':b==='b-warn'?'Prepare':'Status'}</span></span></div>`).join('');
+  $('afilter').innerHTML=['All','Granted','In progress','To submit'].map(f=>`<button class="${f===aF?'on':''}" onclick="aF='${f}';renderA()">${f}</button>`).join('');
+  const m=r=>aF==='All'||(aF==='Granted'?r[7]==='g':aF==='To submit'?r[7]==='sub':!['g','sub'].includes(r[7]));
+  $('atable').innerHTML=`<thead><tr>${['No','Qualification / SP ID','Title','NQF','Credits','Type','Provider','Quality SETA partner','SMME','QCTO advisor','QCTO verifier','Status','Feedback'].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`+
+   ACC.filter(m).map(r=>`<tr><td>${ACC.indexOf(r)+1}</td><td>${r[0]}</td><td style="white-space:normal;min-width:220px;font-weight:600">${esc(r[1])}</td><td>${r[2]}</td><td>${r[3]}</td><td>${r[4]}</td><td>${r[5]}</td><td>${r[6]}</td><td>[SMME]</td><td>[Advisor]</td><td>[Verifier]</td><td><span class="badge ${AST[r[7]][1]}">${AST[r[7]][0]}</span></td><td>${r[8]}</td></tr>`).join('')+'</tbody>';
+}
+function renderLeg(){const q=$('legq').value.trim();const r=LEG[q];
+  $('legres').innerHTML=!q?'<span class="sub">Type a SAQA qualification ID to see whether it is a legacy (pre-2009 or NATED) qualification and how long its extension runs.</span>'
+   :r?`<div class="err" style="display:flex;flex-direction:column;gap:4px;background:var(--warnbg);color:var(--ink)"><b>${q} · ${esc(r[1])}</b><span>Quality partner ${esc(r[0])} · Extended: ${r[2]} · Extension ${r[3]}</span><span class="sub">Plan enrolments so learners finish and certify inside the extension period.</span></div>`
+   :q.length>=5?`<span class="badge b-ok">Not on the consolidated list</span> <span class="sub">Check the registration end date with the quality partner.</span>`:'';
+}
+
+/* Programme: Form 3 tab */
+const F3={sdp:'Catalyst AI (Pty) Ltd',t:'Advanced Occupational Diploma: Business Banker',saqa:121911,nqf:7,cr:592,cc:331205,
+ KM:[['KM-01','Introduction to Business Banking',360],['KM-02','Dynamics of Small Enterprise Financing',160],['KM-03','Dynamics of Medium Enterprise Financing',300],['KM-04','Advanced Business Analysis and Ethics',460],['KM-05','Dynamics of Large Enterprise Financing',480]],
+ PM:[['PM-01','Identify and analyse the financial service needs of business clients',160],['PM-02','Build partnership relationships and win business with clients',260],['PM-03','Interpret Medium Enterprise financial services needs',300],['PM-04','Analyse the financial performance of a range of businesses',null],['PM-05','Interpret Large Enterprise financial services needs',420]],
+ WM:[['WM-01','Determining small business financing and banking needs',180],['WM-02','Growing a quality small business client portfolio',160],['WM-03','Maintaining small business client relationships',180],['WM-04','Matching medium enterprise needs with financial solutions',320],['WM-05','Growing and maintaining Medium Enterprise clients',400],['WM-06','Identifying financial needs of corporate clients',470],['WM-07','Growing and managing large enterprise clients',470],['WM-08','Managing risks of large enterprise clients',460]]};
+function form3HTML(){const fac='Sarojini Naidoo',inFam=PEOPLE.some(p=>p[0]===fac);
+  const tot=a=>a.reduce((t,r)=>t+(r[2]||0),0);
+  const blk=(k,lab,f)=>`<tr><th colspan="${f?6:3}" style="background:var(--ground)">${lab} · ${tot(F3[k])} hours</th></tr>`+F3[k].map(([c,t,h])=>`<tr><td>${F3.cc}-000-00-${c}</td><td style="white-space:normal;min-width:240px">${esc(t)}</td><td>${h==null?'<span class="badge b-bad">Hours missing</span>':h}</td>${f?`<td>${fac}</td><td>${inFam?'<span class="badge b-ok">On FAM registry</span>':'<span class="badge b-warn">Not on FAM registry</span>'}</td><td class="sub">Highest qual + years from FAM</td>`:''}</tr>`).join('');
+  return `<div class="card" style="display:flex;flex-direction:column;gap:12px"><div style="display:flex;flex-wrap:wrap;gap:8px;align-items:baseline"><h2 style="flex-grow:1">Form 3 · Programme Implementation</h2><span class="famas">Same layout as the QCTO <b>Form 3</b> document</span><button class="btn sm y" onclick="toast('Exported Form 3 (.docx)')">Export Form 3 (.docx)</button></div>
+   <div class="kv"><span>Legal name of SDP</span><span>${F3.sdp}</span></div><div class="kv"><span>Qualification / curriculum title</span><span>${F3.t}</span></div><div class="kv"><span>SAQA ID · NQF · Credits · Curriculum code</span><span>${F3.saqa} · ${F3.nqf} · ${F3.cr} · ${F3.cc}</span></div><div class="kv"><span>1. Proposed duration</span><span>[From] → [To]</span></div></div>
+   <div class="card" style="padding:0"><div style="padding:16px 20px"><h2>2. Modules and facilitators</h2><span class="sub">Facilitator credentials come from the FAM registry, so they don't need retyping on each form</span></div>
+   <div class="tw"><table class="dense"><thead><tr><th>Module code</th><th>Module</th><th>Hours on timetable</th><th>Facilitator</th><th>FAM check</th><th>Qualification &amp; experience</th></tr></thead><tbody>${blk('KM','Knowledge modules',1)}${blk('PM','Practical modules',1)}${blk('WM','Workplace modules',0)}</tbody></table></div></div>
+   <div class="card"><h2 style="margin-bottom:8px">Physical resources (as per curriculum)</h2>${['Classroom furniture, audio & visual equipment','Handouts and stationery','Learning material (physical / online)','Learning Management System','Quality Management System'].map(x=>`<div class="chk"><span style="flex-grow:1">${x}</span><span class="badge b-ok">Yes</span></div>`).join('')}</div>`}
+
+/* Visit: QCTO visit type, evidence, finding */
+let vType='Implementation monitoring',vAnn='Announced';
+const EVID={'Implementation monitoring':['Learner registration records','Attendance registers','Learning schedules and timetables','Facilitator, assessor and moderator credentials','Learning materials','Assessment and moderation reports','Workplace contracts / MOAs','Equipment and resource inventories'],
+ 'EISA readiness monitoring':['Learner Portfolios of Evidence (PoEs)','Statements of Results','Internal assessment records','Moderation reports','Workplace logbooks','Workplace completion reports','Learner readiness declarations','EISA entry documentation']};
+const EVD={};
+function renderVT(){
+  $('vtype').innerHTML=Object.keys(EVID).map(t=>`<button class="${t===vType?'on':''}" onclick="vType='${t}';renderVT()">${t.replace(' monitoring','')}</button>`).join('');
+  $('vann').innerHTML=['Announced','Unannounced'].map(t=>`<button class="${t===vAnn?'on':''}" onclick="vAnn='${t}';renderVT()">${t}</button>`).join('');
+  const L=EVID[vType],k=L.filter(x=>EVD[x]).length;
+  $('vevid').innerHTML=`<div style="display:flex;align-items:baseline;margin-bottom:8px"><h2 style="flex-grow:1;font-size:16px">Evidence reviewed</h2><span class="sub">${k} of ${L.length}</span></div>`+L.map((x,i)=>`<label class="chk" style="cursor:pointer"><input type="checkbox" ${EVD[x]?'checked':''} onchange="EVD[EVID[vType][${i}]]=this.checked;renderVT();markSaved(1)"><span style="flex-grow:1">${x}</span></label>`).join('');
+  const sc=Object.values(scores).filter(Boolean),lo=Math.min(...sc);
+  $('qfind').textContent='QCTO finding: '+(!sc.length?'—':lo<=1?'Non-compliant':lo===2?'Partially compliant':'Compliant')+' · corrective action evidence due [date]';
+}
+
+/* Learner: induction pack rules */
+function learnerRules(){return `<div class="row">
+ <section class="card" style="flex:1 1 300px;display:flex;flex-direction:column;gap:8px"><h2>Induction pack</h2>
+  ${[['POPIA consent signed','[Date]',1],['Learner declaration signed','[Date]',1],['Every page initialled','Yes',1],['Academic integrity incidents','0',1]].map(([k,v,o])=>`<div class="kv"><span>${k}</span><span style="color:${o?'var(--ok)':'var(--bad)'};font-weight:600">${v}</span></div>`).join('')}
+  <div class="kv"><span>Absences (valid, with proof)</span><span style="font-weight:600">2 of 5 days used</span></div><span class="bar"><i style="width:40%;background:#E0A100"></i></span>
+  <span class="sub">Limit is 5 days for 12-month programmes and 3 days for 3-month skills programmes. Medical certificates are attached to the session.</span></section>
+ <section class="card" style="flex:2 1 420px;padding:0"><div style="padding:16px 20px"><h2>Assessment attempts &amp; appeals</h2><span class="sub">One resubmission per assessment. A third attempt is paid and goes to the Campus Manager. Appealing forfeits the third attempt.</span></div>
+  <div class="tw"><table class="dense"><thead><tr><th>Assessment</th><th>1st submission</th><th>Resubmission</th><th>3rd attempt (paid)</th><th>Appeal</th></tr></thead><tbody>
+  <tr><td>[Module 1] formative</td><td><span class="badge b-ok">Competent</span></td><td></td><td></td><td></td></tr>
+  <tr><td>[Module 1] summative</td><td><span class="badge b-bad">NYC</span></td><td><span class="badge b-ok">Competent</span></td><td></td><td></td></tr>
+  <tr><td>[Module 2] summative</td><td><span class="badge b-bad">NYC</span></td><td><span class="badge b-bad">NYC</span></td><td><span class="sub">Forfeited by appeal</span></td><td><span class="badge b-warn">Logged [date] · QA reply due in 10 days</span></td></tr>
+  </tbody></table></div><div style="padding:12px 20px" class="sub">Appeals must be logged within 5 days of results. QA assigns a moderator, who upholds or overturns the result. All appeals are reviewed monthly.</div></section></div>`}
+
+/* Wire into existing screens */
+(function(){
+  const tr=$('vrows').closest('table').querySelector('thead tr');tr.children[0].insertAdjacentHTML('afterend','<th>QCTO type</th>');
+  const _rv=renderVisits;const VT={'VIS-018':'EISA readiness','VIS-016':'EISA readiness'};
+  renderVisits=function(){_rv();[...$('vrows').rows].forEach(r=>{const a=r.querySelector('a');if(a)r.cells[0].insertAdjacentHTML('afterend',`<td>${VT[a.textContent]||'Implementation'}</td>`);else if(r.cells[0])r.cells[0].colSpan=7})};renderVisits();
+  const _rk=renderKma;renderKma=function(){_rk();if($('qfind'))renderVT()};
+  const _rp=renderProg;renderProg=function(){_rp();if(!$('ptabs').innerHTML.includes('Form 3'))$('ptabs').insertAdjacentHTML('beforeend',`<button role="tab" aria-selected="${pTab==='Form 3'}" class="${pTab==='Form 3'?'on':''}" onclick="pTab='Form 3';renderProg()">Form 3</button>`);
+    const f=pTab==='Form 3';$('pstats').hidden=f;$('pmodcard').hidden=f;$('form3').hidden=!f;if(f&&!$('form3').innerHTML)$('form3').innerHTML=form3HTML()};renderProg();
+  $('lrules').innerHTML=learnerRules();
+  const qa=[[QT.filter(r=>r.mon==='Delayed').length,'QCTO monitoring Delayed','From the QCTO Projects Tracker','bad','qcto'],[QT.filter(r=>r.sor==='Issued'&&r.book==='Pending Booking').length,'SOR issued, EISA not booked','Registration closes '+fmtD(QWIN[0][3]),'warn','qcto'],[LEI.filter(l=>l[2].length).length,'LEISA stage 2 fields missing','AssessmentCentreCode not filled in','warn','eisa'],[VER.filter(r=>r[11]<7).length,'Exit verifications awaiting SoRs','Legacy SETA programmes','warn','modver']];
+  $('alerts').insertAdjacentHTML('afterbegin',qa.map(([c,t,s,k,h])=>`<a href="#${h}"><span class="count b-${k}">${c}</span><span style="flex-grow:1"><b style="display:block">${t}</b><span class="sub">${s}</span></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4B5A6E" stroke-width="2" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></a>`).join(''));
+  renderQ();renderE();renderM();renderA();renderLeg();renderVT();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="live.js"></script>
+</body>
+</html>
