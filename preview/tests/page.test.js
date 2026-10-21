@@ -3,9 +3,9 @@ const { JSDOM } = require('jsdom');
 const XLSX = require('xlsx');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '')
+  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '')
   .replace(/<link[^>]+fonts[^>]+>/g, '');
-const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8');
+const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8');
 
 const DATA = {
   learners: [{ id: 1, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009087' }, { id: 2, first_name: 'Test', last_name: 'Learner02', id_number: null }, { id: 3, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009081' }],
@@ -26,6 +26,10 @@ const DATA = {
   assessors: [{ id: 1, full_name: 'Fac One', role: 'Facilitator' }],
   v_fam_completeness: [{ assessor_id: 1, full_name: 'Fac One', document_count: 2, registration_count: 1, open_follow_ups: 0 }],
   v_learner_data_quality: [{ learner_id: 2, issue: 'missing_id', first_name: 'Test', last_name: 'Learner02', enrolment_count: 0 }, { learner_id: 1, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 1 }, { learner_id: 3, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 0 }],
+  program_modules: [{ id: 200, programme_id: 100, module_number: 1, title: 'Mod one', dates: 'Jun 2026', trained: true, components: [{ code: 'T-KM-01', kind: 'KM', title: 'Know', hours: 10, facilitator_id: 1 }, { code: 'T-PM-01', kind: 'PM', title: 'Do', hours: null, facilitator_id: 1 }, { code: 'T-WM-01', kind: 'WM', title: 'Work', hours: 5 }] }],
+  attendance_sessions: [{ id: 300, programme_id: 100, session_date: '2026-06-10', topic: 'Day 1', fields: { Module: 1 } }],
+  attendance: [{ id: 400, programme_id: 100, learner_id: 1, session_date: '2026-06-10', status: 'Present' }],
+  eisa: [{ id: 500, programme_id: 100, learner_id: 1, module_number: 1, km_result: 'C', pm_result: 'C', wm_result: 'C', fields: { 'Internal moderation': 'Yes' } }],
   clickup_sync_outbox: [{ id: 1, status: 'queued' }, { id: 2, status: 'succeeded' }, { id: 3, status: 'quarantined', last_error: 'ClickUp API 400' }]
 };
 
@@ -35,7 +39,7 @@ function fakeSupabase(log, opts) {
     const st = { table, op: 'select' };
     const p = {
       select() { return p; }, order() { return p; }, limit() { return p; }, eq(k, v) { st.eq = [k, v]; return p; },
-      update(v) { st.op = 'update'; st.val = v; return p; }, insert(v) { st.op = 'insert'; st.val = v; return p; },
+      update(v) { st.op = 'update'; st.val = v; return p; }, insert(v) { st.op = 'insert'; st.val = v; return p; }, upsert(v, o) { st.op = 'upsert'; st.val = v; st.eq = ['onConflict', o && o.onConflict]; return p; },
       then(res) { if (st.op !== 'select') log.push({ table, op: st.op, val: st.val, eq: st.eq }); const fail = opts.fail && opts.fail === table && st.op !== 'select';
         return Promise.resolve(fail ? { data: null, error: { message: 'denied by RLS' } } : { data: st.op === 'select' ? JSON.parse(JSON.stringify(DATA[table] || [])) : [], error: null }).then(res); }
     };
@@ -205,6 +209,40 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('Legacy check: search by title as well as ID', async () => {
     const { w, d } = await boot(sess('qa_specialist')); await tick(); d.getElementById('legq').value = 'wealth'; w.renderLeg();
     ok(/57608/.test(d.getElementById('legres').textContent), 'title search');
+  });
+  /* ---------- Delivery screens (delivery.js) ---------- */
+  await t('Programmes: real list, header, KPIs and module progress', async () => {
+    const { w, d } = await boot(sess('project_manager')); w.location.hash = 'programmes'; await tick();
+    ok(/PM Cohort/.test(d.getElementById('plist').textContent) && d.querySelector('#view-programmes h1').textContent === 'PM Cohort', 'list/header');
+    ok(/100%/.test(d.getElementById('pstats').textContent) && /Mod one/.test(d.getElementById('modrows').textContent) && /1 of 1/.test(d.getElementById('modrows').textContent), d.getElementById('pstats').textContent);
+  });
+  await t('Form 3: modules from the database, missing hours flagged, hours save, export', async () => {
+    const { w, d, log } = await boot(sess('project_manager')); w.eval("pTab='Form 3'"); w.renderProg(); await tick();
+    const f3 = d.getElementById('form3'); ok(!f3.hidden && /T-KM-01/.test(f3.textContent) && /Fac One/.test(f3.innerHTML) && /On FAM registry/.test(f3.textContent), 'form 3 content');
+    await w.dvComp(200, 1, 'hours', '40'); await tick();
+    const u = log.find(x => x.table === 'program_modules'); ok(u && u.val.components[1].hours === 40 && u.val.components[0].hours === 10, JSON.stringify(u));
+    ok(/^Form3-101869-PM-Cohort\.doc$/.test(w.dvForm3Export()), 'export name');
+  });
+  await t('Attendance: register reads P/Present, a tap upserts the next letter', async () => {
+    const { w, d, log } = await boot(sess('qa_specialist')); w.location.hash = 'attendance'; await tick();
+    const b = d.querySelector('#register button[aria-label*="10/06/2026"]'); ok(b && b.textContent === 'P', 'cell');
+    await w.dvMark(1, '2026-06-10'); await tick();
+    const u = log.find(x => x.table === 'attendance'); ok(u && u.op === 'upsert' && u.val.status === 'R' && u.val.tenant_id === 'apex-preview' && u.eq[1] === 'tenant_id,learner_id,programme_id,session_date', JSON.stringify(u));
+  });
+  await t('Attendance: operations sees the register read only', async () => {
+    const { w, d } = await boot(sess('operations')); w.location.hash = 'attendance'; await tick();
+    ok(!d.querySelector('#register button') && d.getElementById('dvadd').hidden, 'operations can edit');
+  });
+  await t('PoE tracker: result and moderation tick upsert one eisa row per module', async () => {
+    const { w, log } = await boot(sess('qa_specialist')); await tick();
+    await w.dvRes2(1, 1, 'PM', 'RW'); await w.dvMod(1, 1, false); await tick();
+    const u = log.filter(x => x.table === 'eisa'); ok(u.length === 2 && u[0].val.pm_result === 'RW' && u[0].val.km_result === 'C' && u[1].val.fields['Internal moderation'] === 'No' && u[0].eq[1] === 'learner_id,programme_id,module_number', JSON.stringify(u));
+  });
+  await t('EISA readiness: six criteria from results, moderation and SoR', async () => {
+    const { w, d } = await boot(sess('qa_specialist')); w.eval("eTab='Readiness'"); w.renderE(); await tick();
+    ok(/Ready/.test(d.getElementById('eisarows').textContent) && d.getElementById('eisarows').querySelectorAll('.b-ok.dot').length === 6, d.getElementById('eisarows').textContent);
+    await w.dvRes2(1, 1, 'WM', 'NS'); w.renderE();
+    ok(/Not yet/.test(d.getElementById('eisarows').textContent), 'NS should block readiness');
   });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })();

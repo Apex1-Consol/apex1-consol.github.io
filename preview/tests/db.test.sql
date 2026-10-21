@@ -104,6 +104,43 @@ do $$ declare n int; begin
   insert into _r(test,ok) values ('outbox idempotent by event_key', n=1);
 end $$;
 
+-- 12 EISA windows + LEISA tables: QA writes (audited); operations and PM cannot; anon cannot read
+select pg_temp.as_user('preview.qa@apexu.co.za', array['qa_specialist'], 'apex-preview'); set local role authenticated;
+do $$ declare n int; a0 int; begin
+  insert into eisa_windows(label,eisa_date,registration_closing) values ('[TEST] window','2027-06-10','2027-04-29');
+  insert into _r(test,ok) values ('QA can add an EISA window', true);
+  update leisa_settings set compiler_name='Test Compiler QA'; get diagnostics n = row_count;
+  insert into _r(test,ok) values ('QA can edit LEISA settings', n>=1);
+  select count(*) into a0 from audit_log;
+  update leisa_learner set fields = fields || '{"LearnerCellPhoneNumber":"0820000000"}' where id=(select min(id) from leisa_learner); get diagnostics n = row_count;
+  insert into _r(test,ok) values ('QA can edit LEISA learner fields', n=1);
+  insert into _r(test,ok) values ('LEISA learner edit audited', (select count(*) from audit_log) > a0);
+end $$;
+reset role;
+do $$ declare r text; e text; begin
+  foreach r in array array['operations','project_manager'] loop
+    perform pg_temp.as_user('preview.'||r||'@apexu.co.za', array[r], 'apex-preview');
+    execute 'set local role authenticated';
+    declare n1 int; n2 int; n3 int; begin
+      update eisa_windows set label=label; get diagnostics n1 = row_count;
+      update leisa_settings set compiler_name='x'; get diagnostics n2 = row_count;
+      update leisa_learner set fields='{}'::jsonb; get diagnostics n3 = row_count;
+      insert into _r(test,ok) values (r||' cannot edit EISA windows / LEISA (0 rows)', n1+n2+n3=0);
+      insert into _r(test,ok) values (r||' can still read EISA windows', (select count(*) from eisa_windows)>0);
+    end;
+    begin insert into eisa_windows(label,eisa_date,registration_closing) values ('x','2027-01-01','2026-12-01'); insert into _r(test,ok) values (r||' cannot add an EISA window', false);
+    exception when insufficient_privilege then insert into _r(test,ok) values (r||' cannot add an EISA window', true); end;
+    execute 'reset role';
+  end loop;
+end $$;
+do $$ declare t text; begin
+  foreach t in array array['eisa_windows','leisa_settings','leisa_learner'] loop
+    execute 'set local role anon';
+    begin execute format('select count(*) from %I', t); execute 'reset role'; insert into _r(test,ok) values ('anon cannot read '||t, false);
+    exception when insufficient_privilege then execute 'reset role'; insert into _r(test,ok) values ('anon cannot read '||t, true); end;
+  end loop;
+end $$;
+
 -- Report and undo in one step: the exception aborts the transaction, so nothing persists.
 do $$ declare m text; begin
   select case when bool_and(ok) then 'ALL DB TESTS PASSED ('||count(*)||')' else 'FAILED: '||string_agg(test, '; ') filter (where not ok) end into m from _r;
