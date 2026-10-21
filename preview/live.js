@@ -10,6 +10,8 @@
     liveRef: 'nducwhlmudksgxggjrbo'
   };
   if (CFG.url.includes(CFG.liveRef)) throw Error('Preview must never point at the live project');
+  // Messages from this layer are real, so drop the mock's " (mock)" suffix.
+  const toast = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
   const sb = window.supabase.createClient(CFG.url, CFG.key);
   window.__sb = sb;
   const P = { user: null, roles: [], tenant: null, data: {} };
