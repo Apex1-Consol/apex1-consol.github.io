@@ -105,18 +105,19 @@ do $$ declare n int; begin
 end $$;
 
 -- 12 EISA windows + LEISA tables: QA writes (audited); operations and PM cannot; anon cannot read
+-- (QA cannot read audit_log, so the audit count is taken as the owner before and after)
+create temp table _a on commit drop as select count(*) n from audit_log where table_name='leisa_learner';
 select pg_temp.as_user('preview.qa@apexu.co.za', array['qa_specialist'], 'apex-preview'); set local role authenticated;
-do $$ declare n int; a0 int; begin
+do $$ declare n int; begin
   insert into eisa_windows(label,eisa_date,registration_closing) values ('[TEST] window','2027-06-10','2027-04-29');
   insert into _r(test,ok) values ('QA can add an EISA window', true);
   update leisa_settings set compiler_name='Test Compiler QA'; get diagnostics n = row_count;
   insert into _r(test,ok) values ('QA can edit LEISA settings', n>=1);
-  select count(*) into a0 from audit_log;
   update leisa_learner set fields = fields || '{"LearnerCellPhoneNumber":"0820000000"}' where id=(select min(id) from leisa_learner); get diagnostics n = row_count;
   insert into _r(test,ok) values ('QA can edit LEISA learner fields', n=1);
-  insert into _r(test,ok) values ('LEISA learner edit audited', (select count(*) from audit_log) > a0);
 end $$;
 reset role;
+insert into _r(test,ok) select 'LEISA learner edit audited', (select count(*) from audit_log where table_name='leisa_learner') > (select n from _a);
 do $$ declare r text; e text; begin
   foreach r in array array['operations','project_manager'] loop
     perform pg_temp.as_user('preview.'||r||'@apexu.co.za', array[r], 'apex-preview');
