@@ -87,10 +87,10 @@
   async function loadAll() {
     P.errors = {};
     const R = sb.schema('reports');
-    const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports] = await Promise.all([
+    const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa] = await Promise.all([
       q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email').order('last_name')),
       q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at')),
-      q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id')),
+      q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider')),
       q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager')),
       q('qcto_tracker', sb.from('qcto_tracker').select('*').order('id')),
       q('moderation_items', sb.from('moderation_items').select('*').order('id')),
@@ -103,9 +103,12 @@
       q('v_fam_completeness', sb.from('v_fam_completeness').select('*')),
       isAdmin() ? q('v_learner_data_quality', sb.from('v_learner_data_quality').select('*')) : [],
       can('project_manager', 'operations') ? q('outbox', sb.from('clickup_sync_outbox').select('id,source_table,status,last_error').order('id', { ascending: false }).limit(500)) : [],
-      q('reports', R.rpc('my_report_queue', { p_limit: 60 }))
+      q('reports', R.rpc('my_report_queue', { p_limit: 60 })),
+      q('eisa_windows', sb.from('eisa_windows').select('*').order('eisa_date')),
+      q('leisa_settings', sb.from('leisa_settings').select('*')),
+      q('leisa_learner', sb.from('leisa_learner').select('*'))
     ]);
-    Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports });
+    Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa });
     applyAll();
     const bad = Object.keys(P.errors);
     if (bad.length) toast('Could not load: ' + bad.join(', '));
@@ -118,6 +121,7 @@
   function applyAll() {
     applyDashboard(); applyLearners(); applyEnrolments(); applyTracker(); applyModVer(); applyAccred();
     applyDQ(); applySignoff(); applyVisits(); applyRecs(); applyFam(); applyClients(); applySync();
+    if (window.previewQA) window.previewQA(); // QA/ETQA screens (qa.js)
     renderNav(curNav);
   }
   function afterRoute(r) { if (r === 'learners') renderLearners(); if (r === 'dq') renderDQ(); if (r === 'signoff') renderSO(); }

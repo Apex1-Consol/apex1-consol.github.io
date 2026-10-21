@@ -869,7 +869,7 @@ function renderE(){
 /* Moderation & Verification: three sheets from the workbook */
 let mTab='External moderation';
 const LEG={57918:['INSETA','National Certificate: Short Term Insurance','Yes','24 Months'],57608:['INSETA','National Certificate: Wealth Management','Yes','24 Months'],59201:['SERVICES SETA / MQA','National Certificate: Generic Management','Yes','24 / 12 Months'],23655:['SERVICES SETA','National Certificate: Business Administration Services','Yes','24 Months'],49648:['SERVICES SETA','National Certificate: New Venture Creation (SMME)','Yes','24 Months'],66249:['SERVICES SETA','FETC: New Venture Creation','Yes','12 Months'],58206:['W&RSETA','National Certificate: Wholesale and Retail Operations','Yes','12 Months']};
-const legB=q=>{const id=(String(q).match(/\d{5}/)||[])[0];return id&&LEG[id]?`<span class="badge b-warn" title="Pre-2009 list: ${LEG[id][0]}">Legacy · extended ${LEG[id][3]}</span>`:''};
+const legB=q=>{const id=(String(q).match(/\b\d{5,6}\b/)||[])[0];return id&&LEG[id]?`<span class="badge ${LEG[id][2]==='Yes'?'b-warn':'b-bad'}" title="Pre-2009 list: ${esc(LEG[id][0])}">Legacy · ${LEG[id][2]==='Yes'?'extended '+esc(LEG[id][3]||''):'not extended'}</span>`:''};
 const MSTAGE=['Documents requested','Online documents submitted','Follow-up sent','Exit verification application in progress','Exit verification booked','Exit verification done','Awaiting verification report','SoRs received','Certificates received','Submitted to PM','On hold'];
 const MOD=[['Apex Business Academy','[PM 1]','[Client A]','Learnership','57608: NC: Wealth Management','5',5,'Group 1','Employed','2024-01-01','2025-02-01','Online','[Facilitator]','[Assessor]','[Moderator]','INSETA',3,'2026-09-30'],
  ['Catalyst AI (Pty) Ltd','[PM 2]','[Client B]','Skills Programme','SP: Cyber Security (12891, 13107)','5',15,'Cohort 1','Employed','2024-01-01','2024-04-01','Online','[Facilitator]','[Assessor]','[Moderator]','MICT SETA',2,'2026-01-06'],
@@ -986,6 +986,8 @@ function learnerRules(){return `<div class="row">
 })();
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js"></script>
+<script src="qa.js"></script>
 </body>
 </html>

@@ -1,19 +1,24 @@
 // Preview page tests (jsdom + a fake Supabase client). Run: node page.test.js
 const { JSDOM } = require('jsdom');
+const XLSX = require('xlsx');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/, '').replace('<script src="live.js"></script>', '')
+  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '')
   .replace(/<link[^>]+fonts[^>]+>/g, '');
-const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8');
+const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8');
 
 const DATA = {
   learners: [{ id: 1, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009087' }, { id: 2, first_name: 'Test', last_name: 'Learner02', id_number: null }, { id: 3, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009081' }],
   enrolments: [{ id: 10, learner_id: 1, programme_id: 100, status: 'active', created_at: '2026-06-05' }],
-  programmes: [{ id: 100, programme_name: 'PM Cohort', client_id: 7, saqa_id: '101869', nqf_level: '5', status: 'active', start_date: '2026-06-05', end_date: '2028-05-05', facilitator_id: 1 }],
+  programmes: [{ id: 100, provider: 'apex', programme_name: 'PM Cohort', client_id: 7, saqa_id: '101869', nqf_level: '5', status: 'active', start_date: '2026-06-05', end_date: '2028-05-05', facilitator_id: 1 }],
   clients: [{ id: 7, client_name: 'Client A', project_manager: 'PM 1' }],
   qcto_tracker: [{ id: 50, learner_id: 1, programme_id: 100, enrolment_id: 10, current_status: 'In Progress', monitoring_status: 'Delayed', sor_status: 'Issued', eisa_booking_status: 'Pending Booking' }],
-  moderation_items: [{ id: 60, sheet: 'External moderation', qualification: '57608: NC: Wealth Management', stage: 'Documents requested', learners: 4 }, { id: 61, sheet: 'Exit verification', qualification: 'BA', stage: 'Awaiting verification report', learners: 15 }],
-  accreditation_items: [{ id: 1, saqa_id: '118699', title: 'Cloud Administrator', status: 'Accreditation granted' }],
+  moderation_items: [{ id: 60, sheet: 'External moderation', qualification: '57608: NC: Wealth Management', stage: 'Documents requested', learners: 4 }, { id: 61, sheet: 'Exit verification', qualification: 'BA', stage: 'Awaiting verification report', learners: 15 },
+    { id: 62, sheet: 'QCTO projects', programme_id: 100, qualification: '101869 - Project Manager', learners: 1, entity: 'Apex Business Academy' }],
+  accreditation_items: [{ id: 1, saqa_id: '118699', title: 'Cloud Administrator', status: 'Accreditation granted', accreditation_from: '2025-08-29' }],
+  eisa_windows: [{ id: 1, label: 'Official EISA', eisa_date: '2099-11-12', registration_closing: '2099-10-30' }, { id: 2, label: 'Official EISA', eisa_date: '2100-03-10', registration_closing: '2100-01-29' }],
+  leisa_settings: [{ provider: 'apex', sdp_name: 'Apex Business Academy (Pty) Ltd', sdp_code: '07-QCTO/SDP000000000001', compiler_name: 'Test Compiler' }],
+  leisa_learner: [{ learner_id: 1, programme_id: 100, fields: { LearnerEmailAddress: 'a b@example.test', LearnerCellPhoneNumber: '08212345678', LearnerFaxNumber: 'NA' } }],
   legacy_qualifications: [{ saqa_id: '57608', quality_partner: 'INSETA', title: 'NC: Wealth Management', extended: true, extension: '24 Months' }],
   signoff_items: [{ id: 70, kind: 'Visit report', title: 'VIS draft', status: 'waiting', created_at: '2026-10-20' }],
   monitoring_visits: [{ id: 80, programme_id: 100, fields: { 'Visit Title': 'Impl visit', Scores: { KMA3: 2 } } }],
@@ -53,6 +58,7 @@ async function boot(session, opts = {}) {
   w.matchMedia = () => ({ matches: false }); w.scrollTo = () => {};
   w.supabase = { createClient: () => fakeSupabase(log, { session, ...opts }) };
   if (opts.cfg) w.PREVIEW_CFG = opts.cfg;
+  const files = []; w.XLSX = Object.assign({}, XLSX, { writeFile: (wb, name) => files.push({ wb, name }) }); w.__files = files;
   const s = w.document.createElement('script'); s.textContent = live;
   let err = null; w.addEventListener('error', e => { err = e.error; });
   w.document.body.appendChild(s);
@@ -138,6 +144,67 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('Sync panel hidden for roles that cannot read the outbox', async () => {
     const { d } = await boot(sess('qa_specialist')); ok(d.getElementById('syncbox').hidden, 'QA sees outbox');
+  });
+  /* ---------- QA / ETQA module (qa.js) ---------- */
+  const rows = (f, sheet) => XLSX.utils.sheet_to_json(f.wb.Sheets[sheet], { header: 1, raw: true, defval: '' });
+  await t('Tracker: dates and comments save to their own columns; SOR Issued fills its date', async () => {
+    const { w, log } = await boot(sess('qa_specialist')); w.location.hash = 'qcto'; await tick();
+    await w.qaT(0, 'monD', '2026-10-01'); await w.qaT(0, 'cm', 'PoE outstanding'); await w.qSet(0, 'sor', 'Pending'); await w.qSet(0, 'sor', 'Issued'); await tick();
+    const u = log.filter(x => x.table === 'qcto_tracker').map(x => x.val);
+    ok(u.some(v => v.monitoring_date === '2026-10-01') && u.some(v => v.comments === 'PoE outstanding') && u.some(v => v.sor_issued_date), JSON.stringify(u));
+  });
+  await t('Tracker: upcoming EISA windows come from the database', async () => {
+    const { w, d } = await boot(sess('qa_specialist')); await tick();
+    ok(w.eval('QWIN[0][1]') === '2099-11-12' && /12\/11\/2099/.test(d.getElementById('qtable').textContent), 'windows not used');
+  });
+  await t('Tracker: export has the 25 tracker columns and the full ID as text', async () => {
+    const { w } = await boot(sess('qa_specialist')); await tick(); w.qaExportTracker();
+    const f = w.__files[0], r = rows(f, 'QCTO Projects'); ok(/^QCTO_Projects_Tracker_/.test(f.name), f.name);
+    ok(r[0].length === 25 && r[0][24] === 'Comments' && r[1][7] === '9001015009087' && f.wb.Sheets['QCTO Projects'].H2.t === 's', JSON.stringify(r[1]));
+  });
+  await t('Tracker: operations role sees values, not edit boxes', async () => {
+    const { d, w } = await boot(sess('operations')); w.location.hash = 'qcto'; await tick();
+    ok(!d.querySelector('#qtable input.cellin'), 'operations can edit dates');
+  });
+  await t('Moderation: QCTO projects sheet edits mentor; Submitted to PM moves to Projects completed', async () => {
+    const { w, d, log } = await boot(sess('qa_specialist')); w.eval("mTab='QCTO projects'"); w.renderM();
+    ok(/101869/.test(d.getElementById('mtable').textContent), 'QCTO projects sheet empty');
+    await w.qaM(62, 'mentor', 'Test Mentor'); await w.mSet('VER', 0, String(w.eval("MSTAGE.indexOf('Submitted to PM')"))); await tick();
+    const u = log.filter(x => x.table === 'moderation_items').map(x => x.val);
+    ok(u.some(v => v.mentor === 'Test Mentor') && u.some(v => v.sheet === 'Projects completed' && v.submitted_to_pm_date), JSON.stringify(u));
+  });
+  await t('Moderation: workbook export has the five sheets of External Moderation – 2026', async () => {
+    const { w } = await boot(sess('qa_specialist')); await tick(); w.qaExportModeration();
+    ok(w.__files[0].wb.SheetNames.length === 5 && w.__files[0].wb.SheetNames[1] === 'QCTO Projects', JSON.stringify(w.__files[0].wb.SheetNames));
+  });
+  await t('Accreditation: a date change writes the date and the matching Feedback line', async () => {
+    const { w, log } = await boot(sess('qa_specialist')); await tick(); await w.qaA(1, 'accreditation_to', '2030-08-28'); await tick();
+    const u = log.find(x => x.table === 'accreditation_items'); ok(u && u.val.accreditation_to === '2030-08-28' && u.val.feedback === 'Accreditation Granted (29/08/2025 – 28/08/2030)', JSON.stringify(u));
+  });
+  await t('Accreditation: project manager sees the status, cannot change it', async () => {
+    const { d, w } = await boot(sess('project_manager')); w.location.hash = 'accred'; await tick();
+    ok(!d.querySelector('#atable select') && /Accreditation granted/.test(d.getElementById('atable').textContent), 'PM has a status picker');
+  });
+  await t('LEISA: field check finds the same problems as the March file', async () => {
+    const { w } = await boot(sess('qa_specialist')); await tick(); const [a, b] = w.qaLeisaCheck(1, 100);
+    ok(a.includes('LearnerEmailAddress: contains a space') && a.includes('LearnerCellPhoneNumber: 11 digits, needs 10') && b.includes('AssessmentCentreCode'), JSON.stringify([a, b]));
+  });
+  await t('LEISA: stage 1 export is blocked while errors exist; forced file follows the QCTO template', async () => {
+    const { w } = await boot(sess('qa_specialist')); await tick(); w.eval("eTab='LEISA file'"); w.renderE();
+    w.qaExportLeisa(1); ok(!w.__files.length && /errors for stage 1/.test(w.document.getElementById('toast').textContent), 'not blocked');
+    w.qaExportLeisa(1, true); const f = w.__files[0], r = rows(f, '2 - Learner Enrolment and EISA.');
+    ok(/^LEISA\d{8}-SDP000000000001Apex_Business_Academy_Pty_Ltd\.xlsx$/.test(f.name), f.name);
+    ok(r[0].length === 43 && r[0][38] === 'AssessmentCentreCode' && r[1][0] === '07-QCTO/SDP000000000001' && r[1][2] === '9001015009087' && r[1][29] === 'N/A' && r[1].slice(36, 42).every(x => x === '') && /^\d{8}$/.test(r[1][42]), JSON.stringify(r[1]));
+    ok(rows(f, '1 - Instructions').some(x => x[0] === 'Name and Surname of Compiler:' && x[1] === 'Test Compiler'), 'details block');
+  });
+  await t('LEISA: saving a learner’s fields writes them to leisa_learner', async () => {
+    const { w, d, log } = await boot(sess('qa_specialist'), {}); await tick(); w.eval("eTab='LEISA file'"); w.qaLeisaPick(1);
+    d.querySelector('#leisaedit [data-col="AssessmentCentreCode"]').value = 'AC123'; await w.qaLeisaSave(); await tick();
+    const u = log.find(x => x.table === 'leisa_learner'); ok(u && u.op === 'update' && u.val.fields.AssessmentCentreCode === 'AC123', JSON.stringify(u));
+  });
+  await t('Legacy check: search by title as well as ID', async () => {
+    const { w, d } = await boot(sess('qa_specialist')); await tick(); d.getElementById('legq').value = 'wealth'; w.renderLeg();
+    ok(/57608/.test(d.getElementById('legres').textContent), 'title search');
   });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })();
