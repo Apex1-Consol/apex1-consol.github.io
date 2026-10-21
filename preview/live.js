@@ -73,6 +73,10 @@
       document.querySelector('.me .avatar').textContent = (P.user.email || '?')[0].toUpperCase();
       document.querySelector('.me div div').textContent = P.user.email;
       document.querySelector('.me div div+div').textContent = (P.roles.join(', ') || 'no role') + ' · PREVIEW';
+      const now = new Date(), h = now.getHours(), who = (P.user.email || '').split(/[@+.]/)[0];
+      const g = $('greet'), gd = $('greetdate');
+      if (g) g.textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who[0].toUpperCase() + who.slice(1) : '');
+      if (gd) gd.textContent = now.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
       await loadAll();
     }
     window.route();
@@ -277,7 +281,13 @@
 
   /* ---------- Recommendations (writes resolved) ---------- */
   function applyRecs() {
-    RECS.length = 0; P.data.recs.forEach(r => RECS.push([r.fields?.KMA || 'KMA', r.fields?.Text || 'Recommendation', r.fields?.Priority || 'Medium', r.resolved ? 1 : 0, 0, r.id]));
+    const kmaName = k => (typeof KMAS !== 'undefined' && KMAS.find(x => x[0] === k)?.[1]) || '';
+    const fmtDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
+    RECS.length = 0; P.data.recs.forEach(r => {
+      const f = r.fields || {}, due = fmtDate(f.Due), bits = [r.programme_id ? esc(progName(r.programme_id)) : '', due ? 'Due ' + due : 'No due date', r.owner_email ? 'Owner ' + esc(r.owner_email) : 'No owner'].filter(Boolean);
+      RECS.push([f.KMA || 'KMA', kmaName(f.KMA) || 'Key monitoring area', f.Priority || 'Medium', r.resolved ? 1 : 0, 0, r.id,
+        { text: esc(f.Text || 'Recommendation'), sub: bits.join(' · ') + (r.resolved && r.resolved_at ? ' · Resolved ' + fmtDate(r.resolved_at) : '') }]);
+    });
     renderRecs();
     document.querySelectorAll('#reclist button').forEach(b => { b.onclick = null; });
   }

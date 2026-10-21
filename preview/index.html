@@ -201,7 +201,7 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
     <!-- DASHBOARD -->
     <main id="view-dashboard" hidden>
       <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px">
-        <div style="flex-grow:1"><p class="sub" style="margin:0">Wednesday, 21 October 2026</p><h1 style="font-size:30px;margin-top:4px">Good morning, Stavros</h1></div>
+        <div style="flex-grow:1"><p class="sub" style="margin:0" id="greetdate">Wednesday, 21 October 2026</p><h1 style="font-size:30px;margin-top:4px" id="greet">Good morning, Stavros</h1></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="toast('Snapshot exported')">Export snapshot</button><a class="btn y" href="#programmes">+ New programme</a></div>
       </div>
       <div class="grid" id="kpis"></div>
@@ -644,13 +644,13 @@ let rF='Open';
 const RECS=[['KMA3','Assessment Strategy','High',0,1],['KMA6','E-learning','Medium',0,1],['KMA2','Human Resources','Medium',0,0],['KMA1','Programme Implementation','Low',1,0]];
 function renderRecs(){
   $('recfilter').innerHTML=['Open','Resolved','All'].map(s=>`<button class="${s===rF?'on':''}" onclick="rF='${s}';renderRecs()">${s}</button>`).join('');
-  $('reclist').innerHTML=RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3]).map(([c,d,p,res,ai],i)=>`<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
+  $('reclist').innerHTML=RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3]).map(([c,d,p,res,ai,,m],i)=>`<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
     <div style="flex:1 1 380px;display:flex;flex-direction:column;gap:6px">
       <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span class="badge b-n">${c} · ${d}</span><span class="badge ${p==='High'?'b-bad':p==='Medium'?'b-warn':'b-n'}">${p} priority</span>${ai?'<span class="tag" style="font-size:10px">AI drafted</span>':''}</div>
-      <b style="font-size:15px">[Recommendation text — what the provider must put right, in one or two sentences.]</b>
-      <span class="sub">From <a href="#visit">VIS-015</a> · [Programme name] · Due [Date]</span>
+      <b style="font-size:15px">${m?m.text:'[Recommendation text — what the provider must put right, in one or two sentences.]'}</b>
+      <span class="sub">${m?m.sub:'From <a href="#visit">VIS-015</a> · [Programme name] · Due [Date]'}</span>
     </div>
-    <div style="display:flex;gap:8px">${res?'<span class="badge b-ok" style="font-size:13px;padding:8px 12px">Resolved</span>':`<button class="btn sm" onclick="RECS[${RECS.indexOf(RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3])[i])}][3]=1;renderRecs();toast('Marked resolved')">Mark resolved</button>`}</div>
+    <div style="display:flex;gap:8px">${res?'<span class="badge b-ok" style="font-size:13px;padding:8px 12px">Resolved</span>':`<button class="btn sm y" onclick="RECS[${RECS.indexOf(RECS.filter(r=>rF==='All'||(rF==='Resolved')===!!r[3])[i])}][3]=1;renderRecs();toast('Marked resolved')">Mark resolved</button>`}</div>
   </article>`).join('')||'<p class="sub">Nothing here.</p>';
 }
 renderRecs();
