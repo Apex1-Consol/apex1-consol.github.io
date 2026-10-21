@@ -49,14 +49,24 @@
     if (error) form.insertAdjacentHTML('beforeend', `<div class="err" role="alert">${esc(error.message)}</div>`);
   };
   form.querySelector('.ts').textContent = 'Preview project · test data only';
-  document.querySelector('.me a[href="#login"]').onclick = async e => { e.preventDefault(); await sb.auth.signOut(); };
+  // Sign out must never wait on the auth lock: clear the local session first, then tell the server in the background.
+  function hardSignOut() {
+    P.user = null; P.roles = []; P.tenant = null;
+    try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token$/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (_) {}
+    sb.auth.signOut({ scope: 'local' }).catch(() => {});
+    if (location.hash !== '#login') location.hash = 'login'; else window.route();
+  }
+  document.querySelector('.me a[href="#login"]').onclick = e => { e.preventDefault(); hardSignOut(); };
 
-  sb.auth.onAuthStateChange(async (_e, session) => {
+  // Supabase holds its auth lock while this callback runs, so awaiting other sb calls inside it can deadlock.
+  // Defer the real work to the next tick.
+  sb.auth.onAuthStateChange((_e, session) => { setTimeout(() => onAuth(session), 0); });
+  async function onAuth(session) {
     P.user = session?.user || null;
     const am = P.user?.app_metadata || {};
     P.roles = Array.isArray(am.role) ? am.role : am.role ? [am.role] : [];
     P.tenant = am.tenant || null;
-    if (P.user && !P.tenant) { toast('This account is not on the preview allow-list'); await sb.auth.signOut(); return; }
+    if (P.user && !P.tenant) { toast('This account is not on the preview allow-list'); hardSignOut(); return; }
     if (P.user) {
       document.querySelector('.me .avatar').textContent = (P.user.email || '?')[0].toUpperCase();
       document.querySelector('.me div div').textContent = P.user.email;
@@ -64,7 +74,7 @@
       await loadAll();
     }
     window.route();
-  });
+  }
 
   /* ---------- reads ---------- */
   async function q(name, p) { const r = await p; if (r.error) { P.errors[name] = r.error.message; return []; } return r.data || []; }
