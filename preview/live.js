@@ -36,7 +36,7 @@
   window.route = function () {
     const r = location.hash.slice(1) || 'login';
     if (!P.user && r !== 'login') { location.hash = 'login'; return; }
-    if (P.user && r === 'login') { location.hash = 'dashboard'; return; }
+    if (P.user && r === 'login') { location.hash = 'mywork'; return; }
     _route();
     if (P.user) afterRoute(r);
   };
@@ -127,6 +127,7 @@
     applyDQ(); applySignoff(); applyVisits(); applyRecs(); applyFam(); applyClients(); applySync();
     if (window.previewQA) window.previewQA(); // QA/ETQA screens (qa.js)
     if (window.previewDelivery) window.previewDelivery(); // Programmes, Attendance & PoE, EISA readiness (delivery.js)
+    if (window.previewShell) window.previewShell(); // My work, side panel (shell.js)
     renderNav(curNav);
   }
   function afterRoute(r) { if (r === 'learners') renderLearners(); if (r === 'dq') renderDQ(); if (r === 'signoff') renderSO(); }
@@ -335,5 +336,5 @@
   }
 
   /* banner */
-  document.body.insertAdjacentHTML('afterbegin', '<div id="pvbanner" style="position:sticky;top:0;z-index:50;background:#FBDC00;color:#002C5B;font-weight:700;text-align:center;padding:6px 12px;font-size:13px">PREVIEW · separate test project · test data only · live ApexOne is unchanged</div>');
+  document.body.insertAdjacentHTML('afterbegin', '<div id="pvbanner" style="position:sticky;top:0;z-index:50;background:#FBDC00;color:#25247B;font-weight:700;text-align:center;padding:6px 12px;font-size:13px">PREVIEW · separate test project · test data only · live ApexOne is unchanged</div>');
 })();

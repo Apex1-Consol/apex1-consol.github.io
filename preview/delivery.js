@@ -32,6 +32,7 @@
   const kindsOf = m => { const k = KINDS.filter(x => (m.components || []).some(c => c.kind === x)); return k.length ? k : KINDS; };
   const modOfSession = s => +(s.fields?.Module || 0) || null;
   const name = l => esc(l.first_name + ' ' + l.last_name);
+  const lnk = l => `<button type="button" class="lname" onclick="shOpen(${dProg},${l.id})">${name(l)}</button>`;
   const client = p => (D().clients || []).find(c => c.id === p?.client_id);
   const months = p => p?.start_date && p?.end_date ? (new Date(p.end_date) - new Date(p.start_date)) / (30.4 * 864e5) : 12;
   const absenceLimit = p => months(p) >= 12 ? 5 : 3;            // induction pack: 5 days (12-month), 3 days (3-month)
@@ -72,6 +73,8 @@
 
   /* ---------- Programmes ---------- */
   const PST = { Active: s => s === 'active', Planned: s => ['initiated', 'handed_over', 'planned', 'draft'].includes(s), Completed: s => ['closed', 'completed'].includes(s) };
+  // shared with shell.js (My work, side panel)
+  window.dvApi = { readiness, why, learnersOf, modsOf, sessOf, attFor, resFor, kindsOf, attendance, absenceLimit, prog, progs, AT, COL, KINDS, KLAB, RLAB, setProg: id => { dProg = id; } };
   window.dvProg = id => { dProg = id; pTab = 'Overview'; renderProg(); };
   window.dvGo = (hash, tab) => { if (hash === 'attendance') aTab = tab; if (hash === 'eisa') eTab = tab; location.hash = hash; setTimeout(() => { if (hash === 'attendance') renderAtt(); if (hash === 'eisa') renderE(); }, 0); };
   const _renderProg = renderProg;
@@ -186,7 +189,7 @@
       const cells = ss.map(s => { const v = AT(attFor(p.id, l.id, s.session_date)?.status); if (v) { rec++; if (v !== 'A') here++; if (v === 'A') ab++; }
         const [bg, fg] = v ? SC[v] : ['var(--soft)', 'var(--muted)'];
         return `<td style="text-align:center;padding:8px 4px">${ed ? `<button aria-label="${name(l)} ${fmtD(day(s.session_date))}: ${v || 'not recorded'}" onclick="dvMark(${l.id},'${day(s.session_date)}')" style="width:36px;height:36px;border:0;border-radius:8px;font-weight:700;background:${bg};color:${fg}">${v || '·'}</button>` : `<span class="dot" style="width:32px;height:32px;background:${bg};color:${fg}">${v || '·'}</span>`}</td>`; }).join('');
-      return `<tr><td style="font-weight:600">${name(l)}</td>${cells}<td style="font-weight:600">${rec ? pct(here, rec) + '%' : '—'}</td><td>${ab > lim ? `<span class="badge b-bad">${ab} · over ${lim}</span>` : ab}</td></tr>`; }).join('')}</tbody>`;
+      return `<tr><td style="font-weight:600">${lnk(l)}</td>${cells}<td style="font-weight:600">${rec ? pct(here, rec) + '%' : '—'}</td><td>${ab > lim ? `<span class="badge b-bad">${ab} · over ${lim}</span>` : ab}</td></tr>`; }).join('')}</tbody>`;
     if (!ss.length) $('register').insertAdjacentHTML('beforeend', `<tbody><tr><td colspan="3" class="sub">No sessions yet.${ed ? ' Use “+ Add session”.' : ''}</td></tr></tbody>`);
     // PoE tracker: module results per part + internal moderation (feeds EISA readiness)
     const ms = modsOf(p.id);
@@ -198,7 +201,7 @@
     $('poetable').innerHTML = !ms.length ? '<tbody><tr><td class="sub">No modules set up for this programme yet.</td></tr></tbody>'
       : `<thead><tr><th rowspan="2">Learner</th>${ms.map(m => `<th colspan="${kindsOf(m).length + 1}" style="text-align:center;border-left:1px solid var(--line)">Module ${m.module_number}</th>`).join('')}</tr>
         <tr>${ms.map(m => kindsOf(m).map((k, i) => `<th${i ? '' : ' style="border-left:1px solid var(--line)"'}>${KLAB[k]}</th>`).join('') + '<th>Moderated</th>').join('')}</tr></thead>
-        <tbody>${ls.map(l => `<tr><td style="font-weight:600">${name(l)}</td>${ms.map(m => kindsOf(m).map(k => cell(l, m, k)).join('') + modc(l, m)).join('')}</tr>`).join('')}</tbody>`;
+        <tbody>${ls.map(l => `<tr><td style="font-weight:600">${lnk(l)}</td>${ms.map(m => kindsOf(m).map(k => cell(l, m, k)).join('') + modc(l, m)).join('')}</tr>`).join('')}</tbody>`;
   };
   window.dvAddToggle = () => { addOpen = !addOpen; renderAtt(); };
   window.dvAddSession = async () => {
@@ -242,7 +245,7 @@
     $('eisakpis').innerHTML = [['Ready for EISA', short(0), 'var(--ok)'], ['One criterion short', short(1), 'var(--warn)'], ['Two or more short', R.filter(([, r]) => r.c.filter(x => !x).length >= 2).length, 'var(--bad)'], ['EISA booked', R.filter(([, r]) => r.booked).length, 'var(--ink)']]
       .map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span><span class="n sub">of ${ls.length} learners</span></div>`).join('');
     $('eisarows').innerHTML = R.map(([l, r]) => { const ok = r.c.every(Boolean);
-      return `<tr><td style="font-weight:600">${name(l)}</td>${r.c.map((x, i) => `<td><span class="dot ${x ? 'b-ok' : 'b-bad'}" style="width:24px;height:24px" title="${why[i]}" aria-label="${x ? 'Met' : 'Not met'}: ${why[i]}">${x ? '✓' : '✕'}</span></td>`).join('')}
+      return `<tr><td style="font-weight:600">${lnk(l)}</td>${r.c.map((x, i) => `<td><span class="dot ${x ? 'b-ok' : 'b-bad'}" style="width:24px;height:24px" title="${why[i]}" aria-label="${x ? 'Met' : 'Not met'}: ${why[i]}">${x ? '✓' : '✕'}</span></td>`).join('')}
         <td>${ok ? `<span class="badge b-ok">Ready${r.booked ? ' · booked' : ''}</span>` : '<span class="badge b-warn">Not yet</span>'}</td></tr>`; }).join('')
       || '<tr><td colspan="8" class="sub">No learners enrolled on this programme.</td></tr>';
     const sub = document.querySelector('#eisaready .card .sub');

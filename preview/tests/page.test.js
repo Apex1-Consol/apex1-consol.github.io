@@ -3,9 +3,9 @@ const { JSDOM } = require('jsdom');
 const XLSX = require('xlsx');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '')
+  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '').replace('<script src="shell.js"></script>', '')
   .replace(/<link[^>]+fonts[^>]+>/g, '');
-const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8');
+const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'shell.js'), 'utf8');
 
 const DATA = {
   learners: [{ id: 1, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009087' }, { id: 2, first_name: 'Test', last_name: 'Learner02', id_number: null }, { id: 3, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009081' }],
@@ -231,7 +231,24 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('Attendance: operations sees the register read only', async () => {
     const { w, d } = await boot(sess('operations')); w.location.hash = 'attendance'; await tick();
-    ok(!d.querySelector('#register button') && d.getElementById('dvadd').hidden, 'operations can edit');
+    ok(!d.querySelector('#register button:not(.lname)') && d.getElementById('dvadd').hidden, 'operations can edit');
+  });
+  await t('My work: role tasks, admin can view as PM, hide for today', async () => {
+    const { w, d } = await boot(sess(['admin'])); w.location.hash = 'mywork'; await tick();
+    ok(!d.getElementById('view-mywork').hidden, 'My work not shown');
+    ok(d.getElementById('mwroles').querySelectorAll('button').length === 3, 'no View as switch for admin');
+    w.mwRoleSet('pm'); const n = d.querySelectorAll('#mwtasks .mwtask').length;
+    ok(n > 0 && /module/.test(d.getElementById('mwtasks').textContent), 'no PM tasks: ' + d.getElementById('mwtasks').textContent.slice(0, 120));
+    d.querySelector('#mwtasks input').click(); ok(/1 selected/.test(d.getElementById('mwhead').textContent), 'bulk bar missing');
+    w.mwHide(); ok(d.querySelectorAll('#mwtasks .mwtask').length === n - 1, 'task not hidden');
+  });
+  await t('Side panel: learner name opens details; menu closes to a rail', async () => {
+    const { w, d } = await boot(sess(['admin'])); w.location.hash = 'eisa'; await tick();
+    const b = d.querySelector('#eisarows .lname'); ok(b, 'no learner link'); b.click();
+    ok(!d.getElementById('rpanel').hidden && /EISA checklist/.test(d.getElementById('rpbody').textContent), 'panel not opened');
+    w.shTab('Assistant'); ok(/switched off in the preview/.test(d.getElementById('rpbody').textContent), 'assistant note missing');
+    w.toggleRail(false); ok(d.getElementById('shell').classList.contains('rail'), 'rail not applied');
+    w.toggleRail(true); ok(!d.getElementById('shell').classList.contains('rail'), 'menu not reopened');
   });
   await t('PoE tracker: result and moderation tick upsert one eisa row per module', async () => {
     const { w, log } = await boot(sess('qa_specialist')); await tick();
