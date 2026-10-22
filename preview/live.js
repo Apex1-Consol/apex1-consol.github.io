@@ -128,6 +128,7 @@
     if (window.previewQA) window.previewQA(); // QA/ETQA screens (qa.js)
     if (window.previewDelivery) window.previewDelivery(); // Programmes, Attendance & PoE, EISA readiness (delivery.js)
     if (window.previewShell) window.previewShell(); // My work, side panel (shell.js)
+    if (window.previewAdmin) window.previewAdmin(); // PM Tracker, Assessors, Consolidated view, Sync health, Audit, Users (admin.js)
     renderNav(curNav);
   }
   function afterRoute(r) { if (r === 'learners') renderLearners(); if (r === 'dq') renderDQ(); if (r === 'signoff') renderSO(); }
