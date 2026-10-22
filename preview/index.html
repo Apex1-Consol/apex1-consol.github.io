@@ -111,6 +111,12 @@ label.f input,label.f select{height:44px;border:1px solid var(--border2);border-
 .toast.show{opacity:1}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
 [hidden]{display:none!important}
+.login .brand.hero1{align-items:center;justify-content:center;text-align:center;gap:0}
+.hero1 .hmark{height:132px;width:auto;margin-bottom:28px}
+.hero1 h1{font-family:Montserrat,inherit;font-size:48px;font-weight:700;line-height:1.1;margin:0;color:#fff;letter-spacing:-.01em}
+.hero1 .hrule{width:56px;height:5px;border-radius:3px;background:var(--yellow);margin:18px 0 14px}
+.hero1 p{margin:0;font-size:18px;color:#C9C8EC}
+@media (max-width:860px){.login .brand.hero1{flex-basis:100%;padding:36px 24px;flex-direction:row;flex-wrap:wrap;gap:0 16px}.hero1 .hmark{height:64px;margin:0}.hero1 h1{font-size:30px}.hero1 .hrule{display:none}.hero1 p{flex-basis:100%;font-size:15px;margin-top:6px}}
 @media (max-width:640px){main{padding:20px 16px 40px}.top{padding:12px 16px}.login .brand{padding:32px 24px}}
 .paper .btn{background:#fff;color:#3A3994;border-color:#C5CDD7}
 .iconbtn{position:relative;color:var(--ink)}
@@ -232,14 +238,11 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
 
 <!-- LOGIN -->
 <div id="view-login" class="login">
-  <section class="brand">
-    <span class="logo"><span class="aologo" style="--h:56px"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%2230%2065%20330%20312%22%3E%3Cpath%20d%3D%22M55%20215a140%20140%200%201%200%20280%200a140%20140%200%201%200%20-280%200Z%20M93%20215a102%20102%200%201%200%20204%200a102%20102%200%201%200%20-204%200Z%22%20fill%3D%22%23FBDC00%22%20fill-rule%3D%22evenodd%22/%3E%3Cpath%20d%3D%22M195%20105L345%20365H45Z%20M195%20175L292%20335H98Z%20M195%20245L240%20320H150Z%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2218%22/%3E%3C/svg%3E" alt="" height="56"><span class="wm">APEX<small>ONE</small></span></span></span>
-    <div style="margin-top:auto;display:flex;flex-direction:column;gap:16px;max-width:520px">
-      <span style="width:56px;height:6px;border-radius:3px;background:var(--yellow)"></span>
-      <h1 style="font-size:44px;line-height:1.15">Unlimited Potential</h1>
-      <p style="margin:0;font-size:17px;line-height:1.6;color:#E4E4F4">ApexOne brings programmes, learners, monitoring and practitioner compliance into one workspace.</p>
-    </div>
-    <div class="chips"><span>Programmes</span><span>Monitoring</span><span>FAM Registry</span><span>Reporting</span></div>
+  <section class="brand hero1">
+    <img class="hmark" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%2230%2065%20330%20312%22%3E%3Cpath%20d%3D%22M55%20215a140%20140%200%201%200%20280%200a140%20140%200%201%200%20-280%200Z%20M93%20215a102%20102%200%201%200%20204%200a102%20102%200%201%200%20-204%200Z%22%20fill%3D%22%23FBDC00%22%20fill-rule%3D%22evenodd%22/%3E%3Cpath%20d%3D%22M195%20105L345%20365H45Z%20M195%20175L292%20335H98Z%20M195%20245L240%20320H150Z%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2218%22/%3E%3C/svg%3E" alt="ApexOne">
+    <h1>ApexOne</h1>
+    <span class="hrule"></span>
+    <p>One workspace.</p>
   </section>
   <section class="formside">
     <form onsubmit="event.preventDefault();location.hash='dashboard'">
