@@ -127,6 +127,7 @@
     applyDQ(); applySignoff(); applyVisits(); applyRecs(); applyFam(); applyClients(); applySync();
     if (window.previewQA) window.previewQA(); // QA/ETQA screens (qa.js)
     if (window.previewDelivery) window.previewDelivery(); // Programmes, Attendance & PoE, EISA readiness (delivery.js)
+    if (window.previewFam) window.previewFam(); // FAM Registry (fam.js)
     if (window.previewShell) window.previewShell(); // My work, side panel (shell.js)
     if (window.previewAdmin) window.previewAdmin(); // PM Tracker, Assessors, Consolidated view, Sync health, Audit, Users (admin.js)
     renderNav(curNav);

@@ -3,9 +3,9 @@ const { JSDOM } = require('jsdom');
 const XLSX = require('xlsx');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '').replace('<script src="shell.js"></script>', '')
+  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="fam.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '').replace('<script src="shell.js"></script>', '')
   .replace(/<link[^>]+fonts[^>]+>/g, '');
-const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'shell.js'), 'utf8');
+const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'fam.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'shell.js'), 'utf8');
 
 const DATA = {
   learners: [{ id: 1, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009087' }, { id: 2, first_name: 'Test', last_name: 'Learner02', id_number: null }, { id: 3, first_name: 'Test', last_name: 'Learner01', id_number: '9001015009081' }],
@@ -23,7 +23,12 @@ const DATA = {
   signoff_items: [{ id: 70, kind: 'Visit report', title: 'VIS draft', status: 'waiting', created_at: '2026-10-20' }],
   monitoring_visits: [{ id: 80, programme_id: 100, fields: { 'Visit Title': 'Impl visit', Scores: { KMA3: 2 } } }],
   recommendations: [{ id: 90, programme_id: 100, resolved: false, fields: { KMA: 'KMA3', Text: 'Fix strategy', Priority: 'High' } }],
-  assessors: [{ id: 1, full_name: 'Fac One', role: 'Facilitator' }],
+  assessors: [{ id: 1, full_name: 'Fac One', role: 'Facilitator' }, { id: 2, full_name: 'Ass Two', role: 'Assessor' }, { id: 3, full_name: 'No Reg', role: 'Facilitator' }],
+  fam_seta_registrations: [{ id: 11, assessor_id: 1, seta_name: 'ETDP SETA', roles: ['Facilitator'], status: 'Active', registration_expiry_date: new Date(Date.now() + 400 * 864e5).toISOString().slice(0, 10) },
+    { id: 12, assessor_id: 2, seta_name: 'MICT SETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 10) }],
+  fam_documents: [{ id: 21, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: false, version: 1, file_url: 'apex/1/old.pdf' }, { id: 22, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: true, version: 2, file_url: 'apex/1/cv.pdf' },
+    { id: 23, assessor_id: 2, doc_type: 'SLA', status: 'Missing', is_current: true, version: 1 }],
+  fam_follow_ups: [{ id: 31, assessor_id: 2, source_type: 'registration', source_id: 12, kind: 'expired', status: 'Open' }],
   v_fam_completeness: [{ assessor_id: 1, full_name: 'Fac One', document_count: 2, registration_count: 1, open_follow_ups: 0 }],
   v_learner_data_quality: [{ learner_id: 2, issue: 'missing_id', first_name: 'Test', last_name: 'Learner02', enrolment_count: 0 }, { learner_id: 1, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 1 }, { learner_id: 3, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 0 }],
   program_modules: [{ id: 200, programme_id: 100, module_number: 1, title: 'Mod one', dates: 'Jun 2026', trained: true, components: [{ code: 'T-KM-01', kind: 'KM', title: 'Know', hours: 10, facilitator_id: 1 }, { code: 'T-PM-01', kind: 'PM', title: 'Do', hours: null, facilitator_id: 1 }, { code: 'T-WM-01', kind: 'WM', title: 'Work', hours: 5 }] }],
@@ -46,6 +51,7 @@ function fakeSupabase(log, opts) {
     return p;
   };
   return {
+    storage: { from: b => ({ async upload(path) { log.push({ upload: b, path }); return { data: { path }, error: null }; }, async createSignedUrl(path) { log.push({ sign: path }); return { data: { signedUrl: 'about:blank' }, error: null }; } }) },
     from: chain, schema: () => ({ rpc: async () => ({ data: [], error: null }), from: chain }),
     rpc: async (fn, args) => { log.push({ rpc: fn, args }); return opts.failRpc ? { data: null, error: { message: 'Only an admin can sign off' } } : { data: {}, error: null }; },
     auth: {
@@ -260,6 +266,31 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(/Ready/.test(d.getElementById('eisarows').textContent) && d.getElementById('eisarows').querySelectorAll('.b-ok.dot').length === 6, d.getElementById('eisarows').textContent);
     await w.dvRes2(1, 1, 'WM', 'NS'); w.renderE();
     ok(/Not yet/.test(d.getElementById('eisarows').textContent), 'NS should block readiness');
+  });
+  await t('FAM: computed status, expiry KPIs, filters and next action', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    const k = d.getElementById('famkpis').textContent.replace(/\s/g, '');
+    ok(/Practitioners3/.test(k) && /Registrations2/.test(k) && /Expired1/.test(k) && /Openfollow-ups1/.test(k), k);
+    const rows = d.getElementById('famrows').textContent;
+    ok(/No registrations/.test(rows) && /Expired/.test(rows) && /Renew MICT SETA \(expired\)/.test(rows) && /Add a SETA registration/.test(rows), rows);
+    w.famFilter('expired'); ok(d.querySelectorAll('#famrows tr').length === 1, 'filter');
+    w.famFilter('expired'); ok(d.querySelectorAll('#famrows tr').length === 3, 'unfilter');
+  });
+  await t('FAM: panel shows versions; claim upserts follow-up; view signs URL', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.eval('famSel=0'); w.renderFam();
+    ok(/1 older/.test(d.getElementById('fampanel').textContent) && /v2/.test(d.getElementById('fampanel').textContent), d.getElementById('fampanel').textContent);
+    await w.famView(22); ok(log.some(x => x.sign === 'apex/1/cv.pdf'), 'no signed url');
+    await w.famFU('claim', 'registration', 12, 2, 'expired');
+    const u = log.find(x => x.table === 'fam_follow_ups'); ok(u && u.op === 'upsert' && u.val.status === 'In Progress' && u.eq[1] === 'tenant_id,assessor_id,source_type,source_id', JSON.stringify(u));
+  });
+  await t('FAM: add registration needs a role, then inserts', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.famReg(3); const f = d.getElementById('famform'); f.elements.seta_name.value = 'ETDP SETA';
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    ok(/at least one role/.test(d.getElementById('famerr').textContent), 'no role check');
+    f.elements.r_Assessor.checked = true; f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick(); await tick();
+    const u = log.find(x => x.table === 'fam_seta_registrations'); ok(u && u.val.assessor_id === 3 && u.val.roles.join() === 'Assessor', JSON.stringify(u));
   });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })();
