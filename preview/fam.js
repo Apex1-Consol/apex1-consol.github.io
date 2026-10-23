@@ -270,6 +270,7 @@
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regBlock(a, false)}</div>
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${docBlock(a)}</div>
+        <p class="sub" style="margin:0;font-size:12px;border-top:1px solid var(--line2);padding-top:10px">Personal information (POPIA). Use it only for compliance work and don't share it outside ApexU. ID numbers show only on the full profile.</p>
       </div>`;
   }
 
