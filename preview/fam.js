@@ -52,6 +52,14 @@
   const RANK = { expired: 0, mixed: 1, due_soon: 2, needs_review: 3, inactive: 4, unknown: 5, active: 6 };
   const GROUPS = { expired: ['Expired', 'var(--bad)', 'Renew now'], mixed: ['Mixed', 'var(--bad)', 'At least one registration needs action'], due_soon: ['Due soon', '#E0A100', 'Start the renewal'], needs_review: ['Needs review', 'var(--navy2)', 'Registration details not captured'], inactive: ['Inactive', 'var(--muted)', ''], unknown: ['No registrations', 'var(--muted)', 'Add one or mark inactive'], active: ['Active', 'var(--ok)', 'Registered; check documents'] };
   const pill = s => { const [c, l] = PILL[s] || PILL.unknown; return `<span class="badge ${c}">${l}</span>`; };
+  /* "Mixed" says nothing on its own: name the registrations that need action instead */
+  const stPill = id => {
+    const s = status(id); if (s !== 'mixed') return pill(s);
+    const st = regsFor(id).map(risk), n = k => st.filter(x => k.includes(x)).length;
+    const [c, l] = n(['expired']) ? ['b-bad', `${n(['expired'])} expired`] : n(['due_30', 'due_60']) ? ['b-warn', `${n(['due_30', 'due_60'])} due soon`]
+      : n(['pending']) ? ['b-warn', `${n(['pending'])} to capture`] : ['b-warn', `${n(['inactive'])} inactive`];
+    return `<span class="badge ${c}" title="${st.length} registrations, not all active">${l}</span>`;
+  };
   const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Pending entry'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };
   const roles = id => [...new Set(regsFor(id).flatMap(r => r.roles?.length ? r.roles : r.role ? [r.role] : []))];
@@ -193,7 +201,7 @@
         <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
-        <td>${pill(status(a.id))}${complHtml(a.id)}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
+        <td>${stPill(a.id)}${complHtml(a.id)}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
     }).join('') : empty(cw ? 7 : 6);
     finishRows(all, list, pages);
   }
@@ -327,6 +335,7 @@
     if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
     const ids = rows().map(([, i]) => i), pos = ids.indexOf(famSel), hist = S.ptab === 'history';
     const dr = box.parentElement, shut = !S.open || pos < 0;
+    const top = ($('pvbanner')?.offsetHeight || 0) + 'px'; dr.style.top = $('fambk').style.top = top;
     dr.classList.toggle('open', !shut); $('fambk').hidden = shut; if (shut) { S.open = false; box.innerHTML = ''; return; }
     const ev = hist ? activity(a) : [];
     box.innerHTML = `<div class="famnav"><span class="sub">${pos >= 0 ? `${pos + 1} of ${ids.length} in this list` : 'Not in the current list'}</span>
@@ -334,7 +343,7 @@
       <div class="famhead"><span class="disp" style="font-size:20px">${isTest(a) ? '<span class="famtag" style="background:#3A3994;color:#fff">TEST</span>' : ''}${e(shownName(a))}</span>
         <span style="font-size:13px;color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button></div></div>
       <div class="famtabs" role="tablist" style="padding:0 20px"><button role="tab" aria-selected="${!hist}" class="${hist ? '' : 'on'}" onclick="famPTab('record')">Record</button><button role="tab" aria-selected="${hist}" class="${hist ? 'on' : ''}" onclick="famPTab('history')">History</button></div>
       ${hist ? `<div style="padding:12px 20px 16px">${ev.length ? ev.map(([t, l]) => `<div class="famev"><span class="sub">${fmt(t)}</span><span>${e(l)}</span></div>`).join('') : '<div class="sub">No changes recorded yet.</div>'}
         <p class="sub" style="margin:10px 0 0;font-size:12px">Built from registrations, documents and follow-ups, newest first.</p></div>` : `${nextBox(a)}
@@ -394,7 +403,7 @@
     box.innerHTML = `<a href="#fam" class="famback">← FAM Registry</a>
       <section class="card famphead"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start"><div style="flex-grow:1;display:flex;flex-direction:column;gap:4px">
           <span class="disp" style="font-size:24px">${e(a.full_name)}</span><span style="color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
-          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<span class="famscore">${c.score}% complete</span></div></div>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<span class="famscore">${c.score}% complete</span></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button></div></div>
         <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', a.id_number)}${kv('Address', a.physical_address)}</div></section>
       <div class="famtabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" onclick="famTab('${k}')">${l}</button>`).join('')}</div>
