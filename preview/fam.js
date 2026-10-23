@@ -17,7 +17,7 @@
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'status', dir: 1 }, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
+  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, view: 'triage', hideTest: false, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -90,23 +90,30 @@
   const complHtml = id => { const c = compl(id); return c.complete ? '<div class="famok">✓ Profile complete</div>' : `<div class="sub famgap">${e(c.gaps.join(' · '))}</div>`; };
 
   /* ---------- KPIs (click to filter) ---------- */
-  const allRisks = () => S.R.map(risk);
+  const isTest = a => /^\s*\[TEST\]/i.test(a.full_name || '');
+  const shownName = a => (a.full_name || '').replace(/^\s*\[TEST\]\s*/i, '');
+  const vis = () => S.hideTest ? S.A.filter(a => !isTest(a)) : S.A;
+  const visR = () => { const ids = new Set(vis().map(a => a.id)); return S.R.filter(r => ids.has(r.assessor_id)); };
+  const allRisks = () => visR().map(risk);
   const KPIS = () => [
-    ['', 'Practitioners', S.A.length, 'var(--ink)'],
-    ['', 'Registrations', S.R.length, 'var(--ink)'],
     ['active', 'Active', allRisks().filter(s => s === 'active').length, 'var(--ok)'],
     ['expired', 'Expired', allRisks().filter(s => s === 'expired').length, 'var(--bad)'],
     ['due_30', 'Due ≤30 days', allRisks().filter(s => s === 'due_30').length, 'var(--bad)'],
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
     ['pending', 'Pending entry', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
-    ['missing', 'Missing docs', S.A.filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
-    ['followups', 'Open follow-ups', S.F.filter(f => !CLOSED.includes(f.status)).length, 'var(--ink)'],
-    ['incomplete', 'Incomplete profiles', S.A.filter(a => !compl(a.id).complete).length, 'var(--warn)']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : regsFor(a.id).some(r => risk(r) === k);
-  window.famFilter = k => { S.filter = S.filter === k ? '' : k; render(); };
-  window.famSearch = v => { S.q = v.toLowerCase(); renderRows(); };
+    ['missing', 'Missing docs', vis().filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
+    ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
+    ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
+    ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
+  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
+  window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
   window.famSort = k => { S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderRows(); };
+  window.famMode = v => { S.view = v; S.page = 0; renderFam(); };
+  window.famTest = () => { S.hideTest = !S.hideTest; S.page = 0; S.sel.clear(); render(); };
+  window.famPage = d => { S.page = Math.max(0, S.page + d); renderRows(); };
+  window.famPTab = t => { S.ptab = t; renderPanel(); };
   window.famOpen = id => { location.hash = 'fam/' + id; };
 
   /* ---------- list ---------- */
@@ -116,29 +123,84 @@
     docs: a => onFile(a.id).length,
     status: a => RANK[status(a.id)] * 1000 + (100 - compl(a.id).score)
   };
-  function rows() {
-    const k = SORT[S.sort.k] || SORT.name;
-    return S.A.map((a, i) => [a, i])
-      .filter(([a]) => matches(a, S.filter) && (!S.q || a.full_name.toLowerCase().includes(S.q) || setas(a.id).join(' ').toLowerCase().includes(S.q)))
-      .sort(([x], [y]) => { const p = k(x), q = k(y); return (p < q ? -1 : p > q ? 1 : 0) * S.sort.dir; });
+  const WRANK = ['expired', 'due_30', 'due_60', 'pending', 'none', 'active', 'inactive'];
+  const WGRP = { expired: ['Expired', 'var(--bad)', 'Renew now'], due_30: ['Due in 30 days', 'var(--bad)', 'Start the renewal'], due_60: ['Due in 31–60 days', '#E0A100', 'Plan the renewal'], pending: ['Registration not captured', 'var(--navy2)', 'Details still to enter'], none: ['No registration', 'var(--muted)', 'Add one or mark inactive'], active: ['Active', 'var(--ok)', 'Registered; check documents'], inactive: ['Inactive', 'var(--muted)', ''] };
+  const worst = a => { const st = regsFor(a.id).map(risk); return st.length ? WRANK.find(k => st.includes(k)) : 'none'; };
+  function when(a) {
+    const w = worst(a);
+    if (w === 'none') return ['No registration', 'color:var(--muted)'];
+    if (w === 'inactive') return ['Inactive', 'color:var(--muted)'];
+    if (w === 'pending') return ['Details not captured', 'color:var(--navy2);font-weight:600'];
+    const r = nextExp(a.id);
+    if (!r) return ['No expiry on record', 'color:#8A5100;font-weight:600'];
+    const d = days(r);
+    if (d < 0) return [`Expired ${-d} days ago`, 'color:var(--bad);font-weight:700'];
+    if (d <= 60) return [`${d} days left · ${fmt(r.registration_expiry_date)}`, `color:${d <= 30 ? 'var(--bad)' : '#8A5100'};font-weight:700`];
+    return [fmt(r.registration_expiry_date), ''];
   }
+  function rowAction(a) {
+    if (!canWrite()) return '';
+    const w = worst(a), r = regsFor(a.id).find(x => risk(x) === w), miss = TYPES.length - onFile(a.id).length;
+    if (['expired', 'due_30', 'due_60'].includes(w)) return 'Renew ' + String(r?.seta_name || '').replace(/\s+SETA$/i, '');
+    if (w === 'pending') return 'Capture registration';
+    if (w === 'none') return 'Add registration';
+    if (w === 'inactive') return 'Review';
+    return miss ? `Request ${miss} doc${miss > 1 ? 's' : ''}` : '';
+  }
+  function rows() {
+    const k = SORT[S.sort.k] || SORT.name, q = S.q;
+    const hit = a => !q || [a.full_name, rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
+    const list = S.A.map((a, i) => [a, i]).filter(([a]) => (!S.hideTest || !isTest(a)) && matches(a, S.filter) && hit(a));
+    if (S.view === 'triage') return list.sort(([x], [y]) => WRANK.indexOf(worst(x)) - WRANK.indexOf(worst(y)) || dataFlags(y).length - dataFlags(x).length || x.full_name.localeCompare(y.full_name));
+    return list.sort(([x], [y]) => { const p = k(x), r = k(y); return (p < r ? -1 : p > r ? 1 : 0) * S.sort.dir; });
+  }
+  window.famClearAll = () => { S.filter = ''; S.q = ''; S.page = 0; const i = $('famq'); if (i) i.value = ''; render(); };
+  window.famMove = d => { const ids = rows().map(([, i]) => i); if (!ids.length) return; const p = ids.indexOf(famSel); famSel = ids[p < 0 ? 0 : (p + d + ids.length) % ids.length]; renderFam(); };
+  const PER = 50;
   const th = (k, l) => `<th${k ? ` aria-sort="${S.sort.k === k ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')">${l}${S.sort.k === k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`;
   function renderRows() {
-    const list = rows(), cw = canWrite();
-    $('famhead').innerHTML = `<tr>${cw ? `<th style="width:28px"><input type="checkbox" aria-label="Select all shown" onchange="famSelAll(this.checked)" ${list.length && list.every(([a]) => S.sel.has(a.id)) ? 'checked' : ''}></th>` : ''}${th('name', 'Practitioner')}<th>SETA coverage</th>${th('expiry', 'Next expiry')}${th('docs', 'Documents')}${th('status', 'Status')}<th>Next action</th></tr>`;
-    const grouped = S.sort.k === 'status' && S.sort.dir > 0;
-    $('famrows').innerHTML = list.length ? list.map(([a, i], n) => {
+    const all = rows(), cw = canWrite(), tri = S.view === 'triage', pages = Math.max(1, Math.ceil(all.length / PER));
+    if (S.page >= pages) S.page = pages - 1;
+    const list = all.slice(S.page * PER, S.page * PER + PER);
+    const meter = a => { const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)'; return `<span class="bar" style="width:56px"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span>`; };
+    const tag = a => isTest(a) ? '<span class="famtag">TEST</span>' : '';
+    const flag = a => { const n = dataFlags(a).length; return n ? `<span class="famflag" title="Data to tidy: ${e(dataFlags(a).join('; '))}">⚑ ${n}</span>` : ''; };
+    const empty = c => `<tr><td colspan="${c}" class="sub" style="padding:20px">No practitioners match${S.filter || S.q ? '. <a href="#" onclick="famClearAll();return false">Clear filters</a>' : '.'}</td></tr>`;
+    $('famv-t').className = tri ? 'on' : ''; $('famv-t').setAttribute('aria-pressed', tri);
+    $('famv-l').className = tri ? '' : 'on'; $('famv-l').setAttribute('aria-pressed', !tri);
+    $('famtest').textContent = S.hideTest ? 'Show test records' : 'Hide test records';
+    if (tri) {
+      $('famhead').innerHTML = '';
+      $('famrows').innerHTML = list.length ? list.map(([a, i], n) => {
+        const g = worst(a), gn = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g).length : 0, w = when(a), act = rowAction(a), st = [...new Set(regsFor(a.id).map(r => r.seta_name === 'N/A' ? 'SETA not named' : r.seta_name === 'Pending Entry' ? 'Not captured yet' : r.seta_name).filter(Boolean))];
+        return (gn ? `<tr class="famgh"><td colspan="4"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${gn}</span><span class="sub">${WGRP[g][2]}</span></td></tr>` : '') +
+          `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famSel=${i};renderFam()">
+          <td><button class="famname" onclick="event.stopPropagation();famSel=${i};renderFam()" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
+          <td><div style="${w[1]}">${e(w[0])}</div><div class="sub famclip">${e(st.join(', ') || '—')}</div></td>
+          <td class="famdocs" style="white-space:nowrap">${meter(a)}</td>
+          <td style="text-align:right">${act ? `<button class="famact" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`;
+      }).join('') : empty(4);
+      finishRows(all, list, pages);
+      return;
+    }
+    $('famhead').innerHTML = `<tr>${cw ? `<th style="width:28px"><input type="checkbox" aria-label="Select all shown" onchange="famSelAll(this.checked)" ${all.length && all.every(([a]) => S.sel.has(a.id)) ? 'checked' : ''}></th>` : ''}${th('name', 'Practitioner')}<th>SETA coverage</th>${th('expiry', 'Next expiry')}${th('docs', 'Documents')}${th('status', 'Status')}<th>Next action</th></tr>`;
+    $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
-      const gs = status(a.id), gn = grouped && (n === 0 || status(list[n - 1][0].id) !== gs) ? list.filter(([b]) => status(b.id) === gs).length : 0;
-      const gh = gn ? `<tr class="famgh"><td colspan="${cw ? 7 : 6}"><span class="famgd" style="background:${GROUPS[gs] ? GROUPS[gs][1] : 'var(--muted)'}"></span>${GROUPS[gs] ? GROUPS[gs][0] : e(gs)}<span class="famgn">${gn}</span><span class="sub">${GROUPS[gs] ? GROUPS[gs][2] : ''}</span></td></tr>` : '';
-      return gh + `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
-        <td><button class="famname" onclick="famSel=${i};renderFam()">${e(a.full_name)}</button><div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
+      return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
+        <td><button class="famname" onclick="famSel=${i};renderFam()">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
         <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
         <td>${pill(status(a.id))}${complHtml(a.id)}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
-    }).join('') : `<tr><td colspan="7" class="sub" style="padding:20px">No practitioners match${S.filter ? ' this filter. <a href="#" onclick="famFilter(\'\');return false">Clear filter</a>' : '.'}</td></tr>`;
-    $('famcount').textContent = `${list.length} of ${S.A.length}`;
+    }).join('') : empty(cw ? 7 : 6);
+    finishRows(all, list, pages);
+  }
+  function finishRows(all, list, pages) {
+    $('famcount').textContent = `${all.length} of ${vis().length} practitioners${S.filter || S.q ? ' match' : ''}${S.hideTest ? ' · test records hidden' : ''}`;
+    $('famasof').textContent = S.loadedAt ? `Data loaded ${S.loadedAt} · ↑ ↓ to move between practitioners` : '';
+    $('fampage').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${all.length ? S.page * PER + 1 : 0}–${S.page * PER + list.length} of ${all.length} · ${PER} per page</span>
+      <button class="btn sm" onclick="famPage(-1)" ${S.page ? '' : 'disabled'} aria-label="Previous page">‹</button><span class="sub">Page ${S.page + 1} of ${pages}</span>
+      <button class="btn sm" onclick="famPage(1)" ${S.page < pages - 1 ? '' : 'disabled'} aria-label="Next page">›</button>`;
     renderBulk();
   }
 
@@ -161,8 +223,8 @@
   window.famSelAll = on => { rows().forEach(([a]) => on ? S.sel.add(a.id) : S.sel.delete(a.id)); renderRows(); };
   function renderBulk() {
     const n = S.sel.size, box = $('fambulk'); if (!box) return;
-    box.hidden = !n;
-    if (!n) return;
+    box.hidden = !n || S.view !== 'table' || !canWrite();
+    if (box.hidden) return;
     const open = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status)).length;
     box.innerHTML = `<b>${n} selected</b><span class="sub">${open} open follow-up${open === 1 ? '' : 's'}</span>
       <button class="btn sm" onclick="famBulk('claim')" ${open ? '' : 'disabled'}>Claim follow-ups</button><button class="btn sm" onclick="famBulk('dismiss')" ${open ? '' : 'disabled'}>Dismiss follow-ups</button>
@@ -251,7 +313,7 @@
   }
   function nextBox(a) {
     const nx = nextAction(a), fu = openFU(a.id), fl = dataFlags(a);
-    return `<div class="famnext"><div class="famnl">Next step</div>
+    return `<div class="famstep"><div class="famnl">Next step</div>
       <div>${e(nx === '—' ? 'Nothing due. Registration and documents are complete.' : nx + '.')}</div>
       ${fu.length ? `<div class="sub">Open follow-up: ${e(KIND[fu[0].kind] || fu[0].kind)} (${e(fu[0].status)})</div>` : ''}
       ${fl.length ? `<div class="famtidy"><b>Data to tidy</b>${fl.map(x => `<div>⚑ ${e(x)}</div>`).join('')}</div>` : ''}</div>`;
@@ -261,17 +323,23 @@
   function renderPanel() {
     const a = S.A[famSel] || S.A[0], box = $('fampanel');
     if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
-    box.innerHTML = `<div class="famhead"><span class="disp" style="font-size:20px">${e(a.full_name)}</span>
+    const ids = rows().map(([, i]) => i), pos = ids.indexOf(famSel), hist = S.ptab === 'history';
+    const ev = hist ? activity(a) : [];
+    box.innerHTML = `<div class="famnav"><span class="sub">${pos >= 0 ? `${pos + 1} of ${ids.length} in this list` : 'Not in the current list'}</span>
+        <button class="btn sm" onclick="famMove(-1)" aria-label="Previous practitioner">↑</button><button class="btn sm" onclick="famMove(1)" aria-label="Next practitioner">↓</button></div>
+      <div class="famhead"><span class="disp" style="font-size:20px">${isTest(a) ? '<span class="famtag" style="background:#3A3994;color:#fff">TEST</span>' : ''}${e(shownName(a))}</span>
         <span style="font-size:13px;color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button>
         <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
-      ${nextBox(a)}
+      <div class="famtabs" role="tablist" style="padding:0 20px"><button role="tab" aria-selected="${!hist}" class="${hist ? '' : 'on'}" onclick="famPTab('record')">Record</button><button role="tab" aria-selected="${hist}" class="${hist ? 'on' : ''}" onclick="famPTab('history')">History</button></div>
+      ${hist ? `<div style="padding:12px 20px 16px">${ev.length ? ev.map(([t, l]) => `<div class="famev"><span class="sub">${fmt(t)}</span><span>${e(l)}</span></div>`).join('') : '<div class="sub">No changes recorded yet.</div>'}
+        <p class="sub" style="margin:10px 0 0;font-size:12px">Built from registrations, documents and follow-ups, newest first.</p></div>` : `${nextBox(a)}
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regBlock(a, false)}</div>
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${docBlock(a)}</div>
         <p class="sub" style="margin:0;font-size:12px;border-top:1px solid var(--line2);padding-top:10px">Personal information (POPIA). Use it only for compliance work and don't share it outside ApexU. ID numbers show only on the full profile.</p>
-      </div>`;
+      </div>`}`;
   }
 
   /* ---------- profile page ---------- */
@@ -438,7 +506,7 @@
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`;
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
-    $('famkpis').innerHTML = kgrp(`Registrations · ${S.R.length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${S.A.length}`, ['missing', 'followups', 'incomplete']);
+    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'queue') renderQueue();
   }
@@ -540,7 +608,7 @@
       q('follow-ups', sb.from('fam_follow_ups').select('*')),
       q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
       q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id'))]);
-    Object.assign(S, { A, R, D, F, Q, SC });
+    Object.assign(S, { A, R, D, F, Q, SC, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
     if (famSel < 0 || famSel >= A.length) famSel = 0;
@@ -566,7 +634,22 @@
       .famgd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
       .famgn{margin:0 8px;padding:1px 8px;border-radius:999px;background:var(--line2);letter-spacing:0;text-transform:none}
       tr.famgh .sub{letter-spacing:0;text-transform:none;font-weight:400}
-      .famnext{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
+      .famtool{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+      .famseg{display:flex;background:var(--ground);border-radius:10px;padding:3px}
+      .famseg button{border:0;background:transparent;font:inherit;font-size:13px;font-weight:700;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer}
+      .famseg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+      .famsub{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 16px;border-bottom:1px solid var(--line2);font-size:12px}
+      .fampage{display:flex;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line)}
+      .famtr{cursor:pointer}.famtr:hover td{background:var(--ground)}
+      .famtr.sel td{background:var(--soft)}.famtr.sel td:first-child{box-shadow:inset 4px 0 0 var(--yellow)}
+      .famtag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--muted);background:var(--line2);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+      .famflag{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:#8A5100;background:#FFF3D6;border-radius:4px;padding:1px 5px;vertical-align:1px}
+      .famact{border:0;background:none;font:inherit;font-size:13px;font-weight:700;color:var(--navy2);cursor:pointer;padding:6px 0;white-space:nowrap}
+      .famact:hover{text-decoration:underline}
+      .famclip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+      .famnav{display:flex;gap:6px;align-items:center;padding:10px 20px}.famnav .sub{flex-grow:1;font-size:12px}
+      @media (max-width:720px){#view-fam .famdocs{display:none}.famtool{flex-wrap:wrap}.famtool input{flex:1 1 100%}.famclip{max-width:140px}.famact{white-space:normal;text-align:right}#famkpis .famk{min-width:96px}}
+      .famstep{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
@@ -614,7 +697,12 @@
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';
-    sec.insertAdjacentHTML('afterbegin', `<div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)"><input type="search" placeholder="Search name or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex-grow:1"><span class="sub" id="famcount"></span></div><div id="fambulk" hidden></div>`);
+    sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex-grow:1">
+      <div class="famseg" role="group" aria-label="List view"><button id="famv-t" onclick="famMode('triage')">Triage</button><button id="famv-l" onclick="famMode('table')">Table</button></div>
+      <button class="btn sm" id="famtest" onclick="famTest()">Hide test records</button></div>
+      <div class="famsub"><span class="sub" id="famcount" aria-live="polite"></span><span class="sub" id="famasof"></span></div><div id="fambulk" hidden></div>`);
+    (tbl.parentElement.classList.contains('tw') ? tbl.parentElement : tbl).insertAdjacentHTML('afterend', '<div id="fampage" class="fampage"></div>');
+    sec.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !(ev.target.type === 'checkbox')) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
     v.querySelector('.row').insertAdjacentHTML('beforebegin', '<section class="card" id="famstrip"></section>');
     v.insertAdjacentHTML('beforeend', '<div id="famprof" hidden></div>');
     window.renderFam = () => { renderRows(); renderPanel(); };
