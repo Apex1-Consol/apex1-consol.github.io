@@ -24,7 +24,7 @@
   document.head.insertAdjacentHTML('beforeend', `<style>
   .cellin{height:30px;border:1px solid var(--line);border-radius:6px;padding:0 6px;font:inherit;font-size:13px;background:transparent;color:var(--ink);max-width:100%}
   .cellin:focus{outline:2px solid #FBDC00;outline-offset:1px}
-  #qaov{position:fixed;inset:0;background:rgba(0,20,45,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
+  #qaov{position:fixed;inset:0;background:rgba(1,0,45,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
   #qaov .card{width:min(720px,100%);display:flex;flex-direction:column;gap:12px}
   .qagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
   .qagrid label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
