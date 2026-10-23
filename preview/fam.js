@@ -1,16 +1,22 @@
 /* ApexOne redesign preview — FAM Registry module. Loaded after live.js.
-   Brings the standalone fam-registry.html features into the new layout:
-   expiry KPIs (click to filter), SETA coverage + next action columns, computed status,
-   registrations / follow-ups / versioned document checklist in the side panel,
-   add practitioner, add registration, upload / view (signed URL) / replace documents.
+   List: expiry KPIs (click to filter), 90-day expiry strip, sortable columns, completeness per practitioner,
+   row selection with bulk follow-up actions, Excel export of the filtered or selected list.
+   Side panel: quick view with registrations, follow-ups and the versioned document checklist.
+   Profile page (#fam/<id>, live-style #view=fam&assessor=<id> also works): header with contact details and
+   completeness, tabs for Overview, Registrations (+ qualification scope), Documents, Follow-ups and Activity.
+   Scope Import (#fam/scope): catalogue rows linked to registrations, written to fam_registration_scope + audit_log.
    Status and risk rules are the same as fam-registry.html. Writes go through previewWrite; RLS decides who may write. */
 (function () {
   const sb = window.__sb, P = window.__preview, write = window.previewWrite;
   if (!sb || !P || !write) return;
 
   const TYPES = ['CV', 'ID', 'Highest Qualification', 'QUAL', 'SLA', 'AFFIDAVIT'];
+  // Stored values stay as-is; QUAL files on live are assessor/moderator certificates, SETA registration reports and professional body certificates.
+  const LABEL = { QUAL: 'Practitioner certificate', AFFIDAVIT: 'Affidavit' };
+  const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
+  const lbl = t => LABEL[t] || t;
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-  const S = { A: [], R: [], D: [], F: [], filter: '', q: '', showDismissed: false, hist: {} };
+  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -18,6 +24,8 @@
   const me = () => P.user?.email || null;
   const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
   const e = s => esc(s ?? '');
+  const today = () => new Date().toISOString().slice(0, 10);
+  const CLOSED = ['Dismissed', 'Resolved', 'Done'];
 
   /* ---------- rules (same as fam-registry.html) ---------- */
   const regsFor = id => S.R.filter(r => r.assessor_id === id);
@@ -39,6 +47,7 @@
     return 'active';
   }
   const PILL = { active: ['b-ok', 'Active'], inactive: ['b-bad', 'Inactive'], expired: ['b-bad', 'Expired'], mixed: ['b-warn', 'Mixed'], needs_review: ['b-warn', 'Needs review'], unknown: ['b-n', 'No registrations'] };
+  const RANK = { expired: 0, mixed: 1, needs_review: 2, inactive: 3, unknown: 4, active: 5 };
   const pill = s => { const [c, l] = PILL[s] || PILL.unknown; return `<span class="badge ${c}">${l}</span>`; };
   const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Pending entry'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };
@@ -49,7 +58,10 @@
   const cur = (id, t) => S.D.filter(d => d.assessor_id === id && d.doc_type === t && d.is_current !== false).sort((x, y) => (y.version || 1) - (x.version || 1))[0];
   const onFile = id => TYPES.filter(t => { const c = cur(id, t); return c && c.status !== 'Missing'; });
   const fu = (type, sid) => S.F.find(f => f.source_type === type && f.source_id === sid);
-  const openFU = id => S.F.filter(f => f.assessor_id === id && !['Dismissed', 'Resolved', 'Done'].includes(f.status));
+  const openFU = id => S.F.filter(f => f.assessor_id === id && !CLOSED.includes(f.status));
+  const nextExp = id => regsFor(id).filter(r => r.registration_expiry_date).sort((x, y) => days(x) - days(y))[0];
+  const scopeOf = rid => S.SC.filter(s => s.registration_id === rid);
+  const qual = qid => S.Q.find(q => q.id === qid);
 
   function nextAction(a) {
     const regs = regsFor(a.id), miss = TYPES.length - onFile(a.id).length;
@@ -63,9 +75,19 @@
     return '—';
   }
 
+  /* ---------- completeness: four checks, same gaps as live's v_fam_completeness ---------- */
+  function compl(id) {
+    const regs = regsFor(id).length, docs = onFile(id).length, open = openFU(id).length;
+    const missExp = S.D.filter(d => d.assessor_id === id && d.is_current !== false && (d.status === 'Missing' || (d.expiry_date && d.expiry_date < today()))).length;
+    const miss = TYPES.length - docs;
+    const checks = [[regs > 0, 'no registration'], [!miss, `${miss} document${miss === 1 ? '' : 's'} not on file`], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
+    const gaps = checks.filter(c => !c[0]).map(c => c[1]);
+    return { score: Math.round(checks.filter(c => c[0]).length / checks.length * 100), gaps, complete: !gaps.length };
+  }
+  const complHtml = id => { const c = compl(id); return c.complete ? '<div class="famok">✓ Profile complete</div>' : `<div class="sub famgap">${e(c.gaps.join(' · '))}</div>`; };
+
   /* ---------- KPIs (click to filter) ---------- */
   const allRisks = () => S.R.map(risk);
-  const missingDocsCount = () => S.A.filter(a => onFile(a.id).length < TYPES.length).length;
   const KPIS = () => [
     ['', 'Practitioners', S.A.length, 'var(--ink)'],
     ['', 'Registrations', S.R.length, 'var(--ink)'],
@@ -75,29 +97,105 @@
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
     ['pending', 'Pending entry', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
-    ['missing', 'Missing docs', missingDocsCount(), 'var(--bad)'],
-    ['followups', 'Open follow-ups', S.F.filter(f => !['Dismissed', 'Resolved', 'Done'].includes(f.status)).length, 'var(--ink)']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+    ['missing', 'Missing docs', S.A.filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
+    ['followups', 'Open follow-ups', S.F.filter(f => !CLOSED.includes(f.status)).length, 'var(--ink)'],
+    ['incomplete', 'Incomplete profiles', S.A.filter(a => !compl(a.id).complete).length, 'var(--warn)']];
+  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; render(); };
   window.famSearch = v => { S.q = v.toLowerCase(); renderRows(); };
+  window.famSort = k => { S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderRows(); };
+  window.famOpen = id => { location.hash = 'fam/' + id; };
 
-  /* ---------- render ---------- */
-  function render() {
-    $('famkpis').innerHTML = KPIS().map(([k, l, v, c]) => `<button class="kpi famk${S.filter && S.filter === k ? ' on' : ''}" ${k ? `onclick="famFilter('${k}')" aria-pressed="${S.filter === k}"` : 'disabled'} title="${k ? 'Filter the list' : ''}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`).join('');
-    renderRows(); renderPanel();
+  /* ---------- list ---------- */
+  const SORT = {
+    name: a => a.full_name.toLowerCase(),
+    expiry: a => { const r = nextExp(a.id); return r ? days(r) : 1e9; },
+    docs: a => onFile(a.id).length,
+    status: a => RANK[status(a.id)] * 1000 + (100 - compl(a.id).score)
+  };
+  function rows() {
+    const k = SORT[S.sort.k] || SORT.name;
+    return S.A.map((a, i) => [a, i])
+      .filter(([a]) => matches(a, S.filter) && (!S.q || a.full_name.toLowerCase().includes(S.q) || setas(a.id).join(' ').toLowerCase().includes(S.q)))
+      .sort(([x], [y]) => { const p = k(x), q = k(y); return (p < q ? -1 : p > q ? 1 : 0) * S.sort.dir; });
   }
-  function rows() { return S.A.map((a, i) => [a, i]).filter(([a]) => matches(a, S.filter) && (!S.q || a.full_name.toLowerCase().includes(S.q) || setas(a.id).join(' ').toLowerCase().includes(S.q))); }
+  const th = (k, l) => `<th${k ? ` aria-sort="${S.sort.k === k ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')">${l}${S.sort.k === k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`;
   function renderRows() {
-    const list = rows();
+    const list = rows(), cw = canWrite();
+    $('famhead').innerHTML = `<tr>${cw ? `<th style="width:28px"><input type="checkbox" aria-label="Select all shown" onchange="famSelAll(this.checked)" ${list.length && list.every(([a]) => S.sel.has(a.id)) ? 'checked' : ''}></th>` : ''}${th('name', 'Practitioner')}<th>SETA coverage</th>${th('expiry', 'Next expiry')}${th('docs', 'Documents')}${th('status', 'Status')}<th>Next action</th></tr>`;
     $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
-      const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id);
-      return `<tr class="${i === famSel ? 'sel' : ''}"><td><button class="famname" onclick="famSel=${i};renderFam()">${e(a.full_name)}</button><div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
+      const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
+      return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
+        <td><button class="famname" onclick="famSel=${i};renderFam()">${e(a.full_name)}</button><div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
         <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
+        <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
-        <td>${pill(status(a.id))}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
-    }).join('') : `<tr><td colspan="5" class="sub" style="padding:20px">No practitioners match${S.filter ? ' this filter. <a href="#" onclick="famFilter(\'\');return false">Clear filter</a>' : '.'}</td></tr>`;
+        <td>${pill(status(a.id))}${complHtml(a.id)}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
+    }).join('') : `<tr><td colspan="7" class="sub" style="padding:20px">No practitioners match${S.filter ? ' this filter. <a href="#" onclick="famFilter(\'\');return false">Clear filter</a>' : '.'}</td></tr>`;
     $('famcount').textContent = `${list.length} of ${S.A.length}`;
+    renderBulk();
   }
+
+  /* ---------- 90-day expiry strip ---------- */
+  function renderStrip() {
+    const regs = S.R.filter(r => r.registration_expiry_date && days(r) <= 90).sort((x, y) => days(x) - days(y));
+    const exp = regs.filter(r => days(r) < 0), soon = regs.filter(r => days(r) >= 0);
+    const who = r => S.A.find(a => a.id === r.assessor_id)?.full_name || 'Unknown';
+    const dot = r => { const d = days(r), c = d <= 30 ? 'var(--bad)' : d <= 60 ? '#E0A100' : 'var(--navy2)';
+      return `<button class="famdot" style="left:${Math.min(100, d / 90 * 100)}%;background:${c}" title="${e(who(r))} · ${e(r.seta_name)} · in ${d}d" aria-label="${e(who(r))}, ${e(r.seta_name)}, expires in ${d} days" onclick="famOpen(${r.assessor_id})"></button>`; };
+    $('famstrip').innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:15px;flex-grow:1">Expiries in the next 90 days</h2>
+        <span class="sub">${soon.length} due${exp.length ? ` · <a href="#" onclick="famFilter('expired');return false" style="color:var(--bad);font-weight:600">${exp.length} already expired</a>` : ''}</span></div>
+      <div class="famtrack">${soon.map(dot).join('')}</div>
+      <div class="famticks"><span>Today</span><span>30d</span><span>60d</span><span>90d</span></div>
+      ${soon.length ? `<div class="famnext">${soon.slice(0, 4).map(r => `<a href="#fam/${r.assessor_id}">${e(who(r))}</a> <span class="sub">${e(r.seta_name)} · ${fmt(r.registration_expiry_date)}</span>`).join('<span class="sub"> · </span>')}${soon.length > 4 ? `<span class="sub"> +${soon.length - 4} more</span>` : ''}</div>` : '<div class="sub">Nothing due in the next 90 days.</div>'}`;
+  }
+
+  /* ---------- selection, bulk follow-ups, export ---------- */
+  window.famPick = (id, on) => { on ? S.sel.add(id) : S.sel.delete(id); renderBulk(); };
+  window.famSelAll = on => { rows().forEach(([a]) => on ? S.sel.add(a.id) : S.sel.delete(a.id)); renderRows(); };
+  function renderBulk() {
+    const n = S.sel.size, box = $('fambulk'); if (!box) return;
+    box.hidden = !n;
+    if (!n) return;
+    const open = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status)).length;
+    box.innerHTML = `<b>${n} selected</b><span class="sub">${open} open follow-up${open === 1 ? '' : 's'}</span>
+      <button class="btn sm" onclick="famBulk('claim')" ${open ? '' : 'disabled'}>Claim follow-ups</button><button class="btn sm" onclick="famBulk('dismiss')" ${open ? '' : 'disabled'}>Dismiss follow-ups</button>
+      <button class="btn sm" onclick="famExport(true)">Export selected</button><button class="btn sm" onclick="famClearSel()">Clear</button>`;
+  }
+  window.famClearSel = () => { S.sel.clear(); renderRows(); };
+  window.famBulk = async act => {
+    const list = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status));
+    if (!list.length) return say('No open follow-ups for the selection');
+    let extra = {};
+    if (act === 'dismiss') { const n = prompt(`Reason for dismissing ${list.length} follow-up${list.length > 1 ? 's' : ''}:`, ''); if (n === null) return; extra = { notes: n || null }; }
+    const now = new Date().toISOString();
+    const fields = act === 'claim' ? { status: 'In Progress', assigned_to: me() } : { status: 'Dismissed', resolved_at: now, resolved_by: me() };
+    const up = list.map(f => ({ tenant_id: P.tenant, assessor_id: f.assessor_id, source_type: f.source_type, source_id: f.source_id, kind: f.kind, created_by: f.created_by || me(), notes: f.notes ?? null, ...fields, ...(extra.notes !== undefined && extra.notes !== null ? extra : {}) }));
+    try {
+      await write('Follow-up', () => sb.from('fam_follow_ups').upsert(up, { onConflict: 'tenant_id,assessor_id,source_type,source_id' }));
+      say(`${up.length} follow-up${up.length > 1 ? 's' : ''} ${act === 'claim' ? 'claimed' : 'dismissed'}`); await load();
+    } catch (err) { /* write() already showed it */ }
+  };
+  window.famExport = onlySel => {
+    if (!window.XLSX) return say('Excel export is still loading. Try again in a moment.');
+    const list = onlySel ? S.A.filter(a => S.sel.has(a.id)) : rows().map(([a]) => a);
+    if (!list.length) return say('Nothing to export');
+    const ppl = list.map(a => { const nx = nextExp(a.id), c = compl(a.id);
+      return { Practitioner: a.full_name, Roles: rolesOf(a).join(', '), Email: a.email || '', Phone: a.phone || '', 'SETA coverage': setas(a.id).join(', '), Registrations: regsFor(a.id).length,
+        'Next expiry': nx?.registration_expiry_date || '', 'Days to expiry': nx ? days(nx) : '', Status: (PILL[status(a.id)] || PILL.unknown)[1], 'Documents on file': `${onFile(a.id).length}/6`,
+        'Documents missing': TYPES.filter(t => !onFile(a.id).includes(t)).map(lbl).join(', '), 'Completeness %': c.score, Gaps: c.gaps.join('; '), 'Open follow-ups': openFU(a.id).length, 'Next action': nextAction(a) }; });
+    const ids = new Set(list.map(a => a.id));
+    const regs = S.R.filter(r => ids.has(r.assessor_id)).map(r => ({ Practitioner: S.A.find(a => a.id === r.assessor_id)?.full_name || '', SETA: r.seta_name || '', Roles: (r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(', '),
+      'Registration number': r.registration_number || '', Expiry: r.registration_expiry_date || '', 'Days to expiry': days(r) ?? '', Risk: risk(r).replace('_', ' '), Status: r.status || 'Active',
+      Scope: scopeOf(r.id).map(s => qual(s.qualification_id)?.name || s.qualifications?.name || s.qualification_id).join('; ') }));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ppl), 'Practitioners');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(regs.length ? regs : [{ Practitioner: 'No registrations' }]), 'Registrations');
+    XLSX.writeFile(wb, `FAM-registry-${today()}${onlySel ? '-selected' : S.filter ? '-' + S.filter : ''}.xlsx`);
+    say(`Exported ${list.length} practitioner${list.length > 1 ? 's' : ''}`);
+  };
+
+  /* ---------- shared blocks (panel + profile) ---------- */
   function fuControls(type, sid, aid, kind) {
     if (!canWrite()) return '';
     const f = fu(type, sid), st = f?.status || 'Open';
@@ -106,17 +204,20 @@
     return `<div class="famfu"><span class="sub">${f ? e(st) + who : 'No follow-up'}${f?.notes ? ' — ' + e(f.notes) : ''}</span>
       ${st === 'Dismissed' ? b('reopen', 'Reopen') : (st !== 'In Progress' ? b('claim', 'Claim') : '') + b('note', 'Note') + b('dismiss', 'Dismiss')}</div>`;
   }
-  function renderPanel() {
-    const a = S.A[famSel] || S.A[0], box = $('fampanel');
-    if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
-    const regs = regsFor(a.id), docs = S.D.filter(d => d.assessor_id === a.id);
-    const regHtml = regs.length ? regs.map(r => {
-      const k = risk(r), flag = ['expired', 'due_30', 'due_60', 'pending'].includes(k);
+  function regBlock(a, withScope) {
+    const regs = regsFor(a.id);
+    return regs.length ? regs.map(r => {
+      const k = risk(r), flag = ['expired', 'due_30', 'due_60', 'pending'].includes(k), sc = scopeOf(r.id);
+      const scope = !withScope ? '' : `<div class="famscope"><span class="sub">Scope:</span> ${sc.length ? sc.map(s => `<span class="badge b-n">${e(qual(s.qualification_id)?.name || s.qualifications?.name || s.qualification_id)}</span>`).join(' ') : '<span class="sub">No qualifications linked</span>'}
+        ${canWrite() ? `<button class="btn sm" onclick="famScope(${r.id})">+ Scope</button>` : ''}</div>`;
       return `<div class="famreg"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="flex-grow:1">${e(r.seta_name)}</b>${riskBadge(r)}</div>
         <div class="sub">${e((r.roles?.length ? r.roles : [r.role]).join(', '))} · No. ${e(r.registration_number || '—')} · Expires ${fmt(r.registration_expiry_date)}</div>
-        ${flag ? fuControls('registration', r.id, a.id, k) : ''}</div>`;
+        ${scope}${flag ? fuControls('registration', r.id, a.id, k) : ''}</div>`;
     }).join('') : '<div class="sub" style="padding:8px 0">No SETA registrations yet.</div>';
-    const chk = TYPES.map(t => {
+  }
+  function docBlock(a) {
+    const docs = S.D.filter(d => d.assessor_id === a.id);
+    return TYPES.map(t => {
       const c0 = cur(a.id, t), ok = c0 && c0.status !== 'Missing';
       const old = docs.filter(d => d.doc_type === t && d !== c0 && (d.is_current === false || d.version < (c0?.version || 0))).sort((x, y) => (y.version || 0) - (x.version || 0));
       const view = c0?.file_url ? `<a href="#" onclick="famView(${c0.id});return false">View</a>` : ok ? '<span class="sub">No file</span>' : '';
@@ -124,19 +225,162 @@
       const hist = old.length ? `<a href="#" onclick="famHist('${a.id}:${t}');return false">${old.length} older</a>` : '';
       const histRows = S.hist[a.id + ':' + t] ? old.map(d => `<div class="sub famh">v${d.version || 1} · ${fmt(d.doc_date)} · replaced ${fmt(d.superseded_at)} ${d.file_url ? `<a href="#" onclick="famView(${d.id});return false">View</a>` : ''}</div>`).join('') : '';
       const missFU = c0 && c0.status === 'Missing' ? fuControls('document', c0.id, a.id, 'missing_doc') : '';
+      const exp = ok && c0.expiry_date ? ` · expires ${fmt(c0.expiry_date)}` : '';
       return `<div class="chk" style="flex-wrap:wrap"><span class="dot ${ok ? 'b-ok' : 'b-bad'}">${ok ? '✓' : '!'}</span>
-        <span style="flex-grow:1">${e(t)}${ok ? `<span class="sub"> · ${fmt(c0.doc_date)}${c0.version > 1 ? ' · v' + c0.version : ''}</span>` : ''}</span>
+        <span style="flex-grow:1" title="${e(HINT[t] || '')}">${e(lbl(t))}${ok ? `<span class="sub"> · ${fmt(c0.doc_date)}${c0.version > 1 ? ' · v' + c0.version : ''}${exp}</span>` : ''}</span>
         <span class="famacts">${view}${act}${hist}</span>${histRows ? `<div style="flex-basis:100%">${histRows}</div>` : ''}${missFU ? `<div style="flex-basis:100%">${missFU}</div>` : ''}</div>`;
     }).join('');
+  }
+
+  /* ---------- side panel (quick view) ---------- */
+  function renderPanel() {
+    const a = S.A[famSel] || S.A[0], box = $('fampanel');
+    if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
     box.innerHTML = `<div class="famhead"><span class="disp" style="font-size:20px">${e(a.full_name)}</span>
         <span style="font-size:13px;color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${pill(status(a.id))}
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button>
         <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">
-        <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regHtml}</div>
-        <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${chk}</div>
+        <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regBlock(a, false)}</div>
+        <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${docBlock(a)}</div>
       </div>`;
+  }
+
+  /* ---------- profile page ---------- */
+  const KIND = { expired: 'Registration expired', due_30: 'Renewal due ≤30 days', due_60: 'Renewal due 31–60 days', pending: 'Registration entry pending', missing_doc: 'Missing document' };
+  window.famTab = t => { S.tab = t; renderProfile(); };
+  window.famCopyLink = id => { const u = location.href.split('#')[0] + '#fam/' + id; (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => say('Profile link copied'), () => prompt('Copy this link:', u)); };
+  function activity(a) {
+    const ev = [], regs = regsFor(a.id);
+    regs.forEach(r => r.created_at && ev.push([r.created_at, `Registration added: ${r.seta_name}${r.registration_number ? ' (' + r.registration_number + ')' : ''}`]));
+    S.D.filter(d => d.assessor_id === a.id).forEach(d => {
+      const at = d.uploaded_at || d.created_at;
+      if (at) ev.push([at, `${lbl(d.doc_type)} ${d.status === 'Missing' ? 'marked missing' : (d.version > 1 ? 'v' + d.version + ' ' : '') + (d.file_url ? 'uploaded' : 'recorded')}${d.uploaded_by ? ' by ' + d.uploaded_by : ''}`]);
+      if (d.superseded_at) ev.push([d.superseded_at, `${lbl(d.doc_type)} v${d.version || 1} replaced`]);
+    });
+    S.F.filter(f => f.assessor_id === a.id).forEach(f => {
+      if (f.created_at) ev.push([f.created_at, `Follow-up opened: ${KIND[f.kind] || f.kind}`]);
+      if (f.resolved_at) ev.push([f.resolved_at, `Follow-up ${String(f.status || '').toLowerCase()}${f.resolved_by ? ' by ' + f.resolved_by : ''}`]);
+    });
+    return ev.sort((x, y) => String(y[0]).localeCompare(String(x[0])));
+  }
+  function renderProfile() {
+    const box = $('famprof'), a = S.A.find(x => x.id === S.prof);
+    if (!a) { box.innerHTML = `<a href="#fam" class="famback">← FAM Registry</a><div class="card sub" style="padding:20px">${S.A.length ? 'This practitioner was not found.' : 'Loading…'}</div>`; return; }
+    $('heading').textContent = a.full_name; $('crumb').textContent = 'Quality / FAM Registry';
+    const c = compl(a.id), regs = regsFor(a.id), fus = S.F.filter(f => f.assessor_id === a.id), open = openFU(a.id).length;
+    const kv = (k, v) => `<div><span class="sub">${k}</span><div>${v ? e(v) : '<span class="sub">—</span>'}</div></div>`;
+    const tabs = [['overview', 'Overview'], ['regs', `Registrations (${regs.length})`], ['docs', `Documents (${onFile(a.id).length}/6)`], ['fus', `Follow-ups (${open} open)`], ['activity', 'Activity']];
+    let body = '';
+    if (S.tab === 'overview') {
+      const up = regs.filter(r => r.registration_expiry_date).sort((x, y) => days(x) - days(y));
+      body = `<div class="famgrid">
+        <div class="card"><h2 style="font-size:15px">Next action</h2><p style="font-size:18px;font-weight:600;margin:6px 0">${e(nextAction(a))}</p></div>
+        <div class="card"><h2 style="font-size:15px">Completeness · ${c.score}%</h2><span class="bar" style="width:100%;margin:8px 0"><i style="width:${c.score}%;background:${c.complete ? 'var(--ok)' : c.score >= 50 ? '#E0A100' : 'var(--bad)'}"></i></span>
+          ${c.complete ? '<div class="famok">✓ Profile complete</div>' : c.gaps.map(g => `<div class="sub">• ${e(g)}</div>`).join('')}</div>
+        <div class="card"><h2 style="font-size:15px">Expiries</h2>${up.length ? up.map(r => `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0"><span style="flex-grow:1">${e(r.seta_name)} <span class="sub">${fmt(r.registration_expiry_date)}</span></span>${riskBadge(r)}</div>`).join('') : '<div class="sub">No expiry dates captured.</div>'}</div>
+        <div class="card"><h2 style="font-size:15px">Qualifications in scope</h2>${(() => { const qs = [...new Set(regs.flatMap(r => scopeOf(r.id).map(s => qual(s.qualification_id)?.name || s.qualifications?.name || s.qualification_id)))]; return qs.length ? qs.map(q => `<div style="padding:3px 0">${e(q)}</div>`).join('') : '<div class="sub">None linked yet. Add scope on the Registrations tab or use Scope Import.</div>'; })()}</div></div>`;
+    } else if (S.tab === 'regs') {
+      body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add registration</button>` : ''}</div>${regBlock(a, true)}</div>`;
+    } else if (S.tab === 'docs') {
+      body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file · hover a name for what it covers</span></div>${docBlock(a)}</div>`;
+    } else if (S.tab === 'fus') {
+      body = `<div class="card">${fus.length ? fus.map(f => `<div class="famreg"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="flex-grow:1">${e(KIND[f.kind] || f.kind)}</b><span class="badge ${CLOSED.includes(f.status) ? 'b-n' : f.status === 'In Progress' ? 'b-warn' : 'b-bad'}">${e(f.status)}</span></div>
+          <div class="sub">Opened ${fmt(f.created_at)}${f.assigned_to ? ' · assigned to ' + e(f.assigned_to) : ''}${f.resolved_at ? ' · closed ' + fmt(f.resolved_at) : ''}${f.notes ? ' · ' + e(f.notes) : ''}</div>
+          ${fuControls(f.source_type, f.source_id, a.id, f.kind)}</div>`).join('') : '<div class="sub">No follow-ups for this practitioner.</div>'}</div>`;
+    } else {
+      const ev = activity(a);
+      body = `<div class="card">${ev.length ? ev.map(([t, l]) => `<div class="famev"><span class="sub">${fmt(t)}</span><span>${e(l)}</span></div>`).join('') : '<div class="sub">No activity recorded yet.</div>'}</div>`;
+    }
+    box.innerHTML = `<a href="#fam" class="famback">← FAM Registry</a>
+      <section class="card famphead"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start"><div style="flex-grow:1;display:flex;flex-direction:column;gap:4px">
+          <span class="disp" style="font-size:24px">${e(a.full_name)}</span><span style="color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
+          <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<span class="famscore">${c.score}% complete</span></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button>
+          <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
+        <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', a.id_number)}${kv('Address', a.physical_address)}</div></section>
+      <div class="famtabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" onclick="famTab('${k}')">${l}</button>`).join('')}</div>
+      ${body}`;
+  }
+
+  /* ---------- Scope Import ---------- */
+  function regLabel(r) {
+    const name = S.A.find(a => a.id === r.assessor_id)?.full_name || 'Unknown practitioner';
+    const role = (r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(' / ') || 'Role not captured';
+    return `${name} · ${r.seta_name || 'Unverified coverage'} · ${role}${r.registration_number ? ' · #' + r.registration_number : ''}${r.status === 'Pending Entry' ? ' · Needs review' : ''}`;
+  }
+  const qFor = row => S.Q.find(q => String(q.saqa_id || '') === String(row.saqa_id || '') && row.saqa_id) || S.Q.find(q => String(q.name || '').trim().toLowerCase() === String(row.qualification_name || '').trim().toLowerCase());
+  function loadCatalogue() {
+    if (window.FAM_SCOPE_CATALOGUE) { S.cat = window.FAM_SCOPE_CATALOGUE; return Promise.resolve(); }
+    return new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'scope-catalogue.js'; s.onload = () => { S.cat = window.FAM_SCOPE_CATALOGUE || []; ok(); }; s.onerror = no; document.head.appendChild(s); });
+  }
+  window.famSI = () => renderScope();
+  window.famSIReady = () => {
+    const checked = [...document.querySelectorAll('.famsi-c:checked')];
+    const btn = $('famsi-go'); if (btn) btn.disabled = !checked.length || !checked.every(c => c.closest('tr').querySelector('select').value);
+    document.querySelectorAll('#famsi-rows tr').forEach(tr => { const sel = tr.querySelector('select'), p = tr.querySelector('.famsi-p'); if (sel && p && sel.value && p.dataset.ok) { p.textContent = 'Ready to commit'; p.className = 'badge b-ok famsi-p'; } else if (p && p.dataset.ok) { p.textContent = 'Catalogue match'; p.className = 'badge b-n famsi-p'; } });
+  };
+  function renderScope() {
+    const box = $('famprof');
+    $('heading').textContent = 'Scope Import'; $('crumb').textContent = 'Quality / FAM Registry';
+    if (!S.cat) { box.innerHTML = '<a href="#fam" class="famback">← FAM Registry</a><div class="card sub" style="padding:20px">Loading the qualification catalogue…</div>'; loadCatalogue().then(renderScope, () => say('Could not load the qualification catalogue')); return; }
+    const q = S.catQ.toLowerCase(), list = S.cat.filter(r => (!q || Object.values(r).join(' ').toLowerCase().includes(q)) && (!S.catSeta || r.seta === S.catSeta));
+    const regs = [...S.R].sort((x, y) => regLabel(x).localeCompare(regLabel(y)));
+    const matched = S.cat.filter(qFor).length;
+    box.innerHTML = `<a href="#fam" class="famback">← FAM Registry</a>
+      <section class="card" style="display:flex;flex-direction:column;gap:10px"><div><h2 style="font-size:17px">Scope Import</h2>
+        <p class="sub" style="margin:4px 0 0">Link catalogue qualifications to a practitioner's SETA registration. ${matched} of ${S.cat.length} catalogue rows match a qualification in this database; rows without a match can't be committed yet.</p></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap"><input type="search" placeholder="Search qualification, SAQA ID or provider" aria-label="Search catalogue" value="${e(S.catQ)}" oninput="famSIq(this.value)" class="faminput" style="flex:1 1 260px">
+          <select aria-label="Filter by SETA" class="faminput" onchange="famSIs(this.value)"><option value="">All SETAs</option>${[...new Set(S.cat.map(r => r.seta))].sort().map(s => `<option ${s === S.catSeta ? 'selected' : ''}>${e(s)}</option>`).join('')}</select>
+          <button class="btn y" id="famsi-go" onclick="famSIGo()" disabled>Approve selected</button></div></section>
+      <section class="card" style="padding:0"><div class="tw"><table style="min-width:0;width:100%"><thead><tr><th></th><th>Qualification</th><th>SETA</th><th>NQF · credits</th><th>Link to registration</th><th>State</th></tr></thead><tbody id="famsi-rows">
+      ${list.slice(0, 100).map(r => { const m = qFor(r);
+        return `<tr><td><input type="checkbox" class="famsi-c" data-saqa="${e(r.saqa_id)}" data-title="${e(r.qualification_name)}" onchange="famSIReady()" ${m && canWrite() ? '' : 'disabled'} aria-label="Select ${e(r.qualification_name)}"></td>
+          <td><b>${e(r.qualification_name)}</b><div class="sub">SAQA ${e(r.saqa_id || 'missing')} · ${e(r.company || '')}</div></td><td>${e(r.seta)}</td><td class="sub">NQF ${e(r.nqf_level || '—')} · ${e(r.credits || '—')}</td>
+          <td><select class="faminput" style="max-width:280px" onchange="famSIReady()" ${m ? '' : 'disabled'} aria-label="Registration for ${e(r.qualification_name)}"><option value="">Select registration</option>${regs.map(g => `<option value="${g.id}">${e(regLabel(g))}</option>`).join('')}</select></td>
+          <td>${m ? '<span class="badge b-n famsi-p" data-ok="1">Catalogue match</span>' : '<span class="badge b-warn famsi-p">Not in qualifications</span>'}</td></tr>`; }).join('') || '<tr><td colspan="6" class="sub" style="padding:20px">No rows match.</td></tr>'}
+      </tbody></table></div>${list.length > 100 ? `<div class="sub" style="padding:10px 16px">Showing 100 of ${list.length}. Narrow the search to see more.</div>` : ''}</section>`;
+  }
+  let siT; window.famSIq = v => { S.catQ = v; clearTimeout(siT); siT = setTimeout(() => { renderScope(); const i = document.querySelector('#famprof input[type=search]'); if (i) { i.focus(); i.setSelectionRange(v.length, v.length); } }, 200); };
+  window.famSIs = v => { S.catSeta = v; renderScope(); };
+  window.famSIGo = async () => {
+    if (!canWrite()) return say('You do not have FAM write access');
+    const commits = [], skipped = [];
+    document.querySelectorAll('.famsi-c:checked').forEach(c => {
+      const rid = Number(c.closest('tr').querySelector('select').value), reg = S.R.find(r => r.id === rid), m = qFor({ saqa_id: c.dataset.saqa, qualification_name: c.dataset.title });
+      if (!reg || !m) return skipped.push(c.dataset.title);
+      if (scopeOf(rid).some(s => s.qualification_id === m.id) || commits.some(x => x.registration_id === rid && x.qualification_id === m.id)) return skipped.push(c.dataset.title + ' (already linked)');
+      commits.push({ tenant_id: P.tenant, registration_id: rid, qualification_id: m.id });
+    });
+    if (skipped.length) say(`Skipped ${skipped.length}: ${skipped.slice(0, 2).join(', ')}`);
+    if (!commits.length) return;
+    const btn = $('famsi-go'); btn.disabled = true; btn.textContent = 'Committing…';
+    try {
+      await write('Scope', () => sb.from('fam_registration_scope').insert(commits));
+      try { await sb.from('audit_log').insert({ tenant_id: P.tenant, action: 'SCOPE_IMPORT_COMMIT', table_name: 'fam_registration_scope', record_id: 'bulk', user_name: me(), user_role: (P.roles || []).join(',') || null, changes: { count: commits.length, qualification_ids: commits.map(x => x.qualification_id), registration_ids: commits.map(x => x.registration_id) } }); } catch (_) { /* audit is best-effort */ }
+      say(`${commits.length} scope row${commits.length > 1 ? 's' : ''} committed`); await load();
+    } catch (err) { btn.disabled = false; btn.textContent = 'Approve selected'; }
+  };
+
+  /* ---------- modes ---------- */
+  function syncRoute() {
+    const h = location.hash.slice(1);
+    if (h.split('/')[0] !== 'fam' || !ready) return;
+    const arg = h.split('/')[1];
+    const mode = arg === 'scope' ? 'scope' : arg ? 'profile' : 'list';
+    if (mode === 'profile' && S.prof !== Number(arg)) S.tab = 'overview';
+    S.mode = mode; S.prof = mode === 'profile' ? Number(arg) : null;
+    const v = $('view-fam');
+    [...v.children].forEach(ch => { ch.hidden = ch.id === 'famprof' ? mode === 'list' : mode !== 'list'; });
+    if (mode === 'profile') { const i = S.A.findIndex(a => a.id === S.prof); if (i >= 0) famSel = i; renderProfile(); }
+    else if (mode === 'scope') renderScope();
+    else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
+  }
+  function render() {
+    $('famkpis').innerHTML = KPIS().map(([k, l, v, c]) => `<button class="kpi famk${S.filter && S.filter === k ? ' on' : ''}" ${k ? `onclick="famFilter('${k}')" aria-pressed="${S.filter === k}"` : 'disabled'} title="${k ? 'Filter the list' : ''}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`).join('');
+    renderStrip(); renderRows(); renderPanel();
+    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope();
   }
 
   /* ---------- modal ---------- */
@@ -158,10 +402,15 @@
   const sel = (name, label, opts, extra = '') => `<label>${label}<select name="${name}" ${extra}>${opts.map(o => `<option>${e(o)}</option>`).join('')}</select></label>`;
   const val = (f, k) => (f[k]?.value || '').trim() || null;
   const need = () => { if (!P.tenant) throw new Error('No tenant on your account.'); };
+  const personForm = (a = {}) => `<div class="qagrid">${fld('full_name', 'Full name *', 'text', `required value="${e(a.full_name)}"`)}<label>Main role<select name="role">${['Facilitator', 'Assessor', 'Moderator'].map(o => `<option ${a.role === o ? 'selected' : ''}>${o}</option>`).join('')}</select></label>
+    ${fld('id_number', 'ID number', 'text', `value="${e(a.id_number)}"`)}${fld('email', 'Email', 'email', `value="${e(a.email)}"`)}${fld('phone', 'Phone', 'tel', `value="${e(a.phone)}"`)}${fld('physical_address', 'Address', 'text', `value="${e(a.physical_address)}"`)}</div>`;
+  const personVals = f => ({ full_name: val(f, 'full_name'), role: val(f, 'role'), id_number: val(f, 'id_number'), email: val(f, 'email'), phone: val(f, 'phone'), physical_address: val(f, 'physical_address') });
 
-  window.famAdd = () => modal('Add practitioner', `<div class="qagrid">${fld('full_name', 'Full name *', 'text', 'required')}${sel('role', 'Main role', ['Facilitator', 'Assessor', 'Moderator'])}${fld('id_number', 'ID number')}${fld('email', 'Email', 'email')}${fld('phone', 'Phone', 'tel')}${fld('physical_address', 'Address')}</div>`,
-    async f => { need(); const rows = await write('Practitioner', () => sb.from('assessors').insert({ tenant_id: P.tenant, full_name: val(f, 'full_name'), role: val(f, 'role'), id_number: val(f, 'id_number'), email: val(f, 'email'), phone: val(f, 'phone'), physical_address: val(f, 'physical_address') }).select('id'));
+  window.famAdd = () => modal('Add practitioner', personForm(),
+    async f => { need(); const rows = await write('Practitioner', () => sb.from('assessors').insert({ tenant_id: P.tenant, ...personVals(f) }).select('id'));
       say('Practitioner added'); famSel = -1; S.pick = rows?.[0]?.id; });
+  window.famEdit = id => { const a = S.A.find(x => x.id === id); if (!a) return;
+    modal('Edit practitioner', personForm(a), async f => { need(); await write('Practitioner', () => sb.from('assessors').update(personVals(f)).eq('id', id)); say('Details saved'); }); };
 
   window.famReg = aid => modal('Add SETA registration', `<div class="qagrid">${fld('seta_name', 'SETA *', 'text', 'required list="famsetas"')}<datalist id="famsetas">${['ETDP SETA', 'MICT SETA', 'Services SETA', 'AgriSETA', 'BANKSETA', 'CHIETA', 'FASSET', 'HWSETA', 'INSETA', 'LGSETA', 'MERSETA', 'PSETA', 'QCTO', 'TETA', 'W&RSETA'].map(s => `<option value="${s}">`).join('')}</datalist>
       ${fld('registration_number', 'Registration number')}${fld('registration_expiry_date', 'Expiry date', 'date')}${sel('status', 'Status', ['Active', 'Pending Entry', 'Inactive'])}</div>
@@ -171,9 +420,16 @@
       await write('Registration', () => sb.from('fam_seta_registrations').insert({ tenant_id: P.tenant, assessor_id: aid, seta_name: val(f, 'seta_name'), role: rl[0], roles: rl, registration_number: val(f, 'registration_number'), registration_expiry_date: val(f, 'registration_expiry_date'), status: val(f, 'status') }));
       say('Registration added'); });
 
+  window.famScope = rid => {
+    const have = new Set(scopeOf(rid).map(s => s.qualification_id)), opts = S.Q.filter(q => !have.has(q.id));
+    if (!opts.length) return say(S.Q.length ? 'Every qualification is already linked' : 'No qualifications in the catalogue yet');
+    modal('Add qualification to scope', `<label>Qualification *<select name="qid" required>${opts.map(q => `<option value="${e(q.id)}">${e(q.name)}${q.saqa_id ? ' · SAQA ' + e(q.saqa_id) : ''}</option>`).join('')}</select></label>`,
+      async f => { need(); await write('Scope', () => sb.from('fam_registration_scope').insert({ tenant_id: P.tenant, registration_id: rid, qualification_id: f.qid.value })); say('Scope added'); });
+  };
+
   window.famDoc = (aid, type, replaceId) => {
     if (replaceId && !isAdm()) return say('Only admins can replace a document');
-    modal(replaceId ? `Replace ${type}` : `Add ${type}`, `<div class="qagrid">${sel('status', 'Status', ['Current', 'Missing'])}${fld('doc_date', 'Document date', 'date')}${fld('expiry_date', 'Expiry date (if any)', 'date')}</div>
+    modal(replaceId ? `Replace ${lbl(type)}` : `Add ${lbl(type)}`, `${HINT[type] ? `<p class="sub" style="margin:0">${e(HINT[type])}</p>` : ''}<div class="qagrid">${sel('status', 'Status', ['Current', 'Missing'])}${fld('doc_date', 'Document date', 'date')}${fld('expiry_date', 'Expiry date (if any)', 'date')}</div>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">File (PDF, Word, JPG or PNG, max 10 MB)${replaceId ? ' *' : ''}<input name="file" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" ${replaceId ? 'required' : ''}></label>`,
       async f => { need(); const file = f.file.files[0], st = val(f, 'status');
         if (replaceId && !file) throw new Error('Choose a replacement file.');
@@ -200,7 +456,7 @@
     if (error) return say('Could not open file: ' + error.message);
     window.open(data.signedUrl, '_blank', 'noopener');
   };
-  window.famHist = k => { S.hist[k] = !S.hist[k]; renderPanel(); };
+  window.famHist = k => { S.hist[k] = !S.hist[k]; S.mode === 'profile' ? renderProfile() : renderPanel(); };
   window.famFU = async (act, type, sid, aid, kind) => {
     const f = fu(type, sid), now = new Date().toISOString();
     let fields;
@@ -217,16 +473,19 @@
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
-    const [A, R, D, F] = await Promise.all([
-      q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone').order('full_name')),
+    const [A, R, D, F, Q, SC] = await Promise.all([
+      q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone,id_number,physical_address').order('full_name')),
       q('registrations', sb.from('fam_seta_registrations').select('*')),
-      q('documents', sb.from('fam_documents').select('id,assessor_id,doc_type,status,doc_date,expiry_date,file_url,file_name,is_current,version,superseded_at')),
-      q('follow-ups', sb.from('fam_follow_ups').select('*'))]);
-    Object.assign(S, { A, R, D, F });
+      q('documents', sb.from('fam_documents').select('id,assessor_id,doc_type,status,doc_date,expiry_date,file_url,file_name,is_current,version,superseded_at,created_at,uploaded_at,uploaded_by')),
+      q('follow-ups', sb.from('fam_follow_ups').select('*')),
+      q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
+      q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id'))]);
+    Object.assign(S, { A, R, D, F, Q, SC });
+    const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
     if (famSel < 0 || famSel >= A.length) famSel = 0;
     PEOPLE.length = 0; A.forEach(a => PEOPLE.push([a.full_name, rolesOf(a).join(' · '), onFile(a.id)])); // keeps Ctrl K search in step
-    render();
+    render(); syncRoute();
   }
 
   /* ---------- one-time layout ---------- */
@@ -240,10 +499,31 @@
       .famk.on{outline:2px solid var(--yellow);outline-offset:-2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
       .famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
+      .famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
+      .famok{font-size:12px;color:var(--ok);font-weight:700;margin-top:4px}.famgap{font-size:12px;margin-top:4px}
       .famhead{background:var(--navy);color:#fff;padding:20px;display:flex;flex-direction:column;gap:4px}
       .famreg{border-top:1px solid var(--line2);padding:10px 0;display:flex;flex-direction:column;gap:4px}
       .famfu{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.famfu .sub{flex-grow:1}
       .famacts{display:flex;gap:12px;font-weight:600;font-size:13px}.famh{padding:2px 0 2px 32px}
+      .famscope{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+      #famstrip{display:flex;flex-direction:column;gap:8px}
+      .famtrack{position:relative;height:26px;margin:4px 8px 0;border-radius:13px;background:linear-gradient(90deg,var(--badbg) 0 33.3%,var(--warnbg) 33.3% 66.6%,var(--soft) 66.6%)}
+      .famdot{position:absolute;top:5px;width:16px;height:16px;margin-left:-8px;border-radius:50%;border:2px solid var(--surface);cursor:pointer;padding:0}
+      .famdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+      .famticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:0 2px}
+      .famnext{font-size:13px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+      #fambulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:var(--soft);border-bottom:1px solid var(--line)}#fambulk .sub{flex-grow:1}
+      .famback{font-weight:600;font-size:14px;align-self:flex-start}
+      #famprof{display:flex;flex-direction:column;gap:14px}#famprof[hidden]{display:none}
+      .famphead{background:var(--navy);color:#fff;display:flex;flex-direction:column;gap:14px}
+      .famphead .sub{color:#D2D1EC}.famscore{font-size:13px;color:#D2D1EC}
+      .famkv{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:14px;overflow-wrap:anywhere}
+      .famtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+      .famtabs button{border:0;background:none;font:inherit;padding:10px 12px;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
+      .famtabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--yellow)}
+      .famgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+      .famev{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line2)}
+      .faminput{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink);min-width:0}
       #famov{position:fixed;inset:0;background:rgba(1,0,45,.45);z-index:60;display:flex;align-items:flex-start;justify-content:center;padding:6vh 16px;overflow:auto}
       #famov .card{width:min(640px,100%);display:flex;flex-direction:column;gap:12px}
       #famov .qagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
@@ -255,13 +535,18 @@
     btns.forEach(b => {
       const t = b.textContent.trim();
       if (t === '+ Add practitioner') { b.removeAttribute('onclick'); b.onclick = () => canWrite() ? window.famAdd() : say('You do not have FAM write access'); }
-      if (t === 'Scope Import' || t === 'Bulk Intake') { b.removeAttribute('onclick'); b.onclick = () => say(t === 'Bulk Intake' ? 'Bulk Intake comes with PR #61' : 'Scope Import: next step (needs the qualification catalogue)'); }
+      if (t === 'Scope Import') { b.removeAttribute('onclick'); b.onclick = () => { location.hash = 'fam/scope'; }; }
+      if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.title = 'Arrives with PR #61'; b.onclick = () => say('Bulk Intake arrives with PR #61'); }
     });
+    btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
-    const tbl = v.querySelector('table');
-    tbl.querySelector('thead').innerHTML = '<tr><th>Practitioner</th><th>SETA coverage</th><th>Documents</th><th>Status</th><th>Next action</th></tr>';
-    tbl.closest('section').insertAdjacentHTML('afterbegin', `<div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)"><input type="search" placeholder="Search name or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" style="flex-grow:1;height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink)"><span class="sub" id="famcount"></span></div>`);
+    const tbl = v.querySelector('table'), sec = tbl.closest('section');
+    tbl.querySelector('thead').id = 'famhead';
+    sec.insertAdjacentHTML('afterbegin', `<div style="display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)"><input type="search" placeholder="Search name or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex-grow:1"><span class="sub" id="famcount"></span></div><div id="fambulk" hidden></div>`);
+    v.querySelector('.row').insertAdjacentHTML('beforebegin', '<section class="card" id="famstrip"></section>');
+    v.insertAdjacentHTML('beforeend', '<div id="famprof" hidden></div>');
     window.renderFam = () => { renderRows(); renderPanel(); };
+    addEventListener('hashchange', syncRoute);
   }
 
   window.previewFam = () => { setup(); load(); };
