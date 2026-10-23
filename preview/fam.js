@@ -17,7 +17,7 @@
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
+  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'status', dir: 1 }, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -50,6 +50,7 @@
   }
   const PILL = { active: ['b-ok', 'Active'], inactive: ['b-bad', 'Inactive'], expired: ['b-bad', 'Expired'], mixed: ['b-warn', 'Mixed'], due_soon: ['b-warn', 'Due soon'], needs_review: ['b-warn', 'Needs review'], unknown: ['b-n', 'No registrations'] };
   const RANK = { expired: 0, mixed: 1, due_soon: 2, needs_review: 3, inactive: 4, unknown: 5, active: 6 };
+  const GROUPS = { expired: ['Expired', 'var(--bad)', 'Renew now'], mixed: ['Mixed', 'var(--bad)', 'At least one registration needs action'], due_soon: ['Due soon', '#E0A100', 'Start the renewal'], needs_review: ['Needs review', 'var(--navy2)', 'Registration details not captured'], inactive: ['Inactive', 'var(--muted)', ''], unknown: ['No registrations', 'var(--muted)', 'Add one or mark inactive'], active: ['Active', 'var(--ok)', 'Registered; check documents'] };
   const pill = s => { const [c, l] = PILL[s] || PILL.unknown; return `<span class="badge ${c}">${l}</span>`; };
   const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Pending entry'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };
@@ -125,9 +126,12 @@
   function renderRows() {
     const list = rows(), cw = canWrite();
     $('famhead').innerHTML = `<tr>${cw ? `<th style="width:28px"><input type="checkbox" aria-label="Select all shown" onchange="famSelAll(this.checked)" ${list.length && list.every(([a]) => S.sel.has(a.id)) ? 'checked' : ''}></th>` : ''}${th('name', 'Practitioner')}<th>SETA coverage</th>${th('expiry', 'Next expiry')}${th('docs', 'Documents')}${th('status', 'Status')}<th>Next action</th></tr>`;
-    $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
+    const grouped = S.sort.k === 'status' && S.sort.dir > 0;
+    $('famrows').innerHTML = list.length ? list.map(([a, i], n) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
-      return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
+      const gs = status(a.id), gn = grouped && (n === 0 || status(list[n - 1][0].id) !== gs) ? list.filter(([b]) => status(b.id) === gs).length : 0;
+      const gh = gn ? `<tr class="famgh"><td colspan="${cw ? 7 : 6}"><span class="famgd" style="background:${GROUPS[gs] ? GROUPS[gs][1] : 'var(--muted)'}"></span>${GROUPS[gs] ? GROUPS[gs][0] : e(gs)}<span class="famgn">${gn}</span><span class="sub">${GROUPS[gs] ? GROUPS[gs][2] : ''}</span></td></tr>` : '';
+      return gh + `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
         <td><button class="famname" onclick="famSel=${i};renderFam()">${e(a.full_name)}</button><div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
         <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
@@ -234,6 +238,25 @@
     }).join('');
   }
 
+  /* ---------- next step + data to tidy ---------- */
+  const normName = s => (s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  function dataFlags(a) {
+    const regs = regsFor(a.id), f = [];
+    if (regs.some(r => normName(r.seta_name) === 'n/a')) f.push('SETA saved as "N/A"');
+    if (regs.some(r => /,/.test(r.seta_name || ''))) f.push('Two SETAs saved in one registration');
+    if (regs.some(r => risk(r) === 'active' && !r.registration_expiry_date)) f.push('Active registration has no expiry date');
+    if (S.A.some(b => b.id !== a.id && normName(b.full_name) === normName(a.full_name))) f.push('Possible duplicate: another profile has the same name');
+    if (!/\s/.test((a.full_name || '').trim())) f.push('Surname missing');
+    return f;
+  }
+  function nextBox(a) {
+    const nx = nextAction(a), fu = openFU(a.id), fl = dataFlags(a);
+    return `<div class="famnext"><div class="famnl">Next step</div>
+      <div>${e(nx === '—' ? 'Nothing due. Registration and documents are complete.' : nx + '.')}</div>
+      ${fu.length ? `<div class="sub">Open follow-up: ${e(KIND[fu[0].kind] || fu[0].kind)} (${e(fu[0].status)})</div>` : ''}
+      ${fl.length ? `<div class="famtidy"><b>Data to tidy</b>${fl.map(x => `<div>⚑ ${e(x)}</div>`).join('')}</div>` : ''}</div>`;
+  }
+
   /* ---------- side panel (quick view) ---------- */
   function renderPanel() {
     const a = S.A[famSel] || S.A[0], box = $('fampanel');
@@ -243,6 +266,7 @@
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
         <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button>
         <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
+      ${nextBox(a)}
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regBlock(a, false)}</div>
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${docBlock(a)}</div>
@@ -411,7 +435,9 @@
     else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
   }
   function render() {
-    $('famkpis').innerHTML = KPIS().map(([k, l, v, c]) => `<button class="kpi famk${S.filter && S.filter === k ? ' on' : ''}" ${k ? `onclick="famFilter('${k}')" aria-pressed="${S.filter === k}"` : 'disabled'} title="${k ? 'Filter the list' : ''}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`).join('');
+    const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`;
+    const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
+    $('famkpis').innerHTML = kgrp(`Registrations · ${S.R.length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${S.A.length}`, ['missing', 'followups', 'incomplete']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'queue') renderQueue();
   }
@@ -526,11 +552,22 @@
   function setup() {
     if (ready) return; ready = true;
     document.head.insertAdjacentHTML('beforeend', `<style>
-      #famkpis{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;flex:1 1 100%!important;order:2}
+      #famkpis{display:flex!important;flex-wrap:wrap;gap:14px 28px;flex:1 1 100%!important;order:2;align-items:flex-start}
       #famkpis+div{margin-left:auto}
-      .famk{min-width:0;padding:10px 14px;gap:2px;text-align:left;cursor:pointer;font:inherit;border:1px solid var(--line)}
-      .famk[disabled]{cursor:default;opacity:1}.famk .v{font-size:22px}.famk .l{font-size:12px}
-      .famk.on{outline:2px solid var(--yellow);outline-offset:-2px}
+      .famgrp{display:flex;flex-direction:column;gap:6px;min-width:0}
+      .famgl{font-size:12px;font-weight:700;color:var(--muted)}
+      .famgk{display:flex;flex-wrap:wrap;gap:8px}
+      .famk{min-width:112px;padding:10px 14px;gap:2px;text-align:left;cursor:pointer;font:inherit;border:1px solid var(--line);outline:none}
+      .famk .v{font-size:22px}.famk .l{font-size:12px;white-space:nowrap}
+      .famk:focus{outline:none}.famk:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+      .famk.on{border:2px solid var(--navy);padding:9px 13px;box-shadow:inset 0 -3px 0 var(--yellow)}
+      tr.famgh td{background:var(--ground);padding:14px 12px 6px!important;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line)}
+      .famgd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+      .famgn{margin:0 8px;padding:1px 8px;border-radius:999px;background:var(--line2);letter-spacing:0;text-transform:none}
+      tr.famgh .sub{letter-spacing:0;text-transform:none;font-weight:400}
+      .famnext{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
+      .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+      .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
       .famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
       .famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
