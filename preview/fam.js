@@ -493,7 +493,8 @@
   function setup() {
     if (ready) return; ready = true;
     document.head.insertAdjacentHTML('beforeend', `<style>
-      #famkpis{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px}
+      #famkpis{display:grid!important;grid-template-columns:repeat(auto-fill,minmax(128px,1fr));gap:10px;flex:1 1 100%!important;order:2}
+      #famkpis+div{margin-left:auto}
       .famk{min-width:0;padding:10px 14px;gap:2px;text-align:left;cursor:pointer;font:inherit;border:1px solid var(--line)}
       .famk[disabled]{cursor:default;opacity:1}.famk .v{font-size:22px}.famk .l{font-size:12px}
       .famk.on{outline:2px solid var(--yellow);outline-offset:-2px}
