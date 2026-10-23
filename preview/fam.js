@@ -43,11 +43,12 @@
     if (!st.length) return 'unknown';
     if (st.every(s => s === 'active')) return 'active';
     if (st.includes('expired')) return st.every(s => s === 'expired') ? 'expired' : 'mixed';
+    if (st.every(s => s === 'due_30' || s === 'due_60')) return 'due_soon';
     if (st.some(s => ['due_30', 'due_60', 'pending', 'inactive'].includes(s))) return st.includes('active') ? 'mixed' : st.includes('pending') ? 'needs_review' : 'inactive';
     return 'active';
   }
-  const PILL = { active: ['b-ok', 'Active'], inactive: ['b-bad', 'Inactive'], expired: ['b-bad', 'Expired'], mixed: ['b-warn', 'Mixed'], needs_review: ['b-warn', 'Needs review'], unknown: ['b-n', 'No registrations'] };
-  const RANK = { expired: 0, mixed: 1, needs_review: 2, inactive: 3, unknown: 4, active: 5 };
+  const PILL = { active: ['b-ok', 'Active'], inactive: ['b-bad', 'Inactive'], expired: ['b-bad', 'Expired'], mixed: ['b-warn', 'Mixed'], due_soon: ['b-warn', 'Due soon'], needs_review: ['b-warn', 'Needs review'], unknown: ['b-n', 'No registrations'] };
+  const RANK = { expired: 0, mixed: 1, due_soon: 2, needs_review: 3, inactive: 4, unknown: 5, active: 6 };
   const pill = s => { const [c, l] = PILL[s] || PILL.unknown; return `<span class="badge ${c}">${l}</span>`; };
   const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Pending entry'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };
