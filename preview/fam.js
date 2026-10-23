@@ -509,6 +509,7 @@
     S.mode = mode; S.prof = mode === 'profile' ? Number(arg) : null;
     const v = $('view-fam');
     [...v.children].forEach(ch => { ch.hidden = ch.id === 'famprof' ? mode === 'list' : mode !== 'list'; });
+    if (mode !== 'list') { S.open = false; $('fambk').hidden = true; }
     if (mode === 'profile') { const i = S.A.findIndex(a => a.id === S.prof); if (i >= 0) famSel = i; renderProfile(); }
     else if (mode === 'scope') renderScope();
     else if (mode === 'queue') renderQueue();
@@ -711,7 +712,7 @@
     });
     btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
     aside.classList.add('famdrawer'); aside.parentElement.classList.add('famrow'); aside.setAttribute('aria-label', 'Practitioner details');
-    v.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>');
+    document.body.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>'); // outside #view-fam: route code toggles that view's children
     addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) famClose(); });
     aside.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && S.open) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
