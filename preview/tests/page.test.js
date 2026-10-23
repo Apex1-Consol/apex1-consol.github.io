@@ -29,6 +29,8 @@ const DATA = {
   fam_documents: [{ id: 21, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: false, version: 1, file_url: 'apex/1/old.pdf' }, { id: 22, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: true, version: 2, file_url: 'apex/1/cv.pdf' },
     { id: 23, assessor_id: 2, doc_type: 'SLA', status: 'Missing', is_current: true, version: 1 }],
   fam_follow_ups: [{ id: 31, assessor_id: 2, source_type: 'registration', source_id: 12, kind: 'expired', status: 'Open' }],
+  qualifications: [{ id: 'q-101869', name: 'OC: Project Manager', saqa_id: '101869' }, { id: 'q-118699', name: 'OC: Cloud Administrator', saqa_id: '118699' }],
+  fam_registration_scope: [{ id: 1, registration_id: 11, qualification_id: 'q-101869' }],
   v_fam_completeness: [{ assessor_id: 1, full_name: 'Fac One', document_count: 2, registration_count: 1, open_follow_ups: 0 }],
   v_learner_data_quality: [{ learner_id: 2, issue: 'missing_id', first_name: 'Test', last_name: 'Learner02', enrolment_count: 0 }, { learner_id: 1, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 1 }, { learner_id: 3, issue: 'possible_duplicate', first_name: 'Test', last_name: 'Learner01', enrolment_count: 0 }],
   program_modules: [{ id: 200, programme_id: 100, module_number: 1, title: 'Mod one', dates: 'Jun 2026', trained: true, components: [{ code: 'T-KM-01', kind: 'KM', title: 'Know', hours: 10, facilitator_id: 1 }, { code: 'T-PM-01', kind: 'PM', title: 'Do', hours: null, facilitator_id: 1 }, { code: 'T-WM-01', kind: 'WM', title: 'Work', hours: 5 }] }],
@@ -291,6 +293,43 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(/at least one role/.test(d.getElementById('famerr').textContent), 'no role check');
     f.elements.r_Assessor.checked = true; f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick(); await tick();
     const u = log.find(x => x.table === 'fam_seta_registrations'); ok(u && u.val.assessor_id === 3 && u.val.roles.join() === 'Assessor', JSON.stringify(u));
+  });
+  await t('FAM: completeness, sort, expiry strip, QUAL label, Excel export', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    ok(/Incompleteprofiles3/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+    ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
+    w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
+    ok(/already expired/.test(d.getElementById('famstrip').textContent), d.getElementById('famstrip').textContent);
+    w.eval('famSel=0'); w.renderFam(); ok(/Practitioner certificate/.test(d.getElementById('fampanel').textContent) && !/>QUAL</.test(d.getElementById('fampanel').innerHTML), 'QUAL label');
+    w.famExport(false); const f = w.__files[0]; ok(f && f.wb.SheetNames.join() === 'Practitioners,Registrations', 'no workbook');
+    const rowsX = XLSX.utils.sheet_to_json(f.wb.Sheets.Practitioners); ok(rowsX.length === 3 && rowsX.some(r => r['Completeness %'] !== undefined), JSON.stringify(rowsX[0]));
+  });
+  await t('FAM: profile page by deep link, tabs, live-style link redirects', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    w.location.hash = 'fam/1'; await tick();
+    const p = d.getElementById('famprof'); ok(!p.hidden && /Fac One/.test(p.textContent) && /Overview/.test(p.textContent) && d.getElementById('famstrip').hidden, 'profile not shown');
+    ok(/OC: Project Manager/.test(p.textContent), 'scope missing on overview');
+    w.famTab('docs'); ok(/1 older/.test(p.textContent), 'docs tab'); w.famTab('activity'); ok(/Activity/.test(p.textContent), 'activity tab');
+    w.location.hash = 'view=fam&assessor=2'; await tick(); await tick(); ok(w.location.hash === '#fam/2' && /Ass Two/.test(p.textContent), w.location.hash);
+    w.location.hash = 'fam'; await tick(); ok(p.hidden && !d.getElementById('famstrip').hidden, 'back to list');
+  });
+  await t('FAM: bulk claim upserts all open follow-ups of the selection', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.famPick(2, true); ok(!d.getElementById('fambulk').hidden && /1 open follow-up/.test(d.getElementById('fambulk').textContent), 'bulk bar');
+    await w.famBulk('claim'); const u = log.find(x => x.table === 'fam_follow_ups');
+    ok(u && u.op === 'upsert' && Array.isArray(u.val) && u.val[0].status === 'In Progress' && u.val[0].source_id === 12, JSON.stringify(u));
+  });
+  await t('FAM: Scope Import commits scope + audit; manual scope add', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.FAM_SCOPE_CATALOGUE = [{ saqa_id: '118699', qualification_name: 'OC: Cloud Administrator', seta: 'MICT SETA' }, { saqa_id: '1', qualification_name: 'Unknown', seta: 'QCTO' }];
+    w.location.hash = 'fam/scope'; await tick(); await tick();
+    const rows = d.querySelectorAll('#famsi-rows tr'); ok(rows.length === 2 && /Not in qualifications/.test(rows[1].textContent), 'catalogue rows');
+    rows[0].querySelector('input').checked = true; rows[0].querySelector('select').value = '12'; w.famSIReady();
+    ok(!d.getElementById('famsi-go').disabled, 'approve still disabled');
+    await w.famSIGo(); await tick();
+    const s = log.find(x => x.table === 'fam_registration_scope'); ok(s && s.val[0].registration_id === 12 && s.val[0].qualification_id === 'q-118699', JSON.stringify(s));
+    ok(log.some(x => x.table === 'audit_log' && x.val.action === 'SCOPE_IMPORT_COMMIT'), 'no audit row');
+    w.famScope(11); const f = d.getElementById('famform'); ok(f.elements.qid.options.length === 1 && f.elements.qid.value === 'q-118699', 'already-linked not excluded');
   });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })();

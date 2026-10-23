@@ -638,7 +638,7 @@ function renderNav(cur){curNav=cur;
   $('nav').innerHTML=NAV.map(([g,items])=>`<div class="navgroup"><span>${g}</span>${items.filter(([l,r])=>!(window.NAVR&&NAVR[r])||NAVR[r]()).map(([l,r])=>r?`<a class="navlink${r===cur?' on':''}" href="#${r}" title="${esc(l)}"${r===cur?' aria-current="page"':''}>${ico(r)}<span class="lbl">${esc(l)}</span>${NC[r]&&NC[r]()?`<span class="navcount" aria-label="${NC[r]()} waiting">${NC[r]()}</span>`:''}</a>`:`<a class="navlink dim" href="#" onclick="toast('${esc(l)} not mocked yet');return false">${esc(l)}</a>`).join('')}</div>`).join('');
 }
 function route(){
-  const r=location.hash.slice(1)||'login';
+  const r=location.hash.slice(1).split('/')[0]||'login';
   const isLogin=r==='login'||!ROUTES[r];
   $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
   document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);

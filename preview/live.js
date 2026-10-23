@@ -34,9 +34,11 @@
   removeEventListener('hashchange', _route);
   addEventListener('hashchange', () => window.route());
   window.route = function () {
-    const r = location.hash.slice(1) || 'login';
-    if (!P.user && r !== 'login') { location.hash = 'login'; return; }
-    if (P.user && r === 'login') { location.hash = 'mywork'; return; }
+    const legacy = location.hash.match(/view=fam&assessor=(\d+)/); // live-style deep link
+    if (legacy) { location.replace('#fam/' + legacy[1]); return; }
+    const r = location.hash.slice(1).split('/')[0] || 'login';
+    if (!P.user && r !== 'login') { try { sessionStorage.setItem('pvNext', location.hash); } catch (_) {} location.hash = 'login'; return; }
+    if (P.user && r === 'login') { let n = null; try { n = sessionStorage.getItem('pvNext'); sessionStorage.removeItem('pvNext'); } catch (_) {} location.hash = n && n !== '#login' ? n : 'mywork'; return; }
     _route();
     if (P.user) afterRoute(r);
   };
