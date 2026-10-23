@@ -113,6 +113,8 @@
   window.famMode = v => { S.view = v; S.page = 0; renderFam(); };
   window.famTest = () => { S.hideTest = !S.hideTest; S.page = 0; S.sel.clear(); render(); };
   window.famPage = d => { S.page = Math.max(0, S.page + d); renderRows(); };
+  window.famShow = i => { famSel = i; S.open = true; renderFam(); };
+  window.famClose = () => { S.open = false; renderPanel(); };
   window.famPTab = t => { S.ptab = t; renderPanel(); };
   window.famOpen = id => { location.hash = 'fam/' + id; };
 
@@ -174,8 +176,8 @@
       $('famrows').innerHTML = list.length ? list.map(([a, i], n) => {
         const g = worst(a), gn = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g).length : 0, w = when(a), act = rowAction(a), st = [...new Set(regsFor(a.id).map(r => r.seta_name === 'N/A' ? 'SETA not named' : r.seta_name === 'Pending Entry' ? 'Not captured yet' : r.seta_name).filter(Boolean))];
         return (gn ? `<tr class="famgh"><td colspan="4"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${gn}</span><span class="sub">${WGRP[g][2]}</span></td></tr>` : '') +
-          `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famSel=${i};renderFam()">
-          <td><button class="famname" onclick="event.stopPropagation();famSel=${i};renderFam()" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
+          `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
+          <td><button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
           <td><div style="${w[1]}">${e(w[0])}</div><div class="sub famclip">${e(st.join(', ') || '—')}</div></td>
           <td class="famdocs" style="white-space:nowrap">${meter(a)}</td>
           <td style="text-align:right">${act ? `<button class="famact" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`;
@@ -187,7 +189,7 @@
     $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
       return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
-        <td><button class="famname" onclick="famSel=${i};renderFam()">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
+        <td><button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
         <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
@@ -324,14 +326,15 @@
     const a = S.A[famSel] || S.A[0], box = $('fampanel');
     if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
     const ids = rows().map(([, i]) => i), pos = ids.indexOf(famSel), hist = S.ptab === 'history';
+    const dr = box.parentElement, shut = !S.open || pos < 0;
+    dr.classList.toggle('open', !shut); $('fambk').hidden = shut; if (shut) { S.open = false; box.innerHTML = ''; return; }
     const ev = hist ? activity(a) : [];
     box.innerHTML = `<div class="famnav"><span class="sub">${pos >= 0 ? `${pos + 1} of ${ids.length} in this list` : 'Not in the current list'}</span>
-        <button class="btn sm" onclick="famMove(-1)" aria-label="Previous practitioner">↑</button><button class="btn sm" onclick="famMove(1)" aria-label="Next practitioner">↓</button></div>
+        <button class="btn sm" onclick="famMove(-1)" aria-label="Previous practitioner">↑</button><button class="btn sm" onclick="famMove(1)" aria-label="Next practitioner">↓</button><button class="btn sm" onclick="famClose()" aria-label="Close panel">✕</button></div>
       <div class="famhead"><span class="disp" style="font-size:20px">${isTest(a) ? '<span class="famtag" style="background:#3A3994;color:#fff">TEST</span>' : ''}${e(shownName(a))}</span>
         <span style="font-size:13px;color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button>
-        <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button></div></div>
       <div class="famtabs" role="tablist" style="padding:0 20px"><button role="tab" aria-selected="${!hist}" class="${hist ? '' : 'on'}" onclick="famPTab('record')">Record</button><button role="tab" aria-selected="${hist}" class="${hist ? 'on' : ''}" onclick="famPTab('history')">History</button></div>
       ${hist ? `<div style="padding:12px 20px 16px">${ev.length ? ev.map(([t, l]) => `<div class="famev"><span class="sub">${fmt(t)}</span><span>${e(l)}</span></div>`).join('') : '<div class="sub">No changes recorded yet.</div>'}
         <p class="sub" style="margin:10px 0 0;font-size:12px">Built from registrations, documents and follow-ups, newest first.</p></div>` : `${nextBox(a)}
@@ -392,8 +395,7 @@
       <section class="card famphead"><div style="display:flex;gap:12px;flex-wrap:wrap;align-items:flex-start"><div style="flex-grow:1;display:flex;flex-direction:column;gap:4px">
           <span class="disp" style="font-size:24px">${e(a.full_name)}</span><span style="color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
           <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${pill(status(a.id))}<span class="famscore">${c.score}% complete</span></div></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button>
-          <button class="btn sm" disabled title="Needs the AI function in the preview project (paid Gemini tier, see handoff)">AI compliance summary</button></div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button></div></div>
         <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', a.id_number)}${kv('Address', a.physical_address)}</div></section>
       <div class="famtabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" onclick="famTab('${k}')">${l}</button>`).join('')}</div>
       ${body}`;
@@ -648,7 +650,12 @@
       .famact:hover{text-decoration:underline}
       .famclip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .famnav{display:flex;gap:6px;align-items:center;padding:10px 20px}.famnav .sub{flex-grow:1;font-size:12px}
-      @media (max-width:720px){#view-fam .famdocs{display:none}.famtool{flex-wrap:wrap}.famtool input{flex:1 1 100%}.famclip{max-width:140px}.famact{white-space:normal;text-align:right}#famkpis .famk{min-width:96px}}
+      #view-fam .famrow{display:block}#view-fam .famrow>section{width:100%;max-width:none}
+      #view-fam .famdrawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);margin:0;z-index:60;overflow:auto;background:var(--card,#fff);border-radius:0;box-shadow:-8px 0 32px rgba(20,20,60,.18);transform:translateX(105%);transition:transform .2s ease;visibility:hidden}
+      #view-fam .famdrawer.open{transform:none;visibility:visible}
+      #fambk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
+      @media (prefers-reduced-motion:reduce){#view-fam .famdrawer{transition:none}}
+      @media (max-width:720px){#view-fam .famdrawer{width:100vw}#view-fam .famdocs{display:none}.famtool{flex-wrap:wrap}.famtool input{flex:1 1 100%}.famclip{max-width:140px}.famact{white-space:normal;text-align:right}#famkpis .famk{min-width:96px}}
       .famstep{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
@@ -694,6 +701,10 @@
       if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.title = 'Arrives with PR #61'; b.onclick = () => say('Bulk Intake arrives with PR #61'); }
     });
     btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
+    aside.classList.add('famdrawer'); aside.parentElement.classList.add('famrow'); aside.setAttribute('aria-label', 'Practitioner details');
+    v.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>');
+    addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) famClose(); });
+    aside.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && S.open) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';
