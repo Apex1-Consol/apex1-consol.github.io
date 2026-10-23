@@ -52,6 +52,12 @@ Run these against the preview only. Every record is test data in `apexone-previe
 - [ ] KPI filters, column sorting, search, and the 90-day expiry strip (a dot opens the profile).
 - [ ] Statuses: No registrations, Expired, Mixed and Needs review. Completeness gaps show under the status.
 - [ ] Due soon: a practitioner whose registrations are all due within 60 days shows a yellow "Due soon" badge (not Inactive). It sorts after Mixed and before Needs review, and the Excel export shows "Due soon".
+- [ ] Expiry boundaries: registrations expiring yesterday, today, and in 30, 31, 60 and 61 days land in Expired, ≤30 days, ≤30 days, ≤30 days, 31–60 days, 31–60 days and not flagged.
+- [ ] One Active registration plus one due within 60 days shows Mixed, not Due soon.
+- [ ] Follow-ups are created automatically for expired, ≤30 days, 31–60 days, pending entry and missing document, each with the right label.
+- [ ] The profile's next action picks the most urgent: "Renew X (expired)" before "Renew X in Nd" before "Plan renewal: X".
+- [ ] As a non-admin, replacing a PDF is blocked.
+- [ ] Dark mode: the yellow Due soon and Mixed badges are readable.
 - [ ] Export to Excel gives Practitioners and Registrations sheets, matching the filtered list. Export selected works too.
 - [ ] Profile at `#fam/<id>`: all tabs work, Copy link works, and the old `#view=fam&assessor=<id>` link redirects. A deep link opened while signed out lands on the profile after sign-in.
 - [ ] Scope Import (`#fam/scope`): link a matching catalogue row to a registration. It shows on the profile, and an audit_log row is written. Rows marked "Not in qualifications" can't be selected.
