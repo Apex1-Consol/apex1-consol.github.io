@@ -4,6 +4,7 @@
    Side panel: quick view with registrations, follow-ups and the versioned document checklist.
    Profile page (#fam/<id>, live-style #view=fam&assessor=<id> also works): header with contact details and
    completeness, tabs for Overview, Registrations (+ qualification scope), Documents, Follow-ups and Activity.
+   Action queue (#fam/queue): all open follow-up items, filter by issue / mine, show dismissed.
    Scope Import (#fam/scope): catalogue rows linked to registrations, written to fam_registration_scope + audit_log.
    Status and risk rules are the same as fam-registry.html. Writes go through previewWrite; RLS decides who may write. */
 (function () {
@@ -364,24 +365,55 @@
     } catch (err) { btn.disabled = false; btn.textContent = 'Approve selected'; }
   };
 
+  /* ---------- Action queue (#fam/queue): every open item across practitioners, like live's renewal queue ---------- */
+  const QRANK = { expired: 0, due_30: 1, missing_doc: 2, due_60: 3, pending: 4 };
+  function queueItems() {
+    const out = [];
+    S.R.forEach(r => { const k = risk(r); if (k in QRANK && k !== 'missing_doc') out.push({ type: 'registration', sid: r.id, aid: r.assessor_id, kind: k, what: `${r.seta_name || 'SETA not captured'}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`, d: days(r) ?? 9999 }); });
+    S.A.forEach(a => TYPES.forEach(t => { const c = cur(a.id, t); if (c && c.status === 'Missing') out.push({ type: 'document', sid: c.id, aid: a.id, kind: 'missing_doc', what: lbl(t), d: 9999 }); }));
+    return out.map(i => ({ ...i, f: fu(i.type, i.sid), name: S.A.find(a => a.id === i.aid)?.full_name || 'Unknown' }))
+      .sort((x, y) => QRANK[x.kind] - QRANK[y.kind] || x.d - y.d || x.name.localeCompare(y.name));
+  }
+  window.famQ = (k, v) => { S.qf = { ...(S.qf || {}), [k]: v }; renderQueue(); };
+  function renderQueue() {
+    const box = $('famprof'), qf = S.qf || {};
+    $('heading').textContent = 'Action queue'; $('crumb').textContent = 'Quality / FAM Registry';
+    const all = queueItems(), shut = i => i.f && CLOSED.includes(i.f.status);
+    const list = all.filter(i => (qf.dis || !shut(i)) && (!qf.kind || i.kind === qf.kind) && (!qf.mine || i.f?.assigned_to === me()));
+    const open = all.filter(i => !shut(i)), unclaimed = open.filter(i => i.f?.status !== 'In Progress').length;
+    box.innerHTML = `<a href="#fam" class="famback">← FAM Registry</a>
+      <section class="card" style="display:flex;flex-direction:column;gap:10px"><div><h2 style="font-size:17px">Action queue</h2>
+        <p class="sub" style="margin:4px 0 0">${open.length} open item${open.length === 1 ? '' : 's'} · ${unclaimed} not claimed yet. Expired and due registrations, pending entries and missing documents across all practitioners.</p></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+          <select class="faminput" aria-label="Filter by issue" onchange="famQ('kind',this.value)"><option value="">All issues</option>${Object.keys(QRANK).map(k => `<option value="${k}" ${qf.kind === k ? 'selected' : ''}>${e(KIND[k])}</option>`).join('')}</select>
+          <label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${qf.mine ? 'checked' : ''} onchange="famQ('mine',this.checked)"> Assigned to me</label>
+          <label class="sub" style="display:flex;gap:6px;align-items:center"><input type="checkbox" ${qf.dis ? 'checked' : ''} onchange="famQ('dis',this.checked)"> Show dismissed</label></div></section>
+      <section class="card" style="padding:0"><div class="tw"><table style="min-width:0;width:100%"><thead><tr><th>Practitioner</th><th>Issue</th><th>Follow-up</th></tr></thead><tbody>
+      ${list.map(i => `<tr><td><a href="#fam/${i.aid}"><b>${e(i.name)}</b></a></td>
+        <td><span class="badge ${['expired', 'due_30', 'missing_doc'].includes(i.kind) ? 'b-bad' : i.kind === 'due_60' ? 'b-warn' : 'b-n'}">${e(KIND[i.kind])}</span><div class="sub">${e(i.what)}</div></td>
+        <td>${canWrite() ? fuControls(i.type, i.sid, i.aid, i.kind) : `<span class="sub">${e(i.f?.status || 'Open')}${i.f?.assigned_to ? ' · ' + e(i.f.assigned_to) : ''}</span>`}</td></tr>`).join('') || '<tr><td colspan="3" class="sub" style="padding:20px">Nothing to action. 🎉</td></tr>'}
+      </tbody></table></div></section>`;
+  }
+
   /* ---------- modes ---------- */
   function syncRoute() {
     const h = location.hash.slice(1);
     if (h.split('/')[0] !== 'fam' || !ready) return;
     const arg = h.split('/')[1];
-    const mode = arg === 'scope' ? 'scope' : arg ? 'profile' : 'list';
+    const mode = arg === 'scope' ? 'scope' : arg === 'queue' ? 'queue' : arg ? 'profile' : 'list';
     if (mode === 'profile' && S.prof !== Number(arg)) S.tab = 'overview';
     S.mode = mode; S.prof = mode === 'profile' ? Number(arg) : null;
     const v = $('view-fam');
     [...v.children].forEach(ch => { ch.hidden = ch.id === 'famprof' ? mode === 'list' : mode !== 'list'; });
     if (mode === 'profile') { const i = S.A.findIndex(a => a.id === S.prof); if (i >= 0) famSel = i; renderProfile(); }
     else if (mode === 'scope') renderScope();
+    else if (mode === 'queue') renderQueue();
     else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
   }
   function render() {
     $('famkpis').innerHTML = KPIS().map(([k, l, v, c]) => `<button class="kpi famk${S.filter && S.filter === k ? ' on' : ''}" ${k ? `onclick="famFilter('${k}')" aria-pressed="${S.filter === k}"` : 'disabled'} title="${k ? 'Filter the list' : ''}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`).join('');
     renderStrip(); renderRows(); renderPanel();
-    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope();
+    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'queue') renderQueue();
   }
 
   /* ---------- modal ---------- */
@@ -540,7 +572,7 @@
       if (t === 'Scope Import') { b.removeAttribute('onclick'); b.onclick = () => { location.hash = 'fam/scope'; }; }
       if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.title = 'Arrives with PR #61'; b.onclick = () => say('Bulk Intake arrives with PR #61'); }
     });
-    btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
+    btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';

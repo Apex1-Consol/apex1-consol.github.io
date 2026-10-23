@@ -46,6 +46,7 @@ Run these against the preview only. Every record is test data in `apexone-previe
 
 **FAM Registry** (needs `migrations/2026-10-23_fam_preview.sql`, applied 2026-10-23)
 - [ ] Add a practitioner, then use Edit details on their profile.
+- [ ] Action queue (#fam/queue): lists expired, due, pending and missing-doc items across practitioners; Claim, Note and Dismiss work; "Show dismissed" brings dismissed items back with Reopen; "Assigned to me" and the issue filter narrow the list.
 - [ ] Add a registration. A save with no role is blocked.
 - [ ] Upload a PDF, view it, replace it as admin, and check that the history shows.
 - [ ] Claim, note, dismiss and reopen a follow-up. Select two practitioners and use bulk Claim and Dismiss.
