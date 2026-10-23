@@ -51,6 +51,7 @@ Run these against the preview only. Every record is test data in `apexone-previe
 - [ ] Claim, note, dismiss and reopen a follow-up. Select two practitioners and use bulk Claim and Dismiss.
 - [ ] KPI filters, column sorting, search, and the 90-day expiry strip (a dot opens the profile).
 - [ ] Statuses: No registrations, Expired, Mixed and Needs review. Completeness gaps show under the status.
+- [ ] Due soon: a practitioner whose registrations are all due within 60 days shows a yellow "Due soon" badge (not Inactive). It sorts after Mixed and before Needs review, and the Excel export shows "Due soon".
 - [ ] Export to Excel gives Practitioners and Registrations sheets, matching the filtered list. Export selected works too.
 - [ ] Profile at `#fam/<id>`: all tabs work, Copy link works, and the old `#view=fam&assessor=<id>` link redirects. A deep link opened while signed out lands on the profile after sign-in.
 - [ ] Scope Import (`#fam/scope`): link a matching catalogue row to a registration. It shows on the profile, and an audit_log row is written. Rows marked "Not in qualifications" can't be selected.
