@@ -1852,6 +1852,7 @@
                                 <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.loadAll()">&#8635; Refresh</button>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.openScopeImport()">Scope Import</button>
+                                <button class="btn btn-secondary btn-sm" onclick="FAM.openBulkIntake()">Bulk Intake</button>
         <button class="btn btn-secondary btn-sm" onclick="FAM.generateComplianceDigest()">&#10024; Compliance Digest</button>
                                 <button class="btn btn-gold btn-sm" onclick="FAM.openAddPractitioner()">+ Add practitioner</button>
                             </div>
@@ -1921,6 +1922,31 @@
                             <table class="data-table">
                                 <thead><tr><th></th><th>Qualification</th><th>SETA</th><th>Level / credits</th><th>Target registration</th><th>Decision</th></tr></thead>
                                 <tbody id="fam-si-tbody"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+                <!-- Bulk Intake: drop a batch of practitioner documents, review, approve.
+                     Files are read in the browser only; nothing goes to an AI service. -->
+                <div id="fam-bulk-intake" style="display:none;">
+                    <div class="fam-banner">
+                        <span><strong>Private intake:</strong> files are read on this computer only and nothing is saved until you approve.</span>
+                        <button class="btn btn-secondary btn-sm" onclick="FAM.closeBulkIntake()">Back to registry</button>
+                    </div>
+                    <div class="content-container">
+                        <div class="container-header">
+                            <h2>Bulk document intake</h2>
+                            <span style="font-size:11px;color:var(--text-muted);">Check each suggestion: type, practitioner and roles are best guesses</span>
+                        </div>
+                        <div class="filter-row">
+                            <input type="file" id="fam-bi-files" multiple accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onchange="FAM.addBulkFiles(this)">
+                            <span id="fam-bi-status" style="font-size:12px;color:var(--text-muted);flex:1;"></span>
+                            <button id="fam-bi-approve" class="btn btn-gold btn-sm" disabled onclick="FAM.approveBulkIntake()">Approve selected</button>
+                        </div>
+                        <div class="table-wrapper">
+                            <table class="data-table">
+                                <thead><tr><th></th><th>File</th><th>Document type</th><th>Practitioner</th><th>Roles</th><th>Found in file</th><th></th></tr></thead>
+                                <tbody id="fam-bi-tbody"></tbody>
                             </table>
                         </div>
                     </div>
@@ -11409,6 +11435,7 @@ function copyAIDigest() {
 
   function openScopeImport(){
     document.getElementById('fam-main-content').style.display = 'none';
+    document.getElementById('fam-bulk-intake').style.display = 'none';
     document.getElementById('fam-scope-import').style.display = 'block';
     const sel = document.getElementById('fam-si-seta');
     sel.innerHTML = '<option value="">All SETAs</option>' + [...new Set(scopeCatalogue.map(row => row.seta))].sort().map(v => `<option>${escapeHtml(v)}</option>`).join('');
@@ -11490,6 +11517,257 @@ function copyAIDigest() {
     finally { btn.disabled = false; btn.textContent = 'Approve selected'; updateApproveButton(); }
   }
 
+  // ---------- Bulk Intake (local document intake, no external AI) ----------
+  // Reads dropped files IN THE BROWSER ONLY (pdf.js for PDFs, JSZip for .docx),
+  // guesses document type, matches practitioners by name, and spots roles/SETA/
+  // registration numbers with plain pattern rules. Nothing is sent to any AI
+  // service; file text is held in memory only and discarded when the panel closes.
+  // Nothing is saved until the user clicks "Approve selected" (POPIA s10/s19:
+  // minimal processing, human approval, audit_log row per commit).
+  const BI_SETAS = ['AGRI SETA','BANK SETA','CATHSSETA','CETA','CHIETA','ETDP SETA','EWSETA','FASSET','FP&M SETA','FOODBEV SETA','HWSETA','INSETA','LG SETA','MERSETA','MICT SETA','MQA','PSETA','SASSETA','SERVICES SETA','TETA','W&RSETA','QCTO'];
+  const BI_DOC_TYPES = ['CV','Highest Qualification','QUAL','ID','SLA','AFFIDAVIT'];
+  const BI_STOP = new Set(['cv','curriculum','vitae','resume','id','copy','certified','certificate','cert','passport','qualification','qualifications','qual','assessor','moderator','facilitator','mba','degree','diploma','updated','final','new','doc','scan','scanned','document','documents','profile','registration','report','letter','statement','results','affidavit','sla','the','and','of','pdf','docx','jpg','png','irmsa','seta','risk','management','highest','version','v1','v2','mr','mrs','ms','dr','prof']);
+  const bi = { rows: [], seq: 0 };
+
+  function biTitle(s) { return s.replace(/\b([a-z])([a-z]*)/gi, (m, a, b) => a.toUpperCase() + b.toLowerCase()); }
+  function biTokens(s) { return (String(s || '').toLowerCase().match(/[a-zÀ-ɏ]{2,}/g) || []); }
+
+  let pdfjsPromise = null;
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (pdfjsPromise) return pdfjsPromise;
+    pdfjsPromise = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      s.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js'; resolve(window.pdfjsLib); };
+      s.onerror = () => { pdfjsPromise = null; reject(new Error('Could not load the PDF reader')); };
+      document.head.appendChild(s);
+    });
+    return pdfjsPromise;
+  }
+  async function biExtractText(file) {
+    const ext = (file.name.split('.').pop() || '').toLowerCase();
+    try {
+      if (ext === 'pdf') {
+        const lib = await loadPdfJs();
+        const pdf = await lib.getDocument({ data: await file.arrayBuffer() }).promise;
+        const parts = [];
+        for (let p = 1; p <= Math.min(pdf.numPages, 6); p++) {
+          const c = await (await pdf.getPage(p)).getTextContent();
+          parts.push(c.items.map(i => i.str).join(' '));
+        }
+        return parts.join('\n');
+      }
+      if (ext === 'docx' && window.JSZip) {
+        const zip = await JSZip.loadAsync(await file.arrayBuffer());
+        const xml = await zip.file('word/document.xml')?.async('string');
+        return xml ? xml.replace(/<\/w:p>/g, '\n').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/[ \t]+/g, ' ') : '';
+      }
+    } catch (e) { console.warn('Bulk intake: could not read', file.name, e.message); }
+    return ''; // images, .doc, scans: classified from the file name only
+  }
+
+  function biGuessType(name, text) {
+    const f = name.toLowerCase(), t = text.slice(0, 3000).toLowerCase();
+    if (/passport|\bid\b|id[_\- ]?(copy|doc)|identity/.test(f) || /identity document|republic of south africa.*identity|passport no/.test(t)) return 'ID';
+    if (/affidavit/.test(f) || /commissioner of oaths|solemnly (swear|declare)/.test(t)) return 'AFFIDAVIT';
+    if (/\bsla\b|service.?level/.test(f) || /service level agreement/.test(t)) return 'SLA';
+    if (/\bcv\b|curriculum|vitae|resume/.test(f) || /curriculum vitae|work experience|employment history/.test(t)) return 'CV';
+    if (/\bmba\b|degree|diploma|bachelor|master|honours|phd/.test(f) || /(bachelor|master|doctor) of |honours degree|national diploma/.test(t)) return 'Highest Qualification';
+    return 'QUAL';
+  }
+  function biMatchAssessor(name, text) {
+    const hay = new Set([...biTokens(name.replace(/\.[^.]+$/, '')), ...biTokens(text.slice(0, 4000))]);
+    let best = null, bestScore = 0, tie = false;
+    for (const a of fs.assessors) {
+      const toks = biTokens(a.full_name);
+      if (!toks.length || !hay.has(toks[toks.length - 1])) continue; // surname must appear
+      const score = toks.filter(t => hay.has(t)).length / toks.length;
+      if (score > bestScore) { best = a; bestScore = score; tie = false; } else if (score === bestScore) tie = true;
+    }
+    return bestScore >= 0.6 ? { id: best.id, ambiguous: tie } : null;
+  }
+  function biGuessName(name, text, type) {
+    if (type === 'CV') {
+      const line = text.split('\n').map(l => l.trim()).find(l => /^[A-Za-zÀ-ɏ'\-]+( [A-Za-zÀ-ɏ'\-]+){1,3}$/.test(l) && !biTokens(l).some(t => BI_STOP.has(t)));
+      if (line) return biTitle(line);
+    }
+    const holder = text.match(/(?:certif(?:y|ies) that|awarded to|presented to|conferred (?:up)?on)\s+([A-Z][A-Za-z'\-]+(?:\s+[A-Z][A-Za-z'\-]+){1,3})/);
+    if (holder) return biTitle(holder[1]);
+    const toks = name.replace(/\.[^.]+$/, '').split(/[^A-Za-zÀ-ɏ']+/).filter(t => t.length > 1 && !BI_STOP.has(t.toLowerCase()) && !/^\d/.test(t));
+    return biTitle(toks.slice(0, 3).join(' '));
+  }
+  function biValidSaId(n) {
+    if (!/^\d{13}$/.test(n)) return false;
+    let sum = 0;
+    for (let i = 0; i < 13; i++) { let d = +n[12 - i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } sum += d; }
+    return sum % 10 === 0;
+  }
+  function biFindDetails(text) {
+    const t = text.slice(0, 20000), lower = t.toLowerCase();
+    const roles = ['Facilitator', 'Assessor', 'Moderator'].filter(r => new RegExp('\\b' + r.toLowerCase() + '\\b').test(lower));
+    const setas = BI_SETAS.filter(s => lower.replace(/[\s-]/g, '').includes(s.toLowerCase().replace(/[\s-]/g, '')));
+    const regNo = (t.match(/\b[A-Z]{2,6}\/\d{1,4}\/\d{4}\/\d{2,6}\b/) || [])[0] || '';
+    const idNo = (t.match(/\b\d{13}\b/g) || []).find(biValidSaId) || '';
+    return { roles, setas, regNo, idNo };
+  }
+
+  function openBulkIntake() {
+    document.getElementById('fam-main-content').style.display = 'none';
+    document.getElementById('fam-scope-import').style.display = 'none';
+    document.getElementById('fam-bulk-intake').style.display = 'block';
+    renderBulkIntake();
+  }
+  function closeBulkIntake() {
+    bi.rows = []; // drop extracted text from memory
+    document.getElementById('fam-bi-files').value = '';
+    document.getElementById('fam-bulk-intake').style.display = 'none';
+    document.getElementById('fam-main-content').style.display = 'block';
+  }
+
+  async function addBulkFiles(input) {
+    const files = [...(input.files || [])];
+    input.value = '';
+    if (!files.length) return;
+    const status = document.getElementById('fam-bi-status');
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      status.textContent = `Reading ${i + 1} of ${files.length}: ${file.name}`;
+      const row = { key: ++bi.seq, file, include: true, error: '', note: [] };
+      try { validateDocumentFile(file); } catch (e) { row.error = e.message; row.include = false; }
+      const text = row.error ? '' : await biExtractText(file);
+      row.type = biGuessType(file.name, text);
+      const m = biMatchAssessor(file.name, text);
+      row.assessorId = m ? String(m.id) : 'new';
+      if (m && m.ambiguous) row.note.push('Several practitioners match, check the name');
+      row.newName = m ? '' : biGuessName(file.name, text, row.type);
+      const d = biFindDetails(text);
+      row.roles = row.type === 'ID' ? [] : d.roles;
+      row.setas = d.setas; row.regNo = d.regNo;
+      row.idNo = row.type === 'ID' ? d.idNo : '';
+      row.addReg = row.roles.length > 0;
+      if (!text && !row.error) row.note.push('No readable text (scan or image), type and name guessed from the file name');
+      if (m && fs.documents.some(x => String(x.assessor_id) === row.assessorId && x.is_current !== false && x.file_name === file.name)) {
+        row.note.push('A file with this name is already on file'); row.include = false;
+      }
+      bi.rows.push(row);
+    }
+    // Files for the same new person often have differently-built names; unify by surname.
+    const news = bi.rows.filter(r => r.assessorId === 'new' && r.newName);
+    for (const r of news) {
+      const sur = biTokens(r.newName).pop();
+      const longer = news.find(o => o !== r && biTokens(o.newName).pop() === sur && o.newName.length > r.newName.length);
+      if (longer) r.newName = longer.newName;
+    }
+    status.textContent = `${bi.rows.length} file(s) ready for review. Nothing is saved until you approve.`;
+    renderBulkIntake();
+  }
+
+  function biSet(key, field, value) {
+    const r = bi.rows.find(x => x.key === key);
+    if (!r) return;
+    if (field === 'role') { r.roles = r.roles.includes(value) ? r.roles.filter(x => x !== value) : [...r.roles, value]; }
+    else r[field] = value;
+    if (field === 'assessorId') renderBulkIntake();
+    else updateBulkApprove();
+  }
+  function biRemove(key) { bi.rows = bi.rows.filter(x => x.key !== key); renderBulkIntake(); }
+
+  function renderBulkIntake() {
+    const opts = fs.assessors.map(a => `<option value="${a.id}">${escapeHtml(a.full_name)}</option>`).join('');
+    document.getElementById('fam-bi-tbody').innerHTML = bi.rows.map(r => `<tr>
+      <td><input type="checkbox" ${r.include ? 'checked' : ''} ${r.error ? 'disabled' : ''} onchange="FAM.biSet(${r.key},'include',this.checked)"></td>
+      <td><b>${escapeHtml(r.file.name)}</b><div style="color:var(--text-muted);font-size:11px;">${(r.file.size / 1024).toFixed(0)} KB</div>
+        ${r.error ? `<div style="color:var(--danger,#c0392b);font-size:11px;">${escapeHtml(r.error)}</div>` : ''}
+        ${r.note.map(n => `<div style="color:var(--warning,#b7791f);font-size:11px;">${escapeHtml(n)}</div>`).join('')}</td>
+      <td><select onchange="FAM.biSet(${r.key},'type',this.value)">${BI_DOC_TYPES.map(t => `<option ${t === r.type ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
+      <td><select onchange="FAM.biSet(${r.key},'assessorId',this.value)"><option value="new" ${r.assessorId === 'new' ? 'selected' : ''}>+ New practitioner</option>${opts.replace(`value="${r.assessorId}"`, `value="${r.assessorId}" selected`)}</select>
+        ${r.assessorId === 'new' ? `<input style="margin-top:4px;width:100%;" placeholder="Full name" value="${escapeHtml(r.newName)}" oninput="FAM.biSet(${r.key},'newName',this.value)">
+          ${r.type === 'ID' ? `<input style="margin-top:4px;width:100%;" placeholder="ID number (optional)" value="${escapeHtml(r.idNo)}" oninput="FAM.biSet(${r.key},'idNo',this.value)">` : ''}` : ''}</td>
+      <td>${['Facilitator', 'Assessor', 'Moderator'].map(role => `<label style="display:block;font-size:12px;"><input type="checkbox" ${r.roles.includes(role) ? 'checked' : ''} onchange="FAM.biSet(${r.key},'role','${role}')"> ${role}</label>`).join('')}
+        <label style="display:block;font-size:11px;margin-top:4px;color:var(--text-muted);"><input type="checkbox" ${r.addReg ? 'checked' : ''} onchange="FAM.biSet(${r.key},'addReg',this.checked)"> Add as registration</label></td>
+      <td style="font-size:11px;">${r.setas.length ? escapeHtml(r.setas.join(', ')) : '<span style="color:var(--text-muted);">No SETA found</span>'}
+        ${r.regNo ? `<div>Reg no. ${escapeHtml(r.regNo)}</div>` : ''}</td>
+      <td><button class="btn btn-secondary btn-sm" onclick="FAM.biRemove(${r.key})">Remove</button></td>
+    </tr>`).join('') || '<tr><td colspan="7" style="padding:24px;color:var(--text-muted);">Choose files to start. CVs, certificates, IDs and passports (PDF, Word, JPG, PNG, max 10 MB each).</td></tr>';
+    updateBulkApprove();
+  }
+  function updateBulkApprove() {
+    const btn = document.getElementById('fam-bi-approve');
+    if (!btn) return;
+    const chosen = bi.rows.filter(r => r.include && !r.error);
+    const ok = chosen.length > 0 && chosen.every(r => r.assessorId !== 'new' || r.newName.trim().length > 2);
+    btn.disabled = !ok;
+    btn.textContent = chosen.length ? `Approve ${chosen.length} file(s)` : 'Approve selected';
+  }
+
+  async function approveBulkIntake() {
+    const chosen = bi.rows.filter(r => r.include && !r.error);
+    if (!chosen.length) return;
+    if (!fs.tenantId) { showToast('error', 'No tenant on your account.'); return; }
+    if (chosen.some(r => r.assessorId === 'new' && r.newName.trim().length <= 2)) { showToast('error', 'Enter a full name for every new practitioner.'); return; }
+    const btn = document.getElementById('fam-bi-approve'), status = document.getElementById('fam-bi-status');
+    btn.disabled = true; btn.textContent = 'Saving…';
+    const { data: { user } } = await sb.auth.getUser();
+    const created = {}, done = { practitioners: [], documents: [], registrations: [] }, failed = [];
+    try {
+      // 1. Create each new practitioner once (rows grouped by name).
+      for (const r of chosen.filter(x => x.assessorId === 'new')) {
+        const key = r.newName.trim().toLowerCase().replace(/\s+/g, ' ');
+        if (!created[key]) {
+          const idNo = chosen.find(x => x.assessorId === 'new' && x.newName.trim().toLowerCase().replace(/\s+/g, ' ') === key && x.idNo)?.idNo || null;
+          const [a] = await api('assessors', { method: 'POST', body: JSON.stringify({ tenant_id: fs.tenantId, full_name: biTitle(r.newName.trim()), id_number: idNo }) });
+          created[key] = a.id; done.practitioners.push(a.id);
+        }
+        r.targetId = created[key];
+      }
+      chosen.forEach(r => { if (r.assessorId !== 'new') r.targetId = Number(r.assessorId); });
+      // 2. Upload each file and add its document row.
+      for (let i = 0; i < chosen.length; i++) {
+        const r = chosen[i];
+        status.textContent = `Uploading ${i + 1} of ${chosen.length}: ${r.file.name}`;
+        try {
+          const path = await uploadDocumentFile(r.file, fs.tenantId, r.targetId);
+          const [d] = await api('fam_documents', { method: 'POST', body: JSON.stringify({
+            tenant_id: fs.tenantId, assessor_id: r.targetId, doc_type: r.type, status: 'Current',
+            doc_date: new Date().toISOString().slice(0, 10), file_url: path, file_name: r.file.name,
+            file_size_bytes: r.file.size, mime_type: r.file.type || null, uploaded_by: user?.email || null, uploaded_at: new Date().toISOString(),
+          }) });
+          done.documents.push(d.id); r.saved = true;
+        } catch (e) { failed.push(r.file.name + ': ' + e.message); }
+      }
+      // 3. One registration per practitioner, merging roles across their files and
+      //    skipping roles they already hold on an Active registration.
+      const regs = {};
+      chosen.filter(r => r.addReg && r.roles.length).forEach(r => {
+        const g = regs[r.targetId] ||= { roles: new Set(), setas: new Set(), regNo: '' };
+        r.roles.forEach(x => g.roles.add(x)); r.setas.forEach(x => g.setas.add(x)); g.regNo ||= r.regNo;
+      });
+      for (const [aid, g] of Object.entries(regs)) {
+        const held = new Set(fs.registrations.filter(x => String(x.assessor_id) === aid && x.status !== 'Inactive').flatMap(x => x.roles && x.roles.length ? x.roles : [x.role]));
+        const roles = [...g.roles].filter(x => !held.has(x));
+        if (!roles.length) continue;
+        try {
+          const [reg] = await api('fam_seta_registrations', { method: 'POST', body: JSON.stringify({
+            tenant_id: fs.tenantId, assessor_id: Number(aid), seta_name: g.setas.size ? [...g.setas].join(', ') : 'N/A',
+            role: roles[0], roles, status: 'Active', ...(g.regNo ? { registration_number: g.regNo } : {}),
+          }) });
+          done.registrations.push(reg.id);
+        } catch (e) { failed.push('Registration for practitioner ' + aid + ': ' + e.message); }
+      }
+      await api('audit_log', { method: 'POST', body: JSON.stringify({
+        tenant_id: fs.tenantId, action: 'FAM_BULK_INTAKE_COMMIT', table_name: 'fam_documents', record_id: 'bulk',
+        user_name: user?.email || null, user_role: user?.app_metadata?.role || null,
+        changes: { new_practitioner_ids: done.practitioners, document_ids: done.documents, registration_ids: done.registrations, failed: failed.length },
+      }) }).catch(e => console.warn('audit_log:', e.message));
+      bi.rows = bi.rows.filter(r => !r.saved);
+      showToast(failed.length ? 'error' : 'success', `Saved ${done.documents.length} document(s), ${done.practitioners.length} new practitioner(s), ${done.registrations.length} registration(s)` + (failed.length ? `. ${failed.length} failed: ${failed[0]}` : '.'));
+      status.textContent = failed.length ? 'Some files failed and are still listed below.' : 'All approved files saved.';
+      await loadAll();
+    } catch (e) { showToast('error', 'Bulk intake failed: ' + e.message); }
+    finally { renderBulkIntake(); }
+  }
+
   fs.activeTab = 'all';
 
   return {
@@ -11501,6 +11779,7 @@ function copyAIDigest() {
     claimFollowUp, dismissFollowUp, reopenFollowUp, noteFollowUp,
     openScopeImport, closeScopeImport, renderScopeImport, updateScopeReadiness, updateApproveButton, approveScope,
         generateAssessorSummary, copyAISummary, generateComplianceDigest, copyAIDigest,
+    openBulkIntake, closeBulkIntake, addBulkFiles, biSet, biRemove, approveBulkIntake,
   };
 })();
 </script>
