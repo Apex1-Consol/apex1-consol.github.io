@@ -355,11 +355,12 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       const { w, d } = await boot(sess('admin')); await tick(); await tick(); w.famMode('triage');
       const txt = () => d.getElementById('famrows').textContent;
       ok(/Expiring soon/.test(txt()) && /Soon Four/.test(txt()), 'no 61-90 group');
-      ok(/Lapsed over a year/.test(txt()) && /Old Five/.test(txt()), 'no lapsed group');
-      ok(/Expired 400 days ago/.test(txt()), 'expiry text');
+      ok(/Lapsed over a year/.test(txt()) && !/Old Five/.test(txt()), 'lapsed group not collapsed by default');
+      ok(/Missing /.test(txt()), 'missing docs not shown on row');
+      w.famCol(); ok(/Old Five/.test(txt()) && /Expired 400 days ago/.test(txt()), 'expand all / expiry text');
       const nc = d.querySelector('#famrows .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);
       w.famCol('lapsed'); ok(!/Old Five/.test(txt()) && /Lapsed over a year/.test(txt()) && /Expand all/.test(d.getElementById('fampage').textContent), 'collapse');
-      w.famCol(); ok(/Old Five/.test(txt()), 'expand all');
+      w.famCol(); ok(/Old Five/.test(txt()), 'expand all again');
       w.famSelGrp('due_90', true); const b = d.getElementById('fambulk'); ok(!b.hidden && /1 selected/.test(b.textContent) && /Email selected/.test(b.textContent), 'select group / bulk bar');
     } finally { DATA.assessors = keep.a; DATA.fam_seta_registrations = keep.r; }
   });
