@@ -17,7 +17,7 @@
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, view: 'triage', hideTest: false, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
+  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: false, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -116,6 +116,7 @@
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
   const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
+  window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
   window.famSort = k => { S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderRows(); };
   window.famMode = v => { S.view = v; S.page = 0; renderFam(); };
@@ -160,22 +161,31 @@
   function rows() {
     const k = SORT[S.sort.k] || SORT.name, q = S.q;
     const hit = a => !q || [a.full_name, rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
-    const list = S.A.map((a, i) => [a, i]).filter(([a]) => (!S.hideTest || !isTest(a)) && matches(a, S.filter) && hit(a));
+    const dd = a => (!S.fRole || rolesOf(a).includes(S.fRole)) && (!S.fSt || worst(a) === S.fSt) && (!S.fSeta || regsFor(a.id).some(r => (r.seta_name || '').split(/\s*,\s*/).includes(S.fSeta)));
+    const list = S.A.map((a, i) => [a, i]).filter(([a]) => (!S.hideTest || !isTest(a)) && matches(a, S.filter) && hit(a) && dd(a));
     if (S.view === 'triage') return list.sort(([x], [y]) => WRANK.indexOf(worst(x)) - WRANK.indexOf(worst(y)) || dataFlags(y).length - dataFlags(x).length || x.full_name.localeCompare(y.full_name));
     return list.sort(([x], [y]) => { const p = k(x), r = k(y); return (p < r ? -1 : p > r ? 1 : 0) * S.sort.dir; });
   }
-  window.famClearAll = () => { S.filter = ''; S.q = ''; S.page = 0; const i = $('famq'); if (i) i.value = ''; render(); };
+  window.famClearAll = () => { S.filter = ''; S.q = ''; S.fRole = S.fSt = S.fSeta = ''; document.querySelectorAll('.famdd').forEach(x => { x.value = ''; }); S.page = 0; const i = $('famq'); if (i) i.value = ''; render(); };
   window.famMove = d => { const ids = rows().map(([, i]) => i); if (!ids.length) return; const p = ids.indexOf(famSel); famSel = ids[p < 0 ? 0 : (p + d + ids.length) % ids.length]; renderFam(); };
   const PER = 50;
   const th = (k, l) => `<th${k ? ` aria-sort="${S.sort.k === k ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')">${l}${S.sort.k === k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`;
+  const RCH = { Facilitator: 'famc-f', Assessor: 'famc-a', Moderator: 'famc-m' };
+  const roleChips = a => { const r = rolesOf(a); return r.length ? `<div class="famchips">${r.map(x => `<span class="famchip ${RCH[x] || ''}">${e(x)}</span>`).join('')}</div>` : '<div class="sub">No role yet</div>'; };
+  const setaChips = list => list.length ? `<div class="famchips">${list.map(x => `<span class="famchip famc-s">${e(x)}</span>`).join('')}</div>` : '<span class="sub">—</span>';
+  function ddSync() {
+    const sel = $('famdd-seta'); if (!sel || document.activeElement === sel) return;
+    const all = [...new Set(S.R.flatMap(r => (r.seta_name || '').split(/\s*,\s*/)).filter(x => x && x !== 'N/A' && x !== 'Pending Entry'))].sort();
+    sel.innerHTML = '<option value="">All SETAs</option>' + all.map(x => `<option ${x === S.fSeta ? 'selected' : ''}>${e(x)}</option>`).join('');
+  }
   function renderRows() {
     const all = rows(), cw = canWrite(), tri = S.view === 'triage', pages = Math.max(1, Math.ceil(all.length / PER));
-    if (S.page >= pages) S.page = pages - 1;
+    if (S.page >= pages) S.page = pages - 1; ddSync();
     const list = all.slice(S.page * PER, S.page * PER + PER);
     const meter = a => { const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)'; return `<span class="bar" style="width:56px"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span>`; };
     const tag = a => isTest(a) ? '<span class="famtag">TEST</span>' : '';
     const flag = a => { const n = dataFlags(a).length; return n ? `<span class="famflag" title="Data to tidy: ${e(dataFlags(a).join('; '))}">⚑ ${n}</span>` : ''; };
-    const empty = c => `<tr><td colspan="${c}" class="sub" style="padding:20px">No practitioners match${S.filter || S.q ? '. <a href="#" onclick="famClearAll();return false">Clear filters</a>' : '.'}</td></tr>`;
+    const empty = c => `<tr><td colspan="${c}" class="sub" style="padding:20px">No practitioners match${S.filter || S.q || S.fRole || S.fSt || S.fSeta ? '. <a href="#" onclick="famClearAll();return false">Clear filters</a>' : '.'}</td></tr>`;
     $('famv-t').className = tri ? 'on' : ''; $('famv-t').setAttribute('aria-pressed', tri);
     $('famv-l').className = tri ? '' : 'on'; $('famv-l').setAttribute('aria-pressed', !tri);
     $('famtest').textContent = S.hideTest ? 'Show test records' : 'Hide test records';
@@ -185,8 +195,8 @@
         const g = worst(a), gn = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g).length : 0, w = when(a), act = rowAction(a), st = [...new Set(regsFor(a.id).map(r => r.seta_name === 'N/A' ? 'SETA not named' : r.seta_name === 'Pending Entry' ? 'Not captured yet' : r.seta_name).filter(Boolean))];
         return (gn ? `<tr class="famgh"><td colspan="4"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${gn}</span><span class="sub">${WGRP[g][2]}</span></td></tr>` : '') +
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
-          <td><button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
-          <td><div style="${w[1]}">${e(w[0])}</div><div class="sub famclip">${e(st.join(', ') || '—')}</div></td>
+          <td><button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}${roleChips(a)}</td>
+          <td><div style="${w[1]}">${e(w[0])}</div>${setaChips(st)}</td>
           <td class="famdocs" style="white-space:nowrap">${meter(a)}</td>
           <td style="text-align:right">${act ? `<button class="famact" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`;
       }).join('') : empty(4);
@@ -197,8 +207,8 @@
     $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
       return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
-        <td><button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>${flag(a)}<div class="sub">${e(rolesOf(a).join(' · ') || '—')}</div></td>
-        <td class="sub">${st.length ? st.map(e).join(', ') : '—'}</td>
+        <td><button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>${flag(a)}${roleChips(a)}</td>
+        <td>${setaChips(st)}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
         <td>${stPill(a.id)}${complHtml(a.id)}</td><td class="sub">${e(nextAction(a))}</td></tr>`;
@@ -206,7 +216,7 @@
     finishRows(all, list, pages);
   }
   function finishRows(all, list, pages) {
-    $('famcount').textContent = `${all.length} of ${vis().length} practitioners${S.filter || S.q ? ' match' : ''}${S.hideTest ? ' · test records hidden' : ''}`;
+    $('famcount').textContent = `${all.length} of ${vis().length} practitioners${S.filter || S.q || S.fRole || S.fSt || S.fSeta ? ' match' : ''}${S.hideTest ? ' · test records hidden' : ''}`;
     $('famasof').textContent = S.loadedAt ? `Data loaded ${S.loadedAt} · ↑ ↓ to move between practitioners` : '';
     $('fampage').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${all.length ? S.page * PER + 1 : 0}–${S.page * PER + list.length} of ${all.length} · ${PER} per page</span>
       <button class="btn sm" onclick="famPage(-1)" ${S.page ? '' : 'disabled'} aria-label="Previous page">‹</button><span class="sub">Page ${S.page + 1} of ${pages}</span>
@@ -550,7 +560,7 @@
   window.famBIAdd = async input => {
     const files = [...(input.files || [])]; input.value = ''; if (!files.length) return;
     for (let i = 0; i < files.length; i++) {
-      const file = files[i], ext = (file.name.split('.').pop() || '').toLowerCase(); BI.status = `Reading ${i + 1} of ${files.length}: ${file.name}`; renderBulk();
+      const file = files[i], ext = (file.name.split('.').pop() || '').toLowerCase(); BI.status = `Reading ${i + 1} of ${files.length}: ${file.name}`; renderBI();
       const r = { key: ++BI.seq, file, include: true, error: '', note: [] };
       if (file.size > MAX) r.error = `Too large (${(file.size / 1048576).toFixed(1)} MB, limit 10 MB)`; else if (!EXT.includes(ext)) r.error = 'Unsupported file type';
       if (r.error) r.include = false;
@@ -569,17 +579,17 @@
     }
     const news = BI.rows.filter(r => r.aid === 'new' && r.newName);
     news.forEach(r => { const sur = biTok(r.newName).pop(), lo = news.find(o => o !== r && biTok(o.newName).pop() === sur && o.newName.length > r.newName.length); if (lo) r.newName = lo.newName; });
-    BI.status = `${BI.rows.length} file(s) ready for review. Nothing is saved until you approve.`; renderBulk();
+    BI.status = `${BI.rows.length} file(s) ready for review. Nothing is saved until you approve.`; renderBI();
   };
   window.famBISet = (k, f, v) => { const r = BI.rows.find(x => x.key === k); if (!r) return;
     if (f === 'role') r.roles = r.roles.includes(v) ? r.roles.filter(x => x !== v) : [...r.roles, v]; else r[f] = v;
-    if (f === 'aid' || f === 'type') renderBulk(); else biBtn(); };
-  window.famBIDel = k => { BI.rows = BI.rows.filter(x => x.key !== k); renderBulk(); };
+    if (f === 'aid' || f === 'type') renderBI(); else biBtn(); };
+  window.famBIDel = k => { BI.rows = BI.rows.filter(x => x.key !== k); renderBI(); };
   const biChosen = () => BI.rows.filter(r => r.include && !r.error);
   function biBtn() { const b = $('fambi-go'); if (!b) return; const c = biChosen();
     b.disabled = BI.busy || !canWrite() || !c.length || !c.every(r => r.aid !== 'new' || r.newName.trim().length > 2);
     b.textContent = BI.busy ? 'Saving…' : c.length ? `Approve ${c.length} file${c.length > 1 ? 's' : ''}` : 'Approve selected'; }
-  function renderBulk() {
+  function renderBI() {
     const box = $('famprof'); $('heading').textContent = 'Bulk Intake'; $('crumb').textContent = 'Quality / FAM Registry';
     const opts = [...S.A].sort((x, y) => x.full_name.localeCompare(y.full_name));
     box.innerHTML = `<a href="#fam" class="famback" onclick="famBIClear()">← FAM Registry</a>
@@ -634,7 +644,7 @@
       say(`Saved ${done.documents.length} document(s), ${done.practitioners.length} new practitioner(s), ${done.registrations.length} registration(s)${failed.length ? `; ${failed.length} failed` : ''}`);
       await load();
     } catch (err) { say('Bulk intake failed: ' + (err.message || err)); }
-    finally { BI.busy = false; if (S.mode === 'bulk') renderBulk(); }
+    finally { BI.busy = false; if (S.mode === 'bulk') renderBI(); }
   };
 
   /* ---------- modes ---------- */
@@ -650,7 +660,7 @@
     if (mode !== 'list') { S.open = false; $('fambk').hidden = true; }
     if (mode === 'profile') { const i = S.A.findIndex(a => a.id === S.prof); if (i >= 0) famSel = i; renderProfile(); }
     else if (mode === 'scope') renderScope();
-    else if (mode === 'bulk') renderBulk();
+    else if (mode === 'bulk') renderBI();
     else if (mode === 'queue') renderQueue();
     else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
   }
@@ -659,7 +669,7 @@
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
     $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
-    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBulk(); else if (S.mode === 'queue') renderQueue();
+    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }
 
   /* ---------- modal ---------- */
@@ -774,6 +784,14 @@
     document.head.insertAdjacentHTML('beforeend', `<style>
       #famkpis{display:flex!important;flex-wrap:wrap;gap:14px 28px;flex:1 1 100%!important;order:2;align-items:flex-start}
       #famkpis+div{margin-left:auto}
+      #view-fam .tw{max-height:none!important}
+      .famchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+      .famchip{font-size:11px;line-height:18px;padding:0 8px;border-radius:9px;background:var(--soft);color:var(--ink);white-space:nowrap}
+      .famc-f{background:#E3F1E6;color:#1E6B34}.famc-a{background:#E4ECFA;color:#2A4E9B}.famc-m{background:#FBF0D9;color:#8A5100}
+      .famc-s{background:transparent;border:1px solid var(--line);color:var(--muted)}
+      @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:#1E3A26;color:#9FD8AE}:root:not([data-theme=light]) .famc-a{background:#1F2D4D;color:#A9C1F2}:root:not([data-theme=light]) .famc-m{background:#3D2F12;color:#F0CF8A}}
+      :root[data-theme=dark] .famc-f{background:#1E3A26;color:#9FD8AE}:root[data-theme=dark] .famc-a{background:#1F2D4D;color:#A9C1F2}:root[data-theme=dark] .famc-m{background:#3D2F12;color:#F0CF8A}
+      .famtool select.faminput{flex:0 0 auto;max-width:170px}
       .famgrp{display:flex;flex-direction:column;gap:6px;min-width:0}
       .famgl{font-size:12px;font-weight:700;color:var(--muted)}
       .famgk{display:flex;flex-wrap:wrap;gap:8px}
@@ -850,6 +868,7 @@
       if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.onclick = () => canWrite() ? (location.hash = 'fam/bulk') : say('You do not have FAM write access'); }
     });
     btns[0]?.parentElement.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><button class="btn" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button>');
+    $('famkpis').dataset.fam = '1';
     aside.classList.add('famdrawer'); aside.parentElement.classList.add('famrow'); aside.setAttribute('aria-label', 'Practitioner details');
     document.body.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>'); // outside #view-fam: route code toggles that view's children
     addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) famClose(); });
@@ -857,7 +876,10 @@
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';
-    sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex-grow:1">
+    sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex:1 1 220px">
+      <select class="faminput famdd" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
+      <select class="faminput famdd" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
+      <select class="faminput famdd" id="famdd-seta" aria-label="Filter by SETA" onchange="famDD('fSeta',this.value)"><option value="">All SETAs</option></select>
       <div class="famseg" role="group" aria-label="List view"><button id="famv-t" onclick="famMode('triage')">Triage</button><button id="famv-l" onclick="famMode('table')">Table</button></div>
       <button class="btn sm" id="famtest" onclick="famTest()">Hide test records</button></div>
       <div class="famsub"><span class="sub" id="famcount" aria-live="polite"></span><span class="sub" id="famasof"></span></div><div id="fambulk" hidden></div>`);
