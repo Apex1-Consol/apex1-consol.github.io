@@ -17,7 +17,7 @@
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
-  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: false, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
+  const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: true, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -90,8 +90,7 @@
   function compl(id) {
     const regs = regsFor(id).length, docs = onFile(id).length, open = openFU(id).length;
     const missExp = S.D.filter(d => d.assessor_id === id && d.is_current !== false && (d.status === 'Missing' || (d.expiry_date && d.expiry_date < today()))).length;
-    const miss = TYPES.length - docs;
-    const checks = [[regs > 0, 'no registration'], [!miss, `${miss} document${miss === 1 ? '' : 's'} not on file`], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
+        const checks = [[regs > 0, 'no registration'], [docs > 0, 'no documents'], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
     const gaps = checks.filter(c => !c[0]).map(c => c[1]);
     return { score: Math.round(checks.filter(c => c[0]).length / checks.length * 100), gaps, complete: !gaps.length };
   }
@@ -110,11 +109,11 @@
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
     ['pending', 'Pending entry', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
-    ['missing', 'Missing docs', vis().filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
+    ['missing', 'Missing docs', S.D.filter(d => d.status === 'Missing' && d.is_current !== false && vis().some(a => a.id === d.assessor_id)).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
     ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  const matches = (a, k) => !k ? true : k === 'missing' ? S.D.some(d => d.assessor_id === a.id && d.status === 'Missing' && d.is_current !== false) : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
