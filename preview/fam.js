@@ -568,7 +568,7 @@
       r.aid = m ? String(m.id) : 'new'; if (m?.ambiguous) r.note.push('Several practitioners match, check the name');
       r.newName = m ? '' : biName(file.name, text, r.type);
       r.roles = r.type === 'ID' ? [] : ['Facilitator', 'Assessor', 'Moderator'].filter(x => new RegExp('\\b' + x.toLowerCase() + '\\b').test(low));
-      r.setas = BI_SETAS.filter(s => low.replace(/[\s-]/g, '').includes(s.toLowerCase().replace(/[\s-]/g, '')));
+      r.setas = BI_SETAS.filter(s => new RegExp('(^|[^a-z0-9])' + s.toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '').split('').join('[\\s-]*') + '(?![a-z0-9])').test(low));
       r.regNo = (text.match(/\b[A-Z]{2,6}\/\d{1,4}\/\d{4}\/\d{2,6}\b/) || [])[0] || '';
       r.idNo = r.type === 'ID' ? ((text.match(/\b\d{13}\b/g) || []).find(biSaId) || '') : '';
       r.addReg = r.roles.length > 0;
