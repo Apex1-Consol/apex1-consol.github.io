@@ -346,5 +346,22 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(log.some(x => x.table === 'audit_log' && x.val.action === 'SCOPE_IMPORT_COMMIT'), 'no audit row');
     w.famScope(11); const f = d.getElementById('famform'); ok(f.elements.qid.options.length === 1 && f.elements.qid.value === 'q-118699', 'already-linked not excluded');
   });
+  await t('FAM: triage groups 61-90 days and lapsed, collapse, select group, chip tooltip', async () => {
+    const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations };
+    DATA.assessors = [...keep.a, { id: 4, full_name: 'Soon Four', role: 'Assessor' }, { id: 5, full_name: 'Old Five', role: 'Assessor' }];
+    DATA.fam_seta_registrations = [...keep.r, { id: 14, assessor_id: 4, seta_name: 'SERVICES SETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(75) },
+      { id: 15, assessor_id: 5, seta_name: 'INSETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(-400) }, { id: 16, assessor_id: 5, seta_name: 'Pending Entry', roles: ['Assessor'], status: 'Pending' }];
+    try {
+      const { w, d } = await boot(sess('admin')); await tick(); await tick(); w.famMode('triage');
+      const txt = () => d.getElementById('famrows').textContent;
+      ok(/Expiring soon/.test(txt()) && /Soon Four/.test(txt()), 'no 61-90 group');
+      ok(/Lapsed over a year/.test(txt()) && /Old Five/.test(txt()), 'no lapsed group');
+      ok(/Expired 400 days ago/.test(txt()), 'expiry text');
+      const nc = d.querySelector('#famrows .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);
+      w.famCol('lapsed'); ok(!/Old Five/.test(txt()) && /Lapsed over a year/.test(txt()) && /Expand all/.test(d.getElementById('fampage').textContent), 'collapse');
+      w.famCol(); ok(/Old Five/.test(txt()), 'expand all');
+      w.famSelGrp('due_90', true); const b = d.getElementById('fambulk'); ok(!b.hidden && /1 selected/.test(b.textContent) && /Email selected/.test(b.textContent), 'select group / bulk bar');
+    } finally { DATA.assessors = keep.a; DATA.fam_seta_registrations = keep.r; }
+  });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);
 })();
