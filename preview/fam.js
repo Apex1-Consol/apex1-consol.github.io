@@ -22,6 +22,7 @@
   /* Filters remembered per browser (item 6). Search text is not kept. */
   const LSK = 'famFilters.v1', LSF = ['filter', 'fRole', 'fSt', 'fSeta', 'view', 'hideTest'];
   try { const j = JSON.parse(localStorage.getItem(LSK) || 'null'); if (j) { LSF.forEach(k => { if (k in j) S[k] = j[k]; }); if (Array.isArray(j.col)) S.col = new Set(j.col); } } catch (_) {}
+  ['expired', 'due_30', 'due_60'].forEach(g => S.col.delete(g)); // urgent groups always open on load, so the first screen shows names
   const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
