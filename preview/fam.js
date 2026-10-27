@@ -235,9 +235,10 @@
     finishRows(all, list, pages);
   }
   function finishRows(all, list, pages) {
+    let nc;
     $('famcount').textContent = `${all.length} of ${vis().length} practitioners${S.filter || S.q || S.fRole || S.fSt || S.fSeta ? ' match' : ''}${S.hideTest ? ' · test records hidden' : ''}`;
     $('famasof').textContent = S.loadedAt ? `Data loaded ${S.loadedAt} · ↑ ↓ to move between practitioners` : '';
-    $('fampage').innerHTML = S.view === 'triage' ? `<span class="sub" style="flex-grow:1">${S.col.size ? `${S.col.size} group${S.col.size > 1 ? 's' : ''} collapsed · <a href="#" onclick="famCol();return false">Expand all</a>` : 'Click a group heading to collapse it'}</span>` : `<span class="sub" style="flex-grow:1">Showing ${all.length ? S.page * PER + 1 : 0}–${S.page * PER + list.length} of ${all.length} · ${PER} per page</span>
+    $('fampage').innerHTML = S.view === 'triage' ? `<span class="sub" style="flex-grow:1">${(nc = [...S.col].filter(g => all.some(([b]) => worst(b) === g)).length) ? `${nc} group${nc > 1 ? 's' : ''} collapsed · <a href="#" onclick="famCol();return false">Expand all</a>` : 'Click a group heading to collapse it'}</span>` : `<span class="sub" style="flex-grow:1">Showing ${all.length ? S.page * PER + 1 : 0}–${S.page * PER + list.length} of ${all.length} · ${PER} per page</span>
       <button class="btn sm" onclick="famPage(-1)" ${S.page ? '' : 'disabled'} aria-label="Previous page">‹</button><span class="sub">Page ${S.page + 1} of ${pages}</span>
       <button class="btn sm" onclick="famPage(1)" ${S.page < pages - 1 ? '' : 'disabled'} aria-label="Next page">›</button>`;
     renderBulk();
@@ -245,7 +246,7 @@
 
   /* ---------- 90-day expiry strip ---------- */
   function renderStrip() {
-    const regs = S.R.filter(r => r.registration_expiry_date && days(r) <= 90).sort((x, y) => days(x) - days(y));
+    const regs = visR().filter(r => r.registration_expiry_date && days(r) <= 90).sort((x, y) => days(x) - days(y));
     const exp = regs.filter(r => days(r) < 0), soon = regs.filter(r => days(r) >= 0);
     const who = r => S.A.find(a => a.id === r.assessor_id)?.full_name || 'Unknown';
     const dot = r => { const d = days(r), c = d <= 30 ? 'var(--bad)' : d <= 60 ? '#E0A100' : 'var(--navy2)';
@@ -691,7 +692,7 @@
     else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
   }
   function render() {
-    const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span></button>`;
+    const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
     $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
@@ -820,7 +821,7 @@
       .famnoid{margin-left:8px;font-size:11px;color:#8A5100;white-space:nowrap}.famck{margin:0 8px 0 0;vertical-align:middle}
       .famsum td{padding:4px 0 10px!important;border:0!important}.famsc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--soft);font-size:13px}.famsc.q{opacity:.75}.famsc:hover{border-color:var(--navy2)}.famsc:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
       .famgt{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.famgt:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
-      .famgsel{float:right;letter-spacing:0;text-transform:none;font-weight:400;cursor:pointer}
+      .famgsel{float:right;letter-spacing:0;text-transform:none;font-weight:400;cursor:pointer}@media (hover:hover){.famgsel{opacity:0;transition:opacity .15s}.famgh:hover .famgsel,.famgsel:focus-within,.famgsel:has(:checked){opacity:1}}
       @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:#1E3A26;color:#9FD8AE}:root:not([data-theme=light]) .famc-a{background:#1F2D4D;color:#A9C1F2}:root:not([data-theme=light]) .famc-m{background:#3D2F12;color:#F0CF8A}}
       :root[data-theme=dark] .famc-f{background:#1E3A26;color:#9FD8AE}:root[data-theme=dark] .famc-a{background:#1F2D4D;color:#A9C1F2}:root[data-theme=dark] .famc-m{background:#3D2F12;color:#F0CF8A}
       .famtool select.faminput{flex:0 0 auto;max-width:170px}
