@@ -165,7 +165,7 @@
   }
   function rows() {
     const k = SORT[S.sort.k] || SORT.name, q = S.q;
-    const hit = a => !q || [a.full_name, rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
+    const hit = a => !q || [a.full_name, a.id_number || '', rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
     const dd = a => (!S.fRole || rolesOf(a).includes(S.fRole)) && (!S.fSt || worst(a) === S.fSt) && (!S.fSeta || regsFor(a.id).some(r => (r.seta_name || '').split(/\s*,\s*/).includes(S.fSeta)));
     const list = S.A.map((a, i) => [a, i]).filter(([a]) => (!S.hideTest || !isTest(a)) && matches(a, S.filter) && hit(a) && dd(a));
     if (S.view === 'triage') return list.sort(([x], [y]) => WRANK.indexOf(worst(x)) - WRANK.indexOf(worst(y)) || urg(x) - urg(y) || dataFlags(y).length - dataFlags(x).length || x.full_name.localeCompare(y.full_name));
@@ -207,10 +207,12 @@
     $('famtest').textContent = S.hideTest ? 'Show test records' : 'Hide test records';
     if (tri) {
       $('famhead').innerHTML = '';
-      $('famrows').innerHTML = list.length ? list.map(([a, i], n) => {
+      const cnt = WRANK.map(g => [g, all.filter(([b]) => worst(b) === g).length]).filter(([, c]) => c);
+      const sum = cnt.length ? `<tr class="famsum"><td colspan="4">${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span><b>${c}</b> ${WGRP[g][0]}</button>`).join('')}</td></tr>` : '';
+      $('famrows').innerHTML = list.length ? sum + list.map(([a, i], n) => {
         const g = worst(a), mem = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g) : null, w = when(a), act = rowAction(a), shut = S.col.has(g) && !S.q && S.fSt !== g;
         const allOn = mem && mem.every(([b]) => S.sel.has(b.id));
-        return (mem ? `<tr class="famgh"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
+        return (mem ? `<tr class="famgh" id="famg-${g}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
           <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}${a.id_number ? '' : '<span class="famnoid">ID not captured</span>'}${roleChips(a)}</td>
           <td><div style="${w[1]}">${e(w[0])}</div>${regChips(a)}</td>
@@ -267,6 +269,7 @@
       <button class="btn sm" onclick="famBulk('claim')" ${open ? '' : 'disabled'}>Claim follow-ups</button><button class="btn sm" onclick="famBulk('dismiss')" ${open ? '' : 'disabled'}>Dismiss follow-ups</button>
       <button class="btn sm" onclick="famExport(true)">Export selected</button><button class="btn sm" onclick="famMail()" title="Opens your mail app with the selected practitioners in Bcc; nothing is sent until you send it">Email selected</button><button class="btn sm" onclick="famClearSel()">Clear</button>`;
   }
+  window.famJump = g => { S.col.delete(g); renderRows(); $('famg-' + g)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   window.famCol = g => { if (!g) S.col.clear(); else S.col.has(g) ? S.col.delete(g) : S.col.add(g); renderRows(); };
   window.famSelGrp = (g, on) => { rows().forEach(([a]) => { if (worst(a) === g) on ? S.sel.add(a.id) : S.sel.delete(a.id); }); renderRows(); };
   window.famMail = () => { const sel = S.A.filter(a => S.sel.has(a.id)), to = sel.map(a => a.email).filter(Boolean), no = sel.length - to.length;
@@ -815,6 +818,7 @@
       .famc-bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}.famc-warn{background:transparent;border:1px solid #E0A100;color:#8A5100}.famc-ok{background:transparent;border:1px solid var(--ok);color:var(--ok)}
       .famc-nc{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-style:italic}
       .famnoid{margin-left:8px;font-size:11px;color:#8A5100;white-space:nowrap}.famck{margin:0 8px 0 0;vertical-align:middle}
+      .famsum td{padding:4px 0 10px!important;border:0!important}.famsc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--soft);font-size:13px}.famsc.q{opacity:.75}.famsc:hover{border-color:var(--navy2)}.famsc:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
       .famgt{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.famgt:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
       .famgsel{float:right;letter-spacing:0;text-transform:none;font-weight:400;cursor:pointer}
       @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:#1E3A26;color:#9FD8AE}:root:not([data-theme=light]) .famc-a{background:#1F2D4D;color:#A9C1F2}:root:not([data-theme=light]) .famc-m{background:#3D2F12;color:#F0CF8A}}
@@ -904,7 +908,7 @@
     aside.innerHTML = '<div id="fampanel"></div><span id="famname" hidden></span><span id="famroles" hidden></span><span id="famdocs" hidden></span><div id="famcheck" hidden></div>';
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';
-    sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex:1 1 220px">
+    sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, ID number, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex:1 1 220px">
       <select class="faminput famdd" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
       <select class="faminput famdd" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
       <select class="faminput famdd" id="famdd-seta" aria-label="Filter by SETA" onchange="famDD('fSeta',this.value)"><option value="">All SETAs</option></select>

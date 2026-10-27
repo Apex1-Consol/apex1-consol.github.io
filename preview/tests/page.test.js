@@ -357,6 +357,8 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       ok(/Expiring soon/.test(txt()) && /Soon Four/.test(txt()), 'no 61-90 group');
       ok(/Lapsed over a year/.test(txt()) && !/Old Five/.test(txt()), 'lapsed group not collapsed by default');
       ok(/Missing /.test(txt()), 'missing docs not shown on row');
+      const sm = d.querySelector('#famrows .famsum'); ok(sm && /1 Lapsed over a year/.test(sm.textContent) && /1 Expiring soon/.test(sm.textContent), sm && sm.textContent);
+      w.famJump('lapsed'); ok(/Old Five/.test(txt()), 'summary count does not open its group');
       w.famCol(); ok(/Old Five/.test(txt()) && /Expired 400 days ago/.test(txt()), 'expand all / expiry text');
       const nc = d.querySelector('#famrows .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);
       w.famCol('lapsed'); ok(!/Old Five/.test(txt()) && /Lapsed over a year/.test(txt()) && /Expand all/.test(d.getElementById('fampage').textContent), 'collapse');
