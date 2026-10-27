@@ -70,6 +70,7 @@ async function boot(session, opts = {}) {
   w.matchMedia = () => ({ matches: false }); w.scrollTo = () => {};
   w.supabase = { createClient: () => fakeSupabase(log, { session, ...opts }) };
   if (opts.cfg) w.PREVIEW_CFG = opts.cfg;
+  if (opts.ls) Object.entries(opts.ls).forEach(([k, v]) => w.localStorage.setItem(k, v));
   const files = []; w.XLSX = Object.assign({}, XLSX, { writeFile: (wb, name) => files.push({ wb, name }) }); w.__files = files;
   const s = w.document.createElement('script'); s.textContent = live;
   let err = null; w.addEventListener('error', e => { err = e.error; });
@@ -323,6 +324,16 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     w.famMode('table'); w.famPick(2, true); ok(!d.getElementById('fambulk').hidden && /1 open follow-up/.test(d.getElementById('fambulk').textContent), 'bulk bar');
     await w.famBulk('claim'); const u = log.find(x => x.table === 'fam_follow_ups');
     ok(u && u.op === 'upsert' && Array.isArray(u.val) && u.val[0].status === 'In Progress' && u.val[0].source_id === 12, JSON.stringify(u));
+  });
+  await t('FAM: filters remembered in localStorage', async () => {
+    const a = await boot(sess('admin')); await tick(); await tick();
+    a.w.famMode('table'); a.w.famDD('fRole', 'Assessor'); a.w.famFilter('expired');
+    const saved = a.w.localStorage.getItem('famFilters.v1'), j = JSON.parse(saved);
+    ok(j.view === 'table' && j.fRole === 'Assessor' && j.filter === 'expired' && !('q' in j), saved);
+    const b = await boot(sess('admin'), { ls: { 'famFilters.v1': saved } }); await tick(); await tick();
+    ok(b.d.getElementById('famdd-role').value === 'Assessor' && b.d.querySelector('#famkpis .famk.on') && /match/.test(b.d.getElementById('famcount').textContent), 'not restored');
+    const c = await boot(sess('admin'), { ls: { 'famFilters.v1': '{bad' } }); await tick(); await tick();
+    ok(!c.err && c.d.getElementById('famrows').children.length, 'bad JSON should be ignored');
   });
   await t('FAM: role/status/SETA filters, test records hidden, KPI cards kept, Bulk Intake page', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();

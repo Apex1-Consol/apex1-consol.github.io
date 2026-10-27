@@ -19,6 +19,10 @@
   const CRIT = ['ID', 'QUAL']; const critMiss = id => CRIT.some(t => !onFile(id).includes(t)); // ID and practitioner certificate
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
   const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: true, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), col: new Set(['lapsed', 'none', 'active', 'inactive']), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
+  /* Filters remembered per browser (item 6). Search text is not kept. */
+  const LSK = 'famFilters.v1', LSF = ['filter', 'fRole', 'fSt', 'fSeta', 'view', 'hideTest'];
+  try { const j = JSON.parse(localStorage.getItem(LSK) || 'null'); if (j) { LSF.forEach(k => { if (k in j) S[k] = j[k]; }); if (Array.isArray(j.col)) S.col = new Set(j.col); } } catch (_) {}
+  const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin');
@@ -200,6 +204,7 @@
     sel.innerHTML = '<option value="">All SETAs</option>' + all.map(x => `<option ${x === S.fSeta ? 'selected' : ''}>${e(x)}</option>`).join('');
   }
   function renderRows() {
+    saveF();
     const all = rows(), cw = canWrite(), tri = S.view === 'triage', pages = tri ? 1 : Math.max(1, Math.ceil(all.length / PER));
     if (S.page >= pages) S.page = pages - 1; ddSync();
     const list = tri ? all : all.slice(S.page * PER, S.page * PER + PER);
@@ -925,14 +930,15 @@
     const tbl = v.querySelector('table'), sec = tbl.closest('section');
     tbl.querySelector('thead').id = 'famhead';
     sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, ID number, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex:1 1 220px">
-      <select class="faminput famdd" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
-      <select class="faminput famdd" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
+      <select class="faminput famdd" id="famdd-role" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
+      <select class="faminput famdd" id="famdd-st" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
       <select class="faminput famdd" id="famdd-seta" aria-label="Filter by SETA" onchange="famDD('fSeta',this.value)"><option value="">All SETAs</option></select>
       <div class="famseg" role="group" aria-label="List view"><button id="famv-t" onclick="famMode('triage')">Triage</button><button id="famv-l" onclick="famMode('table')">Table</button></div>
       <button class="btn sm" id="famtest" onclick="famTest()">Hide test records</button></div>
       <div class="famsub"><span class="sub" id="famcount" aria-live="polite"></span><span class="sub" id="famasof"></span></div><div id="fambulk" hidden></div>`);
     (tbl.parentElement.classList.contains('tw') ? tbl.parentElement : tbl).insertAdjacentHTML('afterend', '<div id="fampage" class="fampage"></div>');
     sec.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !(ev.target.type === 'checkbox')) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
+    $('famdd-role').value = S.fRole; $('famdd-st').value = S.fSt;
     v.querySelector('.row').insertAdjacentHTML('beforebegin', '<section class="card" id="famstrip"></section>');
     v.insertAdjacentHTML('beforeend', '<div id="famprof" hidden></div>');
     window.renderFam = () => { renderRows(); renderPanel(); };
