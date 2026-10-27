@@ -273,7 +273,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('FAM: computed status, expiry KPIs, filters and next action', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     const kt = d.getElementById('famkpis').textContent.replace(/\s/g, '');
-    ok(/Practitioners·?3/.test(kt) && /Openfollow-ups1/.test(kt) && !/Registrations/.test(kt), 'triage hides registration KPIs: ' + kt);
+    ok(!/Practitioners·/.test(kt) && /Openfollow-ups1/.test(kt) && !/Registrations/.test(kt), 'triage hides registration KPIs: ' + kt);
     w.famMode('table');
     const k = d.getElementById('famkpis').textContent.replace(/\s/g, '');
     ok(/Registrations·?2/.test(k) && /Expired1/.test(k), k);

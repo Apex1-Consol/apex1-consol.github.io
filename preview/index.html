@@ -141,7 +141,7 @@ button.pill{border:0;height:44px;padding:0 14px}
 
 .savest{display:inline-flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--muted);white-space:nowrap}
 .savest i{width:8px;height:8px;border-radius:50%;background:var(--ok);flex-shrink:0}
-.savest.dirty i{background:var(--warn)}.savest.busy i{background:var(--accent2);animation:pl 1s infinite}
+.savest.idle{visibility:hidden}.savest.dirty i{background:var(--warn)}.savest.busy i{background:var(--accent2);animation:pl 1s infinite}
 @keyframes pl{50%{opacity:.3}}
 @media (prefers-reduced-motion:reduce){.savest.busy i{animation:none}}
 .tw.tall{max-height:min(640px,70vh);overflow:auto}
@@ -261,7 +261,6 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
 <div id="shell" class="app" hidden>
   <nav class="side" aria-label="Main">
     <div class="sidehead"><a href="#mywork" class="logo"><span class="lk aologo" style="--h:40px"><img src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%2230%2065%20330%20312%22%3E%3Cpath%20d%3D%22M55%20215a140%20140%200%201%200%20280%200a140%20140%200%201%200%20-280%200Z%20M93%20215a102%20102%200%201%200%20204%200a102%20102%200%201%200%20-204%200Z%22%20fill%3D%22%23FBDC00%22%20fill-rule%3D%22evenodd%22/%3E%3Cpath%20d%3D%22M195%20105L345%20365H45Z%20M195%20175L292%20335H98Z%20M195%20245L240%20320H150Z%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2218%22/%3E%3C/svg%3E" alt="" height="40"><span class="wm">APEX<small>ONE</small></span></span><img class="mk" src="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%2230%2065%20330%20312%22%3E%3Cpath%20d%3D%22M55%20215a140%20140%200%201%200%20280%200a140%20140%200%201%200%20-280%200Z%20M93%20215a102%20102%200%201%200%20204%200a102%20102%200%201%200%20-204%200Z%22%20fill%3D%22%23FBDC00%22%20fill-rule%3D%22evenodd%22/%3E%3Cpath%20d%3D%22M195%20105L345%20365H45Z%20M195%20175L292%20335H98Z%20M195%20245L240%20320H150Z%22%20fill%3D%22none%22%20stroke%3D%22%23FFFFFF%22%20stroke-width%3D%2218%22/%3E%3C/svg%3E" alt="ApexOne" height="34"></a><span class="testtag" title="Preview: test data only">TEST</span></div>
-    <button class="jump" type="button" onclick="jumpTo()" title="Jump to (Ctrl K)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="lbl">Jump to…</span><kbd class="lbl">Ctrl K</kbd></button>
     <div id="nav" style="display:flex;flex-direction:column;gap:18px"></div>
     <div class="me"><span class="avatar">S</span><div><div style="font-weight:600;font-size:13px">Stavros</div><div style="font-size:12px;color:#D2D1EC">Admin · Apex Academy</div></div>
       <a href="#login" style="margin-left:auto;color:#D2D1EC;font-size:12px">Sign out</a></div>
@@ -270,7 +269,7 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
     <header class="top">
       <button class="iconbtn plain" id="lpbtn" type="button" onclick="toggleRail()" aria-label="Close menu" aria-expanded="true" title="Close menu"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></button>
       <div class="t"><small id="crumb">Overview</small><b id="heading">Dashboard</b></div>
-      <span class="savest" id="savest" role="status" title="Changes save automatically to ApexOne"><i></i><span>All changes saved</span></span>
+      <span class="savest idle" id="savest" role="status" title="Changes save automatically to ApexOne"><i></i><span>All changes saved</span></span>
       <div class="sw s"><label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C4B6E" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr">Search</span><input type="search" id="q" autocomplete="off" placeholder="Search learners, programmes, screens…" oninput="doSearch()" onfocus="doSearch()" onkeydown="if(event.key==='Enter'){const a=$('qres').querySelector('a');if(a)a.click()}if(event.key==='Escape')closePops()" aria-controls="qres"><kbd class="kbd" aria-hidden="true">Ctrl K</kbd></label><div class="pop" id="qres" hidden></div></div>
       <div class="sw"><button class="iconbtn" id="bellbtn" aria-label="Notifications" aria-expanded="false" onclick="togglePop('bell')"><span class="dotn" id="dotn">4</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><div class="pop right" id="bell" hidden></div></div><button class="iconbtn" id="themebtn" aria-label="Switch colour theme" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <div class="sw"><button class="pill" id="orgbtn" aria-haspopup="true" aria-expanded="false" onclick="togglePop('org')"><span id="orgname">Apex Academy</span> ▾</button><div class="pop right" id="org" hidden style="min-width:260px"></div></div>
@@ -855,7 +854,7 @@ var curNav='dashboard';let saveT;
 const hhmm=()=>new Date().toLocaleTimeString('en-ZA',{hour:'2-digit',minute:'2-digit'});
 function markSaved(dirty){const s=$('savest'),t=s.lastChild;clearTimeout(saveT);
   if(dirty){s.className='savest dirty';t.textContent='Unsaved changes';saveT=setTimeout(()=>markSaved(),1500);return}
-  s.className='savest busy';t.textContent='Saving…';saveT=setTimeout(()=>{s.className='savest';t.textContent='Saved '+hhmm()},600)}
+  s.className='savest busy';t.textContent='Saving…';saveT=setTimeout(()=>{s.className='savest';t.textContent='Saved '+hhmm();saveT=setTimeout(()=>s.classList.add('idle'),4000)},600)}
 Object.assign(ROUTES,{dq:['Data quality review','Delivery / Learners'],signoff:['Sign-off queue','Quality']});
 const NC={signoff:()=>soWaiting()};
 
