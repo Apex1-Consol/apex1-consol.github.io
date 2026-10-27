@@ -273,7 +273,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('FAM: computed status, expiry KPIs, filters and next action', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     const kt = d.getElementById('famkpis').textContent.replace(/\s/g, '');
-    ok(!/Practitioners·/.test(kt) && /Openfollow-ups1/.test(kt) && !/Registrations/.test(kt), 'triage hides registration KPIs: ' + kt);
+    ok(/Practitioners·/.test(kt) && /Openfollow-ups1/.test(kt) && /Registrations/.test(kt), 'all KPIs shown in urgency order: ' + kt);
     w.famMode('table');
     const k = d.getElementById('famkpis').textContent.replace(/\s/g, '');
     ok(/Registrations·?2/.test(k) && /Expired1/.test(k), k);
@@ -305,7 +305,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
     w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
     ok(!/expired/i.test(d.getElementById('famstrip').textContent), 'strip should not repeat expired: ' + d.getElementById('famstrip').textContent);
-    w.famFilter('expired'); w.famMode('triage'); ok(!d.querySelector('#famkpis .famk.on') && !/match/.test(d.getElementById('famcount').textContent), 'registration filter should clear in triage'); w.famMode('table');
+    w.famFilter('expired'); w.famMode('triage'); ok(d.querySelector('#famkpis .famk.on') && d.getElementById('famv-t').hidden, 'registration filter kept in urgency order'); w.famFilter('expired'); w.famMode('table');
     w.famShow(0); ok(/Practitioner certificate/.test(d.getElementById('fampanel').textContent) && !/>QUAL</.test(d.getElementById('fampanel').innerHTML), 'QUAL label');
     w.famExport(false); const f = w.__files[0]; ok(f && f.wb.SheetNames.join() === 'Practitioners,Registrations', 'no workbook');
     const rowsX = XLSX.utils.sheet_to_json(f.wb.Sheets.Practitioners); ok(rowsX.length === 3 && rowsX.some(r => r['Completeness %'] !== undefined), JSON.stringify(rowsX[0]));
