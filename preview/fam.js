@@ -212,6 +212,8 @@
     if (S.page >= pages) S.page = pages - 1; ddSync();
     const list = tri ? all : all.slice(S.page * PER, S.page * PER + PER);
     const meter = a => { const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)'; return `<span class="bar" style="width:56px"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k === 6 ? 'All docs on file' : (m => `Missing ${m.slice(0, 2).join(', ')}${m.length > 2 ? ` +${m.length - 2}` : ''}`)(TYPES.filter(t => !onFile(a.id).includes(t)).map(lbl))}</span>`; };
+    const ini = a => e(shownName(a).split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?');
+    const who = (a, btn) => `<div class="famwho"><span class="famav" aria-hidden="true">${ini(a)}</span><div>${btn}${flag(a)}${a.id_number ? '' : '<div class="famnoid famidl">ID not captured</div>'}${roleChips(a)}</div></div>`;
     const tag = a => isTest(a) ? '<span class="famtag">TEST</span>' : '';
     const flag = a => { const n = dataFlags(a).length; return n ? `<span class="famflag" title="Data to tidy: ${e(dataFlags(a).join('; '))}">⚑ ${n}</span>` : ''; };
     const empty = c => `<tr><td colspan="${c}" class="sub" style="padding:20px">No practitioners match${S.filter || S.q || S.fRole || S.fSt || S.fSeta ? '. <a href="#" onclick="famClearAll();return false">Clear filters</a>' : '.'}</td></tr>`;
@@ -226,7 +228,7 @@
         const allOn = mem && mem.every(([b]) => S.sel.has(b.id));
         return (mem ? `<tr class="famgh" id="famg-${g}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}${(k => k ? ` · <span class="famnoid" title="ID number not captured">${k} without ID</span>` : '')(mem.filter(([b]) => !b.id_number).length)}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
-          <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}${roleChips(a)}</td>
+          <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}${who(a, `<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>`)}</td>
           <td>${g === 'pending' ? '' : `<div style="${w[1]}">${e(w[0])}${(k => k ? ` <span class="sub famcap" style="font-weight:400">+${k} to capture</span>` : '')(regsFor(a.id).filter(r => risk(r) === 'pending').length)}</div>`}${regChips(a)}</td>
           <td class="famdocs" style="white-space:nowrap" title="${e(docTip(a))}">${meter(a)}</td>
           <td style="text-align:right">${act ? `<button class="famact${['pending', 'none'].includes(g) ? ' q' : ''}" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`);
@@ -238,7 +240,7 @@
     $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
       return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
-        <td><button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>${flag(a)}${roleChips(a)}</td>
+        <td>${who(a, `<button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>`)}</td>
         <td>${setaChips(st)}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap" title="${e(docTip(a))}"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
@@ -893,7 +895,7 @@
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
-      .famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
+      .famwho{display:inline-flex;gap:10px;align-items:flex-start;vertical-align:top}.famav{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;background:var(--accent-gold,#D4A537);margin-top:2px}.famidl{font-size:12px;margin:-2px 0 2px}.famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
       .famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
       .famok{font-size:12px;color:var(--ok);font-weight:700;margin-top:4px}.famgap{font-size:12px;margin-top:4px}
       .famhead{background:var(--navy);color:#fff;padding:20px;display:flex;flex-direction:column;gap:4px}
