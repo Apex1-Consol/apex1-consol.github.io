@@ -358,6 +358,14 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const c = await boot(sess('admin'), { ls: { 'famFilters.v1': '{bad' } }); await tick(); await tick();
     ok(!c.err && c.d.getElementById('famrows').children.length, 'bad JSON should be ignored');
   });
+  await t('Nav: pinned items', async () => {
+    const { w, d } = await boot(sess('admin'), { ls: { 'navPins.v1': '["fam","nope"]' } }); await tick();
+    const g = () => d.querySelector('#nav .navgroup');
+    ok(/Pinned/.test(g().textContent) && /FAM Registry/.test(g().textContent) && g().querySelectorAll('.navlink').length === 1, g().textContent);
+    w.navPin({ preventDefault() {}, stopPropagation() {} }, 'fam');
+    ok(!/Pinned/.test(g().textContent) && w.localStorage.getItem('navPins.v1') === '[]', 'unpin');
+    const c = await boot(sess('admin'), { ls: { 'navPins.v1': '{bad' } }); await tick(); ok(!c.err && !/Pinned/.test(c.d.getElementById('nav').textContent), 'bad JSON');
+  });
   await t('FAM: role/status/SETA filters, test records hidden, KPI cards kept, Bulk Intake page', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     ok(/NoID\/certificate/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), 'KPI cards overwritten');
@@ -385,7 +393,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: triage groups 61-90 days and lapsed, collapse, select group, chip tooltip', async () => {
     const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations };
-    DATA.assessors = [...keep.a, { id: 4, full_name: 'Soon Four', role: 'Assessor' }, { id: 5, full_name: 'Old Five', role: 'Assessor' }];
+    DATA.assessors = [...keep.a, { id: 4, full_name: 'Soon Four', role: 'Assessor', email: 'soon@example.com' }, { id: 5, full_name: 'Old Five', role: 'Assessor' }];
     DATA.fam_seta_registrations = [...keep.r, { id: 14, assessor_id: 4, seta_name: 'SERVICES SETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(75) },
       { id: 15, assessor_id: 5, seta_name: 'INSETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(-400) }, { id: 16, assessor_id: 5, seta_name: 'Pending Entry', roles: ['Assessor'], status: 'Pending' }];
     try {
@@ -401,6 +409,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       w.famCol('lapsed'); ok(!/Old Five/.test(txt()) && /Lapsed over a year/.test(txt()) && /Expand all/.test(d.getElementById('fampage').textContent), 'collapse');
       w.famCol(); ok(/Old Five/.test(txt()), 'expand all again');
       w.famSelGrp('due_90', true); const b = d.getElementById('fambulk'); ok(!b.hidden && /1 selected/.test(b.textContent) && /Email selected/.test(b.textContent), 'select group / bulk bar');
+      { w.famMail(); const ov = d.getElementById('famov'); ok(ov && /Email preview/.test(ov.textContent) && /Bcc \(1\)/.test(ov.textContent) && /Open in mail app/.test(ov.textContent), ov && ov.textContent.slice(0, 120)); d.getElementById('famcancel')?.click(); }
     } finally { DATA.assessors = keep.a; DATA.fam_seta_registrations = keep.r; }
   });
   console.log(`\n${pass} passed, ${fail} failed`); process.exit(fail ? 1 : 0);

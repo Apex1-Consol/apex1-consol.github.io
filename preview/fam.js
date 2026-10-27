@@ -288,10 +288,17 @@
   window.famJump = g => { S.col.delete(g); renderRows(); $('famg-' + g)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   window.famCol = g => { if (!g) S.col.clear(); else S.col.has(g) ? S.col.delete(g) : S.col.add(g); renderRows(); };
   window.famSelGrp = (g, on) => { rows().forEach(([a]) => { if (worst(a) === g) on ? S.sel.add(a.id) : S.sel.delete(a.id); }); renderRows(); };
-  window.famMail = () => { const sel = S.A.filter(a => S.sel.has(a.id)), to = sel.map(a => a.email).filter(Boolean), no = sel.length - to.length;
-    if (!to.length) return say('None of the selected practitioners has an email address');
-    if (no) say(`${no} selected without an email address left out`);
-    location.href = 'mailto:?bcc=' + encodeURIComponent(to.join(',')) + '&subject=' + encodeURIComponent('Your SETA registration and documents'); };
+  window.famMail = () => { const sel = S.A.filter(a => S.sel.has(a.id)), ok = sel.filter(a => a.email), no = sel.filter(a => !a.email);
+    if (!ok.length) return say('None of the selected practitioners has an email address');
+    modal('Email preview', `<div class="sub">Bcc (${ok.length}): ${ok.map(a => e(a.name || a.email)).join(', ')}</div>
+      ${no.length ? `<div class="sub" style="color:var(--bad)">Left out, no email address (${no.length}): ${no.map(a => e(a.name || '')).join(', ')}</div>` : ''}
+      <label>Subject<input name="subj" value="Your SETA registration and documents"></label>
+      <label>Message<textarea name="body" rows="5">Hi,\n\nPlease send us your updated SETA registration and outstanding documents.\n\nThank you</textarea></label>
+      <div class="sub">This opens your mail app. Nothing is sent until you send it there.</div>`, () => {});
+    $('famsave').textContent = 'Open in mail app';
+    $('famform').onsubmit = ev => { ev.preventDefault(); const f = $('famform').elements;
+      const url = 'mailto:?bcc=' + encodeURIComponent(ok.map(a => a.email).join(',')) + '&subject=' + encodeURIComponent(f.subj.value) + '&body=' + encodeURIComponent(f.body.value);
+      close(); location.href = url; }; };
   window.famClearSel = () => { S.sel.clear(); renderRows(); };
   window.famBulk = async act => {
     const list = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status));
