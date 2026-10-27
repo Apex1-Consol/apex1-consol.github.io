@@ -75,6 +75,7 @@
   const onFile = id => TYPES.filter(t => { const c = cur(id, t); return c && c.status !== 'Missing'; });
   const fu = (type, sid) => S.F.find(f => f.source_type === type && f.source_id === sid);
   const openFU = id => S.F.filter(f => f.assessor_id === id && !CLOSED.includes(f.status));
+  const mineFU = id => openFU(id).filter(f => f.status === 'In Progress' && me() && f.assigned_to === me());
   const nextExp = id => regsFor(id).filter(r => r.registration_expiry_date).sort((x, y) => days(x) - days(y))[0];
   const scopeOf = rid => S.SC.filter(s => s.registration_id === rid);
   const qual = qid => S.Q.find(q => q.id === qid);
@@ -117,9 +118,10 @@
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
     ['missing', 'No ID / certificate', vis().filter(a => critMiss(a.id)).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
+    ['mine', 'Claimed by me', vis().filter(a => mineFU(a.id).length > 0).length, 'var(--navy2)'],
     ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? critMiss(a.id) : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  const matches = (a, k) => !k ? true : k === 'missing' ? critMiss(a.id) : k === 'followups' ? openFU(a.id).length > 0 : k === 'mine' ? mineFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
@@ -713,7 +715,7 @@
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
-    $('famkpis').innerHTML = (S.view === 'triage' ? '' : kgrp(`Registrations · ${visR().length}`, REGK)) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
+    $('famkpis').innerHTML = (S.view === 'triage' ? '' : kgrp(`Registrations · ${visR().length}`, REGK)) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }

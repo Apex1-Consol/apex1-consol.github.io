@@ -325,6 +325,17 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     await w.famBulk('claim'); const u = log.find(x => x.table === 'fam_follow_ups');
     ok(u && u.op === 'upsert' && Array.isArray(u.val) && u.val[0].status === 'In Progress' && u.val[0].source_id === 12, JSON.stringify(u));
   });
+  await t('FAM: Claimed by me KPI filters to my in-progress follow-ups', async () => {
+    const keep = DATA.fam_follow_ups;
+    DATA.fam_follow_ups = [...keep, { id: 32, assessor_id: 1, source_type: 'document', source_id: 1, kind: 'missing', status: 'In Progress', assigned_to: 'x@apexu.co.za' },
+      { id: 33, assessor_id: 3, source_type: 'document', source_id: 2, kind: 'missing', status: 'In Progress', assigned_to: 'someone@else.test' }];
+    try {
+      const { w, d } = await boot(sess('admin')); await tick(); await tick();
+      ok(/Claimedbyme1/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+      w.famMode('table'); w.famFilter('mine'); const r = d.querySelectorAll('#famrows tr');
+      ok(r.length === 1 && /Fac One/.test(r[0].textContent), d.getElementById('famrows').textContent);
+    } finally { DATA.fam_follow_ups = keep; }
+  });
   await t('FAM: filters remembered in localStorage', async () => {
     const a = await boot(sess('admin')); await tick(); await tick();
     a.w.famMode('table'); a.w.famDD('fRole', 'Assessor'); a.w.famFilter('expired');
