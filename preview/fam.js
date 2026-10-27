@@ -63,7 +63,8 @@
     const st = regsFor(id).map(risk), n = k => st.filter(x => k.includes(x)).length;
     const [c, l] = n(['expired']) ? ['b-bad', `${n(['expired'])} expired`] : n(['due_30', 'due_60']) ? ['b-warn', `${n(['due_30', 'due_60'])} due soon`]
       : n(['pending']) ? ['b-warn', `${n(['pending'])} to capture`] : ['b-warn', `${n(['inactive'])} inactive`];
-    return `<span class="badge ${c}" title="${st.length} registrations, not all active">${l}</span>`;
+    const pc = n(['pending']), more = pc && !/to capture/.test(l) ? ` +${pc} to capture` : '';
+    return `<span class="badge ${c}" title="${st.length} registrations, not all active${pc ? ` · ${pc} not captured yet` : ''}">${l}${more}</span>`;
   };
   const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Not captured'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };

@@ -336,6 +336,15 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       ok(r.length === 1 && /Fac One/.test(r[0].textContent), d.getElementById('famrows').textContent);
     } finally { DATA.fam_follow_ups = keep; }
   });
+  await t('FAM: Mixed pill adds +n to capture', async () => {
+    const keep = DATA.fam_seta_registrations;
+    DATA.fam_seta_registrations = [...keep, { id: 91, assessor_id: 2, seta_name: 'ETDP SETA', roles: ['Assessor'], status: 'Pending Entry' }];
+    try {
+      const { w, d } = await boot(sess('admin')); await tick(); await tick(); w.famMode('table');
+      const row = [...d.querySelectorAll('#famrows tr')].find(r => /Ass Two/.test(r.textContent));
+      ok(row && /1 expired \+1 to capture/.test(row.textContent), row ? row.textContent : 'no row');
+    } finally { DATA.fam_seta_registrations = keep; }
+  });
   await t('FAM: filters remembered in localStorage', async () => {
     const a = await boot(sess('admin')); await tick(); await tick();
     a.w.famMode('table'); a.w.famDD('fRole', 'Assessor'); a.w.famFilter('expired');
