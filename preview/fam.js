@@ -661,7 +661,7 @@
       .famclip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
       .famnav{display:flex;gap:6px;align-items:center;padding:10px 20px}.famnav .sub{flex-grow:1;font-size:12px}
       #view-fam .famrow{display:block}#view-fam .famrow>section{width:100%;max-width:none}
-      #view-fam .famdrawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);margin:0;z-index:60;overflow:auto;background:var(--card,#fff);border-radius:0;box-shadow:-8px 0 32px rgba(20,20,60,.18);transform:translateX(105%);transition:transform .2s ease;visibility:hidden}
+      #view-fam .famdrawer{position:fixed;top:0;right:0;bottom:0;width:min(440px,100vw);margin:0;z-index:60;overflow:hidden auto!important;overscroll-behavior:contain;background:var(--card,#fff);border-radius:0;box-shadow:-8px 0 32px rgba(20,20,60,.18);transform:translateX(105%);transition:transform .2s ease;visibility:hidden}
       #view-fam .famdrawer.open{transform:none;visibility:visible}
       #fambk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
       @media (prefers-reduced-motion:reduce){#view-fam .famdrawer{transition:none}}
