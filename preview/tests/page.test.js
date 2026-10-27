@@ -301,7 +301,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     w.famMode('table');
     ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
     w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
-    ok(/already expired/.test(d.getElementById('famstrip').textContent), d.getElementById('famstrip').textContent);
+    ok(/expired registration/.test(d.getElementById('famstrip').textContent), d.getElementById('famstrip').textContent);
     w.famShow(0); ok(/Practitioner certificate/.test(d.getElementById('fampanel').textContent) && !/>QUAL</.test(d.getElementById('fampanel').innerHTML), 'QUAL label');
     w.famExport(false); const f = w.__files[0]; ok(f && f.wb.SheetNames.join() === 'Practitioners,Registrations', 'no workbook');
     const rowsX = XLSX.utils.sheet_to_json(f.wb.Sheets.Practitioners); ok(rowsX.length === 3 && rowsX.some(r => r['Completeness %'] !== undefined), JSON.stringify(rowsX[0]));

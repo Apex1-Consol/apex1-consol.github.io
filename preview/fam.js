@@ -60,7 +60,7 @@
       : n(['pending']) ? ['b-warn', `${n(['pending'])} to capture`] : ['b-warn', `${n(['inactive'])} inactive`];
     return `<span class="badge ${c}" title="${st.length} registrations, not all active">${l}</span>`;
   };
-  const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Pending entry'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
+  const RISK = { expired: ['b-bad', d => `Expired ${Math.abs(d)}d ago`], due_30: ['b-bad', d => `Due in ${d}d`], due_60: ['b-warn', d => `Due in ${d}d`], pending: ['b-n', () => 'Not captured'], inactive: ['b-bad', () => 'Inactive'], active: ['b-ok', () => 'Active'] };
   const riskBadge = r => { const k = risk(r), [c, f] = RISK[k]; return `<span class="badge ${c}">${f(days(r))}</span>`; };
   const roles = id => [...new Set(regsFor(id).flatMap(r => r.roles?.length ? r.roles : r.role ? [r.role] : []))];
   const rolesOf = a => { const r = roles(a.id); return r.length ? r : a.role ? [a.role] : []; };
@@ -97,6 +97,7 @@
   const complHtml = id => { const c = compl(id); return c.complete ? '<div class="famok">✓ Profile complete</div>' : `<div class="sub famgap">${e(c.gaps.join(' · '))}</div>`; };
 
   /* ---------- KPIs (click to filter) ---------- */
+  const SETAS = ['ETDP SETA', 'MICT SETA', 'Services SETA', 'AgriSETA', 'BANKSETA', 'CHIETA', 'FASSET', 'HWSETA', 'INSETA', 'LGSETA', 'MERSETA', 'PSETA', 'QCTO', 'TETA', 'W&RSETA'], SETAK = Object.fromEntries(SETAS.map(x => [x.toLowerCase().replace(/[^a-z&]/g, ''), x]));
   const isTest = a => /^\s*\[TEST\]/i.test(a.full_name || '');
   const shownName = a => (a.full_name || '').replace(/^\s*\[TEST\]\s*/i, '');
   const vis = () => S.hideTest ? S.A.filter(a => !isTest(a)) : S.A;
@@ -107,13 +108,13 @@
     ['expired', 'Expired', allRisks().filter(s => s === 'expired').length, 'var(--bad)'],
     ['due_30', 'Due ≤30 days', allRisks().filter(s => s === 'due_30').length, 'var(--bad)'],
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
-    ['pending', 'Pending entry', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
+    ['pending', 'Not captured', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
-    ['missing', 'Missing docs', S.D.filter(d => d.status === 'Missing' && d.is_current !== false && vis().some(a => a.id === d.assessor_id)).length, 'var(--bad)'],
+    ['missing', 'Missing docs', vis().filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
     ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? S.D.some(d => d.assessor_id === a.id && d.status === 'Missing' && d.is_current !== false) : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
@@ -146,7 +147,7 @@
     const w = worst(a);
     if (w === 'none') return ['No registration', 'color:var(--muted)'];
     if (w === 'inactive') return ['Inactive', 'color:var(--muted)'];
-    if (w === 'pending') return ['Details not captured', 'color:var(--navy2);font-weight:600'];
+    if (w === 'pending') return ['Not captured', 'color:var(--navy2);font-weight:600'];
     const r = EXPG.includes(w) ? inGrp(a)[0] : nextExp(a.id);
     if (!r || days(r) === null) return ['No expiry on record', 'color:#8A5100;font-weight:600'];
     const d = days(r), on = ` · ${fmt(r.registration_expiry_date)}`;
@@ -182,10 +183,10 @@
   const RTXT = { expired: 'expired', lapsed: 'expired over a year ago', due_30: 'due within 30 days', due_60: 'due within 60 days', due_90: 'due within 90 days', active: 'active', inactive: 'inactive', pending: 'details not captured' };
   function regChips(a) {
     const m = new Map();
-    regsFor(a.id).forEach(r => { const k = wrisk(r), n = r.seta_name === 'Pending Entry' || (!r.seta_name && k === 'pending') ? 'Not captured yet' : r.seta_name === 'N/A' || !r.seta_name ? 'SETA not named' : r.seta_name, o = m.get(n);
+    regsFor(a.id).forEach(r => { const k = wrisk(r), n = r.seta_name === 'Pending Entry' || (!r.seta_name && k === 'pending') ? 'SETA not captured' : r.seta_name === 'N/A' || !r.seta_name ? 'SETA not named' : r.seta_name, o = m.get(n);
       if (!o || WRANK.indexOf(k) < WRANK.indexOf(o.k)) m.set(n, { k, r }); });
     if (!m.size) return '';
-    return `<div class="famchips">${[...m].map(([n, { k, r }]) => `<span class="famchip ${n === 'Not captured yet' ? 'famc-nc' : RCLS[k]}" title="${n === 'Not captured yet' ? 'Registration added; SETA and expiry date still to be entered' : `${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`}">${e(n)}</span>`).join('')}</div>`;
+    return `<div class="famchips">${[...m].map(([n, { k, r }]) => `<span class="famchip ${n === 'SETA not captured' ? 'famc-nc' : RCLS[k]}" title="${n === 'SETA not captured' ? 'Registration added; SETA and expiry date still to be entered' : `${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`}">${e(n)}</span>`).join('')}</div>`;
   }
   const docTip = a => { const have = onFile(a.id), miss = TYPES.filter(t => !have.includes(t)).map(lbl), c = compl(a.id);
     return `Documents on file: ${have.length} of 6. ${miss.length ? 'Missing: ' + miss.join(', ') + '.' : 'All on file.'} Profile checks: ${c.complete ? 'complete' : c.gaps.join(', ')}.`; };
@@ -252,7 +253,7 @@
     const dot = r => { const d = days(r), c = d <= 30 ? 'var(--bad)' : d <= 60 ? '#E0A100' : 'var(--navy2)';
       return `<button class="famdot" style="left:${Math.min(100, d / 90 * 100)}%;background:${c}" title="${e(who(r))} · ${e(r.seta_name)} · in ${d}d" aria-label="${e(who(r))}, ${e(r.seta_name)}, expires in ${d} days" onclick="famOpen(${r.assessor_id})"></button>`; };
     $('famstrip').innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:15px;flex-grow:1">Expiries in the next 90 days</h2>
-        <span class="sub">${soon.length} due${exp.length ? ` · <a href="#" onclick="famFilter('expired');return false" style="color:var(--bad);font-weight:600">${exp.length} already expired</a>` : ''}</span></div>
+        <span class="sub">${soon.length} due${exp.length ? ` · <a href="#" onclick="famFilter('expired');return false" style="color:var(--bad);font-weight:600">${exp.length} expired registration${exp.length > 1 ? 's' : ''}</a>` : ''}</span></div>
       <div class="famtrack">${soon.map(dot).join('')}</div>
       <div class="famticks"><span>Today</span><span>30d</span><span>60d</span><span>90d</span></div>
       ${soon.length ? `<div class="famnext">${soon.slice(0, 4).map(r => `<a href="#fam/${r.assessor_id}">${e(who(r))}</a> <span class="sub">${e(r.seta_name)} · ${fmt(r.registration_expiry_date)}</span>`).join('<span class="sub"> · </span>')}${soon.length > 4 ? `<span class="sub"> +${soon.length - 4} more</span>` : ''}</div>` : '<div class="sub">Nothing due in the next 90 days.</div>'}`;
@@ -728,7 +729,7 @@
   window.famEdit = id => { const a = S.A.find(x => x.id === id); if (!a) return;
     modal('Edit practitioner', personForm(a), async f => { need(); await write('Practitioner', () => sb.from('assessors').update(personVals(f)).eq('id', id)); say('Details saved'); }); };
 
-  window.famReg = aid => modal('Add SETA registration', `<div class="qagrid">${fld('seta_name', 'SETA *', 'text', 'required list="famsetas"')}<datalist id="famsetas">${['ETDP SETA', 'MICT SETA', 'Services SETA', 'AgriSETA', 'BANKSETA', 'CHIETA', 'FASSET', 'HWSETA', 'INSETA', 'LGSETA', 'MERSETA', 'PSETA', 'QCTO', 'TETA', 'W&RSETA'].map(s => `<option value="${s}">`).join('')}</datalist>
+  window.famReg = aid => modal('Add SETA registration', `<div class="qagrid">${fld('seta_name', 'SETA *', 'text', 'required list="famsetas"')}<datalist id="famsetas">${SETAS.map(s => `<option value="${s}">`).join('')}</datalist>
       ${fld('registration_number', 'Registration number')}${fld('registration_expiry_date', 'Expiry date', 'date')}${sel('status', 'Status', ['Active', 'Pending Entry', 'Inactive'])}</div>
       <fieldset style="border:0;padding:0;display:flex;gap:14px;flex-wrap:wrap"><legend class="sub" style="margin-bottom:4px">Roles *</legend>${['Facilitator', 'Assessor', 'Moderator'].map(r => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="r_${r}">${r}</label>`).join('')}</fieldset>`,
     async f => { need(); const rl = ['Facilitator', 'Assessor', 'Moderator'].filter(r => f['r_' + r].checked);
@@ -796,6 +797,7 @@
       q('follow-ups', sb.from('fam_follow_ups').select('*')),
       q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
       q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id'))]);
+    R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
     Object.assign(S, { A, R, D, F, Q, SC, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
