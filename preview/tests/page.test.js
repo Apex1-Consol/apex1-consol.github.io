@@ -272,7 +272,8 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('FAM: computed status, expiry KPIs, filters and next action', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     const k = d.getElementById('famkpis').textContent.replace(/\s/g, '');
-    ok(/Practitioners3/.test(k) && /Registrations2/.test(k) && /Expired1/.test(k) && /Openfollow-ups1/.test(k), k);
+    ok(/Practitioners·?3/.test(k) && /Registrations·?2/.test(k) && /Expired1/.test(k) && /Openfollow-ups1/.test(k), k);
+    w.famMode('table');
     const rows = d.getElementById('famrows').textContent;
     ok(/No registrations/.test(rows) && /Expired/.test(rows) && /Renew MICT SETA \(expired\)/.test(rows) && /Add a SETA registration/.test(rows), rows);
     w.famFilter('expired'); ok(d.querySelectorAll('#famrows tr').length === 1, 'filter');
@@ -280,7 +281,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: panel shows versions; claim upserts follow-up; view signs URL', async () => {
     const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
-    w.eval('famSel=0'); w.renderFam();
+    w.famShow(0);
     ok(/1 older/.test(d.getElementById('fampanel').textContent) && /v2/.test(d.getElementById('fampanel').textContent), d.getElementById('fampanel').textContent);
     await w.famView(22); ok(log.some(x => x.sign === 'apex/1/cv.pdf'), 'no signed url');
     await w.famFU('claim', 'registration', 12, 2, 'expired');
@@ -296,11 +297,12 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: completeness, sort, expiry strip, QUAL label, Excel export', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
-    ok(/Incompleteprofiles3/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+    ok(/Incompleteprofiles2/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+    w.famMode('table');
     ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
     w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
     ok(/already expired/.test(d.getElementById('famstrip').textContent), d.getElementById('famstrip').textContent);
-    w.eval('famSel=0'); w.renderFam(); ok(/Practitioner certificate/.test(d.getElementById('fampanel').textContent) && !/>QUAL</.test(d.getElementById('fampanel').innerHTML), 'QUAL label');
+    w.famShow(0); ok(/Practitioner certificate/.test(d.getElementById('fampanel').textContent) && !/>QUAL</.test(d.getElementById('fampanel').innerHTML), 'QUAL label');
     w.famExport(false); const f = w.__files[0]; ok(f && f.wb.SheetNames.join() === 'Practitioners,Registrations', 'no workbook');
     const rowsX = XLSX.utils.sheet_to_json(f.wb.Sheets.Practitioners); ok(rowsX.length === 3 && rowsX.some(r => r['Completeness %'] !== undefined), JSON.stringify(rowsX[0]));
   });
@@ -315,9 +317,22 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: bulk claim upserts all open follow-ups of the selection', async () => {
     const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
-    w.famPick(2, true); ok(!d.getElementById('fambulk').hidden && /1 open follow-up/.test(d.getElementById('fambulk').textContent), 'bulk bar');
+    w.famMode('table'); w.famPick(2, true); ok(!d.getElementById('fambulk').hidden && /1 open follow-up/.test(d.getElementById('fambulk').textContent), 'bulk bar');
     await w.famBulk('claim'); const u = log.find(x => x.table === 'fam_follow_ups');
     ok(u && u.op === 'upsert' && Array.isArray(u.val) && u.val[0].status === 'In Progress' && u.val[0].source_id === 12, JSON.stringify(u));
+  });
+  await t('FAM: role/status/SETA filters, test records hidden, KPI cards kept, Bulk Intake page', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    ok(/Missingdocs/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), 'KPI cards overwritten');
+    ok(/Hide|Show/.test(d.getElementById('famtest').textContent) && /Show test records/.test(d.getElementById('famtest').textContent), 'test records not hidden by default');
+    w.famMode('table'); const n = () => d.querySelectorAll('#famrows tr').length;
+    w.famDD('fRole', 'Moderator'); const m = n(); w.famDD('fRole', ''); ok(m < n(), 'role filter');
+    w.famDD('fSt', 'expired'); ok(n() === 1, 'status filter'); w.famDD('fSt', '');
+    ok(d.querySelectorAll('#famdd-seta option').length > 1, 'SETA options');
+    ok(d.querySelector('#famrows .famchip'), 'no chips');
+    w.location.hash = 'fam/bulk'; await tick();
+    ok(/Bulk Intake/.test(d.getElementById('famprof').textContent) && d.getElementById('fambi-go').disabled, 'bulk intake page');
+    w.location.hash = 'fam'; await tick(); w.famPick(2, true); ok(!d.getElementById('fambulk').hidden, 'bulk bar clobbered');
   });
   await t('FAM: Scope Import commits scope + audit; manual scope add', async () => {
     const { w, d, log } = await boot(sess('admin')); await tick(); await tick();

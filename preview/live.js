@@ -319,7 +319,7 @@
     PEOPLE.length = 0; P.data.famc.forEach(a => PEOPLE.push([a.full_name, P.data.assessors.find(x => x.id === a.assessor_id)?.role || '', Array(Math.max(0, a.document_count)).fill('CV')]));
     if (!PEOPLE.length) PEOPLE.push(['No practitioners yet', '', []]);
     famSel = 0; renderFam();
-    $('famkpis').innerHTML = [['Practitioners', P.data.famc.length], ['Registrations', P.data.famc.reduce((t, a) => t + a.registration_count, 0)], ['Open follow-ups', P.data.famc.reduce((t, a) => t + a.open_follow_ups, 0)]]
+    if (!$('famkpis').dataset.fam) $('famkpis').innerHTML = [['Practitioners', P.data.famc.length], ['Registrations', P.data.famc.reduce((t, a) => t + a.registration_count, 0)], ['Open follow-ups', P.data.famc.reduce((t, a) => t + a.open_follow_ups, 0)]]
       .map(([l, v]) => `<div class="kpi" style="min-width:150px;padding:12px 16px;gap:2px"><span class="l">${l}</span><span class="v" style="font-size:24px">${v}</span></div>`).join('');
   }
   function applyClients() {
