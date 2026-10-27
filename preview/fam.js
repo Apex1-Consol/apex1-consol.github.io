@@ -16,6 +16,7 @@
   const LABEL = { QUAL: 'Practitioner certificate', AFFIDAVIT: 'Affidavit' };
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
+  const CRIT = ['ID', 'QUAL']; const critMiss = id => CRIT.some(t => !onFile(id).includes(t)); // ID and practitioner certificate
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
   const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: true, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), col: new Set(['lapsed', 'none', 'active', 'inactive']), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   const say = m => window.toast(m);
@@ -110,11 +111,11 @@
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
     ['pending', 'Not captured', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
-    ['missing', 'Missing docs', vis().filter(a => onFile(a.id).length < TYPES.length).length, 'var(--bad)'],
+    ['missing', 'No ID / certificate', vis().filter(a => critMiss(a.id)).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
     ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? onFile(a.id).length < TYPES.length : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  const matches = (a, k) => !k ? true : k === 'missing' ? critMiss(a.id) : k === 'followups' ? openFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
@@ -122,8 +123,10 @@
   window.famMode = v => { S.view = v; S.page = 0; renderFam(); };
   window.famTest = () => { S.hideTest = !S.hideTest; S.page = 0; S.sel.clear(); render(); };
   window.famPage = d => { S.page = Math.max(0, S.page + d); renderRows(); };
-  window.famShow = i => { famSel = i; S.open = true; renderFam(); };
-  window.famClose = () => { S.open = false; renderPanel(); };
+  const OPEN = /^#fam\/open\/\d+$/;
+  const panelHash = (id, push) => { try { const u = '#fam/open/' + id; if (location.hash === u) return; push ? history.pushState(null, '', u) : history.replaceState(null, '', u); } catch (_) {} };
+  window.famShow = i => { const was = S.open && OPEN.test(location.hash); famSel = i; S.open = true; S.acted = null; renderFam(); if (S.A[i]) panelHash(S.A[i].id, !was); };
+  window.famClose = () => { S.open = false; S.acted = null; renderPanel(); if (OPEN.test(location.hash)) { try { history.replaceState(null, '', '#fam'); } catch (_) {} } };
   window.famPTab = t => { S.ptab = t; renderPanel(); };
   window.famOpen = id => { location.hash = 'fam/' + id; };
 
@@ -173,7 +176,7 @@
     return list.sort(([x], [y]) => { const p = k(x), r = k(y); return (p < r ? -1 : p > r ? 1 : 0) * S.sort.dir; });
   }
   window.famClearAll = () => { S.filter = ''; S.q = ''; S.fRole = S.fSt = S.fSeta = ''; document.querySelectorAll('.famdd').forEach(x => { x.value = ''; }); S.page = 0; const i = $('famq'); if (i) i.value = ''; render(); };
-  window.famMove = d => { const ids = rows().filter(([a]) => S.view !== 'triage' || !S.col.has(worst(a))).map(([, i]) => i); if (!ids.length) return; const p = ids.indexOf(famSel); famSel = ids[p < 0 ? 0 : (p + d + ids.length) % ids.length]; renderFam(); };
+  window.famMove = d => { const ids = rows().filter(([a]) => S.view !== 'triage' || !S.col.has(worst(a))).map(([, i]) => i); if (!ids.length) return; const p = ids.indexOf(famSel); famSel = ids[p < 0 ? 0 : (p + d + ids.length) % ids.length]; S.acted = null; renderFam(); if (S.open && S.A[famSel]) panelHash(S.A[famSel].id, false); };
   const PER = 50;
   const th = (k, l) => `<th${k ? ` aria-sort="${S.sort.k === k ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')">${l}${S.sort.k === k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`;
   const RCH = { Facilitator: 'famc-f', Assessor: 'famc-a', Moderator: 'famc-m' };
@@ -318,7 +321,7 @@
     const who = f?.assigned_to ? ` · ${e(f.assigned_to)}` : '';
     const b = (fn, l) => `<button class="btn sm" onclick="famFU('${fn}','${type}',${sid},${aid},'${kind}')">${l}</button>`;
     return `<div class="famfu"><span class="sub">${f ? e(st) + who : 'No follow-up'}${f?.notes ? ' — ' + e(f.notes) : ''}</span>
-      ${st === 'Dismissed' ? b('reopen', 'Reopen') : (st !== 'In Progress' ? b('claim', 'Claim') : '') + b('note', 'Note') + b('dismiss', 'Dismiss')}</div>`;
+      <details class="famfum"><summary class="btn sm" aria-label="Follow-up actions">…</summary><div>${st === 'Dismissed' ? b('reopen', 'Reopen') : (st !== 'In Progress' ? b('claim', 'Claim') : '') + b('note', 'Note') + b('dismiss', 'Dismiss')}</div></details></div>`;
   }
   function regBlock(a, withScope) {
     const regs = regsFor(a.id);
@@ -368,6 +371,12 @@
   }
 
   /* ---------- side panel (quick view) ---------- */
+  function nextIn(a) {
+    const g = S.acted; if (!g || !WGRP[g]) return '';
+    const ids = rows().filter(([x]) => worst(x) === g || x.id === a.id).map(([, i]) => i); if (ids.length < 2) return '';
+    const n = ids[(ids.indexOf(famSel) + 1) % ids.length]; return `<button class="btn sm" onclick="famNextIn('${g}',${n})">Next in ${e(WGRP[g][0])} →</button>`;
+  }
+  window.famNextIn = (g, i) => { famShow(i); S.acted = g; renderPanel(); };
   function renderPanel() {
     const a = S.A[famSel] || S.A[0], box = $('fampanel');
     if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
@@ -381,7 +390,7 @@
       <div class="famhead"><span class="disp" style="font-size:20px">${isTest(a) ? '<span class="famtag" style="background:#3A3994;color:#fff">TEST</span>' : ''}${e(shownName(a))}</span>
         <span style="font-size:13px;color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
         <span style="font-size:13px;color:#D2D1EC">${e([a.email, a.phone].filter(Boolean).join(' · ') || 'No contact details')}</span>
-        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button></div></div>
+        <div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<button class="btn y sm" onclick="famOpen(${a.id})">Open profile</button>${nextIn(a)}</div></div>
       <div class="famtabs" role="tablist" style="padding:0 20px"><button role="tab" aria-selected="${!hist}" class="${hist ? '' : 'on'}" onclick="famPTab('record')">Record</button><button role="tab" aria-selected="${hist}" class="${hist ? 'on' : ''}" onclick="famPTab('history')">History</button></div>
       ${hist ? `<div style="padding:12px 20px 16px">${ev.length ? ev.map(([t, l]) => `<div class="famev"><span class="sub">${fmt(t)}</span><span>${e(l)}</span></div>`).join('') : '<div class="sub">No changes recorded yet.</div>'}
         <p class="sub" style="margin:10px 0 0;font-size:12px">Built from registrations, documents and follow-ups, newest first.</p></div>` : `${nextBox(a)}
@@ -680,7 +689,7 @@
     const h = location.hash.slice(1);
     if (h.split('/')[0] !== 'fam' || !ready) return;
     const arg = h.split('/')[1];
-    const mode = arg === 'scope' ? 'scope' : arg === 'bulk' ? 'bulk' : arg === 'queue' ? 'queue' : arg ? 'profile' : 'list';
+    const mode = arg === 'scope' ? 'scope' : arg === 'bulk' ? 'bulk' : arg === 'queue' ? 'queue' : arg && arg !== 'open' ? 'profile' : 'list';
     if (mode === 'profile' && S.prof !== Number(arg)) S.tab = 'overview';
     S.mode = mode; S.prof = mode === 'profile' ? Number(arg) : null;
     const v = $('view-fam');
@@ -690,7 +699,10 @@
     else if (mode === 'scope') renderScope();
     else if (mode === 'bulk') renderBI();
     else if (mode === 'queue') renderQueue();
-    else { $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
+    else {
+      const oi = arg === 'open' ? S.A.findIndex(a => a.id === Number(h.split('/')[2])) : -1;
+      if (oi >= 0) { if (!S.open || famSel !== oi) { famSel = oi; S.open = true; renderFam(); } } else if (S.open) { S.open = false; S.acted = null; renderPanel(); }
+      $('heading').textContent = 'FAM Registry'; $('crumb').textContent = 'Quality / Facilitators, Assessors & Moderators'; }
   }
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
@@ -783,7 +795,7 @@
     else { const n = prompt('Note for this follow-up:', f?.notes || ''); if (n === null) return; fields = { notes: n, status: f?.status || 'Open' }; }
     try {
       await write('Follow-up', () => sb.from('fam_follow_ups').upsert({ tenant_id: P.tenant, assessor_id: aid, source_type: type, source_id: sid, kind, created_by: f?.created_by || me(), ...fields }, { onConflict: 'tenant_id,assessor_id,source_type,source_id' }));
-      say('Follow-up updated'); await load();
+      S.acted = S.view === 'triage' && S.open ? worst(S.A.find(x => x.id === aid) || {}) : null; say('Follow-up updated'); await load();
     } catch (err) { /* write() already showed it */ }
   };
 
@@ -822,7 +834,7 @@
       .famc-nc{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-style:italic}
       .famnoid{margin-left:8px;font-size:11px;color:#8A5100;white-space:nowrap}.famck{margin:0 8px 0 0;vertical-align:middle}
       .famsum td{padding:4px 0 10px!important;border:0!important}.famsc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--soft);font-size:13px}.famsc.q{opacity:.75}.famsc:hover{border-color:var(--navy2)}.famsc:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
-      .famsc.on{background:var(--navy);color:#fff;border-color:var(--navy)}.famleg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-top:2px}.famleg .famchip{font-size:11px}.famgt{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.famgt:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
+      .famsc.on{background:var(--navy);color:#fff;border-color:var(--navy)}.famfum{position:relative;display:inline-block}.famfum>summary{list-style:none;cursor:pointer}.famfum>summary::-webkit-details-marker{display:none}.famfum>div{position:absolute;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;gap:4px;padding:6px;background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12)}.famleg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-top:2px}.famleg .famchip{font-size:11px}.famgt{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.famgt:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
       .famgsel{float:right;letter-spacing:0;text-transform:none;font-weight:400;cursor:pointer}@media (hover:hover){.famgsel{opacity:0;transition:opacity .15s}.famgh:hover .famgsel,.famgsel:focus-within,.famgsel:has(:checked){opacity:1}}
       @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:#1E3A26;color:#9FD8AE}:root:not([data-theme=light]) .famc-a{background:#1F2D4D;color:#A9C1F2}:root:not([data-theme=light]) .famc-m{background:#3D2F12;color:#F0CF8A}}
       :root[data-theme=dark] .famc-f{background:#1E3A26;color:#9FD8AE}:root[data-theme=dark] .famc-a{background:#1F2D4D;color:#A9C1F2}:root[data-theme=dark] .famc-m{background:#3D2F12;color:#F0CF8A}

@@ -323,7 +323,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: role/status/SETA filters, test records hidden, KPI cards kept, Bulk Intake page', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
-    ok(/Missingdocs/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), 'KPI cards overwritten');
+    ok(/NoID\/certificate/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), 'KPI cards overwritten');
     ok(/Hide|Show/.test(d.getElementById('famtest').textContent) && /Show test records/.test(d.getElementById('famtest').textContent), 'test records not hidden by default');
     w.famMode('table'); const n = () => d.querySelectorAll('#famrows tr').length;
     w.famDD('fRole', 'Moderator'); const m = n(); w.famDD('fRole', ''); ok(m < n(), 'role filter');
