@@ -906,7 +906,7 @@
       .famdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
       .famticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:0 2px}
       .famnext{font-size:13px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
-      #fambulk{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;padding:10px 14px;max-width:calc(100vw - 32px);background:var(--soft);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18)}#fambulk[hidden]{display:none}
+      #fambulk{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;padding:10px 14px;max-width:calc(100vw - 32px);background:var(--soft);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18)}#fambulk[hidden]{display:none}@media (max-width:600px){#fambulk{left:12px;right:12px;bottom:12px;transform:none;max-width:none;gap:6px;padding:8px 10px}#fambulk .btn.sm{padding:4px 8px;font-size:12px}}
       .famback{font-weight:600;font-size:14px;align-self:flex-start}
       #famprof{display:flex;flex-direction:column;gap:14px}#famprof[hidden]{display:none}
       .famphead{background:var(--navy);color:#fff;display:flex;flex-direction:column;gap:14px}
