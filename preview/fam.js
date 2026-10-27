@@ -126,9 +126,9 @@
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
-  window.famSort = k => { S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderRows(); };
+  window.famSort = k => { S.sort = { k, dir: S.view !== 'triage' && S.sort.k === k ? -S.sort.dir : 1 }; S.view = 'table'; S.page = 0; renderRows(); };
   const REGK = ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive'];
-  window.famMode = v => { S.view = v; S.page = 0; if (v === 'triage' && REGK.includes(S.filter)) S.filter = ''; render(); };
+  window.famMode = v => { S.view = v; S.page = 0; render(); };
   window.famTest = () => { S.hideTest = !S.hideTest; S.page = 0; S.sel.clear(); render(); };
   window.famPage = d => { S.page = Math.max(0, S.page + d); renderRows(); };
   const OPEN = /^#fam\/open\/\d+$/;
@@ -186,7 +186,7 @@
   window.famClearAll = () => { S.filter = ''; S.q = ''; S.fRole = S.fSt = S.fSeta = ''; document.querySelectorAll('.famdd').forEach(x => { x.value = ''; }); S.page = 0; const i = $('famq'); if (i) i.value = ''; render(); };
   window.famMove = d => { const ids = rows().filter(([a]) => S.view !== 'triage' || !S.col.has(worst(a))).map(([, i]) => i); if (!ids.length) return; const p = ids.indexOf(famSel); famSel = ids[p < 0 ? 0 : (p + d + ids.length) % ids.length]; S.acted = null; renderFam(); if (S.open && S.A[famSel]) panelHash(S.A[famSel].id, false); };
   const PER = 50;
-  const th = (k, l) => `<th${k ? ` aria-sort="${S.sort.k === k ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')">${l}${S.sort.k === k ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`;
+  const th = (k, l) => { const on = S.view !== 'triage' && S.sort.k === k; return `<th${k ? ` aria-sort="${on ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')" title="Sort by this column">${l}${on ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`; };
   const RCH = { Facilitator: 'famc-f', Assessor: 'famc-a', Moderator: 'famc-m' };
   const roleChips = a => { const r = rolesOf(a); return r.length ? `<div class="famchips">${r.map(x => `<span class="famchip ${RCH[x] || ''}">${e(x)}</span>`).join('')}</div>` : '<div class="sub">No role yet</div>'; };
   const setaChips = list => list.length ? `<div class="famchips">${list.map(x => `<span class="famchip famc-s">${e(x)}</span>`).join('')}</div>` : '<span class="sub">—</span>';
@@ -215,11 +215,10 @@
     const tag = a => isTest(a) ? '<span class="famtag">TEST</span>' : '';
     const flag = a => { const n = dataFlags(a).length; return n ? `<span class="famflag" title="Data to tidy: ${e(dataFlags(a).join('; '))}">⚑ ${n}</span>` : ''; };
     const empty = c => `<tr><td colspan="${c}" class="sub" style="padding:20px">No practitioners match${S.filter || S.q || S.fRole || S.fSt || S.fSeta ? '. <a href="#" onclick="famClearAll();return false">Clear filters</a>' : '.'}</td></tr>`;
-    $('famv-t').className = tri ? 'on' : ''; $('famv-t').setAttribute('aria-pressed', tri);
-    $('famv-l').className = tri ? '' : 'on'; $('famv-l').setAttribute('aria-pressed', !tri);
+    $('famv-t').hidden = tri;
     $('famtest').textContent = S.hideTest ? 'Show test records' : 'Hide test records';
     if (tri) {
-      $('famhead').innerHTML = '';
+      $('famhead').innerHTML = `<tr>${th('name', 'Practitioner')}${th('expiry', 'Registrations')}${th('docs', 'Documents')}<th class="sub" style="text-align:right;font-weight:400">Urgency order</th></tr>`;
       const cnt = WRANK.map(g => [g, all.filter(([b]) => worst(b) === g).length]).filter(([, c]) => c);
       const sum = cnt.length ? `<tr class="famsum"><td colspan="4"><button class="famsc${S.col.size ? '' : ' on'}" onclick="famCol()" aria-pressed="${!S.col.size}" title="Open every group"><b>${all.length}</b> All practitioners</button>${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span><b>${c}</b> ${WGRP[g][0]}</button>`).join('')}<details class="famfum famlegd" onclick="event.stopPropagation()"><summary class="famsc" title="What the SETA chip colours mean" aria-label="What the SETA chip colours mean">?</summary><div class="famleg sub">${[['famc-ok', 'Active'], ['famc-warn', 'Due within 90 days'], ['famc-bad', 'Expired'], ['famc-nc', 'Details not captured'], ['famc-s', 'Inactive']].map(([c, l]) => `<span class="famchip ${c}">${l}</span>`).join('')}</div></details></td></tr>` : '';
       $('famrows').innerHTML = list.length ? sum + list.map(([a, i], n) => {
@@ -727,7 +726,7 @@
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}<div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
-    $('famkpis').innerHTML = (S.view === 'triage' ? '' : kgrp(`Registrations · ${visR().length}`, REGK)) + kgrp(S.view === 'triage' ? '' : `Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
+    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }
@@ -951,7 +950,7 @@
       <select class="faminput famdd" id="famdd-role" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
       <select class="faminput famdd" id="famdd-st" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
       <select class="faminput famdd" id="famdd-seta" aria-label="Filter by SETA" onchange="famDD('fSeta',this.value)"><option value="">All SETAs</option></select>
-      <div class="famseg" role="group" aria-label="List view"><button id="famv-t" onclick="famMode('triage')">Triage</button><button id="famv-l" onclick="famMode('table')">Table</button></div>
+      <button class="btn sm" id="famv-t" onclick="famMode('triage')" title="Back to urgency order, grouped by status" hidden>↺ Sort: urgency</button>
       <button class="btn sm" id="famtest" onclick="famTest()">Hide test records</button></div>
       <div class="famsub"><span class="sub" id="famcount" aria-live="polite"></span><span class="sub" id="famasof"></span></div><div id="fambulk" hidden></div>`);
     (tbl.parentElement.classList.contains('tw') ? tbl.parentElement : tbl).insertAdjacentHTML('afterend', '<div id="fampage" class="fampage"></div>');
