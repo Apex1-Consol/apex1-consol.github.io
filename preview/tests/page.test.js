@@ -343,6 +343,9 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       const { w, d } = await boot(sess('admin')); await tick(); await tick(); w.famMode('table');
       const row = [...d.querySelectorAll('#famrows tr')].find(r => /Ass Two/.test(r.textContent));
       ok(row && /1 expired \+1 to capture/.test(row.textContent), row ? row.textContent : 'no row');
+      w.famMode('triage'); const tr = [...d.querySelectorAll('#famrows tr')].find(r => /Ass Two/.test(r.textContent));
+      ok(tr && /ago.*\+1 to capture/.test(tr.textContent), tr ? tr.textContent : 'no triage row');
+      ok(/nothing due/.test(d.getElementById('famstrip').textContent) && d.getElementById('famstrip').classList.contains('famstrip0') && !d.querySelector('#famstrip .famtrack'), 'compact empty strip');
     } finally { DATA.fam_seta_registrations = keep; }
   });
   await t('FAM: filters remembered in localStorage', async () => {

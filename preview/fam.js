@@ -228,7 +228,7 @@
         return (mem ? `<tr class="famgh" id="famg-${g}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}${(k => k ? ` · <span class="famnoid" title="ID number not captured">${k} without ID</span>` : '')(mem.filter(([b]) => !b.id_number).length)}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
           <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>${flag(a)}${roleChips(a)}</td>
-          <td><div style="${w[1]}">${e(w[0])}</div>${regChips(a)}</td>
+          <td><div style="${w[1]}">${e(w[0])}${(k => g !== 'pending' && k ? ` <span class="sub famcap" style="font-weight:400">+${k} to capture</span>` : '')(regsFor(a.id).filter(r => risk(r) === 'pending').length)}</div>${regChips(a)}</td>
           <td class="famdocs" style="white-space:nowrap" title="${e(docTip(a))}">${meter(a)}</td>
           <td style="text-align:right">${act ? `<button class="famact" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`);
       }).join('') : empty(4);
@@ -264,6 +264,8 @@
     const who = r => S.A.find(a => a.id === r.assessor_id)?.full_name || 'Unknown';
     const dot = r => { const d = days(r), c = d <= 30 ? 'var(--bad)' : d <= 60 ? '#E0A100' : 'var(--navy2)';
       return `<button class="famdot" style="left:${Math.min(100, d / 90 * 100)}%;background:${c}" title="${e(who(r))} · ${e(r.seta_name)} · in ${d}d" aria-label="${e(who(r))}, ${e(r.seta_name)}, expires in ${d} days" onclick="famOpen(${r.assessor_id})"></button>`; };
+    $('famstrip').classList.toggle('famstrip0', !soon.length);
+    if (!soon.length) { $('famstrip').innerHTML = '<span class="sub"><b style="color:var(--ink)">Expiries in the next 90 days:</b> nothing due.</span>'; return; }
     $('famstrip').innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:15px;flex-grow:1">Expiries in the next 90 days</h2>
         <span class="sub">${soon.length} due</span></div>
       <div class="famtrack">${soon.map(dot).join('')}</div>
@@ -891,7 +893,7 @@
       .famfu{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.famfu .sub{flex-grow:1}
       .famacts{display:flex;gap:12px;font-weight:600;font-size:13px}.famh{padding:2px 0 2px 32px}
       .famscope{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
-      #famstrip{display:flex;flex-direction:column;gap:8px}
+      #famstrip{display:flex;flex-direction:column;gap:8px}#famstrip.famstrip0{padding:10px 16px}
       .famtrack{position:relative;height:26px;margin:4px 8px 0;border-radius:13px;background:linear-gradient(90deg,var(--badbg) 0 33.3%,var(--warnbg) 33.3% 66.6%,var(--soft) 66.6%)}
       .famdot{position:absolute;top:5px;width:16px;height:16px;margin-left:-8px;border-radius:50%;border:2px solid var(--surface);cursor:pointer;padding:0}
       .famdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
