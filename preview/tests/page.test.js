@@ -360,7 +360,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       const sm = d.querySelector('#famrows .famsum'); ok(sm && /1 Lapsed over a year/.test(sm.textContent) && /1 Expiring soon/.test(sm.textContent), sm && sm.textContent);
       w.famJump('lapsed'); ok(/Old Five/.test(txt()), 'summary count does not open its group');
       w.famCol(); ok(/Old Five/.test(txt()) && /Expired 400 days ago/.test(txt()), 'expand all / expiry text');
-      const nc = d.querySelector('#famrows .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);
+      const nc = d.querySelector('#famrows .famtr .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);
       w.famCol('lapsed'); ok(!/Old Five/.test(txt()) && /Lapsed over a year/.test(txt()) && /Expand all/.test(d.getElementById('fampage').textContent), 'collapse');
       w.famCol(); ok(/Old Five/.test(txt()), 'expand all again');
       w.famSelGrp('due_90', true); const b = d.getElementById('fambulk'); ok(!b.hidden && /1 selected/.test(b.textContent) && /Email selected/.test(b.textContent), 'select group / bulk bar');
