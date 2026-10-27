@@ -120,7 +120,8 @@
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
   window.famSort = k => { S.sort = { k, dir: S.sort.k === k ? -S.sort.dir : 1 }; renderRows(); };
-  window.famMode = v => { S.view = v; S.page = 0; renderFam(); };
+  const REGK = ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive'];
+  window.famMode = v => { S.view = v; S.page = 0; if (v === 'triage' && REGK.includes(S.filter)) S.filter = ''; render(); };
   window.famTest = () => { S.hideTest = !S.hideTest; S.page = 0; S.sel.clear(); render(); };
   window.famPage = d => { S.page = Math.max(0, S.page + d); renderRows(); };
   const OPEN = /^#fam\/open\/\d+$/;
@@ -251,12 +252,12 @@
   /* ---------- 90-day expiry strip ---------- */
   function renderStrip() {
     const regs = visR().filter(r => r.registration_expiry_date && days(r) <= 90).sort((x, y) => days(x) - days(y));
-    const exp = regs.filter(r => days(r) < 0), soon = regs.filter(r => days(r) >= 0);
+    const soon = regs.filter(r => days(r) >= 0);
     const who = r => S.A.find(a => a.id === r.assessor_id)?.full_name || 'Unknown';
     const dot = r => { const d = days(r), c = d <= 30 ? 'var(--bad)' : d <= 60 ? '#E0A100' : 'var(--navy2)';
       return `<button class="famdot" style="left:${Math.min(100, d / 90 * 100)}%;background:${c}" title="${e(who(r))} · ${e(r.seta_name)} · in ${d}d" aria-label="${e(who(r))}, ${e(r.seta_name)}, expires in ${d} days" onclick="famOpen(${r.assessor_id})"></button>`; };
     $('famstrip').innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="font-size:15px;flex-grow:1">Expiries in the next 90 days</h2>
-        <span class="sub">${soon.length} due${exp.length ? ` · <a href="#" onclick="famFilter('expired');return false" style="color:var(--bad);font-weight:600">${exp.length} expired registration${exp.length > 1 ? 's' : ''}</a>` : ''}</span></div>
+        <span class="sub">${soon.length} due</span></div>
       <div class="famtrack">${soon.map(dot).join('')}</div>
       <div class="famticks"><span>Today</span><span>30d</span><span>60d</span><span>90d</span></div>
       ${soon.length ? `<div class="famnext">${soon.slice(0, 4).map(r => `<a href="#fam/${r.assessor_id}">${e(who(r))}</a> <span class="sub">${e(r.seta_name)} · ${fmt(r.registration_expiry_date)}</span>`).join('<span class="sub"> · </span>')}${soon.length > 4 ? `<span class="sub"> +${soon.length - 4} more</span>` : ''}</div>` : '<div class="sub">Nothing due in the next 90 days.</div>'}`;
@@ -707,7 +708,7 @@
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
     const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title}"><div class="famgl">${title}</div><div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
-    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, ['expired', 'due_30', 'due_60', 'active', 'pending', 'inactive']) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
+    $('famkpis').innerHTML = (S.view === 'triage' ? '' : kgrp(`Registrations · ${visR().length}`, REGK)) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }
