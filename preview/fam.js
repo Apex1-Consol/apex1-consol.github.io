@@ -185,7 +185,7 @@
     regsFor(a.id).forEach(r => { const k = wrisk(r), n = r.seta_name === 'Pending Entry' || (!r.seta_name && k === 'pending') ? 'Not captured yet' : r.seta_name === 'N/A' || !r.seta_name ? 'SETA not named' : r.seta_name, o = m.get(n);
       if (!o || WRANK.indexOf(k) < WRANK.indexOf(o.k)) m.set(n, { k, r }); });
     if (!m.size) return '';
-    return `<div class="famchips">${[...m].map(([n, { k, r }]) => `<span class="famchip ${n === 'Not captured yet' ? 'famc-nc' : RCLS[k]}" title="${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}">${e(n)}</span>`).join('')}</div>`;
+    return `<div class="famchips">${[...m].map(([n, { k, r }]) => `<span class="famchip ${n === 'Not captured yet' ? 'famc-nc' : RCLS[k]}" title="${n === 'Not captured yet' ? 'Registration added; SETA and expiry date still to be entered' : `${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`}">${e(n)}</span>`).join('')}</div>`;
   }
   const docTip = a => { const have = onFile(a.id), miss = TYPES.filter(t => !have.includes(t)).map(lbl), c = compl(a.id);
     return `Documents on file: ${have.length} of 6. ${miss.length ? 'Missing: ' + miss.join(', ') + '.' : 'All on file.'} Profile checks: ${c.complete ? 'complete' : c.gaps.join(', ')}.`; };
@@ -869,7 +869,7 @@
       .famdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
       .famticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:0 2px}
       .famnext{font-size:13px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
-      #fambulk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:10px 16px;background:var(--soft);border-bottom:1px solid var(--line)}#fambulk .sub{flex-grow:1}
+      #fambulk{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:60;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center;padding:10px 14px;max-width:calc(100vw - 32px);background:var(--soft);border:1px solid var(--line);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.18)}#fambulk[hidden]{display:none}
       .famback{font-weight:600;font-size:14px;align-self:flex-start}
       #famprof{display:flex;flex-direction:column;gap:14px}#famprof[hidden]{display:none}
       .famphead{background:var(--navy);color:#fff;display:flex;flex-direction:column;gap:14px}
