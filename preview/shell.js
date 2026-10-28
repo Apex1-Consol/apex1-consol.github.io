@@ -41,11 +41,12 @@
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
   };
   window.shTab = t => { S.tab = t; renderRP(); };
+  window.addEventListener('hashchange', () => { if (S.open && !learner(S.lid)) renderRP(); });
 
   function renderRP() {
     $('rptabs').innerHTML = ['Details', 'Activity', 'Assistant'].map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')">${t}</button>`).join('');
     const l = learner(S.lid), p = A() && S.pid ? A().prog(S.pid) : null, body = $('rpbody');
-    if (!l) { body.innerHTML = `<div class="empty"><b>Nothing selected</b><span>Select a learner's name in Attendance &amp; PoE, EISA readiness or search (Ctrl K) to see their details here.</span></div>`; return; }
+    if (!l) { const fam = location.hash.slice(1).split('/')[0] === 'fam'; body.innerHTML = `<div class="empty"><b>Nothing selected</b><span>${fam ? 'This panel shows learner details. To see a practitioner, click their name in the FAM Registry list.' : "Select a learner's name in Attendance &amp; PoE, EISA readiness or search (Ctrl K) to see their details here."}</span></div>`; return; }
     if (S.tab === 'Details') body.innerHTML = details(l, p);
     if (S.tab === 'Activity') activity(l, p);
     if (S.tab === 'Assistant') body.innerHTML = assistant(l, p);
