@@ -934,7 +934,7 @@
       #view-fam .famgl{font-size:14px;color:var(--ink)}
       .famstack{display:flex;gap:2px;height:12px;border-radius:9px;overflow:hidden}.famstack i{display:block;height:100%}
       #view-fam .famk{flex:1 1 0;min-width:96px;border:0;background:var(--ground);border-radius:12px;box-shadow:none}
-      #view-fam .famk .v{font-size:24px;font-weight:800}
+      #view-fam .famk .v{font-size:24px;font-weight:800}#view-fam .famk .l{white-space:normal}
       #view-fam .famk.on{box-shadow:inset 0 0 0 2px var(--navy),inset 0 -4px 0 var(--yellow);padding:10px 14px}
       .famzero{display:flex;flex-wrap:wrap;gap:6px}.famz{border:0;font:inherit;font-size:12px;color:var(--muted);background:var(--ground);border-radius:8px;padding:4px 10px;cursor:pointer}.famz b{margin-left:4px;color:var(--ink)}
       .famsc{border:0!important;border-radius:0!important;background:transparent!important;color:var(--muted)!important;font-weight:600;padding:8px 2px!important;margin:0 18px 6px 0!important;box-shadow:inset 0 -3px 0 transparent;opacity:1!important}
