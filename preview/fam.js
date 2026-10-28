@@ -954,7 +954,6 @@
       #fambk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
       @media (prefers-reduced-motion:reduce){#view-fam .famdrawer{transition:none}}
       @media (max-width:720px){#view-fam .famdrawer{width:100vw}#view-fam .famdocs{display:none}.famtool{flex-wrap:wrap}.famtool input{flex:1 1 100%}.famclip{max-width:140px}.famact{white-space:normal;text-align:right}#famkpis .famk{min-width:96px}}
-      @media (min-width:1200px){#view-fam .famrow{display:flex;gap:16px;align-items:flex-start}#view-fam .famrow>section{flex:1 1 auto;min-width:0;width:auto}#view-fam .famdrawer{position:sticky;flex:0 0 400px!important;width:400px;max-height:calc(100vh - 32px);display:none;transform:none;transition:none;visibility:visible;box-shadow:none;border:1px solid var(--line);border-radius:12px;z-index:auto}#view-fam .famdrawer.open{display:block}#fambk{display:none!important}} /* docked side panel on wide screens */
       .famstep{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
