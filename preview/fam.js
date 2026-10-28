@@ -135,6 +135,7 @@
   const OPEN = /^#fam\/open\/\d+$/;
   const panelHash = (id, push) => { try { const u = '#fam/open/' + id; if (location.hash === u) return; push ? history.pushState(null, '', u) : history.replaceState(null, '', u); } catch (_) {} };
   window.famShow = i => { const was = S.open && OPEN.test(location.hash); famSel = i; S.open = true; S.acted = null; renderFam(); if (S.A[i]) panelHash(S.A[i].id, !was); };
+  window.famOpenFirst = () => { const ids = rows().map(([, i]) => i); if (!ids.length) return say('No practitioners in the list to show'); famShow(ids.includes(famSel) ? famSel : ids[0]); }; // side-panel button: first row shown, never a hidden test record
   window.famClose = () => { S.open = false; S.acted = null; renderPanel(); if (OPEN.test(location.hash)) { try { history.replaceState(null, '', '#fam'); } catch (_) {} } };
   window.famPTab = t => { S.ptab = t; renderPanel(); };
   window.famOpen = id => { location.hash = 'fam/' + id; };

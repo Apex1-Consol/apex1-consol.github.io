@@ -36,7 +36,7 @@
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';
-  window.toggleRP = f => { if (onFam() && window.famShow) { const open = !!document.querySelector('#view-fam .famdrawer.open'); if (f === undefined ? open : !f) famClose(); else { famShow(Math.max(0, famSel)); const dr = document.querySelector('#view-fam .famdrawer.open'); if (dr && dr.getBoundingClientRect().top > innerHeight * 0.5) dr.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); } return; } S.open = f === undefined ? !S.open : !!f; ls.set('rp', S.open); applyRP(); };
+  window.toggleRP = f => { if (onFam() && window.famShow) { const open = !!document.querySelector('#view-fam .famdrawer.open'); if (f === undefined ? open : !f) famClose(); else { (window.famOpenFirst || (() => famShow(Math.max(0, famSel))))(); const dr = document.querySelector('#view-fam .famdrawer.open'); if (dr && dr.getBoundingClientRect().top > innerHeight * 0.5) dr.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); } return; } S.open = f === undefined ? !S.open : !!f; ls.set('rp', S.open); applyRP(); };
   window.shOpen = (pid, lid) => {
     if (!pid) { const e = (D().enrol || []).find(x => x.learner_id === lid); pid = e ? e.programme_id : null; }
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
