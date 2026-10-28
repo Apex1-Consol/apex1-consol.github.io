@@ -397,7 +397,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     w.toggleRP(); await tick(); await tick();
     ok(w.location.hash === '#fam/calendar' && d.getElementById('heading').textContent === 'FAM Calendar', w.location.hash);
     w.famCal('qual', 'q-101869'); const t = d.getElementById('famprof').textContent;
-    ok(/Who can cover/.test(t) && /In scope/.test(t) && /Renewal calendar/.test(t) && /At-risk allocations/.test(t), t.slice(0, 300));
+    w.famCal('tab', 'cover'); const t2 = d.getElementById('famprof').textContent; ok(/Who can cover/.test(t) && /In scope/.test(t2) && /Renewals/.test(t) && /At risk/.test(t), t.slice(0, 300));
     w.toggleRP(); await tick(); ok(w.location.hash === '#fam', 'toggle back');
   });
   await t('FAM: triage groups 61-90 days and lapsed, collapse, select group, chip tooltip', async () => {
