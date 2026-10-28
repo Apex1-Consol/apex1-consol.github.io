@@ -3,7 +3,7 @@ const { JSDOM } = require('jsdom');
 const XLSX = require('xlsx');
 const fs = require('fs'), path = require('path');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8')
-  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="fam.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '').replace('<script src="shell.js"></script>', '')
+  .replace(/<script src="https:\/\/cdn[^>]+><\/script>/g, '').replace('<script src="qa.js"></script>', '').replace('<script src="fam.js"></script>', '').replace('<script src="live.js"></script>', '').replace('<script src="delivery.js"></script>', '').replace(/<script src="shell.js[^"]*"><\/script>/, '')
   .replace(/<link[^>]+fonts[^>]+>/g, '');
 const live = fs.readFileSync(path.join(__dirname, '..', 'live.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'qa.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'fam.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'delivery.js'), 'utf8') + '\n' + fs.readFileSync(path.join(__dirname, '..', 'shell.js'), 'utf8');
 
