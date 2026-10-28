@@ -287,7 +287,7 @@
     const open = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status)).length;
     box.innerHTML = `<b>${n} selected</b><span class="sub">${open} open follow-up${open === 1 ? '' : 's'}</span>
       <button class="btn sm" onclick="famBulk('claim')" ${open ? '' : 'disabled'}>Claim follow-ups</button><button class="btn sm" onclick="famBulk('dismiss')" ${open ? '' : 'disabled'}>Dismiss follow-ups</button>
-      <button class="btn sm" onclick="famExport(true)">Export selected</button><button class="btn sm" onclick="famMail()" title="Opens your mail app with the selected practitioners in Bcc; nothing is sent until you send it">Email selected</button><button class="btn sm" onclick="famClearSel()">Clear</button>`;
+      <button class="btn sm" onclick="famExport(true)">Export selected</button><button class="btn sm" onclick="famPack()" title="Downloads a zip of the selected practitioners' current documents, with an index of documents and registrations">Audit pack</button><button class="btn sm" onclick="famMail()" title="Opens your mail app with the selected practitioners in Bcc; nothing is sent until you send it">Email selected</button><button class="btn sm" onclick="famClearSel()">Clear</button>`;
   }
   window.famJump = g => { S.col.delete(g); renderRows(); $('famg-' + g)?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   window.famCol = g => { if (!g) S.col.clear(); else S.col.has(g) ? S.col.delete(g) : S.col.add(g); renderRows(); };
@@ -731,7 +731,7 @@
     const kgrp = (title, ks, bar) => { const ks2 = K.filter(x => ks.includes(x[0])), tot = ks2.reduce((n, x) => n + x[2], 0);
       return `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}${bar && tot ? `<div class="famstack" aria-hidden="true">${ks2.filter(x => x[2]).map(([, l, v, c]) => `<i style="flex:${v};background:${c}" title="${l}: ${v}"></i>`).join('')}</div>` : ''}<div class="famgk">${ks2.filter(x => x[2] || S.filter === x[0]).map(kbtn).join('')}</div>${ks2.some(x => !x[2] && S.filter !== x[0]) ? `<div class="famzero">${ks2.filter(x => !x[2] && S.filter !== x[0]).map(([k, l]) => `<button class="famz" onclick="famFilter('${k}')">${l} <b>0</b></button>`).join('')}</div>` : ''}</div>`; };
     $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
-    renderStrip(); renderRows(); renderPanel();
+    renderStrip(); renderCov(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }
 
@@ -822,6 +822,66 @@
     } catch (err) { /* write() already showed it */ }
   };
 
+  /* ---------- eligibility + conflict (Moderation page), coverage forecast, audit pack ---------- */
+  const nm = s => String(s || '').toLowerCase().replace(/\[test\]/g, '').replace(/[^a-z]+/g, ' ').trim();
+  const setaKey = s => SETAK[String(s || '').toLowerCase().replace(/[^a-z&]/g, '')] || String(s || '').trim();
+  const splitNames = s => String(s || '').split(/\s*(?:,|\/|&|\band\b)\s*/i).filter(x => nm(x));
+  const regCovers = (r, role, seta) => active(r) && (r.roles?.length ? r.roles : [r.role]).some(x => nm(x) === nm(role)) && (!seta || (r.seta_name || '').split(/\s*,\s*/).includes(setaKey(seta)));
+  window.famElig = (row, k) => {
+    const role = ['Facilitator', 'Assessor', 'Moderator'][k - 12], seta = row[15], end = row[10] ? String(row[10]).slice(0, 10) : null, names = splitNames(row[k]);
+    if (!names.length || !S.A?.length) return '';
+    const b = (c, t, tip) => ` <span class="badge ${c}" title="${e(tip)}">${e(t)}</span>`;
+    let out = names.map(n => {
+      const a = S.A.find(x => nm(x.full_name) === nm(n));
+      if (!a) return b('b-warn', 'Not on FAM', `${n} is not on the FAM registry`);
+      const rs = regsFor(a.id).filter(r => regCovers(r, role, seta));
+      if (!rs.length) return b('b-bad', `No ${role.toLowerCase()} reg${seta ? ' · ' + setaKey(seta) : ''}`, `${shownName(a)} has no active ${role} registration${seta ? ' for ' + setaKey(seta) : ''}`);
+      const exp = rs.map(r => r.registration_expiry_date).filter(Boolean).sort().pop();
+      if (!exp) return b('b-warn', 'No expiry date', `${shownName(a)}: registration has no expiry date captured`);
+      if (exp < today()) return b('b-bad', 'Expired ' + fmt(exp), `${shownName(a)}: registration expired ${fmt(exp)}`);
+      if (end && exp < end) return b('b-warn', 'Expires before end', `${shownName(a)}: registration expires ${fmt(exp)}, programme ends ${fmt(end)}`);
+      return b('b-ok', '✓ Eligible', `${shownName(a)}: registered until ${fmt(exp)}`);
+    }).join('');
+    if (k === 14) { const as = splitNames(row[13]).map(nm); if (names.some(n => as.includes(nm(n)))) out += b('b-bad', 'Conflict', 'The same person is assessor and moderator on this programme'); }
+    return out;
+  };
+  function renderCov() {
+    const box = $('famcov'); if (!box) return;
+    const t = today(), in90 = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10), R = visR(), rows = [];
+    [...new Set(R.flatMap(r => (r.seta_name || '').split(/\s*,\s*/)).filter(x => x && x !== 'N/A'))].sort().forEach(st => ['Facilitator', 'Assessor', 'Moderator'].forEach(role => {
+      const rs = R.filter(r => regCovers(r, role, st)); if (!rs.length) return;
+      const ppl = d => new Set(rs.filter(r => r.registration_expiry_date && r.registration_expiry_date >= d).map(r => r.assessor_id)).size;
+      rows.push([st, role, ppl(t), ppl(in90)]);
+    }));
+    const risky = rows.filter(r => r[3] <= 1), show = S.covAll ? rows : risky;
+    const flag = (n, l) => l === 0 ? '<span class="badge b-bad">No cover</span>' : l === 1 ? '<span class="badge b-warn">Single person</span>' : n > l ? '<span class="badge b-warn">Dropping</span>' : '<span class="badge b-ok">Covered</span>';
+    box.innerHTML = `<details class="card" style="padding:14px 18px"${S.covOpen ? ' open' : ''} ontoggle="famCovT(this.open)"><summary style="cursor:pointer"><b>Coverage forecast</b> <span class="sub">${risky.length ? `${risky.length} SETA + role combination${risky.length === 1 ? '' : 's'} will have 0–1 registered people in 90 days` : 'Every SETA + role has at least 2 registered people in 90 days'}</span></summary>
+      <div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>SETA</th><th>Role</th><th>Registered now</th><th>In 90 days</th><th>Risk</th></tr></thead><tbody>${show.map(([st, r, n, l]) => `<tr><td>${e(st)}</td><td>${r}</td><td>${n}</td><td>${l}</td><td>${flag(n, l)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nothing at risk.</td></tr>'}</tbody></table></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>`;
+  }
+  window.famCovT = o => { S.covOpen = o; };
+  window.famCovAll = () => { S.covAll = !S.covAll; S.covOpen = true; renderCov(); };
+  window.famPack = async () => {
+    const ids = [...S.sel], docs = S.D.filter(d => ids.includes(d.assessor_id) && d.is_current !== false && d.file_url);
+    if (!docs.length) return say('No current documents with files for the selected practitioners');
+    if (!window.JSZip) { await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = ok; sc.onerror = no; document.head.appendChild(sc); }).catch(() => {}); if (!window.JSZip) return say('Could not load the zip library'); }
+    say(`Building audit pack: ${docs.length} file${docs.length === 1 ? '' : 's'}…`);
+    const zip = new JSZip(), safe = x => String(x || '').replace(/[\\/:*?"<>|]+/g, '_').trim(), who = id => shownName(S.A.find(x => x.id === id) || {}) || 'Unknown';
+    const idx = [['Practitioner', 'Document', 'Status', 'Date', 'Expiry', 'File in pack']]; let miss = 0;
+    for (const d of docs) {
+      const fn = `${safe(who(d.assessor_id))}/${safe(d.doc_type)} - ${safe(d.file_name || d.file_url.split('/').pop())}`;
+      const { data, error } = await sb.storage.from('fam-documents').download(d.file_url);
+      if (error || !data) { miss++; idx.push([who(d.assessor_id), d.doc_type, d.status || '', d.doc_date || '', d.expiry_date || '', 'NOT INCLUDED: ' + (error?.message || 'download failed')]); continue; }
+      zip.file(fn, data); idx.push([who(d.assessor_id), d.doc_type, d.status || '', d.doc_date || '', d.expiry_date || '', fn]);
+    }
+    const regs = [['Practitioner', 'SETA', 'Roles', 'Registration no.', 'Expiry', 'Status'], ...S.R.filter(r => ids.includes(r.assessor_id)).map(r => [who(r.assessor_id), r.seta_name || '', (r.roles?.length ? r.roles : [r.role]).join(', '), r.registration_number || '', r.registration_expiry_date || '', r.status || 'Active'])];
+    const csvOf = rows => '﻿' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    zip.file('00 Index - documents.csv', csvOf(idx)); zip.file('00 Index - registrations.csv', csvOf(regs));
+    const url = URL.createObjectURL(await zip.generateAsync({ type: 'blob' })), l = document.createElement('a');
+    l.href = url; l.download = `Audit pack ${today()} (${ids.length} practitioner${ids.length === 1 ? '' : 's'}).zip`; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+    say(`Audit pack ready${miss ? ` (${miss} file${miss === 1 ? '' : 's'} could not be included; see the index)` : ''}`);
+  };
+
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
@@ -833,6 +893,7 @@
       q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
       q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id'))]);
     R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
+    setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
     Object.assign(S, { A, R, D, F, Q, SC, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
@@ -972,7 +1033,7 @@
     const io = tb?.querySelector('.famio');
     if (io) { [...btns].filter(b => /^(Scope Import|Bulk Intake)$/.test(b.textContent.trim())).forEach(b => { b.classList.add('sm'); io.lastChild.appendChild(b); });
       io.lastChild.addEventListener('click', () => { io.open = false; }); document.addEventListener('click', ev => { if (io.open && !io.contains(ev.target)) io.open = false; }); }
-    $('famkpis').dataset.fam = '1';
+    $('famkpis').dataset.fam = '1'; $('famkpis').parentElement.insertAdjacentHTML('afterend', '<div id="famcov"></div>');
     aside.classList.add('famdrawer'); aside.parentElement.classList.add('famrow'); aside.setAttribute('aria-label', 'Practitioner details');
     document.body.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>'); // outside #view-fam: route code toggles that view's children
     addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) famClose(); });

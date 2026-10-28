@@ -32,7 +32,7 @@
   const S = { open: ls.get('rp', false), tab: 'Details', pid: null, lid: null, act: null };
   function applyRP() {
     $('rpanel').hidden = !S.open || onFam(); // FAM uses its own docked practitioner panel
-    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', S.open ? 'Close side panel' : 'Open side panel'); b.title = b.getAttribute('aria-label');
+    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'Show or hide practitioner details' : S.open ? 'Close side panel' : 'Open side panel'); b.title = b.getAttribute('aria-label');
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';

@@ -1004,8 +1004,8 @@ function renderM(){
   const st=(a,i,v)=>`<select class="cellsel" aria-label="Stage" onchange="mSet('${a}',${i},this.value)">${MSTAGE.map((s,k)=>`<option value="${k}"${k===v?' selected':''}>${s}</option>`).join('')}</select>`;
   const H=h=>`<thead><tr>${h.map(x=>`<th>${x}</th>`).join('')}</tr></thead>`;
   if(mTab==='External moderation'){
-    $('mnote').innerHTML='FEEDBACK is now a stage you pick plus a date, so it can be filtered and counted. Notes still go in Comments. Legacy qualifications are flagged from the Pre-2009 list.';
-    $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification (OFO / ID)','NQF','Learners','Groups','Employment','Start','End','Face-to-face or Online','Facilitator','Assessor','Moderator','SETA','Feedback stage','Stage date'])+'<tbody>'+MOD.map((r,i)=>`<tr>${r.slice(0,16).map((v,k)=>`<td>${k===4?esc(v)+' '+legB(v):k===9||k===10?fmtD(v):esc(v)}</td>`).join('')}<td>${st('MOD',i,r[16])}</td><td>${fmtD(r[17])}</td></tr>`).join('')+'</tbody>';
+    $('mnote').innerHTML='Facilitator, assessor and moderator are checked against the FAM registry: a current registration for the programme&rsquo;s SETA and role that lasts to the end date. Hover a badge for detail. FEEDBACK is now a stage you pick plus a date, so it can be filtered and counted. Notes still go in Comments. Legacy qualifications are flagged from the Pre-2009 list.';
+    $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification (OFO / ID)','NQF','Learners','Groups','Employment','Start','End','Face-to-face or Online','Facilitator','Assessor','Moderator','SETA','Feedback stage','Stage date'])+'<tbody>'+MOD.map((r,i)=>`<tr>${r.slice(0,16).map((v,k)=>`<td>${k===4?esc(v)+' '+legB(v):k===9||k===10?fmtD(v):k>=12&&k<=14&&window.famElig?esc(v)+famElig(r,k):esc(v)}</td>`).join('')}<td>${st('MOD',i,r[16])}</td><td>${fmtD(r[17])}</td></tr>`).join('')+'</tbody>';
   }else if(mTab==='Exit verification stats'){
     $('mnote').innerHTML='Same columns as the VERIFICATION STATS 2026 sheet. The last column is now a stage, not free text.';
     $('mtable').innerHTML=H(['Entity','Project Manager','Client','Type','Qualification','NQF','Learners','Groups','SETA','Verifier','Exit verification date','Certificate / SoR submission'])+'<tbody>'+VER.map((r,i)=>`<tr>${r.slice(0,11).map((v,k)=>`<td>${k===4?esc(v)+' '+legB(v):k===10?fmtD(v):esc(v)}</td>`).join('')}<td>${st('VER',i,r[11])}</td></tr>`).join('')+'</tbody>';
@@ -1099,7 +1099,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js"></script>
 <script src="qa.js"></script>
-<script src="fam.js?v=20261027o"></script>
+<script src="fam.js?v=20261028a"></script>
 <script src="delivery.js"></script>
 <script src="shell.js"></script>
 <script src="admin.js"></script>
