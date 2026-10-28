@@ -105,7 +105,7 @@
   const complHtml = id => { const c = compl(id); return c.complete ? '<div class="famok">✓ Profile complete</div>' : `<div class="sub famgap">${e(c.gaps.join(' · '))}</div>`; };
 
   /* ---------- KPIs (click to filter) ---------- */
-  const SETAS = ['ETDP SETA', 'MICT SETA', 'Services SETA', 'AgriSETA', 'BANKSETA', 'CHIETA', 'FASSET', 'HWSETA', 'INSETA', 'LGSETA', 'MERSETA', 'PSETA', 'QCTO', 'TETA', 'W&RSETA'], SETAK = Object.fromEntries(SETAS.map(x => [x.toLowerCase().replace(/[^a-z&]/g, ''), x]));
+  const SETAS = ['ETDP SETA', 'MICT SETA', 'Services SETA', 'AgriSETA', 'BANKSETA', 'CHIETA', 'FASSET', 'HWSETA', 'INSETA', 'LGSETA', 'MERSETA', 'PSETA', 'QCTO', 'TETA', 'W&RSETA', 'CompTIA'], SETAK = Object.fromEntries(SETAS.map(x => [x.toLowerCase().replace(/[^a-z&]/g, ''), x]));
   const isTest = a => /^\s*\[TEST\]/i.test(a.full_name || '');
   const shownName = a => (a.full_name || '').replace(/^\s*\[TEST\]\s*/i, '');
   const vis = () => S.hideTest ? S.A.filter(a => !isTest(a)) : S.A;
@@ -569,7 +569,7 @@
   }
 
   /* ---------- Bulk Intake (#fam/bulk), ported from live: files are read in the browser; nothing is saved until Approve ---------- */
-  const BI_SETAS = ['AGRI SETA','BANK SETA','CATHSSETA','CETA','CHIETA','ETDP SETA','EWSETA','FASSET','FP&M SETA','FOODBEV SETA','HWSETA','INSETA','LG SETA','MERSETA','MICT SETA','MQA','PSETA','SASSETA','SERVICES SETA','TETA','W&RSETA','QCTO'];
+  const BI_SETAS = ['AGRI SETA','BANK SETA','CATHSSETA','CETA','CHIETA','ETDP SETA','EWSETA','FASSET','FP&M SETA','FOODBEV SETA','HWSETA','INSETA','LG SETA','MERSETA','MICT SETA','MQA','PSETA','SASSETA','SERVICES SETA','TETA','W&RSETA','QCTO','CompTIA'];
   const BI_STOP = new Set(['cv','curriculum','vitae','resume','id','copy','certified','certificate','cert','passport','qualification','qualifications','qual','assessor','moderator','facilitator','mba','degree','diploma','updated','final','new','doc','scan','scanned','document','documents','profile','pdf','docx','jpg','png','and','the','of','for','seta']);
   const BI = { rows: [], seq: 0, busy: false, status: '' };
   const biTitle = s => s.replace(/\b([a-z])([a-z]*)/gi, (m, a, b) => a.toUpperCase() + b.toLowerCase());
