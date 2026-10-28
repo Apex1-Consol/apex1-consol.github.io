@@ -32,11 +32,11 @@
   const S = { open: ls.get('rp', false), tab: 'Details', pid: null, lid: null, act: null };
   function applyRP() {
     $('rpanel').hidden = !S.open || onFam(); // FAM uses its own docked practitioner panel
-    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'Show or hide practitioner details' : S.open ? 'Close side panel' : 'Open side panel'); b.title = b.getAttribute('aria-label');
+    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'FAM calendar: who is on what, cover and renewals' : S.open ? 'Close side panel' : 'Open side panel'); b.title = b.getAttribute('aria-label');
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';
-  window.toggleRP = f => { if (onFam() && window.famShow) { const open = !!document.querySelector('#view-fam .famdrawer.open'); if (f === undefined ? open : !f) famClose(); else { (window.famOpenFirst || (() => famShow(Math.max(0, famSel))))(); const dr = document.querySelector('#view-fam .famdrawer.open'); if (dr && dr.getBoundingClientRect().top > innerHeight * 0.5) dr.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); } return; } S.open = f === undefined ? !S.open : !!f; ls.set('rp', S.open); applyRP(); };
+  window.toggleRP = f => { if (onFam()) { const cal = /^#fam\/calendar/.test(location.hash); if (f === undefined ? cal : !f) location.hash = 'fam'; else location.hash = 'fam/calendar'; return; } S.open = f === undefined ? !S.open : !!f; ls.set('rp', S.open); applyRP(); };
   window.shOpen = (pid, lid) => {
     if (!pid) { const e = (D().enrol || []).find(x => x.learner_id === lid); pid = e ? e.programme_id : null; }
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();

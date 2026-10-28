@@ -712,7 +712,7 @@
     const h = location.hash.slice(1);
     if (h.split('/')[0] !== 'fam' || !ready) return;
     const arg = h.split('/')[1];
-    const mode = arg === 'scope' ? 'scope' : arg === 'bulk' ? 'bulk' : arg === 'queue' ? 'queue' : arg && arg !== 'open' ? 'profile' : 'list';
+    const mode = arg === 'scope' ? 'scope' : arg === 'bulk' ? 'bulk' : arg === 'queue' ? 'queue' : arg === 'calendar' ? 'calendar' : arg && arg !== 'open' ? 'profile' : 'list';
     if (mode === 'profile' && S.prof !== Number(arg)) S.tab = 'overview';
     S.mode = mode; S.prof = mode === 'profile' ? Number(arg) : null;
     const v = $('view-fam');
@@ -722,6 +722,7 @@
     else if (mode === 'scope') renderScope();
     else if (mode === 'bulk') renderBI();
     else if (mode === 'queue') renderQueue();
+    else if (mode === 'calendar') renderCal();
     else {
       const oi = arg === 'open' ? S.A.findIndex(a => a.id === Number(h.split('/')[2])) : -1;
       if (oi >= 0) { if (!S.open || famSel !== oi) { famSel = oi; S.open = true; renderFam(); } } else if (S.open) { S.open = false; S.acted = null; renderPanel(); }
@@ -733,7 +734,7 @@
       return `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}${bar && tot ? `<div class="famstack" aria-hidden="true">${ks2.filter(x => x[2]).map(([, l, v, c]) => `<i style="flex:${v};background:${c}" title="${l}: ${v}"></i>`).join('')}</div>` : ''}<div class="famgk">${ks2.filter(x => x[2] || S.filter === x[0]).map(kbtn).join('')}</div>${ks2.some(x => !x[2] && S.filter !== x[0]) ? `<div class="famzero">${ks2.filter(x => !x[2] && S.filter !== x[0]).map(([k, l]) => `<button class="famz" onclick="famFilter('${k}')">${l} <b>0</b></button>`).join('')}</div>` : ''}</div>`; };
     $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
     renderStrip(); renderCov(); renderRows(); renderPanel();
-    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
+    if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue(); else if (S.mode === 'calendar') renderCal();
   }
 
   /* ---------- modal ---------- */
@@ -883,6 +884,132 @@
     say(`Audit pack ready${miss ? ` (${miss} file${miss === 1 ? '' : 's'} could not be included; see the index)` : ''}`);
   };
 
+  /* ---------- FAM Calendar (#fam/calendar): who is on what, suitability, cover, risks, renewals, data issues, changes ---------- */
+  const d10 = v => { const x = v ? String(v).slice(0, 10) : ''; return /^\d{4}-\d\d-\d\d$/.test(x) ? x : null; };
+  const addD = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  const monday = d => { const x = new Date(d + 'T00:00:00'), w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x.toISOString().slice(0, 10); };
+  const ROLE3 = ['Facilitator', 'Assessor', 'Moderator'];
+  const eligOf = (a, role, seta, end) => {
+    const rs = regsFor(a.id).filter(r => regCovers(r, role, seta));
+    if (!rs.length) return ['bad', `No active ${role.toLowerCase()} registration${seta ? ' for ' + setaKey(seta) : ''}`];
+    const exp = rs.map(r => r.registration_expiry_date).filter(Boolean).sort().pop();
+    if (!exp) return ['warn', 'Registration has no expiry date'];
+    if (exp < today()) return ['bad', 'Registration expired ' + fmt(exp)];
+    if (end && exp < end) return ['warn', `Registration expires ${fmt(exp)}, before the programme ends ${fmt(end)}`];
+    return ['ok', 'Registered until ' + fmt(exp)];
+  };
+  function assigns() {
+    const out = [], byName = n => S.A.find(x => nm(x.full_name) === nm(n));
+    (typeof MOD !== 'undefined' ? MOD : []).forEach(r => [12, 13, 14].forEach(k => splitNames(r[k]).forEach(n => { const a = byName(n); if (a) out.push({ a, role: ROLE3[k - 12], title: String(r[4] || ''), seta: r[15] || null, start: d10(r[9]), end: d10(r[10]), src: 'Moderation list' }); })));
+    ((P.data && P.data.progs) || []).forEach(p => { const a = S.A.find(x => x.id === p.facilitator_id); if (a && !/complete|closed|cancel/i.test(p.status || '')) out.push({ a, role: 'Facilitator', title: p.qualification_name || p.programme_name || 'Programme ' + p.id, seta: null, start: d10(p.start_date), end: d10(p.end_date), src: 'Programmes', pid: p.id }); });
+    out.forEach(x => { x.el = eligOf(x.a, x.role, x.seta, x.end); x.now = (!x.start || x.start <= today()) && (!x.end || x.end >= today()); x.live = !x.end || x.end >= today(); });
+    return out;
+  }
+  const suitable = a => regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today())).map(r => {
+    const q = (S.SC || []).filter(x => x.registration_id === r.id).map(x => (S.Q || []).find(y => y.id === x.qualification_id)?.name).filter(Boolean);
+    return { seta: r.seta_name || 'No SETA', roles: (r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(', '), quals: q, exp: r.registration_expiry_date };
+  });
+  const lev = (a, b) => { const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; };
+  function calIssues() {
+    const A = vis(), dup = [], iss = [];
+    for (let i = 0; i < A.length; i++) for (let j = i + 1; j < A.length; j++) {
+      const x = nm(A[i].full_name), y = nm(A[j].full_name); if (!x || !y) continue;
+      const one = (p, q) => !p.includes(' ') && q.startsWith(p + ' ');
+      if (x === y || one(x, y) || one(y, x) || (Math.min(x.length, y.length) > 6 && lev(x, y) <= 2)) dup.push([A[i], A[j]]);
+    }
+    A.forEach(a => { if (/\s{2,}|^\s|\s$/.test(a.full_name || '')) iss.push([a, 'Extra spaces in name']); });
+    const ids = new Set(A.map(a => a.id));
+    S.R.filter(r => ids.has(r.assessor_id)).forEach(r => { const a = S.A.find(x => x.id === r.assessor_id);
+      if (!r.seta_name || /^n\/?a$/i.test(r.seta_name.trim())) iss.push([a, 'Registration with no SETA' + (r.seta_name ? ' ("' + r.seta_name + '")' : '')]);
+      if (active(r) && !r.registration_expiry_date) iss.push([a, `${r.seta_name || 'Registration'}: no expiry date`]); });
+    S.D.filter(d => ids.has(d.assessor_id) && d.is_current !== false && /pending/i.test(d.status || '')).forEach(d => iss.push([S.A.find(x => x.id === d.assessor_id), `${d.doc_type}: ${d.status}`]));
+    return { dup, iss };
+  }
+  window.famCal = (k, v) => { S.cal = S.cal || {}; if (k === 'move') S.cal.from = addD(S.cal.from || monday(today()), v * 7); else if (k === 'today') S.cal.from = monday(today()); else S.cal[k] = v; renderCal(); };
+  function renderCal() {
+    const box = $('famprof'), C = S.cal = S.cal || {}, from = C.from || (C.from = monday(today())), WK = 13, to = addD(from, WK * 7), span = WK * 7;
+    $('heading').textContent = 'FAM Calendar'; $('crumb').textContent = 'Quality / FAM Registry';
+    const AS = assigns(), q = (C.q || '').toLowerCase(), qual = (S.Q || []).find(x => String(x.id) === String(C.qual));
+    const setas = [...new Set(S.R.flatMap(r => (r.seta_name || '').split(/\s*,\s*/)).filter(x => x && !/^n\/?a$/i.test(x)))].sort();
+    const fits = a => (!q || nm(a.full_name).includes(nm(q))) && (!C.role && !C.seta || regsFor(a.id).some(r => active(r) && (!C.role || regCovers(r, C.role, null)) && (!C.seta || (r.seta_name || '').split(/\s*,\s*/).includes(C.seta))));
+    const people = vis().filter(fits), mine = a => AS.filter(x => x.a.id === a.id && x.live);
+    people.sort((a, b) => (mine(b).length > 0) - (mine(a).length > 0) || shownName(a).localeCompare(shownName(b)));
+    const pct = d => Math.max(0, Math.min(100, (new Date(d + 'T00:00:00') - new Date(from + 'T00:00:00')) / 864e5 / span * 100));
+    const wk = [...Array(WK)].map((_, i) => addD(from, i * 7)), tpos = today() >= from && today() < to ? pct(today()) : null;
+    const opt = (v, l, cur) => `<option value="${e(v)}"${String(cur || '') === String(v) ? ' selected' : ''}>${e(l)}</option>`;
+    const nowA = AS.filter(x => x.now), busy = new Set(AS.filter(x => x.live).map(x => x.a.id));
+    const risk = AS.filter(x => x.live && x.el[0] !== 'ok').sort((a, b) => (a.start || '').localeCompare(b.start || ''));
+    const free = vis().filter(a => !busy.has(a.id) && suitable(a).length);
+    const exp30 = S.R.filter(r => active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= addD(today(), 30) && vis().some(a => a.id === r.assessor_id));
+    const bar = (x, li) => { const s = x.start && x.start > from ? x.start : from, en = x.end && x.end < to ? x.end : to; if ((x.end && x.end < from) || (x.start && x.start >= to)) return '';
+      const l = pct(s), w = Math.max(1.2, pct(en) - l), bad = x.el[0] !== 'ok';
+      return `<button class="fcbar ${RCH[x.role] || ''}${bad ? ' fcrisk' : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${x.role} · ${x.title}${x.seta ? ' · ' + x.seta : ''}\n${fmt(x.start)} – ${fmt(x.end)}\n${x.el[1]}\nSource: ${x.src}`)}" onclick="${x.pid ? `window.dvProg&&dvProg(${x.pid});location.hash='programmes'` : `location.hash='modver'`}">${bad ? '⚠ ' : ''}${e(x.title)}</button>`; };
+    const marks = a => regsFor(a.id).filter(r => r.registration_expiry_date && r.registration_expiry_date >= from && r.registration_expiry_date < to).map(r => `<span class="fcexp${r.registration_expiry_date < today() ? ' past' : ''}" style="left:${pct(r.registration_expiry_date)}%" title="${e(`${r.seta_name || 'Registration'} expires ${fmt(r.registration_expiry_date)}`)}">◆</span>`).join('')
+      + S.D.filter(d => d.assessor_id === a.id && d.is_current !== false && d.expiry_date && d.expiry_date >= from && d.expiry_date < to).map(d => `<span class="fcexp doc" style="left:${pct(d.expiry_date)}%" title="${e(`${d.doc_type} expires ${fmt(d.expiry_date)}`)}">◇</span>`).join('');
+    const grid = people.map(a => { const m = mine(a); return `<div class="fcrow"><button class="fcname" onclick="location.hash='fam/${a.id}'" title="Open profile">${e(shownName(a))}<span class="sub">${m.filter(x => x.now).length ? m.filter(x => x.now).length + ' now' : busy.has(a.id) ? 'upcoming' : 'free'}</span></button>
+      <div class="fctrack" style="min-height:${Math.max(1, m.length) * 28 + 12}px">${tpos != null ? `<span class="fctoday" style="left:${tpos}%"></span>` : ''}${m.map((x, li) => bar(x, li)).join('')}${marks(a)}</div></div>`; }).join('') || '<div class="sub" style="padding:14px">No practitioners match these filters.</div>';
+    // who can cover
+    let cover = '<div class="sub">Pick a qualification above to see who can cover it.</div>';
+    if (qual) { const rows2 = vis().map(a => { const rs = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
+        const sc = rs.filter(r => (S.SC || []).some(x => x.registration_id === r.id && String(x.qualification_id) === String(qual.id)));
+        const st = !sc.length && qual.seta ? rs.filter(r => (r.seta_name || '').split(/\s*,\s*/).includes(setaKey(qual.seta))) : [];
+        const use = sc.length ? sc : st; if (!use.length) return null;
+        return [a, sc.length ? 'In scope' : `SETA match (${setaKey(qual.seta)}), scope not captured`, [...new Set(use.flatMap(r => r.roles?.length ? r.roles : [r.role]))].filter(Boolean).join(', '), use.map(r => r.registration_expiry_date).filter(Boolean).sort().pop()]; }).filter(Boolean);
+      cover = rows2.length ? `<table class="dense"><thead><tr><th>Practitioner</th><th>Roles</th><th>Basis</th><th>Until</th><th>Now</th></tr></thead><tbody>${rows2.map(([a, b, r, x]) => `<tr><td><a href="#fam/${a.id}">${e(shownName(a))}</a></td><td>${e(r)}</td><td class="sub">${e(b)}</td><td>${fmt(x)}</td><td>${busy.has(a.id) ? '<span class="badge b-warn">Allocated</span>' : '<span class="badge b-ok">Free</span>'}</td></tr>`).join('')}</tbody></table>` : `<div class="sub">Nobody is currently registered for ${e(qual.name)}.</div>`; }
+    // renewals by week
+    const wkMap = {}; const end90 = addD(today(), 90), vids = new Set(vis().map(a => a.id)), who = id => shownName(S.A.find(x => x.id === id) || {});
+    S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= end90).forEach(r => (wkMap[monday(r.registration_expiry_date)] = wkMap[monday(r.registration_expiry_date)] || []).push([r.assessor_id, `${r.seta_name || 'Registration'} registration`, r.registration_expiry_date]));
+    S.D.filter(d => vids.has(d.assessor_id) && d.is_current !== false && d.expiry_date && d.expiry_date >= today() && d.expiry_date <= end90).forEach(d => (wkMap[monday(d.expiry_date)] = wkMap[monday(d.expiry_date)] || []).push([d.assessor_id, d.doc_type, d.expiry_date]));
+    const ren = Object.keys(wkMap).sort().map(w => `<div class="fcwk"><b>Week of ${fmt(w)}</b> <span class="sub">${wkMap[w].length} item${wkMap[w].length === 1 ? '' : 's'}</span><ul>${wkMap[w].sort((a, b) => a[2].localeCompare(b[2])).map(([id, t, d]) => `<li><a href="#fam/${id}">${e(who(id))}</a> · ${e(t)} · ${fmt(d)}</li>`).join('')}</ul></div>`).join('') || '<div class="sub">Nothing expires in the next 90 days.</div>';
+    const { dup, iss } = calIssues();
+    const card = (t, sub, body) => `<section class="card fccard"><h3>${t}${sub ? ` <span class="sub">${sub}</span>` : ''}</h3>${body}</section>`;
+    box.innerHTML = `<style>
+      .fchead{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.fchead select,.fchead input{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px}
+      .fckpis{display:flex;flex-wrap:wrap;gap:10px}.fckpis .kpi{min-width:150px}
+      .fcgrid{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface)}
+      .fcrow{display:grid;grid-template-columns:200px 1fr;border-top:1px solid var(--line);min-height:40px}.fcrow.h{border-top:0;font-size:12px;color:var(--muted)}
+      .fcname{border:0;background:none;text-align:left;padding:8px 12px;font:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;display:flex;flex-direction:column;border-right:1px solid var(--line)}.fcname .sub{font-weight:400;font-size:12px}
+      .fctrack{position:relative;background-image:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/${WK} - 1px),var(--line) calc(100%/${WK} - 1px),var(--line) calc(100%/${WK}))}
+      .fcwks{display:grid;grid-template-columns:repeat(${WK},1fr)}.fcwks span{padding:8px 4px;text-align:center;border-left:1px solid var(--line);white-space:nowrap;overflow:hidden}
+      .fcbar{position:absolute;height:24px;border:0;border-radius:6px;font:inherit;font-size:12px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left}
+      .fcrisk{outline:2px solid var(--bad);outline-offset:-2px}
+      .fcexp{position:absolute;top:50%;transform:translate(-50%,-50%);color:var(--bad);font-size:14px;pointer-events:auto;cursor:help}.fcexp.doc{color:var(--warn,#B26A00)}.fcexp.past{opacity:.5}
+      .fctoday{position:absolute;top:0;bottom:0;width:2px;background:#FBDC00;z-index:1}
+      .fccols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.fccard{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.fccard h3{font-size:16px;margin:0}
+      .fccard ul{margin:4px 0 0;padding-left:18px;font-size:14px}.fcwk{padding:6px 0;border-top:1px solid var(--line)}.fcwk:first-of-type{border-top:0}
+      .fclegend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--muted);align-items:center}.fclegend i{display:inline-block;width:14px;height:10px;border-radius:3px;margin-right:4px;vertical-align:middle}
+      @media (max-width:720px){.fcrow{grid-template-columns:120px 1fr}}
+    </style>
+    <div class="fchead"><button class="btn" onclick="location.hash='fam'">← Registry</button><button class="btn sm" onclick="famCal('move',-4)" aria-label="Back 4 weeks">‹</button><button class="btn sm" onclick="famCal('today')">Today</button><button class="btn sm" onclick="famCal('move',4)" aria-label="Forward 4 weeks">›</button>
+      <span class="sub">${fmt(from)} – ${fmt(addD(to, -1))}</span><span style="flex-grow:1"></span>
+      <input type="search" placeholder="Search name" value="${e(C.q || '')}" oninput="famCal('q',this.value)" aria-label="Search practitioner">
+      <select aria-label="Role" onchange="famCal('role',this.value)">${opt('', 'All roles', C.role)}${ROLE3.map(r => opt(r, r, C.role)).join('')}</select>
+      <select aria-label="SETA" onchange="famCal('seta',this.value)">${opt('', 'All SETAs', C.seta)}${setas.map(x => opt(x, x, C.seta)).join('')}</select></div>
+    <div class="fckpis">${[['On a programme now', new Set(nowA.map(x => x.a.id)).size, ''], ['Free and registered', free.length, 'var(--ok)'], ['At-risk allocations', risk.length, risk.length ? 'var(--bad)' : ''], ['Expiring in 30 days', exp30.length, exp30.length ? 'var(--warn)' : '']].map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v"${c ? ` style="color:${c}"` : ''}>${v}</span></div>`).join('')}</div>
+    <div class="fclegend"><span><i class="famc-f"></i>Facilitator</span><span><i class="famc-a"></i>Assessor</span><span><i class="famc-m"></i>Moderator</span><span><i style="outline:2px solid var(--bad);outline-offset:-2px"></i>Eligibility problem</span><span style="color:var(--bad)">◆ registration expires</span><span>◇ document expires</span><span><i style="background:#FBDC00;width:3px"></i>Today</span></div>
+    <div class="fcgrid"><div class="fcrow h"><span style="padding:8px 12px;border-right:1px solid var(--line)">${people.length} practitioner${people.length === 1 ? '' : 's'}</span><div class="fcwks">${wk.map(w => `<span>${fmt(w).slice(0, 5)}</span>`).join('')}</div></div>${grid}</div>
+    <div class="fccols">
+      ${card('At-risk allocations', risk.length ? risk.length + ' to fix' : '', risk.length ? `<ul>${risk.map(x => `<li><a href="#fam/${x.a.id}">${e(shownName(x.a))}</a> · ${e(x.role)} on ${e(x.title)}${x.start ? ' from ' + fmt(x.start) : ''}<div class="sub" style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'})">${e(x.el[1])}</div></li>`).join('')}</ul>` : '<div class="sub">Every current and upcoming allocation is covered by a valid registration.</div>')}
+      ${card('Who is doing what now', nowA.length ? nowA.length + ' allocation' + (nowA.length === 1 ? '' : 's') : '', nowA.length ? `<ul>${nowA.sort((a, b) => shownName(a.a).localeCompare(shownName(b.a))).map(x => `<li><a href="#fam/${x.a.id}">${e(shownName(x.a))}</a> · ${e(x.role)} · ${e(x.title)}${x.end ? ' · ends ' + fmt(x.end) : ''}</li>`).join('')}</ul>` : '<div class="sub">No allocations running today on the moderation list or programmes.</div>')}
+      ${card('Free and suitable', free.length ? free.length + ' practitioner' + (free.length === 1 ? '' : 's') : '', free.length ? `<ul>${free.map(a => `<li><a href="#fam/${a.id}">${e(shownName(a))}</a><div class="sub">${suitable(a).map(x => e(`${x.seta} · ${x.roles}${x.quals.length ? ' · ' + x.quals.join(', ') : ''}`)).join('<br>')}</div></li>`).join('')}</ul>` : '<div class="sub">Everyone with a valid registration is already allocated.</div>')}
+      ${card('Who can cover a qualification?', '', `<select aria-label="Qualification" style="height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit" onchange="famCal('qual',this.value)">${opt('', 'Choose a qualification…', C.qual)}${(S.Q || []).map(x => opt(x.id, `${x.name}${x.saqa_id ? ' (' + x.saqa_id + ')' : ''}`, C.qual)).join('')}</select>${cover}`)}
+      ${card('Renewal calendar', 'next 90 days', ren)}
+      ${card('Possible duplicates and data issues', (dup.length + iss.length) ? (dup.length + iss.length) + ' to check' : '', `${dup.length ? `<b style="font-size:14px">Possible duplicates</b><ul>${dup.map(([a, b]) => `<li><a href="#fam/${a.id}">${e(a.full_name)}</a> (#${a.id}) and <a href="#fam/${b.id}">${e(b.full_name)}</a> (#${b.id})</li>`).join('')}</ul>` : ''}${iss.length ? `<b style="font-size:14px">Data issues</b><ul>${iss.map(([a, t]) => `<li>${a ? `<a href="#fam/${a.id}">${e(shownName(a))}</a>` : 'Unknown'} · ${e(t)}</li>`).join('')}</ul>` : ''}${dup.length + iss.length ? '' : '<div class="sub">Nothing found.</div>'}`)}
+      ${card('Recent FAM changes', 'last 7 days', '<div id="fcaudit" class="sub">Loading…</div>')}
+    </div>
+    <div class="sub">Allocations come from the moderation list (facilitator, assessor and moderator names matched to the registry) and programme facilitators. Anyone allocated elsewhere shows as free.</div>`;
+    loadCalAudit();
+  }
+  async function loadCalAudit() {
+    const el = () => $('fcaudit'); if (S.calAudit && S.calAudit.at > Date.now() - 60000) return paint();
+    try { const { data, error } = await sb.from('audit_log').select('*').gte('created_at', addD(today(), -7)).order('created_at', { ascending: false }).limit(200);
+      if (error) throw error; S.calAudit = { at: Date.now(), rows: (data || []).filter(r => /^(fam_|assessor)/.test(r.table_name || '')) }; } catch (err) { S.calAudit = { at: Date.now(), err: err.message || String(err) }; }
+    paint();
+    function paint() { const b = el(); if (!b) return; const A = S.calAudit;
+      if (A.err) { b.textContent = 'Change history is not available here (' + A.err + ').'; return; }
+      b.className = ''; b.innerHTML = A.rows.length ? `<ul>${A.rows.slice(0, 30).map(r => `<li>${e(String(r.created_at || '').slice(0, 16).replace('T', ' '))} · ${e(r.user_name || 'Someone')} · ${e(String(r.action || '').replace(/_/g, ' ').toLowerCase())} · ${e(r.table_name)}${r.record_id ? ' #' + e(r.record_id) : ''}</li>`).join('')}</ul>` : '<div class="sub">No FAM changes in the last 7 days.</div>'; }
+  }
+
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
@@ -1029,7 +1156,7 @@
       if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.onclick = () => canWrite() ? (location.hash = 'fam/bulk') : say('You do not have FAM write access'); }
     });
     const tb = btns[0]?.parentElement;
-    tb?.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><details class="famfum famio"><summary class="btn">Import / Export ▾</summary><div><button class="btn sm" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button></div></details>');
+    tb?.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/calendar\'">Calendar</button><button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><details class="famfum famio"><summary class="btn">Import / Export ▾</summary><div><button class="btn sm" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button></div></details>');
     const io = tb?.querySelector('.famio');
     if (io) { [...btns].filter(b => /^(Scope Import|Bulk Intake)$/.test(b.textContent.trim())).forEach(b => { b.classList.add('sm'); io.lastChild.appendChild(b); });
       io.lastChild.addEventListener('click', () => { io.open = false; }); document.addEventListener('click', ev => { if (io.open && !io.contains(ev.target)) io.open = false; }); }

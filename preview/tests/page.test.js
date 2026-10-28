@@ -391,6 +391,15 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(log.some(x => x.table === 'audit_log' && x.val.action === 'SCOPE_IMPORT_COMMIT'), 'no audit row');
     w.famScope(11); const f = d.getElementById('famform'); ok(f.elements.qid.options.length === 1 && f.elements.qid.value === 'q-118699', 'already-linked not excluded');
   });
+  await t('FAM Calendar: side-panel button opens it; cover, risks and renewals render', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    w.location.hash = '#fam'; await tick(); await tick();
+    w.toggleRP(); await tick(); await tick();
+    ok(w.location.hash === '#fam/calendar' && d.getElementById('heading').textContent === 'FAM Calendar', w.location.hash);
+    w.famCal('qual', 'q-101869'); const t = d.getElementById('famprof').textContent;
+    ok(/Who can cover/.test(t) && /In scope/.test(t) && /Renewal calendar/.test(t) && /At-risk allocations/.test(t), t.slice(0, 300));
+    w.toggleRP(); await tick(); ok(w.location.hash === '#fam', 'toggle back');
+  });
   await t('FAM: triage groups 61-90 days and lapsed, collapse, select group, chip tooltip', async () => {
     const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations };
     DATA.assessors = [...keep.a, { id: 4, full_name: 'Soon Four', role: 'Assessor', email: 'soon@example.com' }, { id: 5, full_name: 'Old Five', role: 'Assessor' }];
