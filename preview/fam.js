@@ -227,12 +227,12 @@
       $('famrows').innerHTML = list.length ? sum + list.map(([a, i], n) => {
         const g = worst(a), mem = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g) : null, w = when(a), act = rowAction(a), shut = S.col.has(g) && !S.q && S.fSt !== g;
         const allOn = mem && mem.every(([b]) => S.sel.has(b.id));
-        return (mem ? `<tr class="famgh" id="famg-${g}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
+        return (mem ? `<tr class="famgh" id="famg-${g}" style="--g:${WGRP[g][1]}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
           <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}${who(a, `<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>`)}</td>
           <td>${g === 'pending' ? '' : `<div style="${w[1]}">${e(w[0])}${(k => k ? ` <span class="sub famcap" style="font-weight:400">+${k} to capture</span>` : '')(regsFor(a.id).filter(r => risk(r) === 'pending').length)}</div>`}${regChips(a)}</td>
           <td class="famdocs" style="white-space:nowrap" title="${e(docTip(a))}">${meter(a)}</td>
-          <td style="text-align:right">${act ? `<button class="famact${['pending', 'none'].includes(g) ? ' q' : ''}" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`);
+          <td style="text-align:right">${act ? `<button class="famact${['pending', 'none'].includes(g) ? ' q' : ''}${/^Renew/.test(act) ? ' y' : ''}" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}</td></tr>`);
       }).join('') : empty(4);
       finishRows(all, list, pages);
       return;
@@ -728,8 +728,9 @@
   }
   function render() {
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
-    const kgrp = (title, ks) => `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}<div class="famgk">${K.filter(x => ks.includes(x[0])).map(kbtn).join('')}</div></div>`;
-    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
+    const kgrp = (title, ks, bar) => { const ks2 = K.filter(x => ks.includes(x[0])), tot = ks2.reduce((n, x) => n + x[2], 0);
+      return `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}${bar && tot ? `<div class="famstack" aria-hidden="true">${ks2.filter(x => x[2]).map(([, l, v, c]) => `<i style="flex:${v};background:${c}" title="${l}: ${v}"></i>`).join('')}</div>` : ''}<div class="famgk">${ks2.filter(x => x[2] || S.filter === x[0]).map(kbtn).join('')}</div>${ks2.some(x => !x[2] && S.filter !== x[0]) ? `<div class="famzero">${ks2.filter(x => !x[2] && S.filter !== x[0]).map(([k, l]) => `<button class="famz" onclick="famFilter('${k}')">${l} <b>0</b></button>`).join('')}</div>` : ''}</div>`; };
+    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
     renderStrip(); renderRows(); renderPanel();
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue();
   }
@@ -928,6 +929,31 @@
       #famov label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
       #famov input,#famov select{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)}
       #famov input[type=checkbox]{height:auto}#famov input[type=file]{height:auto;padding:6px 0;border:0}
+      /* ApexU skin (28 Oct mock) */
+      #view-fam .famgrp{flex:1 1 380px;background:var(--surface,#fff);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(22,21,74,.06),0 0 0 1px var(--line2);gap:10px}
+      #view-fam .famgl{font-size:14px;color:var(--ink)}
+      .famstack{display:flex;gap:2px;height:12px;border-radius:9px;overflow:hidden}.famstack i{display:block;height:100%}
+      #view-fam .famk{flex:1 1 0;min-width:96px;border:0;background:var(--ground);border-radius:12px;box-shadow:none}
+      #view-fam .famk .v{font-size:24px;font-weight:800}
+      #view-fam .famk.on{box-shadow:inset 0 0 0 2px var(--navy),inset 0 -4px 0 var(--yellow);padding:10px 14px}
+      .famzero{display:flex;flex-wrap:wrap;gap:6px}.famz{border:0;font:inherit;font-size:12px;color:var(--muted);background:var(--ground);border-radius:8px;padding:4px 10px;cursor:pointer}.famz b{margin-left:4px;color:var(--ink)}
+      .famsc{border:0!important;border-radius:0!important;background:transparent!important;color:var(--muted)!important;font-weight:600;padding:8px 2px!important;margin:0 18px 6px 0!important;box-shadow:inset 0 -3px 0 transparent;opacity:1!important}
+      .famsc b{order:2;font-size:12px;background:var(--line2);color:var(--ink);border-radius:999px;padding:1px 8px}.famsc:hover{color:var(--navy)!important}
+      .famsc.on{color:var(--navy)!important;box-shadow:inset 0 -3px 0 var(--yellow)}.famsc.on b{background:var(--navy);color:#fff}
+      .famc-f,.famc-a,.famc-m{background:rgba(37,36,123,.09)!important;color:var(--navy)!important;font-weight:700}
+      :root[data-theme=dark] .famc-f,:root[data-theme=dark] .famc-a,:root[data-theme=dark] .famc-m{background:rgba(185,184,227,.16)!important;color:#D2D1EC!important}
+      @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f,:root:not([data-theme=light]) .famc-a,:root:not([data-theme=light]) .famc-m{background:rgba(185,184,227,.16)!important;color:#D2D1EC!important}}
+      .famc-bad,.famc-warn,.famc-ok,.famc-nc{border:0!important;font-weight:600;line-height:22px;padding:0 10px;border-radius:8px}
+      .famc-bad::before,.famc-warn::before,.famc-ok::before,.famc-nc::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+      .famc-bad{background:rgba(214,69,69,.12)!important}.famc-warn{background:rgba(224,161,0,.16)!important}.famc-ok{background:rgba(46,158,106,.13)!important}.famc-nc{background:var(--line2)!important;font-style:normal!important}
+      .famav{background:var(--navy)!important;color:var(--yellow)!important;width:36px!important;height:36px!important}
+      .famname{font-weight:700!important}
+      tr.famgh td{background:var(--ground);color:var(--navy);text-transform:none;letter-spacing:0;font-size:13px;box-shadow:inset 4px 0 0 var(--g,var(--line))}
+      #view-fam thead th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+      .famact{border:1px solid var(--line)!important;border-radius:8px;padding:6px 12px!important;background:var(--surface,#fff)!important;color:var(--navy)!important}
+      .famact:hover{text-decoration:none!important;border-color:var(--navy2)!important}
+      .famact.y{background:var(--yellow)!important;border-color:var(--yellow)!important;color:var(--navy)!important}
+      #fambulk{background:var(--navy)!important;color:#fff;border:0!important}#fambulk .sub{color:#D2D1EC}
     </style>`);
     const v = $('view-fam'), aside = v.querySelector('aside'), btns = v.querySelectorAll('button');
     btns.forEach(b => {
