@@ -344,7 +344,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       const row = [...d.querySelectorAll('#famrows tr')].find(r => /Ass Two/.test(r.textContent));
       ok(row && /1 expired \+1 to capture/.test(row.textContent), row ? row.textContent : 'no row');
       w.famMode('triage'); const tr = [...d.querySelectorAll('#famrows tr')].find(r => /Ass Two/.test(r.textContent));
-      ok(tr && /ago.*\+1 to capture/.test(tr.textContent), tr ? tr.textContent : 'no triage row');
+      ok(tr && /ago.*\+1 reg missing dates/.test(tr.textContent), tr ? tr.textContent : 'no triage row');
       ok(/nothing due/.test(d.getElementById('famstrip').textContent) && d.getElementById('famstrip').classList.contains('famstrip0') && !d.querySelector('#famstrip .famtrack'), 'compact empty strip');
     } finally { DATA.fam_seta_registrations = keep; }
   });
@@ -402,7 +402,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       ok(/Expiring soon/.test(txt()) && /Soon Four/.test(txt()), 'no 61-90 group');
       ok(/Lapsed over a year/.test(txt()) && !/Old Five/.test(txt()), 'lapsed group not collapsed by default');
       ok(/Missing /.test(txt()), 'missing docs not shown on row');
-      const sm = d.querySelector('#famrows .famsum'); ok(sm && /1 person · Lapsed over a year/.test(sm.textContent) && /1 person · Expiring soon/.test(sm.textContent), sm && sm.textContent);
+      const sm = d.querySelector('#famrows .famsum'); ok(sm && /Lapsed over a year 1/.test(sm.textContent) && /Expiring soon · 61–90 days 1/.test(sm.textContent), sm && sm.textContent);
       w.famJump('lapsed'); ok(/Old Five/.test(txt()), 'summary count does not open its group');
       w.famCol(); ok(/Old Five/.test(txt()) && /Expired 400 days ago/.test(txt()), 'expand all / expiry text');
       const nc = d.querySelector('#famrows .famtr .famc-nc'); ok(nc && /still to be entered/.test(nc.title), nc && nc.title);

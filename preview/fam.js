@@ -116,7 +116,7 @@
     ['expired', 'Expired', allRisks().filter(s => s === 'expired').length, 'var(--bad)'],
     ['due_30', 'Due ≤30 days', allRisks().filter(s => s === 'due_30').length, 'var(--bad)'],
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
-    ['pending', 'Not captured', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
+    ['pending', 'Not captured (regs)', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
     ['missing', 'No ID / certificate', vis().filter(a => critMiss(a.id)).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
@@ -198,7 +198,7 @@
     regsFor(a.id).forEach(r => { const k = wrisk(r), n = r.seta_name === 'Pending Entry' || (!r.seta_name && k === 'pending') ? 'SETA not captured' : r.seta_name === 'N/A' || !r.seta_name ? 'SETA not named' : r.seta_name, o = m.get(n);
       if (!o || WRANK.indexOf(k) < WRANK.indexOf(o.k)) m.set(n, { k, r }); });
     if (!m.size) return '';
-    return `<div class="famchips">${[...m].map(([n, { k, r }]) => `<span class="famchip ${n === 'SETA not captured' ? 'famc-nc' : RCLS[k]}" title="${n === 'SETA not captured' ? 'Registration added; SETA and expiry date still to be entered' : `${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`}">${e(n)}</span>`).join('')}</div>`;
+    return `<div class="famchips">${[...m].sort(([, x], [, y]) => WRANK.indexOf(x.k) - WRANK.indexOf(y.k) || (days(x.r) ?? 1e9) - (days(y.r) ?? 1e9)).map(([n, { k, r }]) => `<span class="famchip ${n === 'SETA not captured' ? 'famc-nc' : RCLS[k]}" title="${n === 'SETA not captured' ? 'Registration added; SETA and expiry date still to be entered' : `${e(n)}: ${RTXT[k]}${r.registration_expiry_date ? ' · expires ' + fmt(r.registration_expiry_date) : ''}`}">${e(n)}</span>`).join('')}</div>`;
   }
   const docTip = a => { const have = onFile(a.id), miss = TYPES.filter(t => !have.includes(t)).map(lbl), c = compl(a.id);
     return `Documents on file: ${have.length} of 6. ${miss.length ? 'Missing: ' + miss.join(', ') + '.' : 'All on file.'} Profile checks: ${c.complete ? 'complete' : c.gaps.join(', ')}.`; };
@@ -221,16 +221,16 @@
     $('famv-t').hidden = tri;
     $('famtest').textContent = S.hideTest ? 'Show test records' : 'Hide test records';
     if (tri) {
-      $('famhead').innerHTML = `<tr>${th('name', 'Practitioner')}${th('expiry', 'Registrations')}${th('docs', 'Documents')}<th class="sub" style="text-align:right;font-weight:400">Urgency order</th></tr>`;
+      $('famhead').innerHTML = `<tr>${th('name', 'Practitioner')}${th('expiry', 'Registrations')}${th('docs', 'Documents')}<th class="sub" style="text-align:right;font-weight:400" title="Rows are sorted by urgency">Actions</th></tr>`;
       const cnt = WRANK.map(g => [g, all.filter(([b]) => worst(b) === g).length]).filter(([, c]) => c);
-      const sum = cnt.length ? `<tr class="famsum"><td colspan="4"><button class="famsc${S.col.size ? '' : ' on'}" onclick="famCol()" aria-pressed="${!S.col.size}" title="Open every group"><b>${all.length}</b> All practitioners</button>${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span><b>${c}</b> ${c === 1 ? 'person' : 'people'} · ${WGRP[g][0]}</button>`).join('')}${[['due_30', 'due_60', 'due_90'].some(g => cnt.some(([x]) => x === g)) ? '' : 'Due soon', cnt.some(([x]) => x === 'inactive') ? '' : 'Inactive'].filter(Boolean).map(l => `<button class="famsc famsc0" disabled title="None right now"><b>0</b> ${l}</button>`).join('')}<div class="famkey sub"><b>SETA chips:</b>${[['famc-ok', 'Active', '90+ days left'], ['famc-warn', 'Due within 90 days', 'renew'], ['famc-bad', 'Expired', 'past expiry'], ['famc-nc', 'Details not captured', 'number or dates missing'], ['famc-s', 'Inactive', 'not in use']].map(([c, l, m]) => `<span class="famki"><span class="famchip ${c}">${l}</span>${m}</span>`).join('')}</div></td></tr>` : '';
+      const sum = cnt.length ? `<tr class="famsum"><td colspan="4"><button class="famsc${S.col.size ? '' : ' on'}" onclick="famCol()" aria-pressed="${!S.col.size}" title="Open every group">All practitioners <b>${all.length}</b></button>${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]} <b title="${c} ${c === 1 ? 'person' : 'people'}">${c}</b></button>`).join('')}${[['due_30', 'due_60', 'due_90'].some(g => cnt.some(([x]) => x === g)) ? '' : 'Due soon', cnt.some(([x]) => x === 'inactive') ? '' : 'Inactive'].filter(Boolean).map(l => `<button class="famsc famsc0" disabled title="None right now">${l} <b>0</b></button>`).join('')}<div class="famkey sub"><b>SETA chips:</b>${[['famc-ok', 'Active', '90+ days left'], ['famc-warn', 'Due within 90 days', 'renew'], ['famc-bad', 'Expired', 'past expiry'], ['famc-nc', 'Details not captured', 'number or dates missing'], ['famc-s', 'Inactive', 'not in use']].map(([c, l, m]) => `<span class="famki"><span class="famchip ${c}">${l}</span>${m}</span>`).join('')}</div></td></tr>` : '';
       $('famrows').innerHTML = list.length ? sum + list.map(([a, i], n) => {
         const g = worst(a), mem = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g) : null, w = when(a), act = rowAction(a), shut = S.col.has(g) && !S.q && S.fSt !== g;
         const allOn = mem && mem.every(([b]) => S.sel.has(b.id));
         return (mem ? `<tr class="famgh" id="famg-${g}" style="--g:${WGRP[g][1]}"><td colspan="4"><button class="famgt" onclick="famCol('${g}')" aria-expanded="${!shut}">${shut ? '▸' : '▾'} <span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]}<span class="famgn">${mem.length}</span></button><span class="sub">${WGRP[g][2]}</span>${cw ? `<label class="famgsel sub"><input type="checkbox" onchange="famSelGrp('${g}',this.checked)" ${allOn ? 'checked' : ''}> Select group</label>` : ''}</td></tr>` : '') + (shut ? '' :
           `<tr class="famtr${i === famSel ? ' sel' : ''}" onclick="famShow(${i})">
           <td>${cw ? `<input type="checkbox" class="famck" aria-label="Select ${e(a.full_name)}" onclick="event.stopPropagation()" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}>` : ''}${who(a, `<button class="famname" onclick="event.stopPropagation();famShow(${i})" aria-current="${i === famSel}">${tag(a)}${e(shownName(a))}</button>`)}</td>
-          <td>${g === 'pending' ? '' : `<div style="${w[1]}">${e(w[0])}${(k => k ? ` <span class="sub famcap" style="font-weight:400">+${k} to capture</span>` : '')(regsFor(a.id).filter(r => risk(r) === 'pending').length)}</div>`}${regChips(a)}</td>
+          <td>${g === 'pending' ? '' : `<div style="${w[1]}">${e(w[0])}${(k => k ? ` <span class="sub famcap" style="font-weight:400">+${k} ${k === 1 ? 'reg' : 'regs'} missing dates</span>` : '')(regsFor(a.id).filter(r => risk(r) === 'pending').length)}</div>`}${regChips(a)}</td>
           <td class="famdocs" style="white-space:nowrap" title="${e(docTip(a))}">${meter(a)}</td>
           <td style="text-align:right;white-space:nowrap">${act ? `<button class="famact${['pending', 'none'].includes(g) ? ' q' : ''}${/^Renew/.test(act) ? ' y' : ''}" onclick="event.stopPropagation();famOpen(${a.id})">${e(act)}</button>` : ''}<details class="famfum famrm" onclick="event.stopPropagation()"><summary class="famdots" aria-label="More actions for ${e(a.full_name)}">⋯</summary><div><button class="btn sm" onclick="famOpen(${a.id})">Quick view</button><button class="btn sm" onclick="location.hash='fam/${a.id}'">Full profile</button>${cw ? `<button class="btn sm" onclick="famReg(${a.id})">Add registration</button><button class="btn sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button></div></details></td></tr>`);
       }).join('') : empty(4);
@@ -981,14 +981,14 @@
     tbl.querySelector('thead').id = 'famhead';
     sec.insertAdjacentHTML('afterbegin', `<div class="famtool"><input id="famq" type="search" placeholder="Search name, ID number, role or SETA" aria-label="Search practitioners" oninput="famSearch(this.value)" class="faminput" style="flex:1 1 220px">
       <select class="faminput famdd" id="famdd-role" aria-label="Filter by role" onchange="famDD('fRole',this.value)"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
-      <select class="faminput famdd" id="famdd-st" aria-label="Filter by status" onchange="famDD('fSt',this.value)"><option value="">All statuses</option>${WRANK.map(k => `<option value="${k}">${WGRP[k][0]}</option>`).join('')}</select>
+
       <select class="faminput famdd" id="famdd-seta" aria-label="Filter by SETA" onchange="famDD('fSeta',this.value)"><option value="">All SETAs</option></select>
       <button class="btn sm" id="famv-t" onclick="famMode('triage')" title="Back to urgency order, grouped by status" hidden>↺ Sort: urgency</button>
       <button class="btn sm" id="famtest" onclick="famTest()">Hide test records</button></div>
       <div class="famsub"><span class="sub" id="famcount" aria-live="polite"></span><span class="sub" id="famasof"></span></div><div id="fambulk" hidden></div>`);
     (tbl.parentElement.classList.contains('tw') ? tbl.parentElement : tbl).insertAdjacentHTML('afterend', '<div id="fampage" class="fampage"></div>');
     sec.addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !(ev.target.type === 'checkbox')) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
-    $('famdd-role').value = S.fRole; $('famdd-st').value = S.fSt;
+    $('famdd-role').value = S.fRole; 
     v.querySelector('.row').insertAdjacentHTML('beforebegin', '<section class="card" id="famstrip"></section>');
     v.insertAdjacentHTML('beforeend', '<div id="famprof" hidden></div>');
     window.renderFam = () => { renderRows(); renderPanel(); };
