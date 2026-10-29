@@ -1157,6 +1157,8 @@
   window.TDadd = () => { TD.add = !TD.add; renderToday(); };
   window.TDcancel = () => { TD.add = false; renderToday(); };
   addEventListener('keydown', ev => { if (ev.key === 'Escape' && TD) famToday(false); });
+  // ↑/↓ move between practitioners while the side panel is open, even when focus is on the page (e.g. after a mouse click on a row)
+  addEventListener('keydown', ev => { if ((ev.key === 'ArrowDown' || ev.key === 'ArrowUp') && !ev.defaultPrevented && !TD && /^#fam\/open\//.test(location.hash) && !ev.target.closest?.('input,textarea,select,[contenteditable]')) { ev.preventDefault(); famMove(ev.key === 'ArrowDown' ? 1 : -1); } });
   addEventListener('hashchange', () => { if (TD && !/^#fam/.test(location.hash)) famToday(false); });
 
   /* ---------- data ---------- */
