@@ -1030,6 +1030,7 @@
     R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
     setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
     Object.assign(S, { A, R, D, F, Q, SC, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
+    try { window.famBell && window.famBell(S); } catch (_) {}
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
     if (famSel < 0 || famSel >= A.length) famSel = 0;

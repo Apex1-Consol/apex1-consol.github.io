@@ -272,7 +272,7 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
       <div class="t"><small id="crumb">Overview</small><b id="heading">Dashboard</b></div>
       <span class="savest idle" id="savest" role="status" title="Changes save automatically to ApexOne"><i></i><span>All changes saved</span></span>
       <div class="sw s"><label class="search"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4C4B6E" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><span class="sr">Search</span><input type="search" id="q" autocomplete="off" placeholder="Search learners, programmes, screens…" oninput="doSearch()" onfocus="doSearch()" onkeydown="if(event.key==='Enter'){const a=$('qres').querySelector('a');if(a)a.click()}if(event.key==='Escape')closePops()" aria-controls="qres"><kbd class="kbd" aria-hidden="true">Ctrl K</kbd></label><div class="pop" id="qres" hidden></div></div>
-      <div class="sw"><button class="iconbtn" id="bellbtn" aria-label="Notifications" aria-expanded="false" onclick="togglePop('bell')"><span class="dotn" id="dotn">4</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><div class="pop right" id="bell" hidden></div></div><button class="iconbtn" id="themebtn" aria-label="Switch colour theme" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
+      <div class="sw"><button class="iconbtn" id="bellbtn" aria-label="Notifications" aria-expanded="false" onclick="togglePop('bell')"><span class="dotn" id="dotn" hidden>0</span><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.9 1.9 0 0 0 3.4 0"/></svg></button><div class="pop right" id="bell" hidden></div></div><button class="iconbtn" id="themebtn" aria-label="Switch colour theme" onclick="toggleTheme()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg></button>
       <div class="sw"><button class="pill" id="orgbtn" aria-haspopup="true" aria-expanded="false" onclick="togglePop('org')"><span id="orgname">Apex Academy</span> ▾</button><div class="pop right" id="org" hidden style="min-width:260px"></div></div>
       <button class="iconbtn plain" id="rpbtn" type="button" onclick="toggleRP()" aria-label="Open side panel" aria-expanded="false" title="Open side panel"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
     </header>
@@ -831,19 +831,27 @@ function doSearch(){
 }
 addEventListener('hashchange',()=>{$('q').value=''});
 
-/* Notifications */
-let unread=4;
+/* Notifications (from FAM data; fam.js calls famBell(S) after each load) */
+let BELL=[],bellSeen=new Set();try{bellSeen=new Set(JSON.parse(localStorage.getItem('ao-bell-seen')||'[]'))}catch(e){}
+const bellDays=d=>d?Math.round((new Date(d+'T00:00:00')-new Date(new Date().toDateString()))/864e5):null;
+window.famBell=S=>{const nm=id=>(S.A.find(a=>a.id===id)||{}).full_name||'Practitioner',I=[],ago=d=>(Date.now()-new Date(d))/864e5;
+  S.R.forEach(r=>{const d=bellDays(r.registration_expiry_date);if(d===null||d>30)return;I.push({k:'reg'+r.id+r.registration_expiry_date,c:d<0?'bad':'warn',r:d<0?0:1,d,t:`${nm(r.assessor_id)}: ${r.seta_name||'SETA'} registration ${d<0?'expired':d===0?'expires today':'expires in '+d+' day'+(d===1?'':'s')}`,s:'Registration',h:'fam/'+r.assessor_id})});
+  S.D.forEach(x=>{if(x.is_current===false)return;const d=bellDays(x.expiry_date);if(d===null||d>30)return;I.push({k:'doc'+x.id,c:d<0?'bad':'warn',r:d<0?0:1,d,t:`${nm(x.assessor_id)}: ${x.doc_type||'Document'} ${d<0?'expired':'expires in '+d+' days'}`,s:'Document',h:'fam/'+x.assessor_id})});
+  S.F.forEach(f=>{if(f.resolved_at||!f.created_at||ago(f.created_at)<7)return;I.push({k:'fu'+f.id,c:'warn',r:2,d:0,t:`${nm(f.assessor_id)}: follow-up open ${Math.floor(ago(f.created_at))} days`,s:'Follow-up'+(f.kind?' · '+f.kind:''),h:'fam/'+f.assessor_id})});
+  S.D.forEach(x=>{const u=x.uploaded_at||x.created_at;if(!u||ago(u)>7)return;I.push({k:'up'+x.id,c:'ok',r:3,d:0,t:`${nm(x.assessor_id)}: ${x.doc_type||'Document'} uploaded`,s:'Upload',h:'fam/'+x.assessor_id})});
+  BELL=I.sort((x,y)=>x.r-y.r||x.d-y.d);renderBell()};
 function renderBell(){
-  const N=[['bad','3 recommendations due this week','Recommendations','recs'],['n','VIS-016 is in 3 days','Monitoring visits','visit'],['ok','2 FAM documents uploaded','FAM Registry','fam'],['warn','October report draft ready for review','Report Generator','reports']];
-  $('bell').innerHTML=`<div style="display:flex;align-items:center;padding:6px 10px"><b style="flex-grow:1">Notifications</b>${unread?'<button class="btn sm" style="height:32px" onclick="unread=0;renderBell()">Mark all read</button>':''}</div>`+
-   N.map(([k,t,s,h],i)=>`<a href="#${h}"><span class="dot b-${k}" style="width:10px;height:10px;${i<unread?'':'opacity:.25'}"></span><span><span style="display:block;${i<unread?'font-weight:600':''}">${t}</span><span class="sub">${s}</span></span></a>`).join('');
-  $('dotn').hidden=!unread;$('dotn').textContent=unread;
+  const unread=BELL.filter(x=>!bellSeen.has(x.k)).length,shown=BELL.slice(0,8);
+  $('bell').innerHTML=`<div style="display:flex;align-items:center;padding:6px 10px"><b style="flex-grow:1">Notifications</b>${unread?'<button class="btn sm" style="height:32px" onclick="bellRead()">Mark all read</button>':''}</div>`+
+   (shown.length?shown.map(x=>`<a href="#${x.h}"><span class="dot b-${x.c}" style="width:10px;height:10px;${bellSeen.has(x.k)?'opacity:.25':''}"></span><span><span style="display:block;${bellSeen.has(x.k)?'':'font-weight:600'}">${x.t.replace(/</g,'&lt;')}</span><span class="sub">${x.s}</span></span></a>`).join('')+(BELL.length>8?`<a href="#fam/calendar"><span></span><span class="sub">+${BELL.length-8} more in FAM Calendar</span></a>`:''):'<div class="sub" style="padding:6px 10px 10px">Nothing needs attention.</div>');
+  $('dotn').hidden=!unread;$('dotn').textContent=unread>99?'99+':unread;
 }
+function bellRead(){BELL.forEach(x=>bellSeen.add(x.k));try{localStorage.setItem('ao-bell-seen',JSON.stringify([...bellSeen].slice(-500)))}catch(e){}renderBell()}
 renderBell();
 
-/* Workspace switcher */
-let org='Apex Academy';
-function renderOrg(){$('orgname').textContent=org;$('org').innerHTML='<h4>Switch workspace</h4>'+['Apex Academy','[Second entity]'].map(o=>`<button class="it" onclick="org='${o}';renderOrg();closePops();toast('Switched to ${o}')"><span style="flex-grow:1;${o===org?'font-weight:700':''}">${o}</span>${o===org?'✓':''}</button>`).join('')}
+/* Workspace switcher (hidden until a second entity exists) */
+const ORGS=['Apex Academy'];let org=ORGS[0];
+function renderOrg(){$('orgname').textContent=org;$('orgbtn').parentElement.hidden=ORGS.length<2;$('org').innerHTML='<h4>Switch workspace</h4>'+ORGS.map(o=>`<button class="it" onclick="org='${o}';renderOrg();closePops();toast('Switched to ${o}')"><span style="flex-grow:1;${o===org?'font-weight:700':''}">${o}</span>${o===org?'✓':''}</button>`).join('')}
 renderOrg();
 
 /* Theme */
@@ -1099,7 +1107,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js"></script>
 <script src="qa.js"></script>
-<script src="fam.js?v=20261028e"></script>
+<script src="fam.js?v=20261028f"></script>
 <script src="delivery.js"></script>
 <script src="shell.js?v=20261028e"></script>
 <script src="admin.js"></script>
