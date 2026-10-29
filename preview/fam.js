@@ -94,11 +94,11 @@
     return '—';
   }
 
-  /* ---------- completeness: four checks, same gaps as live's v_fam_completeness ---------- */
+  /* ---------- completeness: five checks: live's v_fam_completeness gaps plus ID number ---------- */
   function compl(id) {
     const regs = regsFor(id).length, docs = onFile(id).length, open = openFU(id).length;
     const missExp = S.D.filter(d => d.assessor_id === id && d.is_current !== false && (d.status === 'Missing' || (d.expiry_date && d.expiry_date < today()))).length;
-        const checks = [[regs > 0, 'no registration'], [docs > 0, 'no documents'], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
+        const checks = [[!!S.A.find(x => x.id === id)?.id_number, 'no ID number'], [regs > 0, 'no registration'], [docs > 0, 'no documents'], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
     const gaps = checks.filter(c => !c[0]).map(c => c[1]);
     return { score: Math.round(checks.filter(c => c[0]).length / checks.length * 100), gaps, complete: !gaps.length };
   }

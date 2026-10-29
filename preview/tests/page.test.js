@@ -300,7 +300,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: completeness, sort, expiry strip, QUAL label, Excel export', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
-    ok(/Incompleteprofiles2/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+    ok(/Incompleteprofiles3/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
     w.famMode('table');
     ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
     w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
