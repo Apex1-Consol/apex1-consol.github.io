@@ -44,7 +44,7 @@ const fail=m=>box.innerHTML=`<h1>Link not available</h1><div class="msg err">${e
   if(!t)return fail('This link is incomplete. Open it straight from the email Apex sent you.');
   let r;try{const res=await fetch(FN+'?t='+encodeURIComponent(t));r=await res.json();if(!res.ok)return fail(r.error||'This link is not valid.')}catch(e){return fail('Could not reach Apex. Check your connection and refresh.')}
   box.innerHTML=`<h1>Hi ${esc(r.first||'there')}</h1>
-  <p>Please upload your renewed <b>${esc(r.seta?r.seta+' ':'')}${esc(r.what)}</b>${r.current_expiry?` (currently expires ${fmt(r.current_expiry)})`:''}.</p>
+  <p>Please upload your renewed <b>${esc(r.seta?r.seta+' registration':r.what)}</b>${r.current_expiry?` (currently expires ${fmt(r.current_expiry)})`:''}.</p>
   <p class="sub">Link valid until ${fmt(r.link_expires)}.</p>
   <div id="m"></div>
   <form id="f">
