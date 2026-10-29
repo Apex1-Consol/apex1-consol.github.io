@@ -1089,8 +1089,8 @@
       #famtoday{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:60;overflow:auto;overscroll-behavior:contain;background:var(--card,#fff);box-shadow:-8px 0 32px rgba(20,20,60,.18);padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px}
       #famtoday h2{font-size:18px;margin:0;flex-grow:1}#famtoday h3{font-size:14px;margin:0 0 6px;display:flex;gap:6px;align-items:center}
       #famtoday .tdchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}#famtoday .tdchip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 10px 4px 4px;font:inherit;font-size:13px;cursor:pointer;display:flex;gap:6px;align-items:center}#famtoday .tdchip.on{border-color:var(--navy,#25247B);box-shadow:0 0 0 1px var(--navy,#25247B)}
-      #famtoday .tdi{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}#famtoday .tdi:first-of-type{border-top:0}
-      #famtoday .tdi>div:first-child{flex-grow:1;min-width:0}#famtoday .tdi a{font-weight:600}#famtoday .tdb{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+      #famtoday>*{flex-shrink:0}#famtoday .tdi{padding:8px 0;border-top:1px solid var(--line)}#famtoday .tdi:first-of-type{border-top:0}
+      #famtoday .tdi a{font-weight:600}#famtoday .tdb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}#famtoday .tdb:empty{display:none}#famtoday .tdb .btn{height:30px;font-size:13px;padding:0 10px}
       #famtoday form{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px}#famtoday form select,#famtoday form input{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;width:100%;box-sizing:border-box}
       </style>`); el = $('famtoday'); }
     const vids = new Set(vis().map(a => a.id)), A = id => S.A.find(x => x.id === id), t = today(), in30 = addD(t, 30);
