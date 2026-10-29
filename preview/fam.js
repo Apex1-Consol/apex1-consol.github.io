@@ -950,6 +950,40 @@
     if (k === 14) { const as = splitNames(row[13]).map(nm); if (names.some(n => as.includes(nm(n)))) out += b('b-bad', 'Conflict', 'The same person is assessor and moderator on this programme'); }
     return out;
   };
+  /* Learner demand: read-only from ClickUp (Recruitment Candidates > Candidate Management) via the clickup-relay function.
+     Nothing is written to ClickUp or stored in Supabase. To move the relay to another backend, change RELAY. */
+  const RELAY = 'clickup-relay', DEMX = /unsuitable|exited|archived/i, DEMR = /^recruited/i;
+  const loadDem = () => { if (S.DEM) return; S.DEM = { st: 'loading' };
+    (async () => { try { const { data, error } = await sb.functions.invoke(RELAY, { body: {} });
+      S.DEM = error ? { st: 'err' } : data?.ok ? { st: 'ok', at: data.at, C: data.candidates || [] } : { st: data?.reason === 'not_connected' ? 'off' : 'err' };
+    } catch (_) { S.DEM = { st: 'err' }; } renderCov(); if (TD && typeof renderToday === 'function') renderToday(); })(); };
+  const demRows = () => { if (S.DEM?.st !== 'ok') return []; const g = new Map(), t = today();
+    S.DEM.C.filter(c => !DEMX.test(c.status)).forEach(c => { const k = (c.programme || '').trim(); if (!g.has(k)) g.set(k, []); g.get(k).push(c); });
+    return [...g].map(([k, L]) => { const rec = L.filter(c => DEMR.test(c.status)).length, st = L.map(c => c.start).filter(Boolean).sort();
+      const tw = qWords(k), qs = k ? (S.Q || []).filter(q => { const ids = String(q.saqa_id || '').split(/[^0-9]+/).filter(v => v.length >= 4), w = qWords(q.name);
+        return (ids.length && ids.some(v => new RegExp('\\b' + v + '\\b').test(k))) || (w.length > 8 && (tw.includes(w) || w.includes(tw) && tw.length > 8)); }) : [];
+      const qids = new Set(qs.map(q => String(q.id))), A = assigns();
+      const ppl = qs.length ? vis().filter(a => regsFor(a.id).some(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= t) && scopeOf(r.id).some(x => qids.has(String(x.qualification_id))))) : [];
+      const spare = ppl.filter(a => { const m = +((a.fields || {}).max_cohorts) || 0; return m && A.filter(x => x.a.id === a.id && x.live).length < m; }).length;
+      return { k, L, rec, pipe: L.length - rec, start: st[0] || '', matched: qs.length > 0, n: ppl.length, spare }; })
+      .sort((a, b) => (!a.k) - (!b.k) || (a.start || '9').localeCompare(b.start || '9') || b.L.length - a.L.length); };
+  const demRisk = r => !r.k ? '' : !r.matched ? '<span class="badge b-warn" title="The programme name in ClickUp does not match a qualification in FAM">Unmatched</span>' : r.n === 0 ? '<span class="badge b-bad">No cover</span>' : r.n === 1 ? '<span class="badge b-warn">Single person</span>' : '<span class="badge b-ok">Covered</span>';
+  const demHtml = () => { loadDem(); const D = S.DEM, head = sub => `<details class="card" style="padding:14px 18px;margin-top:12px"${S.demOpen ? ' open' : ''} ontoggle="famDemT(this.open)"><summary style="cursor:pointer"><b>Learner demand</b> <span class="sub">${sub}</span></summary>`;
+    if (D.st === 'loading') return head('Loading from ClickUp…') + '</details>';
+    if (D.st === 'off') return head('ClickUp not connected') + '<div class="sub" style="margin-top:8px">Add the read-only ClickUp token (CLICKUP_TOKEN) to show candidates from Recruitment Candidates.</div></details>';
+    if (D.st !== 'ok') return head('Could not load from ClickUp') + '<div style="margin-top:8px"><button class="btn sm" onclick="famDemR()">Try again</button></div></details>';
+    const R = demRows(), risky = R.filter(r => r.k && (!r.matched || r.n <= 1)).length, tot = R.reduce((t, r) => t + r.L.length, 0);
+    const row = (r, i) => `<tr><td>${r.k ? e(r.k) : '<span class="sub">No programme assigned yet</span>'}</td><td>${r.rec}</td><td>${r.pipe}</td><td>${r.start ? fmt(r.start) : '—'}</td><td>${r.matched ? `${r.n}${r.n ? ` <span class="sub">(${r.spare} with spare capacity)</span>` : ''}` : '—'}</td><td>${demRisk(r)}</td><td><button class="btn sm" onclick="famDemL(${i})">${S.demL === i ? 'Hide' : 'People'}</button></td></tr>`
+      + (S.demL === i ? `<tr><td colspan="7"><div class="tw"><table class="dense"><thead><tr><th>Name</th><th>Status</th><th>Client</th><th>Province</th><th>Start</th><th></th></tr></thead><tbody>${r.L.map(c => `<tr><td>${e(c.name)}</td><td>${e(c.status)}</td><td>${e(c.client || '—')}</td><td>${e(c.province || '—')}</td><td>${c.start ? fmt(c.start) : '—'}</td><td>${/^https:\/\/app\.clickup\.com\//.test(c.url) ? `<a href="${e(c.url)}" target="_blank" rel="noopener">View in ClickUp</a>` : ''}</td></tr>`).join('')}</tbody></table></div></td></tr>` : '');
+    return head(`${tot} active candidate${tot === 1 ? '' : 's'}${risky ? ` · ${risky} programme${risky === 1 ? '' : 's'} need cover` : ''}`)
+      + `<div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>Programme (ClickUp)</th><th>Recruited</th><th>In pipeline</th><th>Earliest start</th><th>Can deliver</th><th>Risk</th><th></th></tr></thead><tbody>${R.map(row).join('') || '<tr><td colspan="7" class="sub">No active candidates.</td></tr>'}</tbody></table></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famDemR()">Refresh</button><span class="sub">Read-only from ClickUp › Recruitment Candidates${D.at ? ' · ' + fmt(D.at.slice(0, 10)) + ' ' + D.at.slice(11, 16) + ' UTC' : ''}. Unsuitable, exited and archived candidates are not counted. Can deliver = people with the qualification in scope on a valid SETA registration.</span></div></details>`; };
+  const demToday = () => { const t = today(), t30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const L = demRows().filter(r => r.k && r.start && r.start >= t && r.start <= t30 && (!r.matched || r.n <= 1));
+    return L.length ? `<section class="card" style="padding:12px 14px"><h3>Learner demand <span class="badge">${L.length}</span></h3>${L.map(r => `<div class="tdi"><div><b>${e(r.k)}</b> <span class="sub">· starts ${fmt(r.start)} · ${r.L.length} learner${r.L.length === 1 ? '' : 's'}</span> ${demRisk(r)}</div></div>`).join('')}</section>` : ''; };
+  window.famDemT = o => { S.demOpen = o; };
+  window.famDemL = i => { S.demL = S.demL === i ? null : i; S.demOpen = true; renderCov(); };
+  window.famDemR = () => { S.DEM = null; S.demOpen = true; renderCov(); };
   function renderCov() {
     const box = $('famcov'); if (!box) return;
     const t = today(), in90 = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10), R = visR(), rows = [];
@@ -962,7 +996,7 @@
     const flag = (n, l) => l === 0 ? '<span class="badge b-bad">No cover</span>' : l === 1 ? '<span class="badge b-warn">Single person</span>' : n > l ? '<span class="badge b-warn">Dropping</span>' : '<span class="badge b-ok">Covered</span>';
     box.innerHTML = `<details class="card" style="padding:14px 18px"${S.covOpen ? ' open' : ''} ontoggle="famCovT(this.open)"><summary style="cursor:pointer"><b>Coverage forecast</b> <span class="sub">${risky.length ? `${risky.length} SETA + role combination${risky.length === 1 ? '' : 's'} will have 0–1 registered people in 90 days` : 'Every SETA + role has at least 2 registered people in 90 days'}</span></summary>
       <div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>SETA</th><th>Role</th><th>Registered now</th><th>In 90 days</th><th>Risk</th></tr></thead><tbody>${show.map(([st, r, n, l]) => `<tr><td>${e(st)}</td><td>${r}</td><td>${n}</td><td>${l}</td><td>${flag(n, l)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nothing at risk.</td></tr>'}</tbody></table></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>${spofHtml()}`;
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>${spofHtml()}${demHtml()}`;
   }
   window.famCovT = o => { S.covOpen = o; };
   window.famCovAll = () => { S.covAll = !S.covAll; S.covOpen = true; renderCov(); };
@@ -1385,7 +1419,7 @@
     el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="famToday(false)" aria-label="Close">✕</button></div>
       <div class="sub" style="margin-top:-8px">${fmt(t)} · ${live.length} to act on</div><div class="tdchips">${chips}</div>${form}
       ${body || `<div class="card" style="padding:18px;text-align:center">${cf || TD.snz ? 'Nothing here.' : 'Nothing due. ✓'}</div>`}
-      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${done}`;
+      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${demToday()}${done}`;
     if (TD.add) el.querySelector('form select')?.focus();
   }
   window.TDf = k => { TD.snz = false; TD.f = TD.f === k ? null : k; renderToday(); };
