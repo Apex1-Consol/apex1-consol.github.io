@@ -1138,7 +1138,7 @@
     const DT = [...S.F.filter(f => vids.has(f.assessor_id) && f.status === 'Done' && (f.resolved_at || '').slice(0, 10) === t).map(f => `${pl(A(f.assessor_id))} <span class="sub">· ${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}</span>`),
       ...(S.RN || []).filter(x => vids.has(x.assessor_id) && x.status === 'Approved' && (x.reviewed_at || '').slice(0, 10) === t).map(x => `${pl(A(x.assessor_id))} <span class="sub">· Renewal approved</span>`)];
     const done = DT.length ? `<details class="card" style="padding:12px 14px"><summary style="cursor:pointer;font-weight:600">Done today <span class="badge b-ok">${DT.length}</span></summary>${DT.map(h => `<div class="tdi">${h}</div>`).join('')}</details>` : '';
-    const SECS = ['At risk allocations', 'Renewals to review', 'Expiring in 30 days', 'Follow-ups'];
+    const SECS = ['At risk allocations', 'Renewals to review', 'Expired or expiring in 30 days', 'Follow-ups'];
     const body = SECS.map((s, k) => { const L = list.filter(x => x.sec === k).sort((a, b) => k === 2 ? (b.esc ? 1 : 0) - (a.esc ? 1 : 0) || a.d.localeCompare(b.d) : 0); return L.length ? `<section class="card" style="padding:12px 14px"><h3>${s} <span class="badge">${L.length}</span></h3>${L.map(row).join('')}</section>` : ''; }).join('');
     const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
     const people = vis().slice().sort((a, b) => shownName(a).localeCompare(shownName(b)));
