@@ -995,7 +995,7 @@
     const tbl = (h, rows, none) => rows.length ? `<div class="tw"><table class="dense fctbl"><thead><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<div class="sub" style="padding:18px 20px">${none}</div>`;
     const pl = a => a ? `<a href="#fam/${a.id}">${e(shownName(a))}</a>` : 'Unknown', rb = r => `<span class="badge ${RCH[r] || ''}">${e(r)}</span>`;
     const rnFor = rid => (S.RN || []).find(x => x.registration_id === rid), dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
-    const rnCell = (id, rid, d) => { if (!rid) return '<span class="sub">Upload in profile</span>'; const x = rnFor(rid), esc30 = dleft(d) <= 30 && (!x || x.status === 'Sent');
+    const rnCell = (id, rid, d) => { if (!rid) return '<span class="sub">Upload in profile</span>'; const x = rnFor(rid), esc30 = dleft(d) <= 30 && (!x || !['Uploaded', 'Approved'].includes(x.status));
       const st = !x || ['Cancelled', 'Rejected'].includes(x.status) || (x.status === 'Sent' && x.expires_at < new Date().toISOString()) ? `<button class="btn sm" onclick="famRenew(${rid})">Send link</button>${x?.status === 'Rejected' ? ' <span class="sub">last rejected</span>' : ''}`
         : x.status === 'Sent' ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <button class="btn sm" onclick="famRenew(${rid})">Resend</button>`
         : x.status === 'Uploaded' ? '<span class="badge b-warn">Uploaded, review above</span>' : `<span class="badge b-ok">Renewed</span>`;
