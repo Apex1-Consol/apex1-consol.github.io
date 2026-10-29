@@ -23,7 +23,7 @@ const DATA = {
   signoff_items: [{ id: 70, kind: 'Visit report', title: 'VIS draft', status: 'waiting', created_at: '2026-10-20' }],
   monitoring_visits: [{ id: 80, programme_id: 100, fields: { 'Visit Title': 'Impl visit', Scores: { KMA3: 2 } } }],
   recommendations: [{ id: 90, programme_id: 100, resolved: false, fields: { KMA: 'KMA3', Text: 'Fix strategy', Priority: 'High' } }],
-  assessors: [{ id: 1, full_name: 'Fac One', role: 'Facilitator' }, { id: 2, full_name: 'Ass Two', role: 'Assessor' }, { id: 3, full_name: 'No Reg', role: 'Facilitator' }],
+  assessors: [{ id: 1, full_name: 'Fac One', role: 'Facilitator' }, { id: 2, full_name: 'Ass Two', role: 'Assessor', fields: { citizenship: 'Foreign national', province: 'Gauteng' } }, { id: 3, full_name: 'No Reg', role: 'Facilitator' }],
   fam_seta_registrations: [{ id: 11, assessor_id: 1, seta_name: 'ETDP SETA', roles: ['Facilitator'], status: 'Active', registration_expiry_date: new Date(Date.now() + 400 * 864e5).toISOString().slice(0, 10) },
     { id: 12, assessor_id: 2, seta_name: 'MICT SETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: new Date(Date.now() - 5 * 864e5).toISOString().slice(0, 10) }],
   fam_documents: [{ id: 21, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: false, version: 1, file_url: 'apex/1/old.pdf' }, { id: 22, assessor_id: 1, doc_type: 'CV', status: 'Current', is_current: true, version: 2, file_url: 'apex/1/cv.pdf' },
@@ -289,6 +289,14 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     await w.famView(22); ok(log.some(x => x.sign === 'apex/1/cv.pdf'), 'no signed url');
     await w.famFU('claim', 'registration', 12, 2, 'expired');
     const u = log.find(x => x.table === 'fam_follow_ups'); ok(u && u.op === 'upsert' && u.val.status === 'In Progress' && u.eq[1] === 'tenant_id,assessor_id,source_type,source_id', JSON.stringify(u));
+  });
+  await t('FAM: Compliance tab shows right to work, POPIA and rates; quality entry inserts', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.location.hash = 'fam/2'; await tick(); w.famTab('comp'); const ct = d.getElementById('famprof').textContent;
+    ok(/Right to work/.test(ct) && /No work permit or visa on file/.test(ct) && /POPIA/.test(ct) && /Rates and payment/.test(ct) && /Gauteng/.test(ct), ct);
+    w.famQAdd(2); const f = d.getElementById('famform'); f.elements.kind.value = 'Moderation'; f.elements.outcome.value = 'Agreed'; f.elements.learners.value = '10'; f.elements.competent.value = '8';
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick(); await tick();
+    const q = log.find(x => x.table === 'fam_quality'); ok(q && q.op === 'insert' && q.val.kind === 'moderation' && q.val.competent === 8 && q.val.outcome === 'Agreed', JSON.stringify(q));
   });
   await t('FAM: Can deliver shows verified scope and matching open programmes in list, panel and profile', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();

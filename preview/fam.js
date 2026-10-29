@@ -16,6 +16,12 @@
   const LABEL = { QUAL: 'Practitioner certificate', AFFIDAVIT: 'Affidavit' };
   const HINT = { CV: 'Curriculum vitae', ID: 'ID document or passport', 'Highest Qualification': 'Highest academic qualification', QUAL: 'Assessor, moderator or facilitator certificate, SETA registration report or professional body certificate', SLA: 'Signed service level agreement', AFFIDAVIT: 'Sworn affidavit' };
   const lbl = t => LABEL[t] || t;
+  // extra compliance documents (not part of the 6-document checklist)
+  const XT = { PERMIT: 'Work permit or visa', SAQA_EVAL: 'SAQA foreign qualification evaluation', BANK: 'Bank confirmation letter', POPIA: 'Signed POPIA consent' };
+  Object.assign(LABEL, XT); Object.assign(HINT, { PERMIT: 'Work permit or visa, with its expiry date', SAQA_EVAL: 'SAQA evaluation certificate for a foreign qualification', BANK: 'Bank confirmation letter (keep the full account number here only)', POPIA: 'Signed POPIA consent form' });
+  const PROV = ['Eastern Cape', 'Free State', 'Gauteng', 'KwaZulu-Natal', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape', 'Western Cape', 'Outside South Africa'];
+  const DELIV = ['In person', 'Online', 'Both'], CIT = ['South African citizen', 'Permanent resident', 'Foreign national'];
+  const PERMITS = ['Critical skills visa', 'General work visa', 'Asylum or refugee permit', 'Spousal visa', 'Other'];
   const CRIT = ['ID', 'QUAL']; const critMiss = id => CRIT.some(t => !onFile(id).includes(t)); // ID and practitioner certificate
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
   const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: true, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), col: new Set(['lapsed', 'none', 'active', 'inactive']), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
@@ -94,11 +100,88 @@
     return '—';
   }
 
+  /* ---------- right to work, availability, quality, POPIA, rates ---------- */
+  const fx = a => (a && a.fields) || {};
+  const maskId = v => !v || canWrite() ? v : '•••••••••' + String(v).slice(-4);
+  const saId = v => { if (!/^\d{13}$/.test(v)) return false; const m = +v.slice(2, 4), d = +v.slice(4, 6); if (m < 1 || m > 12 || d < 1 || d > 31) return false; let t = 0; for (let i = 0; i < 13; i++) { let n = +v[12 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } t += n; } return t % 10 === 0; };
+  const idCheck = (f, self) => { const v = (f.id_number?.value || '').replace(/\s/g, ''); if (!v) return;
+    const d = S.A.find(x => x.id !== self && (x.id_number || '').replace(/\s/g, '') === v);
+    if (d && !confirm(`${shownName(d)} already has ID number ${v}. Save anyway?`)) throw new Error('Not saved: that ID number is already on another practitioner.');
+    if (/^\d{13}$/.test(v) && !saId(v) && !confirm('This is not a valid South African ID number (the date or check digit is wrong). Save anyway?')) throw new Error('Check the ID number.'); };
+  const rwBad = w => !!(w && w[0] === 'bad');
+  const rtw = (a, end) => { if (fx(a).citizenship !== 'Foreign national') return null;
+    const p = cur(a.id, 'PERMIT'); if (!p || p.status === 'Missing') return ['bad', 'No work permit or visa on file'];
+    if (!p.expiry_date) return ['warn', 'Work permit has no expiry date'];
+    if (p.expiry_date < today()) return ['bad', 'Work permit expired ' + fmt(p.expiry_date)];
+    if (end && p.expiry_date < end) return ['warn', `Work permit expires ${fmt(p.expiry_date)}, before the programme ends ${fmt(end)}`];
+    return null; };
+  const awayIn = (a, from, to) => (fx(a).away || []).find(w => w.from && w.to && (!to || w.from <= to) && (!from || w.to >= from) && w.to >= today());
+  const whereOf = a => { const f = fx(a); return [[f.city, f.province].filter(Boolean).join(', '), f.delivery, f.languages].filter(Boolean).join(' · '); };
+  const consentOf = a => { const f = fx(a); if (f.popia_consent_at) return { d: f.popia_consent_at, via: f.popia_consent_via };
+    const r = (S.RN || []).filter(x => x.assessor_id === a.id && x.consent_at).sort((x, y) => (y.consent_at || '').localeCompare(x.consent_at || ''))[0]; if (r) return { d: r.consent_at.slice(0, 10), via: 'Ticked on the practitioner link' };
+    const p = cur(a.id, 'POPIA'); return p && p.status !== 'Missing' ? { d: p.doc_date, via: 'Signed form' } : null; };
+  const retainDue = (a, live) => { const regs = regsFor(a.id); if (!regs.length || regs.some(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()))) return false;
+    const last = regs.map(r => r.registration_expiry_date || '').sort().pop(); if (!last || last >= addD(today(), -730)) return false;
+    return !(live || new Set(assigns().filter(x => x.live).map(x => x.a.id))).has(a.id); };
+  const qSum = id => { const L = (S.QL || []).filter(x => x.assessor_id === id); if (!L.length) return null;
+    const mod = L.filter(x => x.outcome), lr = L.filter(x => x.learners > 0), ln = lr.reduce((t, x) => t + x.learners, 0), cp = lr.reduce((t, x) => t + (x.competent || 0), 0), ot = L.filter(x => x.on_time != null), rt = L.filter(x => x.rating);
+    return { n: L.length, agree: mod.length ? Math.round(mod.filter(x => x.outcome === 'Agreed').length / mod.length * 100) : null, comp: ln ? Math.round(cp / ln * 100) : null,
+      ontime: ot.length ? Math.round(ot.filter(x => x.on_time).length / ot.length * 100) : null, rating: rt.length ? +(rt.reduce((t, x) => t + x.rating, 0) / rt.length).toFixed(1) : null, inc: L.filter(x => x.kind === 'incident').length }; };
+  const qTxt = s => !s ? '' : [s.rating != null ? `★ ${s.rating}` : '', s.agree != null ? `${s.agree}% agreed` : '', s.comp != null ? `${s.comp}% competent` : '', s.ontime != null ? `${s.ontime}% on time` : '', s.inc ? `${s.inc} incident${s.inc > 1 ? 's' : ''}` : ''].filter(Boolean).join(' · ') || `${s.n} entr${s.n > 1 ? 'ies' : 'y'}`;
+  const qLine = s => s ? e(qTxt(s)) : '<span class="sub">No record yet</span>';
+  const qScore = s => !s ? 50 : ((s.rating ?? 3) * 20 + (s.agree ?? 70) + (s.comp ?? 70)) / 3 - s.inc * 10;
+  const rateOf = id => { const p = (S.PV || {})[id]; if (!p) return '<span class="sub">—</span>'; const r = v => 'R ' + Number(v).toLocaleString('en-ZA');
+    return p.rate_daily != null ? r(p.rate_daily) + '/day' : p.rate_learner != null ? r(p.rate_learner) + '/learner' : '<span class="sub">—</span>'; };
+  const teach = (q, end) => { if (!q || (!q.last_achieve_date && !q.last_enrol_date)) return ''; const t = today(), tip = `Last enrolment ${fmt(q.last_enrol_date)} · last achievement ${fmt(q.last_achieve_date)}${q.qcto_code ? ' · QCTO replacement ' + q.qcto_code : ''}`;
+    if (q.last_achieve_date && (q.last_achieve_date < t || (end && q.last_achieve_date < end))) return ` <span class="badge b-bad" title="${e(tip)}">Teach-out: achieve by ${fmt(q.last_achieve_date)}</span>`;
+    if (q.last_enrol_date && q.last_enrol_date < t) return ` <span class="badge b-warn" title="${e(tip)}">Legacy · no new enrolments</span>`;
+    return ` <span class="badge" title="${e(tip)}">Legacy · enrol by ${fmt(q.last_enrol_date)}</span>`; };
+  const extraChecks = id => { const a = S.A.find(x => x.id === id); if (!a) return []; const out = [[!!consentOf(a), 'no POPIA consent']];
+    if (fx(a).citizenship === 'Foreign national') { const s2 = cur(id, 'SAQA_EVAL'); out.push([!rwBad(rtw(a)), 'no valid work permit'], [!!(s2 && s2.status !== 'Missing'), 'no SAQA evaluation']); }
+    return out; };
+  const exportExtra = a => { const f = fx(a), p = cur(a.id, 'PERMIT'), c = consentOf(a);
+    return { Province: f.province || '', 'City or town': f.city || '', Languages: f.languages || '', Delivers: f.delivery || '', Citizenship: f.citizenship || '', 'Work permit expiry': f.citizenship === 'Foreign national' ? (p?.expiry_date || 'none on file') : '', 'POPIA consent': c ? c.d : '', Quality: qTxt(qSum(a.id)) }; };
+  const xdoc = (a, t) => { const c0 = cur(a.id, t), ok = c0 && c0.status !== 'Missing', exp = ok && c0.expiry_date;
+    const st = !ok ? '<span class="badge b-n">Not on file</span>' : exp && exp < today() ? `<span class="badge b-bad">Expired ${fmt(exp)}</span>` : exp ? `<span class="badge b-ok">Valid to ${fmt(exp)}</span>` : '<span class="badge b-ok">On file</span>';
+    const act = !canWrite() ? '' : ok ? (isAdm() ? `<a href="#" onclick="famDoc(${a.id},'${t}',${c0.id});return false">Replace</a>` : '') : `<a href="#" onclick="famDoc(${a.id},'${t}');return false">Upload</a>`;
+    return `<div class="chk" style="flex-wrap:wrap"><span style="flex-grow:1" title="${e(HINT[t] || '')}">${e(lbl(t))}</span>${st}<span class="famacts">${c0?.file_url ? `<a href="#" onclick="famView(${c0.id});return false">View</a>` : ''}${act}</span></div>`; };
+  const compBody = a => { const f = fx(a), rw = rtw(a), pv = (S.PV || {})[a.id] || {}, w = canWrite(), cons = consentOf(a), away = (f.away || []).filter(x => x.to >= today()).sort((x, y) => x.from.localeCompare(y.from));
+    const btn = (fn, l) => w ? `<button class="btn sm" onclick="${fn}">${l}</button>` : '', kv2 = (k, v) => `<div><span class="sub">${k}</span><div>${v ? e(v) : '<span class="sub">—</span>'}</div></div>`;
+    const hd = (t, b) => `<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px"><h2 style="font-size:15px;flex-grow:1">${t}</h2>${b}</div>`, rnd = v => v != null ? 'R ' + Number(v).toLocaleString('en-ZA') : '';
+    return `<div class="famcomp">
+      <section class="card">${hd('Right to work', btn(`famMatch(${a.id},'rtw')`, 'Edit'))}
+        <div class="famkv2">${kv2('Citizenship', f.citizenship)}${kv2('Nationality', f.nationality)}${kv2('Permit or visa', f.permit_type)}${kv2('Permit number', w ? f.permit_no : f.permit_no ? '•••' : '')}</div>
+        ${rw ? `<div class="famrtw ${rw[0]}">⚠ ${e(rw[1])}${rwBad(rw) ? '. Allocation is blocked until this is fixed.' : ''}</div>` : f.citizenship === 'Foreign national' ? '<div class="famok">✓ Work permit valid</div>' : f.citizenship ? '' : '<div class="sub">Citizenship not captured. Foreign nationals need a valid work permit or visa before they are allocated.</div>'}
+        ${f.citizenship === 'Foreign national' ? xdoc(a, 'PERMIT') + xdoc(a, 'SAQA_EVAL') + '<p class="sub" style="margin:8px 0 0">A foreign qualification needs a SAQA evaluation certificate to count as evidence.</p>' : ''}</section>
+      <section class="card">${hd('Location and availability', btn(`famMatch(${a.id},'match')`, 'Edit') + btn(`famAway(${a.id})`, '+ Unavailable dates'))}
+        <div class="famkv2">${kv2('Province', f.province)}${kv2('City or town', f.city)}${kv2('Languages', f.languages)}${kv2('Delivers', f.delivery)}</div>
+        ${away.length ? away.map(x => `<div class="chk"><span style="flex-grow:1">Away ${fmt(x.from)} – ${fmt(x.to)}${x.reason ? ' <span class="sub">· ' + e(x.reason) + '</span>' : ''}</span>${w ? `<a href="#" onclick="famAwayDel(${a.id},'${e(x.from)}','${e(x.to)}');return false">Remove</a>` : ''}</div>`).join('') : '<div class="sub">No unavailable dates.</div>'}
+        ${w ? `<div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">${btn(`famProfLink(${a.id})`, 'Send update link')}<span class="sub">The practitioner checks these details themselves; you approve the changes in Today.</span></div>` : ''}</section>
+      <section class="card">${hd('POPIA', btn(`famConsent(${a.id})`, cons ? 'Update consent' : 'Record consent'))}
+        ${cons ? `<div class="famok">✓ Consent recorded ${fmt(cons.d)}${cons.via ? ' · ' + e(cons.via) : ''}</div>` : '<div class="famrtw warn">No consent recorded. Record it here, or send an update link (the practitioner consents on that page).</div>'}
+        ${xdoc(a, 'POPIA')}<p class="sub" style="margin:8px 0 0">${retainDue(a) ? '⚠ No valid registration for over two years and no current work: review whether to keep or delete this record.' : 'ID numbers, permit numbers and payment details are hidden from read-only users.'}</p></section>
+      ${w ? `<section class="card">${hd('Rates and payment', btn(`famRates(${a.id})`, 'Edit'))}
+        <div class="famkv2">${kv2('Daily rate', rnd(pv.rate_daily))}${kv2('Per learner', rnd(pv.rate_learner))}${kv2('VAT number', pv.vat_number)}${kv2('Tax number', pv.tax_number)}${kv2('Bank', pv.bank_name ? pv.bank_name + (pv.bank_account_last4 ? ' ···' + pv.bank_account_last4 : '') : '')}${kv2('Bank letter checked', pv.bank_name ? (pv.bank_verified ? 'Yes' : 'No') : '')}</div>
+        ${pv.rate_note ? `<div class="sub">${e(pv.rate_note)}</div>` : ''}${xdoc(a, 'BANK')}<p class="sub" style="margin:8px 0 0">Only editors and admins can see this card.</p></section>` : ''}</div>`; };
+  const QK = { moderation: 'Moderation', programme: 'Programme review', incident: 'Incident' };
+  const qualBody = a => { const L = (S.QL || []).filter(x => x.assessor_id === a.id);
+    return `<div class="card"><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Quality record</h2>${canWrite() ? `<button class="btn sm" onclick="famQAdd(${a.id})">+ Add entry</button>` : ''}</div>
+      <div style="margin-bottom:8px">${qLine(qSum(a.id))}</div>
+      ${L.length ? L.map(x => `<div class="famreg"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="flex-grow:1">${e(QK[x.kind] || x.kind)}${x.programme_id ? ' · ' + e(x.programme_id) : ''}</b>${x.outcome ? `<span class="badge ${x.outcome === 'Agreed' ? 'b-ok' : x.outcome === 'Not agreed' ? 'b-bad' : 'b-warn'}">${e(x.outcome)}</span>` : ''}${x.rating ? `<span class="badge">★ ${x.rating}</span>` : ''}</div>
+        <div class="sub">${fmt(x.created_at)}${x.created_by ? ' · ' + e(x.created_by) : ''}${x.learners ? ` · ${x.competent ?? 0}/${x.learners} competent` : ''}${x.on_time === true ? ' · on time' : x.on_time === false ? ' · late' : ''}${x.note ? ' · ' + e(x.note) : ''}</div></div>`).join('') : '<div class="sub">No entries yet. Add one after each moderation or programme, so Suitable people can rank on track record.</div>'}</div>`; };
+  const spofHtml = () => { const m = new Map(), t = today();
+    vis().forEach(a => { if (rwBad(rtw(a))) return; regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= t)).forEach(r => scopeOf(r.id).forEach(sc => { const q = qual(sc.qualification_id); if (!q) return;
+      if (!m.has(q.id)) m.set(q.id, { q, who: new Map() }); const w = m.get(q.id).who; if ((r.registration_expiry_date || '9999') > (w.get(a.id)?.until || '')) w.set(a.id, { a, until: r.registration_expiry_date || '' }); })); });
+    const one = [...m.values()].filter(x => x.who.size === 1).sort((x, y) => String(x.q.name).localeCompare(String(y.q.name)));
+    return `<details class="card" style="padding:14px 18px;margin-top:10px"><summary style="cursor:pointer"><b>Single-person qualifications</b> <span class="sub">${one.length ? `${one.length} of ${m.size} qualification${m.size === 1 ? '' : 's'} in scope can only be delivered by one person` : m.size ? 'Every qualification in scope has at least two people' : 'No qualifications in scope yet'}</span></summary>
+      ${one.length ? `<div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>Qualification</th><th>SAQA</th><th>Only person</th><th>Registered until</th><th>Status</th></tr></thead><tbody>${one.map(x => { const [w] = [...x.who.values()]; return `<tr><td>${e(x.q.name)}</td><td>${e(x.q.saqa_id || '—')}</td><td><a href="#fam/${w.a.id}">${e(shownName(w.a))}</a></td><td>${w.until ? fmt(w.until) : '—'}</td><td>${teach(x.q) || '—'}</td></tr>`; }).join('')}</tbody></table></div>
+      <p class="sub">Counts people with the qualification in scope on a valid registration and a valid right to work. Recruit, or add scope for a second person.</p>` : ''}</details>`; };
+
   /* ---------- completeness: five checks: live's v_fam_completeness gaps plus ID number ---------- */
   function compl(id) {
     const regs = regsFor(id).length, docs = onFile(id).length, open = openFU(id).length;
     const missExp = S.D.filter(d => d.assessor_id === id && d.is_current !== false && (d.status === 'Missing' || (d.expiry_date && d.expiry_date < today()))).length;
-        const checks = [[!!S.A.find(x => x.id === id)?.id_number, 'no ID number'], [regs > 0, 'no registration'], [docs > 0, 'no documents'], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`]];
+        const checks = [[!!S.A.find(x => x.id === id)?.id_number, 'no ID number'], [regs > 0, 'no registration'], [docs > 0, 'no documents'], [!missExp, `${missExp} missing/expired doc${missExp === 1 ? '' : 's'}`], [!open, `${open} open follow-up${open === 1 ? '' : 's'}`], ...extraChecks(id)];
     const gaps = checks.filter(c => !c[0]).map(c => c[1]);
     return { score: Math.round(checks.filter(c => c[0]).length / checks.length * 100), gaps, complete: !gaps.length };
   }
@@ -179,7 +262,7 @@
   }
   function rows() {
     const k = SORT[S.sort.k] || SORT.name, q = S.q;
-    const hit = a => !q || [a.full_name, a.id_number || '', rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
+    const hit = a => !q || [a.full_name, canWrite() ? a.id_number || '' : '', rolesOf(a).join(' '), regsFor(a.id).map(r => r.seta_name || '').join(' ')].join(' ').toLowerCase().includes(q);
     const dd = a => (!S.fRole || rolesOf(a).includes(S.fRole)) && (!S.fSt || worst(a) === S.fSt) && (!S.fSeta || regsFor(a.id).some(r => (r.seta_name || '').split(/\s*,\s*/).includes(S.fSeta)));
     const list = S.A.map((a, i) => [a, i]).filter(([a]) => (!S.hideTest || !isTest(a)) && matches(a, S.filter) && hit(a) && dd(a));
     if (S.view === 'triage') return list.sort(([x], [y]) => WRANK.indexOf(worst(x)) - WRANK.indexOf(worst(y)) || urg(x) - urg(y) || dataFlags(y).length - dataFlags(x).length || x.full_name.localeCompare(y.full_name));
@@ -325,7 +408,7 @@
     const ppl = list.map(a => { const nx = nextExp(a.id), c = compl(a.id);
       return { Practitioner: a.full_name, Roles: rolesOf(a).join(', '), Email: a.email || '', Phone: a.phone || '', 'SETA coverage': setas(a.id).join(', '), Registrations: regsFor(a.id).length,
         'Next expiry': nx?.registration_expiry_date || '', 'Days to expiry': nx ? days(nx) : '', Status: (PILL[status(a.id)] || PILL.unknown)[1], 'Documents on file': `${onFile(a.id).length}/6`,
-        'Documents missing': TYPES.filter(t => !onFile(a.id).includes(t)).map(lbl).join(', '), 'Completeness %': c.score, Gaps: c.gaps.join('; '), 'Open follow-ups': openFU(a.id).length, 'Next action': nextAction(a) }; });
+        'Documents missing': TYPES.filter(t => !onFile(a.id).includes(t)).map(lbl).join(', '), 'Completeness %': c.score, Gaps: c.gaps.join('; '), 'Open follow-ups': openFU(a.id).length, 'Next action': nextAction(a), ...exportExtra(a) }; });
     const ids = new Set(list.map(a => a.id));
     const regs = S.R.filter(r => ids.has(r.assessor_id)).map(r => ({ Practitioner: S.A.find(a => a.id === r.assessor_id)?.full_name || '', SETA: r.seta_name || '', Roles: (r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(', '),
       'Registration number': r.registration_number || '', Expiry: r.registration_expiry_date || '', 'Days to expiry': days(r) ?? '', Risk: risk(r).replace('_', ' '), Status: r.status || 'Active',
@@ -426,7 +509,7 @@
   }
 
   /* ---------- profile page ---------- */
-  const KIND = { expired: 'Registration expired', due_30: 'Renewal due ≤30 days', due_60: 'Renewal due 31–60 days', pending: 'Registration entry pending', missing_doc: 'Missing document', manual: 'Follow-up (added by hand)' };
+  const KIND = { expired: 'Registration expired', due_30: 'Renewal due ≤30 days', due_60: 'Renewal due 31–60 days', pending: 'Registration entry pending', missing_doc: 'Missing document', manual: 'Follow-up (added by hand)', right_to_work: 'Right to work', retention: 'Review for retention (POPIA)' };
   window.famTab = t => { S.tab = t; renderProfile(); };
   window.famCopyLink = id => { const u = location.href.split('#')[0] + '#fam/' + id; (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => say('Profile link copied'), () => prompt('Copy this link:', u)); };
   function activity(a) {
@@ -449,7 +532,7 @@
     $('heading').textContent = a.full_name; $('crumb').textContent = 'Quality / FAM Registry';
     const c = compl(a.id), regs = regsFor(a.id), fus = S.F.filter(f => f.assessor_id === a.id), open = openFU(a.id).length;
     const kv = (k, v) => `<div><span class="sub">${k}</span><div>${v ? e(v) : '<span class="sub">—</span>'}</div></div>`;
-    const tabs = [['overview', 'Overview'], ['regs', `Registrations (${regs.length})`], ['docs', `Documents (${onFile(a.id).length}/6)`], ['fus', `Follow-ups (${open} open)`], ['activity', 'Activity']];
+    const tabs = [['overview', 'Overview'], ['regs', `Registrations (${regs.length})`], ['docs', `Documents (${onFile(a.id).length}/6)`], ['fus', `Follow-ups (${open} open)`], ['comp', 'Compliance'], ['quality', `Quality (${(S.QL || []).filter(x => x.assessor_id === a.id).length})`], ['activity', 'Activity']];
     let body = '';
     if (S.tab === 'overview') {
       const up = regs.filter(r => r.registration_expiry_date).sort((x, y) => days(x) - days(y));
@@ -463,6 +546,8 @@
       body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add registration</button>` : ''}</div>${regBlock(a, true)}</div>`;
     } else if (S.tab === 'docs') {
       body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file · hover a name for what it covers</span></div>${docBlock(a)}</div>`;
+    } else if (S.tab === 'comp') { body = compBody(a);
+    } else if (S.tab === 'quality') { body = qualBody(a);
     } else if (S.tab === 'fus') {
       body = `<div class="card">${fus.length ? fus.map(f => `<div class="famreg"><div style="display:flex;gap:8px;align-items:baseline;flex-wrap:wrap"><b style="flex-grow:1">${e(KIND[f.kind] || f.kind)}</b><span class="badge ${CLOSED.includes(f.status) ? 'b-n' : f.status === 'In Progress' ? 'b-warn' : 'b-bad'}">${e(f.status)}</span></div>
           <div class="sub">Opened ${fmt(f.created_at)}${f.assigned_to ? ' · assigned to ' + e(f.assigned_to) : ''}${f.resolved_at ? ' · closed ' + fmt(f.resolved_at) : ''}${f.notes ? ' · ' + e(f.notes) : ''}</div>
@@ -476,7 +561,7 @@
           <span class="disp" style="font-size:24px">${e(a.full_name)}</span><span style="color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
           <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<span class="famscore">${c.score}% complete</span></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button></div></div>
-        <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', a.id_number)}${kv('Address', a.physical_address)}</div></section>
+        <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', maskId(a.id_number))}${kv('Address', a.physical_address)}</div></section>
       <div class="famtabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" onclick="famTab('${k}')">${l}</button>`).join('')}</div>
       ${body}`;
   }
@@ -762,10 +847,10 @@
   const personVals = f => ({ full_name: val(f, 'full_name'), role: val(f, 'role'), id_number: val(f, 'id_number'), email: val(f, 'email'), phone: val(f, 'phone'), physical_address: val(f, 'physical_address') });
 
   window.famAdd = () => modal('Add practitioner', personForm(),
-    async f => { need(); const rows = await write('Practitioner', () => sb.from('assessors').insert({ tenant_id: P.tenant, ...personVals(f) }).select('id'));
+    async f => { need(); idCheck(f); const rows = await write('Practitioner', () => sb.from('assessors').insert({ tenant_id: P.tenant, ...personVals(f) }).select('id'));
       say('Practitioner added'); famSel = -1; S.pick = rows?.[0]?.id; });
   window.famEdit = id => { const a = S.A.find(x => x.id === id); if (!a) return;
-    modal('Edit practitioner', personForm(a), async f => { need(); await write('Practitioner', () => sb.from('assessors').update(personVals(f)).eq('id', id)); say('Details saved'); }); };
+    modal('Edit practitioner', personForm(a), async f => { need(); idCheck(f, id); await write('Practitioner', () => sb.from('assessors').update(personVals(f)).eq('id', id)); say('Details saved'); }); };
 
   window.famReg = aid => modal('Add SETA registration', `<div class="qagrid">${fld('seta_name', 'SETA *', 'text', 'required list="famsetas"')}<datalist id="famsetas">${SETAS.map(s => `<option value="${s}">`).join('')}</datalist>
       ${fld('registration_number', 'Registration number')}${fld('registration_expiry_date', 'Expiry date', 'date')}${sel('status', 'Status', ['Active', 'Pending Entry', 'Inactive'])}</div>
@@ -847,6 +932,7 @@
       if (!exp) return b('b-warn', 'No expiry date', `${shownName(a)}: registration has no expiry date captured`);
       if (exp < today()) return b('b-bad', 'Expired ' + fmt(exp), `${shownName(a)}: registration expired ${fmt(exp)}`);
       if (end && exp < end) return b('b-warn', 'Expires before end', `${shownName(a)}: registration expires ${fmt(exp)}, programme ends ${fmt(end)}`);
+      { const w = rtw(a, end); if (w) return b(rwBad(w) ? 'b-bad' : 'b-warn', rwBad(w) ? 'No right to work' : 'Permit ends first', `${shownName(a)}: ${w[1]}`); }
       return b('b-ok', '✓ Eligible', `${shownName(a)}: registered until ${fmt(exp)}`);
     }).join('');
     if (k === 14) { const as = splitNames(row[13]).map(nm); if (names.some(n => as.includes(nm(n)))) out += b('b-bad', 'Conflict', 'The same person is assessor and moderator on this programme'); }
@@ -864,7 +950,7 @@
     const flag = (n, l) => l === 0 ? '<span class="badge b-bad">No cover</span>' : l === 1 ? '<span class="badge b-warn">Single person</span>' : n > l ? '<span class="badge b-warn">Dropping</span>' : '<span class="badge b-ok">Covered</span>';
     box.innerHTML = `<details class="card" style="padding:14px 18px"${S.covOpen ? ' open' : ''} ontoggle="famCovT(this.open)"><summary style="cursor:pointer"><b>Coverage forecast</b> <span class="sub">${risky.length ? `${risky.length} SETA + role combination${risky.length === 1 ? '' : 's'} will have 0–1 registered people in 90 days` : 'Every SETA + role has at least 2 registered people in 90 days'}</span></summary>
       <div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>SETA</th><th>Role</th><th>Registered now</th><th>In 90 days</th><th>Risk</th></tr></thead><tbody>${show.map(([st, r, n, l]) => `<tr><td>${e(st)}</td><td>${r}</td><td>${n}</td><td>${l}</td><td>${flag(n, l)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nothing at risk.</td></tr>'}</tbody></table></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>`;
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>${spofHtml()}`;
   }
   window.famCovT = o => { S.covOpen = o; };
   window.famCovAll = () => { S.covAll = !S.covAll; S.covOpen = true; renderCov(); };
@@ -894,7 +980,8 @@
   const addD = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
   const monday = d => { const x = new Date(d + 'T00:00:00'), w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x.toISOString().slice(0, 10); };
   const ROLE3 = ['Facilitator', 'Assessor', 'Moderator'];
-  const eligOf = (a, role, seta, end) => {
+  const eligOf = (a, role, seta, end) => { const w = rtw(a, end), r0 = eligReg(a, role, seta, end); return w && (rwBad(w) || r0[0] === 'ok') ? w : r0; };
+  const eligReg = (a, role, seta, end) => {
     const rs = regsFor(a.id).filter(r => regCovers(r, role, seta));
     if (!rs.length) return ['bad', `No active ${role.toLowerCase()} registration${seta ? ' for ' + setaKey(seta) : ''}`];
     const exp = rs.map(r => r.registration_expiry_date).filter(Boolean).sort().pop();
@@ -929,15 +1016,15 @@
         x.progs = P2.filter(p => sqs.some(v => new RegExp('\\b' + v + '\\b').test(p.text)) || (w.length > 8 && qWords(p.text).includes(w))).map(p => {
           const on = p.pid ? p.fac === a.id : mine.some(m => m.title === p.title);
           const busy = !on && mine.some(m => m.title !== p.title && (!m.end || !p.start || m.end >= p.start) && (!m.start || !p.end || m.start <= p.end));
-          return { ...p, state: on ? 'on' : busy ? 'busy' : 'free', short: !!(x.until && p.end && x.until < p.end) }; }); }); }
+          const aw = !on && awayIn(a, p.start, p.end); return { ...p, state: on ? 'on' : aw ? 'away' : busy ? 'busy' : 'free', short: !!(x.until && p.end && x.until < p.end) }; }); }); }
     return { list, noScope: ok.filter(r => !scopeOf(r.id).length) };
   };
   const canLine = a => { const { list } = canDo(a); if (!list.length) return ''; const n = list.map(x => x.q.name), open = list.reduce((t, x) => t + x.progs.length, 0);
     return `<div class="famcan" title="${e('Can deliver (verified on a SETA registration):\n' + n.join('\n'))}">✓ Can deliver ${n.length}${open ? ` · ${open} open` : ''}</div>`; };
-  const canBlock = a => { const { list, noScope } = canDo(a), lab = { on: ['b-ok', 'Already on it'], free: ['b-ok', 'Free'], busy: ['b-warn', 'Busy on other work'] };
+  const canBlock = a => { const { list, noScope } = canDo(a), lab = { on: ['b-ok', 'Already on it'], free: ['b-ok', 'Free'], busy: ['b-warn', 'Busy on other work'], away: ['b-warn', 'Away'] };
     const tip = noScope.length ? `<div class="sub" style="margin-top:8px">${e(noScope.map(r => r.seta_name || 'No SETA').join(', '))}: registered, but no qualifications linked. Check the CV and supporting documents, then add the scope to that registration.</div>` : '';
     if (!list.length) return `<div class="sub">${regsFor(a.id).length ? 'No verified qualifications yet.' : 'Add a SETA registration and its scope first.'}</div>${tip}`;
-    return list.map(x => `<div class="famcan-q"><div><b>${e(x.q.name)}</b>${x.q.saqa_id ? ` <span class="sub">SAQA ${e(x.q.saqa_id)}</span>` : ''} <span class="badge b-ok" title="In scope on a valid SETA registration">✓ Verified</span></div>
+    const rw = rtw(a); return (rw ? `<div class="famrtw ${rw[0]}">⚠ ${e(rw[1])}${rwBad(rw) ? ': cannot be allocated until this is fixed' : ''}</div>` : '') + list.map(x => `<div class="famcan-q"><div><b>${e(x.q.name)}</b>${x.q.saqa_id ? ` <span class="sub">SAQA ${e(x.q.saqa_id)}</span>` : ''} <span class="badge b-ok" title="In scope on a valid SETA registration">✓ Verified</span>${teach(x.q)}${isAdm() ? ` <a href="#" class="sub" onclick="famQDates('${e(x.q.id)}');return false">Qualification dates</a>` : ''}</div>
       <div class="sub">${e([...x.roles].join(', ') || 'Role not set')} · ${e([...x.setas].join(', ') || 'No SETA')} · ${x.until ? 'registered until ' + fmt(x.until) : 'no expiry captured'}</div>
       ${x.progs.length ? x.progs.map(p => `<div class="famcan-p">→ ${p.pid ? `<a href="#programmes" onclick="window.dvProg&&dvProg(${p.pid})">${e(p.title)}</a>` : e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span> <span class="badge ${lab[p.state][0]}">${lab[p.state][1]}</span>${p.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Registration ends first</span>' : ''}</div>`).join('') : '<div class="sub famcan-p">No open programmes for this qualification right now.</div>'}</div>`).join('') + tip; };
   /* "Suitable people" on a programme (Programmes › Overview): who can deliver this programme's qualification, best first */
@@ -950,7 +1037,7 @@
       return (ids.length && ids.every(v => new RegExp('\\b' + v + '\\b').test(text))) || (w.length > 8 && tw.includes(w)); });
     if (!qs.length) return head() + `<div class="sub" style="padding:0 20px 16px">This programme's qualification (SAQA ${e(p.saqa_id || '—')}) is not in the qualification list yet, so suitability can't be checked.</div>`;
     const qids = new Set(qs.map(q => String(q.id))), setas = new Set(qs.map(q => q.seta).filter(x => x && !/^(N\/A|QCTO)$/i.test(x)).map(setaKey));
-    const end = d10(p.end_date), start = d10(p.start_date), all = assigns();
+    const end = d10(p.end_date), start = d10(p.start_date), all = assigns(), tq = qs.map(q => teach(q, end)).join('');
     const rows = vis().map(a => {
       const ok = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
       const sc = ok.filter(r => scopeOf(r.id).some(x => qids.has(String(x.qualification_id))));
@@ -959,15 +1046,15 @@
       const roles = [...new Set(use.flatMap(r => r.roles?.length ? r.roles : [r.role]).filter(Boolean))];
       const until = use.map(r => r.registration_expiry_date || '').sort().pop(), on = p.facilitator_id === a.id;
       const busy = !on && all.some(m => m.a.id === a.id && m.live && m.pid !== p.id && (!m.end || !start || m.end >= start) && (!m.start || !end || m.start <= end));
-      return { a, v: !!sc.length, roles, until, on, busy, short: !!(until && end && until < end) };
-    }).filter(Boolean).sort((x, y) => (y.on - x.on) || (y.v - x.v) || (x.busy - y.busy) || (x.short - y.short) || shownName(x.a).localeCompare(shownName(y.a)));
+      return { a, v: !!sc.length, roles, until, on, busy, short: !!(until && end && until < end), rw: rtw(a, end), away: awayIn(a, start, end), qs: qSum(a.id) };
+    }).filter(Boolean).sort((x, y) => (y.on - x.on) || (rwBad(x.rw) - rwBad(y.rw)) || (y.v - x.v) || (!!x.away - !!y.away) || (x.busy - y.busy) || (x.short - y.short) || (qScore(y.qs) - qScore(x.qs)) || shownName(x.a).localeCompare(shownName(y.a)));
     if (!rows.length) return head(0) + `<div class="sub" style="padding:0 20px 16px">Nobody on the FAM Registry has ${e(qs.map(q => q.name).join(' / '))} in scope or a valid ${e([...setas].join(', ') || 'SETA')} registration. Add their scope in the FAM Registry.</div>`;
     const pid = Number(p.id);
-    return head(rows.length) + `<div class="tw"><table class="dense"><thead><tr><th>Practitioner</th><th>Roles</th><th>Fit</th><th>Registered until</th><th>Availability</th><th></th></tr></thead><tbody>${rows.map(x => `<tr>
+    return head(rows.length) + (tq ? `<div class="sub" style="padding:0 20px 10px">Qualification status:${tq}</div>` : '') + `<div class="tw"><table class="dense"><thead><tr><th>Practitioner</th><th>Roles</th><th>Fit</th><th>Registered until</th><th>Availability</th><th>Where</th><th>Quality</th>${canWrite() ? '<th>Rate</th>' : ''}<th></th></tr></thead><tbody>${rows.map(x => `<tr>
       <td><a href="#fam/${x.a.id}">${e(shownName(x.a))}</a></td><td>${e(x.roles.join(', ') || '—')}</td>
-      <td>${x.v ? '<span class="badge b-ok">✓ Verified</span>' : '<span class="badge b-warn" title="Registered with the right SETA, but this qualification is not linked to the registration yet">SETA match, check scope</span>'}</td>
+      <td>${x.v ? '<span class="badge b-ok">✓ Verified</span>' : '<span class="badge b-warn" title="Registered with the right SETA, but this qualification is not linked to the registration yet">SETA match, check scope</span>'}${x.rw ? ` <span class="badge ${rwBad(x.rw) ? 'b-bad' : 'b-warn'}" title="${e(x.rw[1])}">${rwBad(x.rw) ? 'No right to work' : 'Permit ends first'}</span>` : ''}</td>
       <td>${x.until ? fmt(x.until) : '<span class="sub">No expiry</span>'}${x.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Ends first</span>' : ''}</td>
-      <td>${x.on ? '<span class="badge b-ok">Facilitating this</span>' : x.busy ? '<span class="badge b-warn">Busy on other work</span>' : '<span class="badge b-ok">Free</span>'}</td>
+      <td>${x.on ? '<span class="badge b-ok">Facilitating this</span>' : x.away ? `<span class="badge b-warn" title="${e(x.away.reason || 'Unavailable')}">Away ${fmt(x.away.from)}–${fmt(x.away.to)}</span>` : x.busy ? '<span class="badge b-warn">Busy on other work</span>' : '<span class="badge b-ok">Free</span>'}</td><td>${whereOf(x.a) ? e(whereOf(x.a)) : '<span class="sub">—</span>'}</td><td>${qLine(x.qs)}</td>${canWrite() ? `<td>${rateOf(x.a.id)}</td>` : ''}
       <td style="text-align:right">${!x.on && canWrite() && [...x.roles, ...rolesOf(x.a)].some(r => /facilitat/i.test(r)) ? `<button class="btn sm" onclick="famSetFac(${pid},${x.a.id})">Set as facilitator</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   };
   window.famSetFac = async (pid, aid) => {
@@ -993,6 +1080,56 @@
   }
   // self-service renewal: single-use link (only its SHA-256 is stored), practitioner uploads on renew.html via the fam-renew function, staff approve here
   const sha = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  const selV = (name, label, opts, v) => `<label>${label}<select name="${name}">${['', ...opts].map(o => `<option value="${e(o)}" ${o === (v || '') ? 'selected' : ''}>${e(o || '—')}</option>`).join('')}</select></label>`;
+  const setFx = (id, patch) => { const a = S.A.find(x => x.id === id); return write('Practitioner', () => sb.from('assessors').update({ fields: { ...fx(a), ...patch } }).eq('id', id)); };
+  window.famMatch = (id, part) => { const a = S.A.find(x => x.id === id); if (!a) return; const f = fx(a);
+    if (part === 'rtw') modal('Right to work', `<div class="qagrid">${selV('citizenship', 'Citizenship', CIT, f.citizenship)}${fld('nationality', 'Nationality', 'text', `value="${e(f.nationality)}"`)}${selV('permit_type', 'Permit or visa type', PERMITS, f.permit_type)}${fld('permit_no', 'Permit number', 'text', `value="${e(f.permit_no)}"`)}</div><p class="sub" style="margin:0">Upload the permit itself, with its expiry date, on the Compliance tab. Allocation is blocked for a foreign national without a valid permit.</p>`,
+      async F => { need(); await setFx(id, { citizenship: val(F, 'citizenship'), nationality: val(F, 'nationality'), permit_type: val(F, 'permit_type'), permit_no: val(F, 'permit_no') }); say('Right to work saved'); });
+    else modal('Location and delivery', `<div class="qagrid">${selV('province', 'Province', PROV, f.province)}${fld('city', 'City or town', 'text', `value="${e(f.city)}"`)}${fld('languages', 'Languages (comma separated)', 'text', `value="${e(f.languages)}"`)}${selV('delivery', 'Can deliver', DELIV, f.delivery)}</div>`,
+      async F => { need(); await setFx(id, { province: val(F, 'province'), city: val(F, 'city'), languages: val(F, 'languages'), delivery: val(F, 'delivery') }); say('Location saved'); }); };
+  window.famAway = id => modal('Unavailable dates', `<div class="qagrid">${fld('from', 'From *', 'date', 'required')}${fld('to', 'To *', 'date', 'required')}${fld('reason', 'Reason', 'text', 'placeholder="Leave, another contract…"')}</div>`,
+    async F => { need(); const fr = val(F, 'from'), to = val(F, 'to'); if (to < fr) throw new Error('The end date is before the start date.'); const a = S.A.find(x => x.id === id); await setFx(id, { away: [...(fx(a).away || []), { from: fr, to, reason: val(F, 'reason') }] }); say('Unavailable dates added'); });
+  window.famAwayDel = async (id, fr, to) => { const a = S.A.find(x => x.id === id); if (!a || !confirm('Remove these unavailable dates?')) return; try { await setFx(id, { away: (fx(a).away || []).filter(x => !(x.from === fr && x.to === to)) }); await load(); } catch (_) {} };
+  window.famConsent = id => { const f = fx(S.A.find(x => x.id === id));
+    modal('POPIA consent', `<div class="qagrid">${fld('d', 'Consent date *', 'date', `required value="${e(f.popia_consent_at || today())}"`)}${selV('via', 'How it was given', ['Signed form', 'Email', 'Practitioner link', 'Verbal, confirmed in writing'], f.popia_consent_via)}</div><p class="sub" style="margin:0">Upload the signed form on the Compliance tab if there is one.</p>`,
+      async F => { need(); await setFx(id, { popia_consent_at: val(F, 'd'), popia_consent_via: val(F, 'via'), popia_recorded_by: me() }); say('Consent recorded'); }); };
+  window.famRates = id => { const p = (S.PV || {})[id] || {};
+    modal('Rates and payment', `<div class="qagrid">${fld('rate_daily', 'Daily rate (R)', 'number', `min="0" step="0.01" value="${e(p.rate_daily)}"`)}${fld('rate_learner', 'Per learner (R)', 'number', `min="0" step="0.01" value="${e(p.rate_learner)}"`)}${fld('vat_number', 'VAT number', 'text', `value="${e(p.vat_number)}"`)}${fld('tax_number', 'Income tax number', 'text', `value="${e(p.tax_number)}"`)}${fld('bank_name', 'Bank', 'text', `value="${e(p.bank_name)}"`)}${fld('bank_account_last4', 'Account number: last 4 digits only', 'text', `maxlength="4" pattern="\\d{4}" value="${e(p.bank_account_last4)}"`)}${selV('bank_verified', 'Bank letter checked', ['Yes', 'No'], p.bank_verified ? 'Yes' : p.bank_name ? 'No' : '')}${fld('rate_note', 'Note', 'text', `value="${e(p.rate_note)}"`)}</div><p class="sub" style="margin:0">Keep the full account number on the bank confirmation letter only.</p>`,
+      async F => { need(); const n = k => { const v = val(F, k); return v == null ? null : Number(v); };
+        await write('Rates', () => sb.from('fam_private').upsert({ assessor_id: id, tenant_id: P.tenant, rate_daily: n('rate_daily'), rate_learner: n('rate_learner'), vat_number: val(F, 'vat_number'), tax_number: val(F, 'tax_number'), bank_name: val(F, 'bank_name'), bank_account_last4: val(F, 'bank_account_last4'), bank_verified: val(F, 'bank_verified') === 'Yes', rate_note: val(F, 'rate_note'), updated_by: me(), updated_at: new Date().toISOString() }, { onConflict: 'assessor_id' })); say('Rates saved'); }); };
+  window.famQAdd = id => { const T = [...new Set([...assigns().filter(x => x.a.id === id).map(x => x.title), ...progsNow().map(p => p.title)])].filter(Boolean), K = { Moderation: 'moderation', 'Programme review': 'programme', Incident: 'incident' };
+    modal('Quality entry', `<div class="qagrid">${sel('kind', 'Type *', Object.keys(K))}<label>Programme<input name="prog" list="famqp" maxlength="200"></label><datalist id="famqp">${T.map(t => `<option value="${e(t)}">`).join('')}</datalist>${selV('outcome', 'Moderation outcome', ['Agreed', 'Partly agreed', 'Not agreed'], '')}${fld('learners', 'Learners', 'number', 'min="0"')}${fld('competent', 'Found competent', 'number', 'min="0"')}${selV('on_time', 'Submitted on time', ['Yes', 'No'], '')}${selV('rating', 'Rating (5 = excellent)', ['5', '4', '3', '2', '1'], '')}${fld('note', 'Note', 'text', 'maxlength="500"')}</div>`,
+      async F => { need(); const n = k => { const v = val(F, k); return v == null ? null : Number(v); }, L = n('learners'), C = n('competent'), ot = val(F, 'on_time');
+        if (C != null && (L == null || C > L)) throw new Error('Found competent cannot be more than the number of learners.');
+        await write('Quality', () => sb.from('fam_quality').insert({ tenant_id: P.tenant, assessor_id: id, kind: K[val(F, 'kind')] || 'programme', programme_id: val(F, 'prog'), outcome: val(F, 'outcome'), learners: L, competent: C, on_time: ot === 'Yes' ? true : ot === 'No' ? false : null, rating: n('rating'), note: val(F, 'note'), created_by: me() })); say('Quality entry added'); }); };
+  window.famQDates = qid => { const q = (S.Q || []).find(x => String(x.id) === String(qid)); if (!q) return;
+    modal(`Qualification dates: ${q.name}`, `<div class="qagrid">${fld('le', 'Last date for enrolment', 'date', `value="${e(q.last_enrol_date)}"`)}${fld('la', 'Last date for achievement', 'date', `value="${e(q.last_achieve_date)}"`)}${fld('qc', 'QCTO replacement (SAQA ID or name)', 'text', `value="${e(q.qcto_code)}"`)}</div><p class="sub" style="margin:0">Take the dates from the qualification's SAQA or QCTO record. Programmes that end after the last achievement date are flagged.</p>`,
+      async F => { need(); await write('Qualification', () => sb.from('qualifications').update({ last_enrol_date: val(F, 'le'), last_achieve_date: val(F, 'la'), qcto_code: val(F, 'qc') }).eq('id', q.id)); say('Qualification dates saved'); }); };
+  window.famProfLink = async aid => { const a = S.A.find(x => x.id === aid); if (!a) return; if (!a.email) return say(`${shownName(a)} has no email address. Add it on the profile first.`);
+    const b = new Uint8Array(32); crypto.getRandomValues(b); const tok = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    try { const old = (S.RN || []).filter(x => x.assessor_id === aid && x.doc_type === 'Profile update' && x.status === 'Sent').map(x => x.id);
+      if (old.length) await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Cancelled' }).in('id', old));
+      const th = await sha(tok); await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: aid, registration_id: null, doc_type: 'Profile update', token_hash: th, sent_to: a.email }));
+    } catch (_) { return; }
+    const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').replace(/^\s*\[test\]\s*/i, '').trim().split(/\s+/)[0];
+    const body = `Hi ${first},\n\nPlease check and update your contact details, location, languages and availability for Apex here (the link works once and expires in 30 days):\n\n${link}\n\nThank you,\nApex`;
+    try { await navigator.clipboard.writeText(link); } catch (_) {}
+    window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Please update your Apex practitioner details')}&body=${encodeURIComponent(body)}`, '_self');
+    say('Update link created and copied. Your email app opens with the message.'); await load(); };
+  const applyProfile = async x => { const a = S.A.find(y => y.id === x.assessor_id), p = x.proposed_profile || {}; if (!a) throw new Error('Practitioner not found');
+    const up = {}; if (p.email) up.email = p.email; if (p.phone) up.phone = p.phone; if (p.address) up.physical_address = p.address;
+    const f = { ...fx(a) }; ['province', 'city', 'languages', 'delivery'].forEach(k => { if (p[k]) f[k] = p[k]; });
+    if (p.away_from && p.away_to) f.away = [...(f.away || []), { from: p.away_from, to: p.away_to, reason: p.away_reason || 'Given by the practitioner' }];
+    if (x.uploaded_at && !f.popia_consent_at) Object.assign(f, { popia_consent_at: x.uploaded_at.slice(0, 10), popia_consent_via: 'Practitioner link' });
+    up.fields = f;
+    await write('Practitioner', () => sb.from('assessors').update(up).eq('id', a.id));
+    await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Approved', reviewed_by: me(), reviewed_at: new Date().toISOString() }).eq('id', x.id)); };
+  const profView = x => { const a = S.A.find(y => y.id === x.assessor_id) || {}, f = fx(a), p = x.proposed_profile || {}, can = isAdm() && x.status === 'Uploaded';
+    const rows = [['Email', a.email, p.email], ['Phone', a.phone, p.phone], ['Address', a.physical_address, p.address], ['Province', f.province, p.province], ['City or town', f.city, p.city], ['Languages', f.languages, p.languages], ['Delivers', f.delivery, p.delivery], ['Unavailable', '', p.away_from ? `${fmt(p.away_from)} – ${fmt(p.away_to)}${p.away_reason ? ' · ' + p.away_reason : ''}` : '']];
+    modal(`Profile update: ${shownName(a)}`, `<table class="dense"><thead><tr><th></th><th>Now</th><th>Sent by practitioner</th></tr></thead><tbody>${rows.map(([k, o, n]) => `<tr><td>${k}</td><td>${e(o || '—')}</td><td${n && n !== o ? ' style="font-weight:600"' : ''}>${e(n || 'no change')}</td></tr>`).join('')}</tbody></table>
+      ${x.practitioner_note ? `<p class="sub">Note: ${e(x.practitioner_note)}</p>` : ''}${x.file_path ? `<p><a href="#" onclick="famRenewFile(${x.id});return false">View attached file</a> <span class="sub">(file it on the profile if it is needed)</span></p>` : ''}<p class="sub" style="margin:0">Changed values are in bold. Blank fields keep the current value.</p>`,
+      async () => { if (can) { await applyProfile(x); say('Profile update applied'); } });
+    const sv = $('famsave'); if (sv) sv.textContent = can ? 'Approve and apply' : 'Close'; };
   window.famRenew = async rid => {
     const r = S.R.find(x => x.id === rid), a = r && S.A.find(x => x.id === r.assessor_id); if (!r || !a) return;
     if (!a.email) return say(`${shownName(a)} has no email address. Add it on the profile first.`);
@@ -1008,11 +1145,13 @@
     window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Your SETA registration renewal')}&body=${encodeURIComponent(body)}`, '_self');
     say('Renewal link created and copied. Your email app opens with the message.'); await load();
   };
-  window.famRenewView = async id => { const x = (S.RN || []).find(y => y.id === id); if (!x?.file_path) return say('No file');
+  window.famRenewView = async id => { const x = (S.RN || []).find(y => y.id === id); if (x?.proposed_profile) return profView(x); return famRenewFile(id); };
+  window.famRenewFile = async id => { const x = (S.RN || []).find(y => y.id === id); if (!x?.file_path) return say('No file');
     const { data, error } = await sb.storage.from('fam-documents').createSignedUrl(x.file_path, 60); if (error) return say('Could not open file: ' + error.message); window.open(data.signedUrl, '_blank', 'noopener'); };
   window.famRenewDo = async (id, ok) => {
     const x = (S.RN || []).find(y => y.id === id); if (!x) return;
     const note = ok ? null : prompt('Reason for rejecting (the practitioner gets a new link when you resend)'); if (!ok && note === null) return;
+    if (ok && x.proposed_profile) { try { await applyProfile(x); say('Profile update applied'); await load(); } catch (_) {} return; }
     if (ok && !x.proposed_expiry && !confirm('No new expiry date was given. Approve anyway and keep the current date?')) return;
     const cr = S.R.find(y => y.id === x.registration_id);
     if (ok && x.proposed_expiry && cr?.registration_expiry_date && x.proposed_expiry <= cr.registration_expiry_date) return say(`The new expiry (${fmt(x.proposed_expiry)}) is not later than the current one (${fmt(cr.registration_expiry_date)}). Reject it and send a new link, or fix the registration on the profile.`);
@@ -1183,6 +1322,11 @@
         btns: canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent || lapsed ? 'Resend' : 'Send link'}</button>` : '' }); });
     S.D.filter(dd => vids.has(dd.assessor_id) && dd.is_current !== false && dd.expiry_date && dd.expiry_date <= in30 && dd.expiry_date >= addD(t, -30)).forEach(dd => { const d = dd.expiry_date;
       add({ sec: 2, d, over: d < t, week: d <= w7, ref: ['document', dd.id, dd.assessor_id, d < t ? 'expired' : 'due_30'], main: `${pl(A(dd.assessor_id))}<div class="sub">${e(dd.doc_type || 'Document')} ${when(d)}</div>`, btns: `<button class="btn sm" onclick="famTodayGo('fam/${dd.assessor_id}')">Open</button>` }); });
+    // compliance: no right to work, records to review for retention
+    { const liveA = new Set(assigns().filter(x => x.live).map(x => x.a.id));
+      vis().forEach(a => { const w = rtw(a), go = `<button class="btn sm" onclick="famTodayGo('fam/${a.id}')">Open</button>`;
+        if (rwBad(w)) add({ sec: 4, aid: a.id, over: true, ref: ['practitioner', a.id * 10 + 1, a.id, 'right_to_work'], main: `${pl(a)}<div class="sub">${e(w[1])}: cannot be allocated</div>`, btns: go });
+        if (retainDue(a, liveA)) add({ sec: 4, aid: a.id, ref: ['practitioner', a.id * 10 + 2, a.id, 'retention'], main: `${pl(a)}<div class="sub">No valid registration for 2+ years: keep or delete this record? (POPIA)</div>`, btns: go }); }); }
     // follow-ups: added by hand, due/overdue, or open more than 7 days (expiry ones already show above)
     const shown = new Set(I.filter(x => x.ref).map(x => x.ref[0] + x.ref[1]));
     S.F.filter(f => vids.has(f.assessor_id) && !CLOSED.includes(f.status) && !shown.has(f.source_type + f.source_id) && (f.source_type === 'manual' || (f.due_date && f.due_date <= t) || (f.created_at && (Date.now() - new Date(f.created_at)) / 864e5 > 7)))
@@ -1200,7 +1344,7 @@
     const DT = [...S.F.filter(f => vids.has(f.assessor_id) && f.status === 'Done' && (f.resolved_at || '').slice(0, 10) === t).map(f => `${pl(A(f.assessor_id))} <span class="sub">· ${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}</span>`),
       ...(S.RN || []).filter(x => vids.has(x.assessor_id) && x.status === 'Approved' && (x.reviewed_at || '').slice(0, 10) === t).map(x => `${pl(A(x.assessor_id))} <span class="sub">· Renewal approved</span>`)];
     const done = DT.length ? `<details class="card" style="padding:12px 14px"><summary style="cursor:pointer;font-weight:600">Done today <span class="badge b-ok">${DT.length}</span></summary>${DT.map(h => `<div class="tdi">${h}</div>`).join('')}</details>` : '';
-    const SECS = ['At risk allocations', 'Renewals to review', 'Expired or expiring in 30 days', 'Follow-ups'];
+    const SECS = ['At risk allocations', 'Renewals to review', 'Expired or expiring in 30 days', 'Follow-ups', 'Compliance and POPIA'];
     const body = SECS.map((s, k) => { const L = list.filter(x => x.sec === k).sort((a, b) => k === 2 ? (b.esc ? 1 : 0) - (a.esc ? 1 : 0) || a.d.localeCompare(b.d) : 0); return L.length ? `<section class="card" style="padding:12px 14px"><h3>${s} <span class="badge">${L.length}</span></h3>${L.map(row).join('')}</section>` : ''; }).join('');
     const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
     const people = vis().slice().sort((a, b) => shownName(a).localeCompare(shownName(b)));
@@ -1226,17 +1370,19 @@
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
-    const [A, R, D, F, Q, SC, RN] = await Promise.all([
-      q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone,id_number,physical_address').order('full_name')),
+    const [A, R, D, F, Q, SC, RN, QL, PV] = await Promise.all([
+      q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone,id_number,physical_address,fields').order('full_name')),
       q('registrations', sb.from('fam_seta_registrations').select('*')),
       q('documents', sb.from('fam_documents').select('id,assessor_id,doc_type,status,doc_date,expiry_date,file_url,file_name,is_current,version,superseded_at,created_at,uploaded_at,uploaded_by')),
       q('follow-ups', sb.from('fam_follow_ups').select('*')),
-      q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
+      q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta,last_enrol_date,last_achieve_date,qcto_code').order('name')),
       q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id')),
-      q('renewals', sb.from('fam_renewals').select('id,assessor_id,registration_id,doc_type,status,expires_at,sent_to,created_at,uploaded_at,file_path,file_name,proposed_expiry,proposed_reg_no,practitioner_note,review_note,reviewed_at').order('created_at', { ascending: false }))]);
+      q('renewals', sb.from('fam_renewals').select('id,assessor_id,registration_id,doc_type,status,expires_at,sent_to,created_at,uploaded_at,file_path,file_name,proposed_expiry,proposed_reg_no,practitioner_note,review_note,reviewed_at,proposed_profile,consent_at').order('created_at', { ascending: false })),
+      q('quality record', sb.from('fam_quality').select('*').order('created_at', { ascending: false })),
+      q('rates', sb.from('fam_private').select('*'))]);
     R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
     setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
-    Object.assign(S, { A, R, D, F, Q, SC, RN, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
+    Object.assign(S, { A, R, D, F, Q, SC, RN, QL, PV: Object.fromEntries(PV.map(x => [x.assessor_id, x])), loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     try { window.famBell && window.famBell(S); } catch (_) {}
     try { renderToday(); } catch (_) {}
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
@@ -1259,6 +1405,8 @@
       .famc-f{background:#E3F1E6;color:#1E6B34}.famc-a{background:#E4ECFA;color:#2A4E9B}.famc-m{background:#FBF0D9;color:#8A5100}
       .famc-s{background:transparent;border:1px solid var(--line);color:var(--muted)}
       .famc-bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}.famc-warn{background:transparent;border:1px solid #E0A100;color:#8A5100}.famc-ok{background:transparent;border:1px solid var(--ok);color:var(--ok)}
+      .famrtw{padding:8px 10px;border-radius:10px;margin:4px 0 8px;font-size:13px}.famrtw.bad{background:#FDECEA;color:var(--bad)}.famrtw.warn{background:#FBF0D9;color:#8A5100}
+      .famcomp{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.famkv2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;margin:6px 0 10px}
       .famc-nc{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-style:italic}
       .famnoid{margin-left:8px;font-size:11px;color:#8A5100;white-space:nowrap}.famck{margin:0 8px 0 0;vertical-align:middle}
       .famsum td{padding:4px 0 10px!important;border:0!important}.famsc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--soft);font-size:13px}.famsc.q{opacity:.75}.famsc:hover{border-color:var(--navy2)}.famsc:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}

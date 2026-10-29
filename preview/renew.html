@@ -18,7 +18,7 @@ h1{font-size:20px;margin:0 0 6px}
 p{margin:0 0 12px}
 .sub{color:var(--muted);font-size:13px}
 label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);margin-bottom:14px}
-input[type=date],input[type=text],textarea,input[type=file]{font:inherit;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;width:100%}
+input[type=date],input[type=text],input[type=email],input[type=tel],select,textarea,input[type=file]{font:inherit;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;width:100%}
 textarea{min-height:70px;resize:vertical}
 .chk{flex-direction:row;align-items:flex-start;gap:10px;color:var(--ink);font-size:14px}
 .chk input{margin-top:3px;width:18px;height:18px}
@@ -30,7 +30,7 @@ button:disabled{opacity:.6;cursor:default}
 </style>
 </head>
 <body>
-<header><span class="ring">A</span><b>Apex practitioner renewals</b></header>
+<header><span class="ring">A</span><b>Apex practitioner records</b></header>
 <main><div class="card" id="box"><p class="sub">Checking your link…</p></div>
 <p class="sub" style="margin-top:14px">This link works once and expires. Apex uses the document only to keep your practitioner record and SETA registration up to date, under POPIA.</p></main>
 <script>
@@ -39,10 +39,32 @@ const t=new URLSearchParams(location.hash.slice(1)).get('t')||'';
 history.replaceState(null,'',location.pathname+location.hash);
 const box=document.getElementById('box'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const fmt=d=>d?new Date(d.length===10?d+'T00:00:00':d).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'}):'';
+function submit(f,lab,ok){const m=document.getElementById('m');
+  f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button[type=submit]'),file=f.file.files[0];
+    if(file&&file.size>10485760){m.innerHTML='<div class="msg err">The file is larger than 10 MB.</div>';return}
+    b.disabled=true;b.textContent='Sending…';m.innerHTML='';
+    const fd=new FormData(f);fd.append('t',t);
+    try{const res=await fetch(FN,{method:'POST',body:fd}),j=await res.json();
+      if(!res.ok){m.innerHTML=`<div class="msg err">${esc(j.error||'That did not work.')}</div>`;b.disabled=false;b.textContent=lab;return}
+      box.innerHTML=`<h1>Thank you</h1><div class="msg done">${ok}</div>`;
+    }catch(e){m.innerHTML='<div class="msg err">Sending failed. Check your connection and try again.</div>';b.disabled=false;b.textContent=lab}}}
+function prof(r){const c=r.current||{},opt=(l,v)=>['',...l].map(o=>`<option value="${esc(o)}" ${o===v?'selected':''}>${esc(o||'Choose…')}</option>`).join('');
+  box.innerHTML=`<h1>Hi ${esc(r.first||'there')}</h1><p>Please check your details and change anything that is out of date. Leave a field as it is if it is still right.</p><p class="sub">Link valid until ${fmt(r.link_expires)}.</p><div id="m"></div>
+  <form id="f"><label>Email<input type="email" name="email" maxlength="120" value="${esc(c.email)}"></label><label>Phone<input type="tel" name="phone" maxlength="30" value="${esc(c.phone)}"></label>
+  <label>Physical address<input type="text" name="address" maxlength="300" value="${esc(c.address)}"></label><label>Province<select name="province">${opt(r.provinces||[],c.province)}</select></label>
+  <label>City or town<input type="text" name="city" maxlength="80" value="${esc(c.city)}"></label><label>Languages you can facilitate in (comma separated)<input type="text" name="languages" maxlength="200" value="${esc(c.languages)}"></label>
+  <label>How you can deliver<select name="delivery">${opt(r.delivery||[],c.delivery)}</select></label>
+  <fieldset style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin:0 0 14px"><legend class="sub">Dates you are not available (optional)</legend><label>From<input type="date" name="away_from"></label><label>To<input type="date" name="away_to"></label><label>Reason (optional)<input type="text" name="away_reason" maxlength="120"></label></fieldset>
+  <label>Supporting document, e.g. work permit or updated CV (optional; PDF, JPG or PNG, max 10 MB)<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png"></label>
+  <label>Note for Apex (optional)<textarea name="note" maxlength="500"></textarea></label>
+  <label class="chk"><input type="checkbox" name="consent" value="yes" required><span>I consent to Apex keeping these details, and any document I attach, on my practitioner record to match me to work and meet SETA requirements, under POPIA.</span></label>
+  <button type="submit">Send my details</button></form>`;
+  submit(document.getElementById('f'),'Send my details','Your details were received. Apex will review them and update your record. You can close this page.')}
 const fail=m=>box.innerHTML=`<h1>Link not available</h1><div class="msg err">${esc(m)}</div>`;
 (async()=>{
   if(!t)return fail('This link is incomplete. Open it straight from the email Apex sent you.');
   let r;try{const res=await fetch(FN+'?t='+encodeURIComponent(t));r=await res.json();if(!res.ok)return fail(r.error||'This link is not valid.')}catch(e){return fail('Could not reach Apex. Check your connection and refresh.')}
+  if(r.profile)return prof(r);
   const minD=(()=>{const t=new Date();t.setDate(t.getDate()+1);const c=t.toISOString().slice(0,10);return r.current_expiry&&r.current_expiry>=c?new Date(new Date(r.current_expiry+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):c})();
   box.innerHTML=`<h1>Hi ${esc(r.first||'there')}</h1>
   <p>Please upload your renewed <b>${esc(r.seta?r.seta+' registration':r.what)}</b>${r.current_expiry?` (currently expires ${fmt(r.current_expiry)})`:''}.</p>
@@ -56,15 +78,7 @@ const fail=m=>box.innerHTML=`<h1>Link not available</h1><div class="msg err">${e
     <label class="chk"><input type="checkbox" name="consent" value="yes" required><span>I consent to Apex storing this document and these details on my practitioner record for SETA compliance.</span></label>
     <button type="submit">Upload</button>
   </form>`;
-  const f=document.getElementById('f'),m=document.getElementById('m');
-  f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button'),file=f.file.files[0];
-    if(file&&file.size>10485760){m.innerHTML='<div class="msg err">The file is larger than 10 MB.</div>';return}
-    b.disabled=true;b.textContent='Uploading…';m.innerHTML='';
-    const fd=new FormData(f);fd.append('t',t);
-    try{const res=await fetch(FN,{method:'POST',body:fd}),j=await res.json();
-      if(!res.ok){m.innerHTML=`<div class="msg err">${esc(j.error||'Upload failed.')}</div>`;b.disabled=false;b.textContent='Upload';return}
-      box.innerHTML='<h1>Thank you</h1><div class="msg done">Your document was received. Apex will review it and update your record. You can close this page.</div>';
-    }catch(e){m.innerHTML='<div class="msg err">Upload failed. Check your connection and try again.</div>';b.disabled=false;b.textContent='Upload'}};
+  submit(document.getElementById('f'),'Upload','Your document was received. Apex will review it and update your record. You can close this page.');
 })();
 </script>
 </body>
