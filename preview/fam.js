@@ -1130,7 +1130,9 @@
   // emails the link through fam-renew-send (Gmail SMTP); false = not sent, caller falls back to mailto
   const mailLink = async (id, tok, to) => { if (!id) return false; try { const { data, error } = await sb.functions.invoke('fam-renew-send', { body: { id, t: tok, base: new URL('renew.html', location.href.split('#')[0]).href } }); return !error && data?.ok === true && data.to === to; } catch (_) { return false; } };
   const selV = (name, label, opts, v) => `<label>${label}<select name="${name}">${['', ...opts].map(o => `<option value="${e(o)}" ${o === (v || '') ? 'selected' : ''}>${e(o || '—')}</option>`).join('')}</select></label>`;
-  const setFx = (id, patch) => { const a = S.A.find(x => x.id === id); return write('Practitioner', () => sb.from('assessors').update({ fields: { ...fx(a), ...patch } }).eq('id', id)); };
+  const setFx = async (id, patch) => { const a = S.A.find(x => x.id === id); // merge onto the latest saved fields, so two quick saves never undo each other
+    let cur = fx(a); try { const { data } = await sb.from('assessors').select('id,fields').eq('id', id); if (data && data[0]) cur = data[0].fields || {}; } catch (_) {}
+    return write('Practitioner', () => sb.from('assessors').update({ fields: { ...cur, ...patch } }).eq('id', id)); };
   window.famMatch = (id, part) => { const a = S.A.find(x => x.id === id); if (!a) return; const f = fx(a);
     if (part === 'rtw') modal('Right to work', `<div class="qagrid">${selV('citizenship', 'Citizenship', CIT, f.citizenship)}${fld('nationality', 'Nationality', 'text', `value="${e(f.nationality)}"`)}${selV('permit_type', 'Permit or visa type', PERMITS, f.permit_type)}${fld('permit_no', 'Permit number', 'text', `value="${e(f.permit_no)}"`)}</div><p class="sub" style="margin:0">Upload the permit itself, with its expiry date, on the Compliance tab. Allocation is blocked for a foreign national without a valid permit.</p>`,
       async F => { need(); await setFx(id, { citizenship: val(F, 'citizenship'), nationality: val(F, 'nationality'), permit_type: val(F, 'permit_type'), permit_no: val(F, 'permit_no') }); say('Right to work saved'); });
@@ -1175,7 +1177,10 @@
     if (await mailLink(nid, tok, a.email)) say(`Update link emailed to ${a.email} (also copied).`);
     else { window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Please update your Apex practitioner details')}&body=${encodeURIComponent(body)}`, '_self'); say('Update link created and copied. Your email app opens with the message.'); }
     await load(); };
-  const applyProfile = async x => { const a = S.A.find(y => y.id === x.assessor_id), p = x.proposed_profile || {}; if (!a) throw new Error('Practitioner not found');
+  const applyProfile = async x0 => { // re-read the renewal and the person so approval uses what was actually submitted and saved
+    let x = x0, a = S.A.find(y => y.id === x0.assessor_id);
+    try { const r = await sb.from('fam_renewals').select('*').eq('id', x0.id).single(); if (r.data) x = r.data; const q = await sb.from('assessors').select('*').eq('id', x0.assessor_id); if (q.data && q.data[0]) a = q.data[0]; } catch (_) {}
+    const p = x.proposed_profile || {}; if (!a) throw new Error('Practitioner not found');
     const up = {}; if (p.email) up.email = p.email; if (p.phone) up.phone = p.phone; if (p.address) up.physical_address = p.address;
     const f = { ...fx(a) }; ['province', 'city', 'languages', 'delivery'].forEach(k => { if (p[k]) f[k] = p[k]; });
     if (p.away_from && p.away_to) f.away = [...(f.away || []), { from: p.away_from, to: p.away_to, reason: p.away_reason || 'Given by the practitioner' }];
