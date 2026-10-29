@@ -940,6 +940,40 @@
     return list.map(x => `<div class="famcan-q"><div><b>${e(x.q.name)}</b>${x.q.saqa_id ? ` <span class="sub">SAQA ${e(x.q.saqa_id)}</span>` : ''} <span class="badge b-ok" title="In scope on a valid SETA registration">✓ Verified</span></div>
       <div class="sub">${e([...x.roles].join(', ') || 'Role not set')} · ${e([...x.setas].join(', ') || 'No SETA')} · ${x.until ? 'registered until ' + fmt(x.until) : 'no expiry captured'}</div>
       ${x.progs.length ? x.progs.map(p => `<div class="famcan-p">→ ${p.pid ? `<a href="#programmes" onclick="window.dvProg&&dvProg(${p.pid})">${e(p.title)}</a>` : e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span> <span class="badge ${lab[p.state][0]}">${lab[p.state][1]}</span>${p.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Registration ends first</span>' : ''}</div>`).join('') : '<div class="sub famcan-p">No open programmes for this qualification right now.</div>'}</div>`).join('') + tip; };
+  /* "Suitable people" on a programme (Programmes › Overview): who can deliver this programme's qualification, best first */
+  window.famSuitable = p => {
+    const head = n => `<div style="padding:16px 20px"><h2>Suitable people${n == null ? '' : ` <span class="sub" style="font-weight:400">(${n})</span>`}</h2><span class="sub">From the FAM Registry. Verified = the qualification is in scope on a valid SETA registration.</span></div>`;
+    if (!S.A?.length) return head() + '<div class="sub" style="padding:0 20px 16px">Loading practitioners…</div>';
+    const text = [p.saqa_id, p.qualification_name, p.programme_name].join(' '), tw = qWords(text);
+    const qs = (S.Q || []).filter(q => { const ids = String(q.saqa_id || '').split(/[^0-9]+/).filter(v => v.length >= 4), w = qWords(q.name);
+      return (ids.length && ids.every(v => new RegExp('\\b' + v + '\\b').test(text))) || (w.length > 8 && tw.includes(w)); });
+    if (!qs.length) return head() + `<div class="sub" style="padding:0 20px 16px">This programme's qualification (SAQA ${e(p.saqa_id || '—')}) is not in the qualification list yet, so suitability can't be checked.</div>`;
+    const qids = new Set(qs.map(q => String(q.id))), setas = new Set(qs.map(q => q.seta).filter(x => x && !/^(N\/A|QCTO)$/i.test(x)).map(setaKey));
+    const end = d10(p.end_date), start = d10(p.start_date), all = assigns();
+    const rows = vis().map(a => {
+      const ok = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
+      const sc = ok.filter(r => scopeOf(r.id).some(x => qids.has(String(x.qualification_id))));
+      const st = sc.length ? [] : ok.filter(r => (r.seta_name || '').split(/\s*,\s*/).some(x => setas.has(setaKey(x))));
+      const use = sc.length ? sc : st; if (!use.length) return null;
+      const roles = [...new Set(use.flatMap(r => r.roles?.length ? r.roles : [r.role]).filter(Boolean))];
+      const until = use.map(r => r.registration_expiry_date || '').sort().pop(), on = p.facilitator_id === a.id;
+      const busy = !on && all.some(m => m.a.id === a.id && m.live && m.pid !== p.id && (!m.end || !start || m.end >= start) && (!m.start || !end || m.start <= end));
+      return { a, v: !!sc.length, roles, until, on, busy, short: !!(until && end && until < end) };
+    }).filter(Boolean).sort((x, y) => (y.on - x.on) || (y.v - x.v) || (x.busy - y.busy) || (x.short - y.short) || shownName(x.a).localeCompare(shownName(y.a)));
+    if (!rows.length) return head(0) + `<div class="sub" style="padding:0 20px 16px">Nobody on the FAM Registry has ${e(qs.map(q => q.name).join(' / '))} in scope or a valid ${e([...setas].join(', ') || 'SETA')} registration. Add their scope in the FAM Registry.</div>`;
+    const pid = Number(p.id);
+    return head(rows.length) + `<div class="tw"><table class="dense"><thead><tr><th>Practitioner</th><th>Roles</th><th>Fit</th><th>Registered until</th><th>Availability</th><th></th></tr></thead><tbody>${rows.map(x => `<tr>
+      <td><a href="#fam/${x.a.id}">${e(shownName(x.a))}</a></td><td>${e(x.roles.join(', ') || '—')}</td>
+      <td>${x.v ? '<span class="badge b-ok">✓ Verified</span>' : '<span class="badge b-warn" title="Registered with the right SETA, but this qualification is not linked to the registration yet">SETA match, check scope</span>'}</td>
+      <td>${x.until ? fmt(x.until) : '<span class="sub">No expiry</span>'}${x.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Ends first</span>' : ''}</td>
+      <td>${x.on ? '<span class="badge b-ok">Facilitating this</span>' : x.busy ? '<span class="badge b-warn">Busy on other work</span>' : '<span class="badge b-ok">Free</span>'}</td>
+      <td style="text-align:right">${!x.on && canWrite() ? `<button class="btn sm" onclick="famSetFac(${pid},${x.a.id})">Set as facilitator</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+  };
+  window.famSetFac = async (pid, aid) => {
+    const p = ((P.data && P.data.progs) || []).find(x => x.id === pid), a = S.A.find(x => x.id === aid); if (!p || !a) return;
+    if (!confirm(`Set ${shownName(a)} as the facilitator for ${p.programme_name}?`)) return;
+    try { await write('Facilitator', () => sb.from('programmes').update({ facilitator_id: aid }).eq('id', pid)); p.facilitator_id = aid; say(`${shownName(a)} is now the facilitator`); if (typeof renderProg === 'function') renderProg(); } catch (_) { /* write() already showed it */ }
+  };
   const lev = (a, b) => { const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; };
   function calIssues() {
     const A = vis(), dup = [], iss = [];

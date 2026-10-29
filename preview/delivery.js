@@ -86,7 +86,7 @@
     $('pstatus').innerHTML = Object.keys(PST).map(s => `<button class="${s === pStatus ? 'on' : ''}" onclick="pStatus='${s}';renderProg()">${s}</button>`).join('');
     $('plist').innerHTML = list.map(x => `<button class="pick${x.id === dProg ? ' on' : ''}" onclick="dvProg(${x.id})"><b>${esc(x.programme_name)}</b><span class="sub">${esc(client(x)?.client_name || 'No client')} · ${learnersOf(x.id).length} learners</span></button>`).join('') || `<div class="empty"><b>No ${pStatus.toLowerCase()} programmes</b></div>`;
     const v = $('view-programmes'), hd = v.querySelector('.dark');
-    if (!p || !PST[pStatus](p.status)) { hd.hidden = true; $('ptabs').innerHTML = ''; $('pstats').hidden = $('pmodcard').hidden = $('form3').hidden = true; return; }
+    if (!p || !PST[pStatus](p.status)) { if ($('psuit')) $('psuit').hidden = true; hd.hidden = true; $('ptabs').innerHTML = ''; $('pstats').hidden = $('pmodcard').hidden = $('form3').hidden = true; return; }
     hd.hidden = false;
     const sp = hd.querySelectorAll('span');
     sp[0].textContent = `${p.status === 'active' ? 'Active' : p.status} · ${p.programme_type || p.qualification_type || 'Programme'}`;
@@ -98,6 +98,8 @@
     $('ptabs').innerHTML = tabs.map(([t, f]) => `<button role="tab" aria-selected="${t === pTab}" class="${t === pTab ? 'on' : ''}" onclick="${f}">${t}</button>`).join('');
     const f3 = pTab === 'Form 3';
     $('pstats').hidden = f3; $('pmodcard').hidden = f3; $('form3').hidden = !f3;
+    let su = $('psuit'); if (!su) { $('pmodcard').insertAdjacentHTML('afterend', '<section class="card" id="psuit" style="padding:0;margin-top:16px"></section>'); su = $('psuit'); }
+    su.hidden = f3; if (!f3) su.innerHTML = window.famSuitable ? famSuitable(p) : '';
     if (f3) { $('form3').innerHTML = form3(p); return; }
     const ls = learnersOf(p.id), a = attendance(p), rd = ls.filter(l => readiness(p, l).c.every(Boolean)).length;
     const recs = (D().recs || []).filter(r => r.programme_id === p.id && !r.resolved).length;

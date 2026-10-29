@@ -297,6 +297,13 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     w.famShow(0); const pt = d.getElementById('fampanel').textContent;
     ok(/Can deliver/.test(pt) && /OC: Project Manager/.test(pt) && /Verified/.test(pt) && /PM Cohort/.test(pt) && /Already on it/.test(pt), pt);
   });
+  await t('Programmes: Suitable people lists verified practitioners and sets a facilitator', async () => {
+    const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+    w.location.hash = 'programmes'; await tick(); w.dvProg(100); await tick();
+    const su = d.getElementById('psuit'); ok(su && !su.hidden, 'panel missing');
+    ok(/Suitable people/.test(su.textContent) && /Fac One/.test(su.textContent) && /Verified/.test(su.textContent) && /Facilitating this/.test(su.textContent), su.textContent);
+    w.confirm = () => true; await w.famSetFac(100, 2); await tick();
+  });
   await t('FAM: add registration needs a role, then inserts', async () => {
     const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
     w.famReg(3); const f = d.getElementById('famform'); f.elements.seta_name.value = 'ETDP SETA';
