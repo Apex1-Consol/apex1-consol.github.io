@@ -425,7 +425,7 @@
   }
 
   /* ---------- profile page ---------- */
-  const KIND = { expired: 'Registration expired', due_30: 'Renewal due ≤30 days', due_60: 'Renewal due 31–60 days', pending: 'Registration entry pending', missing_doc: 'Missing document' };
+  const KIND = { expired: 'Registration expired', due_30: 'Renewal due ≤30 days', due_60: 'Renewal due 31–60 days', pending: 'Registration entry pending', missing_doc: 'Missing document', manual: 'Follow-up (added by hand)' };
   window.famTab = t => { S.tab = t; renderProfile(); };
   window.famCopyLink = id => { const u = location.href.split('#')[0] + '#fam/' + id; (navigator.clipboard?.writeText(u) || Promise.reject()).then(() => say('Profile link copied'), () => prompt('Copy this link:', u)); };
   function activity(a) {
@@ -816,6 +816,7 @@
     let fields;
     if (act === 'claim') fields = { status: 'In Progress', assigned_to: me() };
     else if (act === 'dismiss') fields = { status: 'Dismissed', resolved_at: now, resolved_by: me() };
+    else if (act === 'done') fields = { status: 'Done', resolved_at: now, resolved_by: me() };
     else if (act === 'reopen') fields = { status: 'Open', resolved_at: null, resolved_by: null };
     else { const n = prompt('Note for this follow-up:', f?.notes || ''); if (n === null) return; fields = { notes: n, status: f?.status || 'Open' }; }
     try {
@@ -1070,6 +1071,72 @@
       b.className = ''; b.style.padding = '0'; b.innerHTML = A.rows.length ? `<div class="tw"><table class="dense fctbl"><thead><tr><th>When</th><th>Who</th><th>Action</th><th>Record</th></tr></thead><tbody>${A.rows.slice(0, 50).map(r => `<tr><td>${e(String(r.created_at || '').slice(0, 16).replace('T', ' '))}</td><td>${e(r.user_name || 'Someone')}</td><td>${e(String(r.action || '').replace(/_/g, ' ').toLowerCase())}</td><td>${e(r.table_name)}${r.record_id ? ' #' + e(r.record_id) : ''}</td></tr>`).join('')}</tbody></table></div>` : '<div class="sub" style="padding:18px 20px">No FAM changes in the last 7 days.</div>'; }
   }
 
+  /* ---------- Today panel (side-panel button on #fam): things to act on now, with actions in place ---------- */
+  let TD = null;
+  window.famToday = f => { const open = f === undefined ? !TD : !!f; if (!open) { TD = null; $('famtoday')?.remove(); $('famtodaybk')?.remove(); return; } TD = TD || { add: false }; renderToday(); };
+  window.famTodayGo = h => { famToday(false); location.hash = h; };
+  window.famTodayCover = (k, tab) => { S.cal = S.cal || {}; S.cal.tab = tab; S.cal.cf = k === '' ? '' : TD.rk[k]; famTodayGo('fam/calendar'); setTimeout(() => window.famCal && famCal('tab', tab), 0); };
+  window.famTodayAdd = async ev => { ev.preventDefault(); const f = ev.target, aid = +f.elements.aid.value, notes = f.elements.note.value.trim(), due = f.elements.due.value || null;
+    if (!aid || !notes) return say('Choose a practitioner and add a note');
+    try { await write('Follow-up', () => sb.from('fam_follow_ups').insert({ tenant_id: P.tenant, assessor_id: aid, source_type: 'manual', source_id: Date.now(), kind: 'manual', status: 'Open', notes, due_date: due, created_by: me() }));
+      TD.add = false; say('Follow-up added'); await load(); } catch (_) { /* write() already showed it */ } };
+  function renderToday() {
+    if (!TD) return;
+    let el = $('famtoday');
+    if (!el) { document.body.insertAdjacentHTML('beforeend', `<div id="famtodaybk" onclick="famToday(false)"></div><aside id="famtoday" role="dialog" aria-label="Today"></aside><style id="famtodaycss">
+      #famtodaybk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
+      #famtoday{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:60;overflow:auto;overscroll-behavior:contain;background:var(--card,#fff);box-shadow:-8px 0 32px rgba(20,20,60,.18);padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px}
+      #famtoday h2{font-size:18px;margin:0;flex-grow:1}#famtoday h3{font-size:14px;margin:0 0 6px;display:flex;gap:6px;align-items:center}
+      #famtoday .tdi{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}#famtoday .tdi:first-of-type{border-top:0}
+      #famtoday .tdi>div:first-child{flex-grow:1;min-width:0}#famtoday .tdi a{font-weight:600}#famtoday .tdb{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+      #famtoday form{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px}#famtoday form select,#famtoday form input{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;width:100%;box-sizing:border-box}
+      </style>`); el = $('famtoday'); }
+    const vids = new Set(vis().map(a => a.id)), A = id => S.A.find(x => x.id === id), t = today(), in30 = addD(t, 30);
+    const pl = a => a ? `<a href="#fam/${a.id}" onclick="famToday(false)">${e(shownName(a))}</a>` : 'Unknown';
+    const dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(t + 'T00:00:00')) / 864e5), when = d => { const n = dleft(d); return n < 0 ? `expired ${-n} day${n === -1 ? '' : 's'} ago` : n === 0 ? 'expires today' : `in ${n} day${n === 1 ? '' : 's'}`; };
+    const item = (main, btns) => `<div class="tdi"><div>${main}</div><div class="tdb">${btns || ''}</div></div>`;
+    const sec = (title, list, extra) => list.length ? `<section class="card" style="padding:12px 14px"><h3>${title} <span class="badge">${list.length}</span></h3>${extra || ''}${list.join('')}</section>` : '';
+    // at risk
+    const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`; TD.rk = [];
+    const risk = assigns().filter(x => x.live && x.el[0] !== 'ok' && vids.has(x.a.id)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+      .map(x => item(`${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, `<button class="btn sm" onclick="famTodayCover(${(TD.rk = TD.rk || []).push(rk(x)) - 1},'risk')">Find cover</button>`));
+    // renewals to review
+    const rev = (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id)).map(x => { const r = S.R.find(y => y.id === x.registration_id);
+      return item(`${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
+        `<button class="btn sm" onclick="famRenewView(${x.id})">View</button>${isAdm() ? `<button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button>` : ''}<button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button>`); });
+    // expiring in 30 days (registrations: renewal link state; documents: upload in profile)
+    const rnFor = rid => (S.RN || []).filter(x => x.registration_id === rid).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
+    const exp = [];
+    S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date <= in30 && r.registration_expiry_date >= addD(t, -30)).forEach(r => {
+      const x = rnFor(r.id); if (x && ['Uploaded', 'Approved'].includes(x.status)) return;
+      const sent = x && x.status === 'Sent' && x.expires_at >= new Date().toISOString();
+      exp.push([sent ? 0 : 1, r.registration_expiry_date, item(`${pl(A(r.assessor_id))}<div class="sub">${e(r.seta_name || 'SETA')} registration ${when(r.registration_expiry_date)}</div>${sent ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <span class="badge b-bad" title="Nothing uploaded yet: phone the practitioner">Escalate</span>` : ''}`,
+        canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent ? 'Resend' : 'Send link'}</button>` : '')]); });
+    S.D.filter(d => vids.has(d.assessor_id) && d.is_current !== false && d.expiry_date && d.expiry_date <= in30 && d.expiry_date >= addD(t, -30)).forEach(d =>
+      exp.push([1, d.expiry_date, item(`${pl(A(d.assessor_id))}<div class="sub">${e(d.doc_type || 'Document')} ${when(d.expiry_date)}</div>`, `<button class="btn sm" onclick="famTodayGo('fam/${d.assessor_id}')">Open</button>`)]));
+    const expL = exp.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])).map(x => x[2]);
+    // follow-ups: added by hand (open), or due/overdue, or open more than 7 days
+    const fus = S.F.filter(f => vids.has(f.assessor_id) && !CLOSED.includes(f.status) && (f.source_type === 'manual' || (f.due_date && f.due_date <= t) || (f.created_at && (Date.now() - new Date(f.created_at)) / 864e5 > 7)))
+      .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || (a.created_at || '').localeCompare(b.created_at || ''))
+      .map(f => item(`${pl(A(f.assessor_id))}<div class="sub">${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}${f.source_type !== 'manual' && f.notes ? ' · ' + e(f.notes) : ''}</div><div class="sub" style="font-size:12px">${f.due_date ? `<span style="color:var(--${f.due_date < t ? 'bad' : f.due_date === t ? 'warn' : 'muted'})">Due ${fmt(f.due_date)}</span> · ` : ''}Opened ${fmt(f.created_at)}${f.assigned_to ? ' · ' + e(f.assigned_to) : ''}</div>`,
+        canWrite() ? `<button class="btn sm" onclick="famFU('done','${e(f.source_type)}',${f.source_id},${f.assessor_id},'${e(f.kind)}')">Done</button>` : ''));
+    const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
+    const people = vis().slice().sort((a, b) => shownName(a).localeCompare(shownName(b)));
+    const form = TD.add ? `<form onsubmit="famTodayAdd(event)"><b>New follow-up</b><select name="aid" aria-label="Practitioner" required><option value="">Choose practitioner…</option>${people.map(a => `<option value="${a.id}">${e(shownName(a))}</option>`).join('')}</select>
+      <input name="note" placeholder="What needs doing?" aria-label="Note" required maxlength="500"><label class="sub" style="display:grid;gap:4px">Due date (optional)<input type="date" name="due" min="${t}"></label>
+      <div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn sm" onclick="TDcancel()">Cancel</button><button class="btn sm y">Save</button></div></form>` : '';
+    const body = sec('At risk allocations', risk) + sec('Renewals to review', rev) + sec('Expiring in 30 days', expL) + sec('Follow-ups', fus);
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="famToday(false)" aria-label="Close">✕</button></div>
+      <div class="sub" style="margin-top:-8px">${fmt(t)} · ${risk.length + rev.length + expL.length + fus.length} to act on</div>${form}
+      ${body || '<div class="card" style="padding:18px;text-align:center">Nothing due. ✓</div>'}
+      ${nIss ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}`;
+    if (TD.add) el.querySelector('form select')?.focus();
+  }
+  window.TDadd = () => { TD.add = !TD.add; renderToday(); };
+  window.TDcancel = () => { TD.add = false; renderToday(); };
+  addEventListener('keydown', ev => { if (ev.key === 'Escape' && TD) famToday(false); });
+  addEventListener('hashchange', () => { if (TD && !/^#fam/.test(location.hash)) famToday(false); });
+
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
@@ -1085,6 +1152,7 @@
     setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
     Object.assign(S, { A, R, D, F, Q, SC, RN, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     try { window.famBell && window.famBell(S); } catch (_) {}
+    try { renderToday(); } catch (_) {}
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }
     if (famSel < 0 || famSel >= A.length) famSel = 0;

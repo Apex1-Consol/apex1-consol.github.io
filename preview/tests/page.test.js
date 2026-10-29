@@ -391,16 +391,18 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     ok(log.some(x => x.table === 'audit_log' && x.val.action === 'SCOPE_IMPORT_COMMIT'), 'no audit row');
     w.famScope(11); const f = d.getElementById('famform'); ok(f.elements.qid.options.length === 1 && f.elements.qid.value === 'q-118699', 'already-linked not excluded');
   });
-  await t('FAM Calendar: side-panel button opens it; cover, risks and renewals render', async () => {
+  await t('FAM Today panel opens from side-panel button; Calendar: cover, risks and renewals render', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     w.location.hash = '#fam'; await tick(); await tick();
-    w.toggleRP(); await tick(); await tick();
+    w.toggleRP(); await tick(); const td = d.getElementById('famtoday'); ok(td && /Today/.test(td.textContent) && /At risk allocations/.test(td.textContent), td ? td.textContent.slice(0, 300) : 'no Today panel');
+    d.querySelector('#famtoday button[onclick^="TDadd"]').click(); ok(d.querySelector('#famtoday form select[name=aid]'), 'no add form');
+    w.toggleRP(); await tick(); ok(!d.getElementById('famtoday'), 'Today did not close');
+    w.location.hash = '#fam/calendar'; await tick(); await tick();
     ok(w.location.hash === '#fam/calendar' && d.getElementById('heading').textContent === 'FAM Calendar', w.location.hash);
     w.famCal('qual', 'q-101869'); const t = d.getElementById('famprof').textContent;
     w.famCal('tab', 'cover'); const t2 = d.getElementById('famprof').textContent; ok(/Who can cover/.test(t) && /In scope/.test(t2) && /Renewals/.test(t) && /At risk/.test(t), t.slice(0, 300));
     w.famCal('tab', 'risk'); const fb = d.querySelector('#famprof button[onclick^="famCal(\'cf\'"]');
     ok(fb, 'no at-risk row in fixture'); if (fb) { fb.click(); ok(/Cover for /.test(d.getElementById('famprof').textContent), 'Find cover did not open'); w.famCal('cf', ''); }
-    w.toggleRP(); await tick(); ok(w.location.hash === '#fam', 'toggle back');
   });
   await t('FAM renewals: Send link, review queue, approve updates the registration', async () => {
     const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations, n: DATA.fam_renewals };
@@ -409,7 +411,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     DATA.fam_renewals = [{ id: 9, assessor_id: 6, registration_id: 22, doc_type: 'SETA registration', status: 'Uploaded', created_at: day(-2) + 'T08:00:00Z', expires_at: day(28) + 'T08:00:00Z', file_path: 'apex-preview/6/renewals/9.pdf', file_name: 'mict.pdf', proposed_expiry: day(800), proposed_reg_no: 'M-1' }];
     try {
       const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
-      w.location.hash = '#fam'; await tick(); await tick(); w.toggleRP(); await tick(); await tick(); w.famCal('tab', 'renew'); const tx = d.getElementById('famprof').textContent;
+      w.location.hash = '#fam/calendar'; await tick(); await tick(); w.famCal('tab', 'renew'); const tx = d.getElementById('famprof').textContent;
       ok(/Uploaded, waiting for review \(1\)/.test(tx) && /Send link/.test(tx) && /Escalate/.test(tx), tx.slice(0, 400));
       w.confirm = () => true; await w.famRenewDo(9, true); await tick();
       const rp = log.find(x => x.rpc === 'fam_approve_renewal'); ok(rp && rp.args.p_id === 9 && !log.some(x => x.table === 'fam_seta_registrations' && x.op === 'update'), JSON.stringify(log.slice(-3)));
