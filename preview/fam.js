@@ -816,6 +816,7 @@
     let fields;
     if (act === 'claim') fields = { status: 'In Progress', assigned_to: me() };
     else if (act === 'dismiss') fields = { status: 'Dismissed', resolved_at: now, resolved_by: me() };
+    else if (act === 'snooze') fields = { snoozed_until: addD(today(), 7), status: f?.status && !CLOSED.includes(f.status) ? f.status : 'Open' };
     else if (act === 'done') fields = { status: 'Done', resolved_at: now, resolved_by: me() };
     else if (act === 'reopen') fields = { status: 'Open', resolved_at: null, resolved_by: null };
     else { const n = prompt('Note for this follow-up:', f?.notes || ''); if (n === null) return; fields = { notes: n, status: f?.status || 'Open' }; }
@@ -1087,6 +1088,7 @@
       #famtodaybk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
       #famtoday{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:60;overflow:auto;overscroll-behavior:contain;background:var(--card,#fff);box-shadow:-8px 0 32px rgba(20,20,60,.18);padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px}
       #famtoday h2{font-size:18px;margin:0;flex-grow:1}#famtoday h3{font-size:14px;margin:0 0 6px;display:flex;gap:6px;align-items:center}
+      #famtoday .tdchips{display:flex;gap:6px;flex-wrap:wrap;margin-top:-4px}#famtoday .tdchip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 10px 4px 4px;font:inherit;font-size:13px;cursor:pointer;display:flex;gap:6px;align-items:center}#famtoday .tdchip.on{border-color:var(--navy,#25247B);box-shadow:0 0 0 1px var(--navy,#25247B)}
       #famtoday .tdi{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}#famtoday .tdi:first-of-type{border-top:0}
       #famtoday .tdi>div:first-child{flex-grow:1;min-width:0}#famtoday .tdi a{font-weight:600}#famtoday .tdb{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
       #famtoday form{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px}#famtoday form select,#famtoday form input{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;width:100%;box-sizing:border-box}
@@ -1094,44 +1096,58 @@
     const vids = new Set(vis().map(a => a.id)), A = id => S.A.find(x => x.id === id), t = today(), in30 = addD(t, 30);
     const pl = a => a ? `<a href="#fam/${a.id}" onclick="famToday(false)">${e(shownName(a))}</a>` : 'Unknown';
     const dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(t + 'T00:00:00')) / 864e5), when = d => { const n = dleft(d); return n < 0 ? `expired ${-n} day${n === -1 ? '' : 's'} ago` : n === 0 ? 'expires today' : `in ${n} day${n === 1 ? '' : 's'}`; };
-    const item = (main, btns) => `<div class="tdi"><div>${main}</div><div class="tdb">${btns || ''}</div></div>`;
-    const sec = (title, list, extra) => list.length ? `<section class="card" style="padding:12px 14px"><h3>${title} <span class="badge">${list.length}</span></h3>${extra || ''}${list.join('')}</section>` : '';
+    // every row: sec, main html, btns html, over/week flags, follow-up ref (for claim/snooze), owner
+    const I = [], mine = me(), w7 = addD(t, 7);
+    const fuBtns = x => !x.ref || !canWrite() ? '' : (x.owner === mine ? '' : `<button class="btn sm" onclick="TDfu('claim',${x.n})">Assign to me</button>`) + `<button class="btn sm" onclick="TDfu('snooze',${x.n})" title="Hide from Today for 7 days">Snooze</button>`;
+    const add = x => { const f = x.ref ? fu(x.ref[0], x.ref[1]) : null; if (x.fu) Object.assign(x, { owner: x.fu.assigned_to || null, snz: x.fu.snoozed_until }); else if (f) Object.assign(x, { owner: CLOSED.includes(f.status) ? null : f.assigned_to || null, snz: f.snoozed_until }); x.n = I.length; I.push(x); };
     // at risk
     const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`; TD.rk = [];
-    const risk = assigns().filter(x => x.live && x.el[0] !== 'ok' && vids.has(x.a.id)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-      .map(x => item(`${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, `<button class="btn sm" onclick="famTodayCover(${(TD.rk = TD.rk || []).push(rk(x)) - 1},'risk')">Find cover</button>`));
+    assigns().filter(x => x.live && x.el[0] !== 'ok' && vids.has(x.a.id)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
+      .forEach(x => add({ sec: 0, over: x.el[0] === 'bad', week: !!x.start && x.start <= w7, main: `${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, btns: `<button class="btn sm" onclick="famTodayCover(${TD.rk.push(rk(x)) - 1},'risk')">Find cover</button>` }));
     // renewals to review
-    const rev = (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id)).map(x => { const r = S.R.find(y => y.id === x.registration_id);
-      return item(`${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
-        `<button class="btn sm" onclick="famRenewView(${x.id})">View</button>${isAdm() ? `<button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button>` : ''}<button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button>`); });
-    // expiring in 30 days (registrations: renewal link state; documents: upload in profile)
+    (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id)).forEach(x => { const r = S.R.find(y => y.id === x.registration_id);
+      add({ sec: 1, week: true, main: `${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
+        btns: `<button class="btn sm" onclick="famRenewView(${x.id})">View</button>${isAdm() ? `<button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button>` : ''}<button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button>` }); });
+    // expiring in 30 days (registrations: renewal link state; documents: open profile)
     const rnFor = rid => (S.RN || []).filter(x => x.registration_id === rid).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
-    const exp = [];
     S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date <= in30 && r.registration_expiry_date >= addD(t, -30)).forEach(r => {
       const x = rnFor(r.id); if (x && ['Uploaded', 'Approved'].includes(x.status)) return;
-      const sent = x && x.status === 'Sent' && x.expires_at >= new Date().toISOString();
-      exp.push([sent ? 0 : 1, r.registration_expiry_date, item(`${pl(A(r.assessor_id))}<div class="sub">${e(r.seta_name || 'SETA')} registration ${when(r.registration_expiry_date)}</div>${sent ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <span class="badge b-bad" title="Nothing uploaded yet: phone the practitioner">Escalate</span>` : ''}`,
-        canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent ? 'Resend' : 'Send link'}</button>` : '')]); });
-    S.D.filter(d => vids.has(d.assessor_id) && d.is_current !== false && d.expiry_date && d.expiry_date <= in30 && d.expiry_date >= addD(t, -30)).forEach(d =>
-      exp.push([1, d.expiry_date, item(`${pl(A(d.assessor_id))}<div class="sub">${e(d.doc_type || 'Document')} ${when(d.expiry_date)}</div>`, `<button class="btn sm" onclick="famTodayGo('fam/${d.assessor_id}')">Open</button>`)]));
-    const expL = exp.sort((a, b) => a[0] - b[0] || a[1].localeCompare(b[1])).map(x => x[2]);
-    // follow-ups: added by hand (open), or due/overdue, or open more than 7 days
-    const fus = S.F.filter(f => vids.has(f.assessor_id) && !CLOSED.includes(f.status) && (f.source_type === 'manual' || (f.due_date && f.due_date <= t) || (f.created_at && (Date.now() - new Date(f.created_at)) / 864e5 > 7)))
+      const sent = x && x.status === 'Sent' && x.expires_at >= new Date().toISOString(), d = r.registration_expiry_date;
+      add({ sec: 2, esc: sent, d, over: d < t, week: d <= w7, ref: ['registration', r.id, r.assessor_id, d < t ? 'expired' : 'due_30'],
+        main: `${pl(A(r.assessor_id))}<div class="sub">${e(r.seta_name || 'SETA')} registration ${when(d)}</div>${sent ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <span class="badge b-bad" title="Nothing uploaded yet: phone the practitioner">Escalate</span>` : ''}`,
+        btns: canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent ? 'Resend' : 'Send link'}</button>` : '' }); });
+    S.D.filter(dd => vids.has(dd.assessor_id) && dd.is_current !== false && dd.expiry_date && dd.expiry_date <= in30 && dd.expiry_date >= addD(t, -30)).forEach(dd => { const d = dd.expiry_date;
+      add({ sec: 2, d, over: d < t, week: d <= w7, ref: ['document', dd.id, dd.assessor_id, d < t ? 'expired' : 'due_30'], main: `${pl(A(dd.assessor_id))}<div class="sub">${e(dd.doc_type || 'Document')} ${when(d)}</div>`, btns: `<button class="btn sm" onclick="famTodayGo('fam/${dd.assessor_id}')">Open</button>` }); });
+    // follow-ups: added by hand, due/overdue, or open more than 7 days (expiry ones already show above)
+    const shown = new Set(I.filter(x => x.ref).map(x => x.ref[0] + x.ref[1]));
+    S.F.filter(f => vids.has(f.assessor_id) && !CLOSED.includes(f.status) && !shown.has(f.source_type + f.source_id) && (f.source_type === 'manual' || (f.due_date && f.due_date <= t) || (f.created_at && (Date.now() - new Date(f.created_at)) / 864e5 > 7)))
       .sort((a, b) => (a.due_date || '9999').localeCompare(b.due_date || '9999') || (a.created_at || '').localeCompare(b.created_at || ''))
-      .map(f => item(`${pl(A(f.assessor_id))}<div class="sub">${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}${f.source_type !== 'manual' && f.notes ? ' · ' + e(f.notes) : ''}</div><div class="sub" style="font-size:12px">${f.due_date ? `<span style="color:var(--${f.due_date < t ? 'bad' : f.due_date === t ? 'warn' : 'muted'})">Due ${fmt(f.due_date)}</span> · ` : ''}Opened ${fmt(f.created_at)}${f.assigned_to ? ' · ' + e(f.assigned_to) : ''}</div>`,
-        canWrite() ? `<button class="btn sm" onclick="famFU('done','${e(f.source_type)}',${f.source_id},${f.assessor_id},'${e(f.kind)}')">Done</button>` : ''));
+      .forEach(f => add({ sec: 3, fu: f, over: !!f.due_date && f.due_date < t, week: !!f.due_date && f.due_date <= w7, ref: [f.source_type, f.source_id, f.assessor_id, f.kind],
+        main: `${pl(A(f.assessor_id))}<div class="sub">${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}${f.source_type !== 'manual' && f.notes ? ' · ' + e(f.notes) : ''}</div><div class="sub" style="font-size:12px">${f.due_date ? `<span style="color:var(--${f.due_date < t ? 'bad' : f.due_date === t ? 'warn' : 'muted'})">Due ${fmt(f.due_date)}</span> · ` : ''}Opened ${fmt(f.created_at)}</div>`,
+        btns: canWrite() ? `<button class="btn sm" onclick="famFU('done','${e(f.source_type)}',${f.source_id},${f.assessor_id},'${e(f.kind)}')">Done</button>` : '' }));
+    TD.I = I;
+    const live = I.filter(x => !(x.snz && x.snz > t)), snoozed = I.length - live.length;
+    const CH = [['over', 'Overdue', x => x.over, 'b-bad'], ['week', 'This week', x => x.week, 'b-warn'], ['unas', 'Unassigned', x => x.ref && !x.owner, ''], ['mine', 'Mine', x => x.owner === mine, 'b-ok']];
+    const cf = CH.find(c => c[0] === TD.f), list = TD.snz ? I.filter(x => x.snz && x.snz > t) : cf ? live.filter(cf[2]) : live;
+    const chips = CH.map(([k, l, fn, c]) => `<button class="tdchip${TD.f === k && !TD.snz ? ' on' : ''}" onclick="TDf('${k}')" aria-pressed="${TD.f === k && !TD.snz}"><span class="badge ${c}">${live.filter(fn).length}</span> ${l}</button>`).join('')
+      + (snoozed ? `<button class="tdchip${TD.snz ? ' on' : ''}" onclick="TDsnz()" aria-pressed="${!!TD.snz}"><span class="badge">${snoozed}</span> Snoozed</button>` : '');
+    const row = x => `<div class="tdi"><div>${x.main}${x.owner ? `<div class="sub" style="font-size:12px">Assigned to ${x.owner === mine ? 'me' : e(x.owner)}</div>` : ''}${x.snz && x.snz > t ? `<div class="sub" style="font-size:12px">Snoozed until ${fmt(x.snz)}</div>` : ''}</div><div class="tdb">${x.btns || ''}${x.snz && x.snz > t ? '' : fuBtns(x)}</div></div>`;
+    const SECS = ['At risk allocations', 'Renewals to review', 'Expiring in 30 days', 'Follow-ups'];
+    const body = SECS.map((s, k) => { const L = list.filter(x => x.sec === k).sort((a, b) => k === 2 ? (b.esc ? 1 : 0) - (a.esc ? 1 : 0) || a.d.localeCompare(b.d) : 0); return L.length ? `<section class="card" style="padding:12px 14px"><h3>${s} <span class="badge">${L.length}</span></h3>${L.map(row).join('')}</section>` : ''; }).join('');
     const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
     const people = vis().slice().sort((a, b) => shownName(a).localeCompare(shownName(b)));
     const form = TD.add ? `<form onsubmit="famTodayAdd(event)"><b>New follow-up</b><select name="aid" aria-label="Practitioner" required><option value="">Choose practitioner…</option>${people.map(a => `<option value="${a.id}">${e(shownName(a))}</option>`).join('')}</select>
       <input name="note" placeholder="What needs doing?" aria-label="Note" required maxlength="500"><label class="sub" style="display:grid;gap:4px">Due date (optional)<input type="date" name="due" min="${t}"></label>
       <div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn sm" onclick="TDcancel()">Cancel</button><button class="btn sm y">Save</button></div></form>` : '';
-    const body = sec('At risk allocations', risk) + sec('Renewals to review', rev) + sec('Expiring in 30 days', expL) + sec('Follow-ups', fus);
     el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="famToday(false)" aria-label="Close">✕</button></div>
-      <div class="sub" style="margin-top:-8px">${fmt(t)} · ${risk.length + rev.length + expL.length + fus.length} to act on</div>${form}
-      ${body || '<div class="card" style="padding:18px;text-align:center">Nothing due. ✓</div>'}
-      ${nIss ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}`;
+      <div class="sub" style="margin-top:-8px">${fmt(t)} · ${live.length} to act on</div><div class="tdchips">${chips}</div>${form}
+      ${body || `<div class="card" style="padding:18px;text-align:center">${cf || TD.snz ? 'Nothing here.' : 'Nothing due. ✓'}</div>`}
+      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}`;
     if (TD.add) el.querySelector('form select')?.focus();
   }
+  window.TDf = k => { TD.snz = false; TD.f = TD.f === k ? null : k; renderToday(); };
+  window.TDsnz = () => { TD.snz = !TD.snz; TD.f = null; renderToday(); };
+  window.TDfu = (act, n) => { const x = TD.I[n]; if (x?.ref) famFU(act, ...x.ref); };
   window.TDadd = () => { TD.add = !TD.add; renderToday(); };
   window.TDcancel = () => { TD.add = false; renderToday(); };
   addEventListener('keydown', ev => { if (ev.key === 'Escape' && TD) famToday(false); });

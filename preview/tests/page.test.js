@@ -395,6 +395,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     w.location.hash = '#fam'; await tick(); await tick();
     w.toggleRP(); await tick(); const td = d.getElementById('famtoday'); ok(td && /Today/.test(td.textContent) && /At risk allocations/.test(td.textContent), td ? td.textContent.slice(0, 300) : 'no Today panel');
+    ok(d.querySelectorAll('#famtoday .tdchip').length >= 4, 'no chips'); w.TDf('over'); ok(d.querySelector('#famtoday .tdchip.on'), 'chip filter'); w.TDf('over');
     d.querySelector('#famtoday button[onclick^="TDadd"]').click(); ok(d.querySelector('#famtoday form select[name=aid]'), 'no add form');
     w.toggleRP(); await tick(); ok(!d.getElementById('famtoday'), 'Today did not close');
     w.location.hash = '#fam/calendar'; await tick(); await tick();
