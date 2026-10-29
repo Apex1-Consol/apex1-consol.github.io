@@ -412,8 +412,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       w.location.hash = '#fam'; await tick(); await tick(); w.toggleRP(); await tick(); await tick(); w.famCal('tab', 'renew'); const tx = d.getElementById('famprof').textContent;
       ok(/Uploaded, waiting for review \(1\)/.test(tx) && /Send link/.test(tx) && /Escalate/.test(tx), tx.slice(0, 400));
       w.confirm = () => true; await w.famRenewDo(9, true); await tick();
-      const up = log.find(x => x.table === 'fam_seta_registrations' && x.op === 'update'), rn = log.find(x => x.table === 'fam_renewals' && x.op === 'update');
-      ok(up && up.val.registration_expiry_date === day(800) && up.val.registration_number === 'M-1' && rn && rn.val.status === 'Approved', JSON.stringify(log.slice(-3)));
+      const rp = log.find(x => x.rpc === 'fam_approve_renewal'); ok(rp && rp.args.p_id === 9 && !log.some(x => x.table === 'fam_seta_registrations' && x.op === 'update'), JSON.stringify(log.slice(-3)));
       w.navigator.clipboard = { writeText: async () => {} }; w.open = () => {}; const nc = require('crypto'); w.TextEncoder = require('util').TextEncoder; Object.defineProperty(w, 'crypto', { value: { getRandomValues: a => { a.set(nc.randomBytes(a.length)); return a; }, subtle: { digest: (al, dt) => nc.webcrypto.subtle.digest(al, Buffer.from(dt)) } }, configurable: true }); await w.famRenew(21); await tick();
       const ins = log.find(x => x.table === 'fam_renewals' && x.op === 'insert'); ok(ins && /^[0-9a-f]{64}$/.test(ins.val.token_hash) && ins.val.registration_id === 21 && !('token' in ins.val), JSON.stringify(ins));
     } finally { Object.assign(DATA, { assessors: keep.a, fam_seta_registrations: keep.r, fam_renewals: keep.n }); }

@@ -936,7 +936,7 @@
       if (old.length) await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Cancelled' }).in('id', old));
       const th = await sha(tok); await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: a.id, registration_id: rid, doc_type: 'SETA registration', token_hash: th, sent_to: a.email }));
     } catch (_) { return; }
-    const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').trim().split(/\s+/)[0];
+    const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').replace(/^\s*\[test\]\s*/i, '').trim().split(/\s+/)[0];
     const body = `Hi ${first},\n\nYour ${r.seta_name || 'SETA'} registration expires on ${fmt(r.registration_expiry_date)}. Please upload your renewed registration letter here (the link works once and expires in 30 days):\n\n${link}\n\nThank you,\nApex`;
     try { await navigator.clipboard.writeText(link); } catch (_) {}
     window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Your SETA registration renewal')}&body=${encodeURIComponent(body)}`, '_self');
@@ -948,10 +948,11 @@
     const x = (S.RN || []).find(y => y.id === id); if (!x) return;
     const note = ok ? null : prompt('Reason for rejecting (the practitioner gets a new link when you resend)'); if (!ok && note === null) return;
     if (ok && !x.proposed_expiry && !confirm('No new expiry date was given. Approve anyway and keep the current date?')) return;
+    const cr = S.R.find(y => y.id === x.registration_id);
+    if (ok && x.proposed_expiry && cr?.registration_expiry_date && x.proposed_expiry <= cr.registration_expiry_date) return say(`The new expiry (${fmt(x.proposed_expiry)}) is not later than the current one (${fmt(cr.registration_expiry_date)}). Reject it and send a new link, or fix the registration on the profile.`);
     try {
-      if (ok && x.registration_id) { const up = { status: 'Active' }; if (x.proposed_expiry) up.registration_expiry_date = x.proposed_expiry; if (x.proposed_reg_no) up.registration_number = x.proposed_reg_no;
-        await write('Registration', () => sb.from('fam_seta_registrations').update(up).eq('id', x.registration_id)); }
-      await write('Renewal', () => sb.from('fam_renewals').update({ status: ok ? 'Approved' : 'Rejected', review_note: note || null, reviewed_by: me(), reviewed_at: new Date().toISOString() }).eq('id', id));
+      if (ok) await write('Renewal', () => sb.rpc('fam_approve_renewal', { p_id: id }));
+      else await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Rejected', review_note: note || null, reviewed_by: me(), reviewed_at: new Date().toISOString() }).eq('id', id));
       say(ok ? 'Renewal approved and registration updated' : 'Renewal rejected'); await load();
     } catch (_) {}
   };
@@ -1004,8 +1005,8 @@
     const upl = (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id));
     const review = upl.length ? `<div class="fccover" style="margin:14px 20px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px"><b>Uploaded, waiting for review (${upl.length})</b>
       <table class="dense" style="margin-top:6px"><thead><tr><th>Practitioner</th><th>What</th><th>New expiry</th><th>Reg. no.</th><th>Note</th><th></th></tr></thead><tbody>${upl.map(x => { const r = S.R.find(y => y.id === x.registration_id);
-        return `<tr><td>${pl(S.A.find(a => a.id === x.assessor_id))}</td><td>${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}<div class="sub">${e(x.file_name || '')}</div></td><td>${fmt(x.proposed_expiry) || '—'}</td><td>${e(x.proposed_reg_no || '—')}</td><td class="sub">${e(x.practitioner_note || '')}</td>
-        <td style="white-space:nowrap"><button class="btn sm" onclick="famRenewView(${x.id})">View</button> <button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button> <button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button></td></tr>`; }).join('')}</tbody></table></div>` : '';
+        return `<tr><td>${pl(S.A.find(a => a.id === x.assessor_id))}</td><td>${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}<div class="sub">${e(x.file_name || '')}</div></td><td>${fmt(x.proposed_expiry) || '—'}${x.proposed_expiry && r?.registration_expiry_date && x.proposed_expiry <= r.registration_expiry_date ? `<div><span class="badge b-bad" title="Current expiry ${fmt(r.registration_expiry_date)}">Not later than current</span></div>` : ''}</td><td>${e(x.proposed_reg_no || '—')}</td><td class="sub">${e(x.practitioner_note || '')}</td>
+        <td style="white-space:nowrap"><button class="btn sm" onclick="famRenewView(${x.id})">View</button> ${isAdm() ? `<button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button>` : '<span class="sub" title="Only FAM admins can approve">Admin approves</span>'} <button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button></td></tr>`; }).join('')}</tbody></table></div>` : '';
     const issRows = [...dup.map(([a, b]) => ['<span class="badge b-warn">Possible duplicate</span>', `${pl(a)} (#${a.id}) and ${pl(b)} (#${b.id})`, `“${e(a.full_name)}” vs “${e(b.full_name)}”`]), ...iss.map(([a, t]) => ['<span class="badge">Data issue</span>', pl(a), e(t)])];
     // find cover for one at-risk allocation: valid reg for role (+SETA) until it ends, free over its dates, not in conflict on the same programme
     const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`, cx = risk.find(x => rk(x) === C.cf);

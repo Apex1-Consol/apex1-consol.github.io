@@ -43,13 +43,14 @@ const fail=m=>box.innerHTML=`<h1>Link not available</h1><div class="msg err">${e
 (async()=>{
   if(!t)return fail('This link is incomplete. Open it straight from the email Apex sent you.');
   let r;try{const res=await fetch(FN+'?t='+encodeURIComponent(t));r=await res.json();if(!res.ok)return fail(r.error||'This link is not valid.')}catch(e){return fail('Could not reach Apex. Check your connection and refresh.')}
+  const minD=(()=>{const t=new Date();t.setDate(t.getDate()+1);const c=t.toISOString().slice(0,10);return r.current_expiry&&r.current_expiry>=c?new Date(new Date(r.current_expiry+'T00:00:00Z').getTime()+864e5).toISOString().slice(0,10):c})();
   box.innerHTML=`<h1>Hi ${esc(r.first||'there')}</h1>
   <p>Please upload your renewed <b>${esc(r.seta?r.seta+' registration':r.what)}</b>${r.current_expiry?` (currently expires ${fmt(r.current_expiry)})`:''}.</p>
   <p class="sub">Link valid until ${fmt(r.link_expires)}.</p>
   <div id="m"></div>
   <form id="f">
     <label>Document (PDF, JPG or PNG, max 10 MB)<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required></label>
-    <label>New expiry date<input type="date" name="expiry" required></label>
+    <label>New expiry date (after ${r.current_expiry?fmt(r.current_expiry):"today"})<input type="date" name="expiry" required min="${minD}"></label>
     <label>Registration number (if it changed)<input type="text" name="reg_no" maxlength="60" autocomplete="off"></label>
     <label>Note for Apex (optional)<textarea name="note" maxlength="500"></textarea></label>
     <label class="chk"><input type="checkbox" name="consent" value="yes" required><span>I consent to Apex storing this document and these details on my practitioner record for SETA compliance.</span></label>
