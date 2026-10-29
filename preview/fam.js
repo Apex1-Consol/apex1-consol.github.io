@@ -8,7 +8,7 @@
    Scope Import (#fam/scope): catalogue rows linked to registrations, written to fam_registration_scope + audit_log.
    Status and risk rules are the same as fam-registry.html. Writes go through previewWrite; RLS decides who may write. */
 (function () {
-  const sb = window.__sb, P = window.__preview, write = window.previewWrite;
+  const sb = window.famCU ? window.famCU(window.__sb) : window.__sb, P = window.__preview, write = window.previewWrite;
   if (!sb || !P || !write) return;
 
   const TYPES = ['CV', 'ID', 'Highest Qualification', 'QUAL', 'SLA', 'AFFIDAVIT'];
