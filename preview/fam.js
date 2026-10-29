@@ -968,7 +968,7 @@
       <td>${x.v ? '<span class="badge b-ok">✓ Verified</span>' : '<span class="badge b-warn" title="Registered with the right SETA, but this qualification is not linked to the registration yet">SETA match, check scope</span>'}</td>
       <td>${x.until ? fmt(x.until) : '<span class="sub">No expiry</span>'}${x.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Ends first</span>' : ''}</td>
       <td>${x.on ? '<span class="badge b-ok">Facilitating this</span>' : x.busy ? '<span class="badge b-warn">Busy on other work</span>' : '<span class="badge b-ok">Free</span>'}</td>
-      <td style="text-align:right">${!x.on && canWrite() ? `<button class="btn sm" onclick="famSetFac(${pid},${x.a.id})">Set as facilitator</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
+      <td style="text-align:right">${!x.on && canWrite() && [...x.roles, ...rolesOf(x.a)].some(r => /facilitat/i.test(r)) ? `<button class="btn sm" onclick="famSetFac(${pid},${x.a.id})">Set as facilitator</button>` : ''}</td></tr>`).join('')}</tbody></table></div>`;
   };
   window.famSetFac = async (pid, aid) => {
     const p = ((P.data && P.data.progs) || []).find(x => x.id === pid), a = S.A.find(x => x.id === aid); if (!p || !a) return;
