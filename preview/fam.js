@@ -1080,6 +1080,8 @@
   }
   // self-service renewal: single-use link (only its SHA-256 is stored), practitioner uploads on renew.html via the fam-renew function, staff approve here
   const sha = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  // emails the link through fam-renew-send (Gmail SMTP); false = not sent, caller falls back to mailto
+  const mailLink = async (id, tok, to) => { if (!id) return false; try { const { data, error } = await sb.functions.invoke('fam-renew-send', { body: { id, t: tok, base: new URL('renew.html', location.href.split('#')[0]).href } }); return !error && data?.ok === true && data.to === to; } catch (_) { return false; } };
   const selV = (name, label, opts, v) => `<label>${label}<select name="${name}">${['', ...opts].map(o => `<option value="${e(o)}" ${o === (v || '') ? 'selected' : ''}>${e(o || '—')}</option>`).join('')}</select></label>`;
   const setFx = (id, patch) => { const a = S.A.find(x => x.id === id); return write('Practitioner', () => sb.from('assessors').update({ fields: { ...fx(a), ...patch } }).eq('id', id)); };
   window.famMatch = (id, part) => { const a = S.A.find(x => x.id === id); if (!a) return; const f = fx(a);
@@ -1107,15 +1109,16 @@
       async F => { need(); await write('Qualification', () => sb.from('qualifications').update({ last_enrol_date: val(F, 'le'), last_achieve_date: val(F, 'la'), qcto_code: val(F, 'qc') }).eq('id', q.id)); say('Qualification dates saved'); }); };
   window.famProfLink = async aid => { const a = S.A.find(x => x.id === aid); if (!a) return; if (!a.email) return say(`${shownName(a)} has no email address. Add it on the profile first.`);
     const b = new Uint8Array(32); crypto.getRandomValues(b); const tok = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    try { const old = (S.RN || []).filter(x => x.assessor_id === aid && x.doc_type === 'Profile update' && x.status === 'Sent').map(x => x.id);
+    let nid; try { const old = (S.RN || []).filter(x => x.assessor_id === aid && x.doc_type === 'Profile update' && x.status === 'Sent').map(x => x.id);
       if (old.length) await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Cancelled' }).in('id', old));
-      const th = await sha(tok); await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: aid, registration_id: null, doc_type: 'Profile update', token_hash: th, sent_to: a.email }));
+      const th = await sha(tok); nid = (await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: aid, registration_id: null, doc_type: 'Profile update', token_hash: th, sent_to: a.email }).select('id').single()))?.id;
     } catch (_) { return; }
     const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').replace(/^\s*\[test\]\s*/i, '').trim().split(/\s+/)[0];
     const body = `Hi ${first},\n\nPlease check and update your contact details, location, languages and availability for Apex here (the link works once and expires in 30 days):\n\n${link}\n\nThank you,\nApex`;
     try { await navigator.clipboard.writeText(link); } catch (_) {}
-    window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Please update your Apex practitioner details')}&body=${encodeURIComponent(body)}`, '_self');
-    say('Update link created and copied. Your email app opens with the message.'); await load(); };
+    if (await mailLink(nid, tok, a.email)) say(`Update link emailed to ${a.email} (also copied).`);
+    else { window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Please update your Apex practitioner details')}&body=${encodeURIComponent(body)}`, '_self'); say('Update link created and copied. Your email app opens with the message.'); }
+    await load(); };
   const applyProfile = async x => { const a = S.A.find(y => y.id === x.assessor_id), p = x.proposed_profile || {}; if (!a) throw new Error('Practitioner not found');
     const up = {}; if (p.email) up.email = p.email; if (p.phone) up.phone = p.phone; if (p.address) up.physical_address = p.address;
     const f = { ...fx(a) }; ['province', 'city', 'languages', 'delivery'].forEach(k => { if (p[k]) f[k] = p[k]; });
@@ -1134,16 +1137,17 @@
     const r = S.R.find(x => x.id === rid), a = r && S.A.find(x => x.id === r.assessor_id); if (!r || !a) return;
     if (!a.email) return say(`${shownName(a)} has no email address. Add it on the profile first.`);
     const b = new Uint8Array(32); crypto.getRandomValues(b); const tok = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-    try {
+    let nid; try {
       const old = (S.RN || []).filter(x => x.registration_id === rid && x.status === 'Sent').map(x => x.id);
       if (old.length) await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Cancelled' }).in('id', old));
-      const th = await sha(tok); await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: a.id, registration_id: rid, doc_type: 'SETA registration', token_hash: th, sent_to: a.email }));
+      const th = await sha(tok); nid = (await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: a.id, registration_id: rid, doc_type: 'SETA registration', token_hash: th, sent_to: a.email }).select('id').single()))?.id;
     } catch (_) { return; }
     const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').replace(/^\s*\[test\]\s*/i, '').trim().split(/\s+/)[0];
     const body = `Hi ${first},\n\nYour ${r.seta_name || 'SETA'} registration expires on ${fmt(r.registration_expiry_date)}. Please upload your renewed registration letter here (the link works once and expires in 30 days):\n\n${link}\n\nThank you,\nApex`;
     try { await navigator.clipboard.writeText(link); } catch (_) {}
-    window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Your SETA registration renewal')}&body=${encodeURIComponent(body)}`, '_self');
-    say('Renewal link created and copied. Your email app opens with the message.'); await load();
+    if (await mailLink(nid, tok, a.email)) say(`Renewal link emailed to ${a.email} (also copied).`);
+    else { window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Your SETA registration renewal')}&body=${encodeURIComponent(body)}`, '_self'); say('Renewal link created and copied. Your email app opens with the message.'); }
+    await load();
   };
   window.famRenewView = async id => { const x = (S.RN || []).find(y => y.id === id); if (x?.proposed_profile) return profView(x); return famRenewFile(id); };
   window.famRenewFile = async id => { const x = (S.RN || []).find(y => y.id === id); if (!x?.file_path) return say('No file');

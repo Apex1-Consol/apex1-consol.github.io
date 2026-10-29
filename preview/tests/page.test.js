@@ -45,7 +45,7 @@ function fakeSupabase(log, opts) {
   const chain = (table) => {
     const st = { table, op: 'select' };
     const p = {
-      select() { return p; }, order() { return p; }, limit() { return p; }, eq(k, v) { st.eq = [k, v]; return p; }, in(k, v) { st.eq = [k, v]; return p; },
+      select() { return p; }, single() { return p; }, order() { return p; }, limit() { return p; }, eq(k, v) { st.eq = [k, v]; return p; }, in(k, v) { st.eq = [k, v]; return p; },
       update(v) { st.op = 'update'; st.val = v; return p; }, insert(v) { st.op = 'insert'; st.val = v; return p; }, upsert(v, o) { st.op = 'upsert'; st.val = v; st.eq = ['onConflict', o && o.onConflict]; return p; },
       then(res) { if (st.op !== 'select') log.push({ table, op: st.op, val: st.val, eq: st.eq }); const fail = opts.fail && opts.fail === table && st.op !== 'select';
         return Promise.resolve(fail ? { data: null, error: { message: 'denied by RLS' } } : { data: st.op === 'select' ? JSON.parse(JSON.stringify(DATA[table] || [])) : [], error: null }).then(res); }
@@ -54,6 +54,7 @@ function fakeSupabase(log, opts) {
   };
   return {
     storage: { from: b => ({ async upload(path) { log.push({ upload: b, path }); return { data: { path }, error: null }; }, async createSignedUrl(path) { log.push({ sign: path }); return { data: { signedUrl: 'about:blank' }, error: null }; } }) },
+    functions: { invoke: async (fn, o) => { log.push({ invoke: fn, body: o && o.body }); return { data: null, error: { message: 'Email is not set up yet' } }; } },
     from: chain, schema: () => ({ rpc: async () => ({ data: [], error: null }), from: chain }),
     rpc: async (fn, args) => { log.push({ rpc: fn, args }); return opts.failRpc ? { data: null, error: { message: 'Only an admin can sign off' } } : { data: {}, error: null }; },
     auth: {
