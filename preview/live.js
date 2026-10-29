@@ -101,7 +101,7 @@
       q('signoff_items', sb.from('signoff_items').select('*').order('created_at', { ascending: false })),
       q('monitoring_visits', sb.from('monitoring_visits').select('*').order('id')),
       q('recommendations', sb.from('recommendations').select('*').order('id')),
-      q('assessors', sb.from('assessors').select('id,full_name,role')),
+      q('assessors', (window.__sb || sb).from('assessors').select('id,full_name,role')),
       q('v_fam_completeness', sb.from('v_fam_completeness').select('*')),
       isAdmin() ? q('v_learner_data_quality', sb.from('v_learner_data_quality').select('*')) : [],
       can('project_manager', 'operations') ? q('outbox', sb.from('clickup_sync_outbox').select('id,source_table,status,last_error').order('id', { ascending: false }).limit(500)) : [],

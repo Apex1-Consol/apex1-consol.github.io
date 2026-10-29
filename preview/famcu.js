@@ -26,6 +26,14 @@
       }
     };
 
+    const strip = r => { if (!r) return r; const { _t, id_number, ...x } = r; return x; };
+    function audit(t, before, rows) {
+      const P = window.__preview || {};
+      const recs = (rows || []).map(r => { const b = before && before[r._t];
+        return { tenant_id: r.tenant_id || P.tenant, action: b ? 'update' : 'insert', table_name: t, record_id: String(r.id), user_name: P.user?.email || null,
+          user_role: JSON.stringify(P.roles || []), changes: b ? { before: strip(b), after: strip(r) } : { new: strip(r) } }; });
+      if (recs.length) sb.from('audit_log').insert(recs).then(r => r.error && console.warn('audit', r.error.message));
+    }
     function q(t) {
       const st = { op: 'select', f: [], ord: null, lim: null, one: false, vals: null, conflict: null };
       const match = r => st.f.every(([k, op, v]) => op === 'eq' ? String(r[k]) === String(v) : op === 'in' ? v.map(String).includes(String(r[k])) : op === 'gte' ? String(r[k] ?? '') >= String(v) : true);
@@ -41,7 +49,7 @@
         then(res, rej) { return run().then(res, rej); }
       };
       async function run() {
-        let out;
+        let out; const before = {}; (cache[t] || []).forEach(r => { before[r._t] = r; });
         if (st.op === 'select') {
           const r = await ids(t); if (r.error) return { data: null, error: r.error };
           out = r.data.filter(match);
@@ -58,7 +66,7 @@
           if (t === 'assessors') await splitId(r.data.map((x, i) => ({ id: x.id, id_number: st.vals[i].id_number })).filter((x, i) => 'id_number' in st.vals[i]));
           out = r.data;
         } else if (st.op === 'update') {
-          if (!cache[t]) { const r = await ids(t); if (r.error) return { data: null, error: r.error }; }
+          if (!cache[t]) { const r = await ids(t); if (r.error) return { data: null, error: r.error }; } cache[t].forEach(r => { before[r._t] = before[r._t] || r; });
           const hit = cache[t].filter(match);
           const { id_number, ...patch } = st.vals;
           if (t === 'assessors' && 'id_number' in st.vals) await splitId(hit.map(h => ({ id: h.id, id_number })));
@@ -67,7 +75,7 @@
           if (r.error) return { data: null, error: r.error };
           out = r.data;
         } else if (st.op === 'upsert') {
-          const r0 = await ids(t); if (r0.error) return { data: null, error: r0.error };
+          const r0 = await ids(t); if (r0.error) return { data: null, error: r0.error }; cache[t].forEach(r => { before[r._t] = before[r._t] || r; });
           const ins = [], upd = [];
           for (const v of st.vals) {
             const h = cache[t].find(x => st.conflict.every(k => String(x[k.trim()]) === String(v[k.trim()])));
@@ -79,6 +87,7 @@
           if (u.error) return { data: null, error: u.error };
           out = [...a.data, ...u.data];
         }
+        if (st.op !== 'select') audit(t, st.op === 'insert' ? null : before, out);
         if (st.op !== 'select' && cache[t]) { for (const r of out) { const i = cache[t].findIndex(x => x._t === r._t); if (i >= 0) cache[t][i] = r; else cache[t].push(r); } }
         return { data: st.one ? (out[0] || null) : out, error: null };
       }
@@ -103,16 +112,24 @@
 
     return new Proxy(sb, {
       get(o, k) {
-        if (k === 'from') return t => CU.has(t) ? q(t) : o.from(t);
+        if (k === 'from') return t => {
+          if (CU.has(t)) return q(t);
+          const b = o.from(t);
+          if (t === 'fam_renewals') { const ins = b.insert.bind(b); b.insert = (v, opt) => ins([].concat(v).map(x => ({ ...x, backend: 'clickup' })), opt); }
+          return b;
+        };
         if (k === 'rpc') return (fn, args) => fn === 'fam_approve_renewal' ? approve(args.p_id) : o.rpc(fn, args);
         const v = o[k]; return typeof v === 'function' ? v.bind(o) : v;
       }
     });
   };
 
+  window.__sbRaw = window.__sb;
+  if (window.__sb) window.__sb = window.famCU(window.__sb);
+
   // Admin-only one-time copy of this tenant's preview rows into ClickUp. Run in the console: famCUImport()
   window.famCUImport = async function () {
-    const sb = window.__sb, log = [];
+    const sb = window.__sbRaw, log = [];
     for (const t of CU) {
       let off = 0;
       while (off != null) {
