@@ -293,7 +293,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('FAM: Can deliver shows verified scope and matching open programmes in list, panel and profile', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
     w.famMode('table');
-    ok(/Can deliver: OC: Project Manager/.test(d.getElementById('famrows').textContent), d.getElementById('famrows').textContent);
+    ok(/Can deliver 1/.test(d.getElementById('famrows').textContent), d.getElementById('famrows').textContent);
     w.famShow(0); const pt = d.getElementById('fampanel').textContent;
     ok(/Can deliver/.test(pt) && /OC: Project Manager/.test(pt) && /Verified/.test(pt) && /PM Cohort/.test(pt) && /Already on it/.test(pt), pt);
   });

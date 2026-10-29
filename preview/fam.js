@@ -933,7 +933,7 @@
     return { list, noScope: ok.filter(r => !scopeOf(r.id).length) };
   };
   const canLine = a => { const { list } = canDo(a); if (!list.length) return ''; const n = list.map(x => x.q.name), open = list.reduce((t, x) => t + x.progs.length, 0);
-    return `<div class="famcan" title="${e('Can deliver (verified on a SETA registration):\n' + n.join('\n'))}">Can deliver: ${e(n.slice(0, 2).join(' · '))}${n.length > 2 ? ` <b>+${n.length - 2} more</b>` : ''}${open ? ` · <b class="famcan-n">${open} open programme${open === 1 ? '' : 's'}</b>` : ''}</div>`; };
+    return `<div class="famcan" title="${e('Can deliver (verified on a SETA registration):\n' + n.join('\n'))}">✓ Can deliver ${n.length}${open ? ` · ${open} open` : ''}</div>`; };
   const canBlock = a => { const { list, noScope } = canDo(a), lab = { on: ['b-ok', 'Already on it'], free: ['b-ok', 'Free'], busy: ['b-warn', 'Busy on other work'] };
     const tip = noScope.length ? `<div class="sub" style="margin-top:8px">${e(noScope.map(r => r.seta_name || 'No SETA').join(', '))}: registered, but no qualifications linked. Check the CV and supporting documents, then add the scope to that registration.</div>` : '';
     if (!list.length) return `<div class="sub">${regsFor(a.id).length ? 'No verified qualifications yet.' : 'Add a SETA registration and its scope first.'}</div>${tip}`;
@@ -1267,7 +1267,7 @@
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
-      .famcan{font-size:12px;color:var(--muted,#5B6475);margin:2px 0 0 42px}.famcan-n{color:var(--ok)}.famcan-q{padding:8px 0;border-top:1px solid var(--line2,#eee)}.famcan-q:first-child{border-top:0;padding-top:0}.famcan-p{margin:4px 0 0 12px;font-size:13px}
+      .famcan{display:inline-block;font-size:11px;font-weight:700;white-space:nowrap;color:var(--ok);background:var(--okbg);border-radius:6px;padding:2px 6px;margin:4px 0 0 42px;cursor:help}.famcan-q{padding:8px 0;border-top:1px solid var(--line2,#eee)}.famcan-q:first-child{border-top:0;padding-top:0}.famcan-p{margin:4px 0 0 12px;font-size:13px}
       .famwho{display:inline-flex;gap:10px;align-items:flex-start;vertical-align:top}.famav{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;background:var(--accent-gold,#D4A537);margin-top:2px}.famidl{font-size:12px;margin:-2px 0 2px}.famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
       .famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
       .famok{font-size:12px;color:var(--ok);font-weight:700;margin-top:4px}.famgap{font-size:12px;margin-top:4px}
