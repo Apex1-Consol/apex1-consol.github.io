@@ -943,7 +943,8 @@
   /* "Suitable people" on a programme (Programmes › Overview): who can deliver this programme's qualification, best first */
   window.famSuitable = p => {
     const head = n => `<div style="padding:16px 20px"><h2>Suitable people${n == null ? '' : ` <span class="sub" style="font-weight:400">(${n})</span>`}</h2><span class="sub">From the FAM Registry. Verified = the qualification is in scope on a valid SETA registration.</span></div>`;
-    if (!S.A?.length) return head() + '<div class="sub" style="padding:0 20px 16px">Loading practitioners…</div>';
+    if (!S.A?.length) { if (!S.lp) S.lp = (async () => { try { setup(); await load(); } catch (_) {} if (typeof renderProg === 'function' && /^#programmes/.test(location.hash)) renderProg(); })();
+      return head() + '<div class="sub" style="padding:0 20px 16px">Loading practitioners…</div>'; }
     const text = [p.saqa_id, p.qualification_name, p.programme_name].join(' '), tw = qWords(text);
     const qs = (S.Q || []).filter(q => { const ids = String(q.saqa_id || '').split(/[^0-9]+/).filter(v => v.length >= 4), w = qWords(q.name);
       return (ids.length && ids.every(v => new RegExp('\\b' + v + '\\b').test(text))) || (w.length > 8 && tw.includes(w)); });
