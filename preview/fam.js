@@ -242,7 +242,7 @@
     $('famrows').innerHTML = list.length ? list.map(([a, i]) => {
       const k = onFile(a.id).length, c = k === 6 ? 'var(--ok)' : k >= 3 ? '#E0A100' : 'var(--bad)', st = setas(a.id), nx = nextExp(a.id);
       return `<tr class="${i === famSel ? 'sel' : ''}">${cw ? `<td><input type="checkbox" aria-label="Select ${e(a.full_name)}" onchange="famPick(${a.id},this.checked)" ${S.sel.has(a.id) ? 'checked' : ''}></td>` : ''}
-        <td>${who(a, `<button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>`)}</td>
+        <td>${who(a, `<button class="famname" onclick="famShow(${i})">${tag(a)}${e(shownName(a))}</button>`)}${canLine(a)}</td>
         <td>${setaChips(st)}</td>
         <td style="white-space:nowrap">${nx ? `${fmt(nx.registration_expiry_date)}<div>${riskBadge(nx)}</div>` : '<span class="sub">—</span>'}</td>
         <td style="white-space:nowrap" title="${e(docTip(a))}"><span class="bar"><i style="width:${Math.round(k / 6 * 100)}%;background:${c}"></i></span> <span class="sub">${k}/6</span></td>
@@ -419,6 +419,7 @@
         <p class="sub" style="margin:10px 0 0;font-size:12px">Built from registrations, documents and follow-ups, newest first.</p></div>` : `${nextBox(a)}
       <div style="padding:16px 20px;display:flex;flex-direction:column;gap:18px">
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add</button>` : ''}</div>${regBlock(a, false)}</div>
+        <div><h2 style="font-size:15px;margin-bottom:6px">Can deliver</h2>${canBlock(a)}</div>
         <div><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Document checklist</h2><span class="sub">${onFile(a.id).length} of 6 on file</span></div>${docBlock(a)}</div>
         <p class="sub" style="margin:0;font-size:12px;border-top:1px solid var(--line2);padding-top:10px">Personal information (POPIA). Use it only for compliance work and don't share it outside ApexU. ID numbers show only on the full profile.</p>
       </div>`}`;
@@ -457,7 +458,7 @@
         <div class="card"><h2 style="font-size:15px">Completeness · ${c.score}%</h2><span class="bar" style="width:100%;margin:8px 0"><i style="width:${c.score}%;background:${c.complete ? 'var(--ok)' : c.score >= 50 ? '#E0A100' : 'var(--bad)'}"></i></span>
           ${c.complete ? '<div class="famok">✓ Profile complete</div>' : c.gaps.map(g => `<div class="sub">• ${e(g)}</div>`).join('')}</div>
         <div class="card"><h2 style="font-size:15px">Expiries</h2>${up.length ? up.map(r => `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0"><span style="flex-grow:1">${e(r.seta_name)} <span class="sub">${fmt(r.registration_expiry_date)}</span></span>${riskBadge(r)}</div>`).join('') : '<div class="sub">No expiry dates captured.</div>'}</div>
-        <div class="card"><h2 style="font-size:15px">Qualifications in scope</h2>${(() => { const qs = [...new Set(regs.flatMap(r => scopeOf(r.id).map(s => qual(s.qualification_id)?.name || s.qualifications?.name || s.qualification_id)))]; return qs.length ? qs.map(q => `<div style="padding:3px 0">${e(q)}</div>`).join('') : '<div class="sub">None linked yet. Add scope on the Registrations tab or use Scope Import.</div>'; })()}</div></div>`;
+        <div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Can deliver</h2><p class="sub" style="margin:2px 0 8px">Qualifications in scope on a valid SETA registration, and the open programmes for each.</p>${canBlock(a)}</div></div>`;
     } else if (S.tab === 'regs') {
       body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add registration</button>` : ''}</div>${regBlock(a, true)}</div>`;
     } else if (S.tab === 'docs') {
@@ -913,6 +914,32 @@
     const q = (S.SC || []).filter(x => x.registration_id === r.id).map(x => (S.Q || []).find(y => y.id === x.qualification_id)?.name).filter(Boolean);
     return { seta: r.seta_name || 'No SETA', roles: (r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(', '), quals: q, exp: r.registration_expiry_date };
   });
+  /* "Can deliver": qualifications in scope on a valid SETA registration (the registration is the supporting evidence), with open programmes for each */
+  const qWords = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/^(nc|fc|gc|nd) /, '').trim();
+  const progsNow = () => [
+    ...((P.data && P.data.progs) || []).filter(p => !/complete|closed|cancel/i.test(p.status || '') && (!d10(p.end_date) || d10(p.end_date) >= today())).map(p => ({ pid: p.id, title: p.programme_name || p.qualification_name || 'Programme', text: [p.saqa_id, p.qualification_name, p.programme_name].join(' '), start: d10(p.start_date), end: d10(p.end_date), fac: p.facilitator_id })),
+    ...(typeof MOD !== 'undefined' ? MOD : []).filter(r => !d10(r[10]) || d10(r[10]) >= today()).map(r => ({ pid: null, title: String(r[4] || ''), text: String(r[4] || ''), start: d10(r[9]), end: d10(r[10]) }))];
+  const canDo = a => {
+    const out = new Map(), ok = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
+    ok.forEach(r => scopeOf(r.id).forEach(s => { const q = qual(s.qualification_id); if (!q) return; if (!out.has(q.id)) out.set(q.id, { q, roles: new Set(), setas: new Set(), until: '' }); const x = out.get(q.id);
+      (r.roles?.length ? r.roles : [r.role]).filter(Boolean).forEach(v => x.roles.add(v)); if (r.seta_name) x.setas.add(r.seta_name); if ((r.registration_expiry_date || '') > x.until) x.until = r.registration_expiry_date; }));
+    const list = [...out.values()].sort((x, y) => String(x.q.name).localeCompare(String(y.q.name)));
+    if (list.length) { const mine = assigns().filter(x => x.a.id === a.id && x.live), P2 = progsNow();
+      list.forEach(x => { const sq = String(x.q.saqa_id || '').trim(), w = qWords(x.q.name);
+        x.progs = P2.filter(p => (sq && new RegExp('\\b' + sq + '\\b').test(p.text)) || (w.length > 8 && qWords(p.text).includes(w))).map(p => {
+          const on = p.pid ? p.fac === a.id : mine.some(m => m.title === p.title);
+          const busy = !on && mine.some(m => m.title !== p.title && (!m.end || !p.start || m.end >= p.start) && (!m.start || !p.end || m.start <= p.end));
+          return { ...p, state: on ? 'on' : busy ? 'busy' : 'free', short: !!(x.until && p.end && x.until < p.end) }; }); }); }
+    return { list, noScope: ok.filter(r => !scopeOf(r.id).length) };
+  };
+  const canLine = a => { const { list } = canDo(a); if (!list.length) return ''; const n = list.map(x => x.q.name), open = list.reduce((t, x) => t + x.progs.length, 0);
+    return `<div class="famcan" title="${e('Can deliver (verified on a SETA registration):\n' + n.join('\n'))}">Can deliver: ${e(n.slice(0, 2).join(' · '))}${n.length > 2 ? ` <b>+${n.length - 2} more</b>` : ''}${open ? ` · <b class="famcan-n">${open} open programme${open === 1 ? '' : 's'}</b>` : ''}</div>`; };
+  const canBlock = a => { const { list, noScope } = canDo(a), lab = { on: ['b-ok', 'Already on it'], free: ['b-ok', 'Free'], busy: ['b-warn', 'Busy on other work'] };
+    const tip = noScope.length ? `<div class="sub" style="margin-top:8px">${e(noScope.map(r => r.seta_name || 'No SETA').join(', '))}: registered, but no qualifications linked. Check the CV and supporting documents, then add the scope to that registration.</div>` : '';
+    if (!list.length) return `<div class="sub">${regsFor(a.id).length ? 'No verified qualifications yet.' : 'Add a SETA registration and its scope first.'}</div>${tip}`;
+    return list.map(x => `<div class="famcan-q"><div><b>${e(x.q.name)}</b>${x.q.saqa_id ? ` <span class="sub">SAQA ${e(x.q.saqa_id)}</span>` : ''} <span class="badge b-ok" title="In scope on a valid SETA registration">✓ Verified</span></div>
+      <div class="sub">${e([...x.roles].join(', ') || 'Role not set')} · ${e([...x.setas].join(', ') || 'No SETA')} · ${x.until ? 'registered until ' + fmt(x.until) : 'no expiry captured'}</div>
+      ${x.progs.length ? x.progs.map(p => `<div class="famcan-p">→ ${p.pid ? `<a href="#programmes" onclick="window.dvProg&&dvProg(${p.pid})">${e(p.title)}</a>` : e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span> <span class="badge ${lab[p.state][0]}">${lab[p.state][1]}</span>${p.short ? ' <span class="badge b-bad" title="The registration ends before the programme does">Registration ends first</span>' : ''}</div>`).join('') : '<div class="sub famcan-p">No open programmes for this qualification right now.</div>'}</div>`).join('') + tip; };
   const lev = (a, b) => { const m = a.length, n = b.length, d = Array.from({ length: m + 1 }, (_, i) => [i]); for (let j = 1; j <= n; j++) d[0][j] = j; for (let i = 1; i <= m; i++) for (let j = 1; j <= n; j++) d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); return d[m][n]; };
   function calIssues() {
     const A = vis(), dup = [], iss = [];
@@ -1240,6 +1267,7 @@
       .famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
       .famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
       #view-fam table{min-width:0!important;width:100%}#view-fam td{vertical-align:top}
+      .famcan{font-size:12px;color:var(--muted,#5B6475);margin:2px 0 0 42px}.famcan-n{color:var(--ok)}.famcan-q{padding:8px 0;border-top:1px solid var(--line2,#eee)}.famcan-q:first-child{border-top:0;padding-top:0}.famcan-p{margin:4px 0 0 12px;font-size:13px}
       .famwho{display:inline-flex;gap:10px;align-items:flex-start;vertical-align:top}.famav{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;background:var(--accent-gold,#D4A537);margin-top:2px}.famidl{font-size:12px;margin:-2px 0 2px}.famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
       .famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
       .famok{font-size:12px;color:var(--ok);font-weight:700;margin-top:4px}.famgap{font-size:12px;margin-top:4px}

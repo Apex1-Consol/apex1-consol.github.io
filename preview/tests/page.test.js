@@ -290,6 +290,13 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     await w.famFU('claim', 'registration', 12, 2, 'expired');
     const u = log.find(x => x.table === 'fam_follow_ups'); ok(u && u.op === 'upsert' && u.val.status === 'In Progress' && u.eq[1] === 'tenant_id,assessor_id,source_type,source_id', JSON.stringify(u));
   });
+  await t('FAM: Can deliver shows verified scope and matching open programmes in list, panel and profile', async () => {
+    const { w, d } = await boot(sess('admin')); await tick(); await tick();
+    w.famMode('table');
+    ok(/Can deliver: OC: Project Manager/.test(d.getElementById('famrows').textContent), d.getElementById('famrows').textContent);
+    w.famShow(0); const pt = d.getElementById('fampanel').textContent;
+    ok(/Can deliver/.test(pt) && /OC: Project Manager/.test(pt) && /Verified/.test(pt) && /PM Cohort/.test(pt) && /Already on it/.test(pt), pt);
+  });
   await t('FAM: add registration needs a role, then inserts', async () => {
     const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
     w.famReg(3); const f = d.getElementById('famform'); f.elements.seta_name.value = 'ETDP SETA';
