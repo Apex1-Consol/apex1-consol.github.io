@@ -819,6 +819,8 @@
     else if (act === 'snooze') fields = { snoozed_until: addD(today(), 7), status: f?.status && !CLOSED.includes(f.status) ? f.status : 'Open' };
     else if (act === 'done') fields = { status: 'Done', resolved_at: now, resolved_by: me() };
     else if (act === 'reopen') fields = { status: 'Open', resolved_at: null, resolved_by: null };
+    else if (act === 'due') { const d = prompt('Due date (YYYY-MM-DD). Leave blank to clear:', f?.due_date || ''); if (d === null) return;
+      if (d && !/^\d{4}-\d{2}-\d{2}$/.test(d.trim())) return say('Use the format YYYY-MM-DD'); fields = { due_date: d.trim() || null, status: f?.status && !CLOSED.includes(f.status) ? f.status : 'Open' }; }
     else { const n = prompt('Note for this follow-up:', f?.notes || ''); if (n === null) return; fields = { notes: n, status: f?.status || 'Open' }; }
     try {
       await write('Follow-up', () => sb.from('fam_follow_ups').upsert({ tenant_id: P.tenant, assessor_id: aid, source_type: type, source_id: sid, kind, created_by: f?.created_by || me(), ...fields }, { onConflict: 'tenant_id,assessor_id,source_type,source_id' }));
@@ -1098,24 +1100,25 @@
     const dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(t + 'T00:00:00')) / 864e5), when = d => { const n = dleft(d); return n < 0 ? `expired ${-n} day${n === -1 ? '' : 's'} ago` : n === 0 ? 'expires today' : `in ${n} day${n === 1 ? '' : 's'}`; };
     // every row: sec, main html, btns html, over/week flags, follow-up ref (for claim/snooze), owner
     const I = [], mine = me(), w7 = addD(t, 7);
-    const fuBtns = x => !x.ref || !canWrite() ? '' : (x.owner === mine ? '' : `<button class="btn sm" onclick="TDfu('claim',${x.n})">Assign to me</button>`) + `<button class="btn sm" onclick="TDfu('snooze',${x.n})" title="Hide from Today for 7 days">Snooze</button>`;
+    const fuBtns = x => !x.ref || !canWrite() ? '' : (x.owner === mine ? '' : `<button class="btn sm" onclick="TDfu('claim',${x.n})">Assign to me</button>`) + `<button class="btn sm" onclick="TDfu('snooze',${x.n})" title="Hide from Today for 7 days">Snooze</button><button class="btn sm" onclick="TDfu('note',${x.n})">Note</button>` + (x.sec === 3 ? `<button class="btn sm" onclick="TDfu('due',${x.n})">Due date</button>` : '');
+    const ct = id => { const a = A(id); return !a ? '' : (a.email ? `<a class="btn sm" href="mailto:${e(a.email)}" title="${e(a.email)}">Email</a>` : '') + (a.phone ? `<a class="btn sm" href="tel:${e(String(a.phone).replace(/[^\d+]/g, ''))}" title="${e(a.phone)}">Call</a>` : ''); };
     const add = x => { const f = x.ref ? fu(x.ref[0], x.ref[1]) : null; if (x.fu) Object.assign(x, { owner: x.fu.assigned_to || null, snz: x.fu.snoozed_until }); else if (f) Object.assign(x, { owner: CLOSED.includes(f.status) ? null : f.assigned_to || null, snz: f.snoozed_until }); x.n = I.length; I.push(x); };
     // at risk
     const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`; TD.rk = [];
     assigns().filter(x => x.live && x.el[0] !== 'ok' && vids.has(x.a.id)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-      .forEach(x => add({ sec: 0, over: x.el[0] === 'bad', week: !!x.start && x.start <= w7, main: `${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, btns: `<button class="btn sm" onclick="famTodayCover(${TD.rk.push(rk(x)) - 1},'risk')">Find cover</button>` }));
+      .forEach(x => add({ sec: 0, aid: x.a.id, over: x.el[0] === 'bad', week: !!x.start && x.start <= w7, main: `${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, btns: `<button class="btn sm" onclick="famTodayCover(${TD.rk.push(rk(x)) - 1},'risk')">Find cover</button>` }));
     // renewals to review
     (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id)).forEach(x => { const r = S.R.find(y => y.id === x.registration_id);
-      add({ sec: 1, week: true, main: `${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
+      add({ sec: 1, aid: x.assessor_id, week: true, main: `${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
         btns: `<button class="btn sm" onclick="famRenewView(${x.id})">View</button>${isAdm() ? `<button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button>` : ''}<button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button>` }); });
     // expiring in 30 days (registrations: renewal link state; documents: open profile)
     const rnFor = rid => (S.RN || []).filter(x => x.registration_id === rid).sort((a, b) => (b.created_at || '').localeCompare(a.created_at || ''))[0];
     S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date <= in30 && r.registration_expiry_date >= addD(t, -30)).forEach(r => {
       const x = rnFor(r.id); if (x && ['Uploaded', 'Approved'].includes(x.status)) return;
-      const sent = x && x.status === 'Sent' && x.expires_at >= new Date().toISOString(), d = r.registration_expiry_date;
+      const now = new Date().toISOString(), sent = x && x.status === 'Sent' && x.expires_at >= now, lapsed = x && x.status === 'Sent' && !x.uploaded_at && x.expires_at < now, d = r.registration_expiry_date;
       add({ sec: 2, esc: sent, d, over: d < t, week: d <= w7, ref: ['registration', r.id, r.assessor_id, d < t ? 'expired' : 'due_30'],
-        main: `${pl(A(r.assessor_id))}<div class="sub">${e(r.seta_name || 'SETA')} registration ${when(d)}</div>${sent ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <span class="badge b-bad" title="Nothing uploaded yet: phone the practitioner">Escalate</span>` : ''}`,
-        btns: canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent ? 'Resend' : 'Send link'}</button>` : '' }); });
+        main: `${pl(A(r.assessor_id))}<div class="sub">${e(r.seta_name || 'SETA')} registration ${when(d)}</div>${sent ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <span class="badge b-bad" title="Nothing uploaded yet: phone the practitioner">Escalate</span>` : lapsed ? `<span class="badge b-warn" title="Link expired ${fmt(x.expires_at.slice(0, 10))} without an upload">Link expired</span>` : ''}`,
+        btns: canWrite() ? `<button class="btn sm" onclick="famRenew(${r.id})">${sent || lapsed ? 'Resend' : 'Send link'}</button>` : '' }); });
     S.D.filter(dd => vids.has(dd.assessor_id) && dd.is_current !== false && dd.expiry_date && dd.expiry_date <= in30 && dd.expiry_date >= addD(t, -30)).forEach(dd => { const d = dd.expiry_date;
       add({ sec: 2, d, over: d < t, week: d <= w7, ref: ['document', dd.id, dd.assessor_id, d < t ? 'expired' : 'due_30'], main: `${pl(A(dd.assessor_id))}<div class="sub">${e(dd.doc_type || 'Document')} ${when(d)}</div>`, btns: `<button class="btn sm" onclick="famTodayGo('fam/${dd.assessor_id}')">Open</button>` }); });
     // follow-ups: added by hand, due/overdue, or open more than 7 days (expiry ones already show above)
@@ -1131,7 +1134,10 @@
     const cf = CH.find(c => c[0] === TD.f), list = TD.snz ? I.filter(x => x.snz && x.snz > t) : cf ? live.filter(cf[2]) : live;
     const chips = CH.map(([k, l, fn, c]) => `<button class="tdchip${TD.f === k && !TD.snz ? ' on' : ''}" onclick="TDf('${k}')" aria-pressed="${TD.f === k && !TD.snz}"><span class="badge ${c}">${live.filter(fn).length}</span> ${l}</button>`).join('')
       + (snoozed ? `<button class="tdchip${TD.snz ? ' on' : ''}" onclick="TDsnz()" aria-pressed="${!!TD.snz}"><span class="badge">${snoozed}</span> Snoozed</button>` : '');
-    const row = x => `<div class="tdi"><div>${x.main}${x.owner ? `<div class="sub" style="font-size:12px">Assigned to ${x.owner === mine ? 'me' : e(x.owner)}</div>` : ''}${x.snz && x.snz > t ? `<div class="sub" style="font-size:12px">Snoozed until ${fmt(x.snz)}</div>` : ''}</div><div class="tdb">${x.btns || ''}${x.snz && x.snz > t ? '' : fuBtns(x)}</div></div>`;
+    const row = x => `<div class="tdi"><div>${x.main}${x.owner ? `<div class="sub" style="font-size:12px">Assigned to ${x.owner === mine ? 'me' : e(x.owner)}</div>` : ''}${x.snz && x.snz > t ? `<div class="sub" style="font-size:12px">Snoozed until ${fmt(x.snz)}</div>` : ''}</div><div class="tdb">${x.btns || ''}${x.snz && x.snz > t ? '' : fuBtns(x)}${ct(x.aid ?? x.ref?.[2])}</div></div>`;
+    const DT = [...S.F.filter(f => vids.has(f.assessor_id) && f.status === 'Done' && (f.resolved_at || '').slice(0, 10) === t).map(f => `${pl(A(f.assessor_id))} <span class="sub">· ${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}</span>`),
+      ...(S.RN || []).filter(x => vids.has(x.assessor_id) && x.status === 'Approved' && (x.reviewed_at || '').slice(0, 10) === t).map(x => `${pl(A(x.assessor_id))} <span class="sub">· Renewal approved</span>`)];
+    const done = DT.length ? `<details class="card" style="padding:12px 14px"><summary style="cursor:pointer;font-weight:600">Done today <span class="badge b-ok">${DT.length}</span></summary>${DT.map(h => `<div class="tdi">${h}</div>`).join('')}</details>` : '';
     const SECS = ['At risk allocations', 'Renewals to review', 'Expiring in 30 days', 'Follow-ups'];
     const body = SECS.map((s, k) => { const L = list.filter(x => x.sec === k).sort((a, b) => k === 2 ? (b.esc ? 1 : 0) - (a.esc ? 1 : 0) || a.d.localeCompare(b.d) : 0); return L.length ? `<section class="card" style="padding:12px 14px"><h3>${s} <span class="badge">${L.length}</span></h3>${L.map(row).join('')}</section>` : ''; }).join('');
     const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
@@ -1142,7 +1148,7 @@
     el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="famToday(false)" aria-label="Close">✕</button></div>
       <div class="sub" style="margin-top:-8px">${fmt(t)} · ${live.length} to act on</div><div class="tdchips">${chips}</div>${form}
       ${body || `<div class="card" style="padding:18px;text-align:center">${cf || TD.snz ? 'Nothing here.' : 'Nothing due. ✓'}</div>`}
-      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}`;
+      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${done}`;
     if (TD.add) el.querySelector('form select')?.focus();
   }
   window.TDf = k => { TD.snz = false; TD.f = TD.f === k ? null : k; renderToday(); };
