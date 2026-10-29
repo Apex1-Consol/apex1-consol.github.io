@@ -925,6 +925,36 @@
     S.D.filter(d => ids.has(d.assessor_id) && d.is_current !== false && /pending/i.test(d.status || '')).forEach(d => iss.push([S.A.find(x => x.id === d.assessor_id), `${d.doc_type}: ${d.status}`]));
     return { dup, iss };
   }
+  // self-service renewal: single-use link (only its SHA-256 is stored), practitioner uploads on renew.html via the fam-renew function, staff approve here
+  const sha = async t => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map(b => b.toString(16).padStart(2, '0')).join('');
+  window.famRenew = async rid => {
+    const r = S.R.find(x => x.id === rid), a = r && S.A.find(x => x.id === r.assessor_id); if (!r || !a) return;
+    if (!a.email) return say(`${shownName(a)} has no email address. Add it on the profile first.`);
+    const b = new Uint8Array(32); crypto.getRandomValues(b); const tok = btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    try {
+      const old = (S.RN || []).filter(x => x.registration_id === rid && x.status === 'Sent').map(x => x.id);
+      if (old.length) await write('Renewal', () => sb.from('fam_renewals').update({ status: 'Cancelled' }).in('id', old));
+      const th = await sha(tok); await write('Renewal', () => sb.from('fam_renewals').insert({ tenant_id: P.tenant, assessor_id: a.id, registration_id: rid, doc_type: 'SETA registration', token_hash: th, sent_to: a.email }));
+    } catch (_) { return; }
+    const link = new URL('renew.html', location.href.split('#')[0]).href + '#t=' + tok, first = (a.full_name || '').trim().split(/\s+/)[0];
+    const body = `Hi ${first},\n\nYour ${r.seta_name || 'SETA'} registration expires on ${fmt(r.registration_expiry_date)}. Please upload your renewed registration letter here (the link works once and expires in 30 days):\n\n${link}\n\nThank you,\nApex`;
+    try { await navigator.clipboard.writeText(link); } catch (_) {}
+    window.open(`mailto:${encodeURIComponent(a.email)}?subject=${encodeURIComponent('Your SETA registration renewal')}&body=${encodeURIComponent(body)}`, '_self');
+    say('Renewal link created and copied. Your email app opens with the message.'); await load();
+  };
+  window.famRenewView = async id => { const x = (S.RN || []).find(y => y.id === id); if (!x?.file_path) return say('No file');
+    const { data, error } = await sb.storage.from('fam-documents').createSignedUrl(x.file_path, 60); if (error) return say('Could not open file: ' + error.message); window.open(data.signedUrl, '_blank', 'noopener'); };
+  window.famRenewDo = async (id, ok) => {
+    const x = (S.RN || []).find(y => y.id === id); if (!x) return;
+    const note = ok ? null : prompt('Reason for rejecting (the practitioner gets a new link when you resend)'); if (!ok && note === null) return;
+    if (ok && !x.proposed_expiry && !confirm('No new expiry date was given. Approve anyway and keep the current date?')) return;
+    try {
+      if (ok && x.registration_id) { const up = { status: 'Active' }; if (x.proposed_expiry) up.registration_expiry_date = x.proposed_expiry; if (x.proposed_reg_no) up.registration_number = x.proposed_reg_no;
+        await write('Registration', () => sb.from('fam_seta_registrations').update(up).eq('id', x.registration_id)); }
+      await write('Renewal', () => sb.from('fam_renewals').update({ status: ok ? 'Approved' : 'Rejected', review_note: note || null, reviewed_by: me(), reviewed_at: new Date().toISOString() }).eq('id', id));
+      say(ok ? 'Renewal approved and registration updated' : 'Renewal rejected'); await load();
+    } catch (_) {}
+  };
   window.famCal = (k, v) => { S.cal = S.cal || {}; if (k === 'move') S.cal.from = addD(S.cal.from || monday(today()), v * 7); else if (k === 'today') S.cal.from = monday(today()); else S.cal[k] = v; renderCal(); };
   function renderCal() {
     const box = $('famprof'), C = S.cal = S.cal || {}, from = C.from || (C.from = monday(today())), WK = 13, to = addD(from, WK * 7), span = WK * 7;
@@ -958,13 +988,24 @@
       cover = rows2.length ? `<table class="dense"><thead><tr><th>Practitioner</th><th>Roles</th><th>Basis</th><th>Until</th><th>Now</th></tr></thead><tbody>${rows2.map(([a, b, r, x]) => `<tr><td><a href="#fam/${a.id}">${e(shownName(a))}</a></td><td>${e(r)}</td><td class="sub">${e(b)}</td><td>${fmt(x)}</td><td>${busy.has(a.id) ? '<span class="badge b-warn">Allocated</span>' : '<span class="badge b-ok">Free</span>'}</td></tr>`).join('')}</tbody></table>` : `<div class="sub">Nobody is currently registered for ${e(qual.name)}.</div>`; }
     // renewals by week
     const wkMap = {}; const end90 = addD(today(), 90), vids = new Set(vis().map(a => a.id)), who = id => shownName(S.A.find(x => x.id === id) || {});
-    S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= end90).forEach(r => (wkMap[monday(r.registration_expiry_date)] = wkMap[monday(r.registration_expiry_date)] || []).push([r.assessor_id, `${r.seta_name || 'Registration'} registration`, r.registration_expiry_date]));
+    S.R.filter(r => vids.has(r.assessor_id) && active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= end90).forEach(r => (wkMap[monday(r.registration_expiry_date)] = wkMap[monday(r.registration_expiry_date)] || []).push([r.assessor_id, `${r.seta_name || 'Registration'} registration`, r.registration_expiry_date, r.id]));
     S.D.filter(d => vids.has(d.assessor_id) && d.is_current !== false && d.expiry_date && d.expiry_date >= today() && d.expiry_date <= end90).forEach(d => (wkMap[monday(d.expiry_date)] = wkMap[monday(d.expiry_date)] || []).push([d.assessor_id, d.doc_type, d.expiry_date]));
     const ren = Object.keys(wkMap).sort().map(w => `<div class="fcwk"><b>Week of ${fmt(w)}</b> <span class="sub">${wkMap[w].length} item${wkMap[w].length === 1 ? '' : 's'}</span><ul>${wkMap[w].sort((a, b) => a[2].localeCompare(b[2])).map(([id, t, d]) => `<li><a href="#fam/${id}">${e(who(id))}</a> · ${e(t)} · ${fmt(d)}</li>`).join('')}</ul></div>`).join('') || '<div class="sub">Nothing expires in the next 90 days.</div>';
     const { dup, iss } = calIssues();
     const tbl = (h, rows, none) => rows.length ? `<div class="tw"><table class="dense fctbl"><thead><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>` : `<div class="sub" style="padding:18px 20px">${none}</div>`;
     const pl = a => a ? `<a href="#fam/${a.id}">${e(shownName(a))}</a>` : 'Unknown', rb = r => `<span class="badge ${RCH[r] || ''}">${e(r)}</span>`;
-    const renRows = Object.keys(wkMap).sort().flatMap(w => wkMap[w].sort((a, b) => a[2].localeCompare(b[2])).map(([id, t, d], k) => [k ? '' : `<b>${fmt(w)}</b>`, pl(S.A.find(x => x.id === id)), e(t), `${fmt(d)} <span class="sub">(${Math.round((new Date(d + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5)} days)</span>`]));
+    const rnFor = rid => (S.RN || []).find(x => x.registration_id === rid), dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(today() + 'T00:00:00')) / 864e5);
+    const rnCell = (id, rid, d) => { if (!rid) return '<span class="sub">Upload in profile</span>'; const x = rnFor(rid), esc30 = dleft(d) <= 30 && (!x || x.status === 'Sent');
+      const st = !x || ['Cancelled', 'Rejected'].includes(x.status) || (x.status === 'Sent' && x.expires_at < new Date().toISOString()) ? `<button class="btn sm" onclick="famRenew(${rid})">Send link</button>${x?.status === 'Rejected' ? ' <span class="sub">last rejected</span>' : ''}`
+        : x.status === 'Sent' ? `<span class="badge">Link sent ${fmt(x.created_at.slice(0, 10))}</span> <button class="btn sm" onclick="famRenew(${rid})">Resend</button>`
+        : x.status === 'Uploaded' ? '<span class="badge b-warn">Uploaded, review above</span>' : `<span class="badge b-ok">Renewed</span>`;
+      return st + (esc30 ? ' <span class="badge b-bad" title="30 days or less and nothing uploaded yet: phone the practitioner">Escalate</span>' : ''); };
+    const renRows = Object.keys(wkMap).sort().flatMap(w => wkMap[w].sort((a, b) => a[2].localeCompare(b[2])).map(([id, t, d, rid], k) => [k ? '' : `<b>${fmt(w)}</b>`, pl(S.A.find(x => x.id === id)), e(t), `${fmt(d)} <span class="sub">(${dleft(d)} days)</span>`, rnCell(id, rid, d)]));
+    const upl = (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id));
+    const review = upl.length ? `<div class="fccover" style="margin:14px 20px 0;padding:12px 14px;border:1px solid var(--line);border-radius:12px"><b>Uploaded, waiting for review (${upl.length})</b>
+      <table class="dense" style="margin-top:6px"><thead><tr><th>Practitioner</th><th>What</th><th>New expiry</th><th>Reg. no.</th><th>Note</th><th></th></tr></thead><tbody>${upl.map(x => { const r = S.R.find(y => y.id === x.registration_id);
+        return `<tr><td>${pl(S.A.find(a => a.id === x.assessor_id))}</td><td>${e((r?.seta_name ? r.seta_name + ' ' : '') + x.doc_type)}<div class="sub">${e(x.file_name || '')}</div></td><td>${fmt(x.proposed_expiry) || '—'}</td><td>${e(x.proposed_reg_no || '—')}</td><td class="sub">${e(x.practitioner_note || '')}</td>
+        <td style="white-space:nowrap"><button class="btn sm" onclick="famRenewView(${x.id})">View</button> <button class="btn sm y" onclick="famRenewDo(${x.id},true)">Approve</button> <button class="btn sm" onclick="famRenewDo(${x.id},false)">Reject</button></td></tr>`; }).join('')}</tbody></table></div>` : '';
     const issRows = [...dup.map(([a, b]) => ['<span class="badge b-warn">Possible duplicate</span>', `${pl(a)} (#${a.id}) and ${pl(b)} (#${b.id})`, `“${e(a.full_name)}” vs “${e(b.full_name)}”`]), ...iss.map(([a, t]) => ['<span class="badge">Data issue</span>', pl(a), e(t)])];
     // find cover for one at-risk allocation: valid reg for role (+SETA) until it ends, free over its dates, not in conflict on the same programme
     const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`, cx = risk.find(x => rk(x) === C.cf);
@@ -982,7 +1023,7 @@
       ['now', 'Doing now', nowA.length, tbl(['Practitioner', 'Role', 'Programme', 'SETA', 'Ends', 'Source'], nowA.sort((a, b) => shownName(a.a).localeCompare(shownName(b.a))).map(x => [pl(x.a), rb(x.role), e(x.title), e(x.seta ? setaKey(x.seta) : '—'), fmt(x.end), `<span class="sub">${e(x.src)}</span>`]), 'No allocations running today on the moderation list or programmes.')],
       ['free', 'Free and suitable', free.length, tbl(['Practitioner', 'SETA', 'Roles', 'Qualifications in scope', 'Registered until'], free.flatMap(a => suitable(a).map((x, k) => [k ? '' : pl(a), e(x.seta), x.roles.split(', ').filter(Boolean).map(rb).join(' '), x.quals.length ? e(x.quals.join(', ')) : '<span class="sub">Scope not captured</span>', fmt(x.exp)])), 'Everyone with a valid registration is already allocated.')],
       ['cover', 'Who can cover', null, `<div style="padding:16px 20px 0"><select aria-label="Qualification" style="height:38px;max-width:100%;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit" onchange="famCal('qual',this.value)">${opt('', 'Choose a qualification…', C.qual)}${(S.Q || []).map(x => opt(x.id, `${x.name}${x.saqa_id ? ' (' + x.saqa_id + ')' : ''}`, C.qual)).join('')}</select></div><div style="padding:12px 20px 18px">${cover}</div>`],
-      ['renew', 'Renewals (90 days)', renRows.length, tbl(['Week of', 'Practitioner', 'What expires', 'Date'], renRows, 'Nothing expires in the next 90 days.')],
+      ['renew', 'Renewals (90 days)', renRows.length + upl.length, review + tbl(['Week of', 'Practitioner', 'What expires', 'Date', 'Renewal link'], renRows, 'Nothing expires in the next 90 days.')],
       ['issues', 'Duplicates and data issues', issRows.length, tbl(['Type', 'Practitioner', 'Detail'], issRows, 'Nothing found.')],
       ['changes', 'Recent changes', null, '<div id="fcaudit" class="sub" style="padding:18px 20px">Loading…</div>']];
     const tab = TABS.some(x => x[0] === C.tab) ? C.tab : 'risk';
@@ -1031,16 +1072,17 @@
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
-    const [A, R, D, F, Q, SC] = await Promise.all([
+    const [A, R, D, F, Q, SC, RN] = await Promise.all([
       q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone,id_number,physical_address').order('full_name')),
       q('registrations', sb.from('fam_seta_registrations').select('*')),
       q('documents', sb.from('fam_documents').select('id,assessor_id,doc_type,status,doc_date,expiry_date,file_url,file_name,is_current,version,superseded_at,created_at,uploaded_at,uploaded_by')),
       q('follow-ups', sb.from('fam_follow_ups').select('*')),
       q('qualifications', sb.from('qualifications').select('id,name,saqa_id,seta').order('name')),
-      q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id'))]);
+      q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id')),
+      q('renewals', sb.from('fam_renewals').select('id,assessor_id,registration_id,doc_type,status,expires_at,sent_to,created_at,uploaded_at,file_path,file_name,proposed_expiry,proposed_reg_no,practitioner_note,review_note,reviewed_at').order('created_at', { ascending: false }))]);
     R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
     setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
-    Object.assign(S, { A, R, D, F, Q, SC, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
+    Object.assign(S, { A, R, D, F, Q, SC, RN, loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     try { window.famBell && window.famBell(S); } catch (_) {}
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));
     if (S.pick) { famSel = A.findIndex(a => a.id === S.pick); S.pick = null; }

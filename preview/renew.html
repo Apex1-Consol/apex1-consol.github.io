@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Apex renewal upload</title>
+<style>
+:root{--navy:#25247B;--yellow:#FBDC00;--ink:#1b1b2f;--muted:#5d5d73;--line:#dcdce6;--bg:#f5f5f9;--surf:#fff;--bad:#b42318;--ok:#1a7f4b}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--navy);color:#fff;padding:14px 16px;display:flex;align-items:center;gap:10px}
+.ring{width:30px;height:30px;border-radius:50%;border:4px solid var(--yellow);display:grid;place-items:center;font-weight:800;background:#fff;color:var(--navy);font-size:14px}
+main{max-width:560px;margin:24px auto;padding:0 16px}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:14px;padding:20px}
+h1{font-size:20px;margin:0 0 6px}
+p{margin:0 0 12px}
+.sub{color:var(--muted);font-size:13px}
+label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);margin-bottom:14px}
+input[type=date],input[type=text],textarea,input[type=file]{font:inherit;color:var(--ink);border:1px solid var(--line);border-radius:10px;padding:9px 10px;background:#fff;width:100%}
+textarea{min-height:70px;resize:vertical}
+.chk{flex-direction:row;align-items:flex-start;gap:10px;color:var(--ink);font-size:14px}
+.chk input{margin-top:3px;width:18px;height:18px}
+button{font:inherit;font-weight:700;background:var(--navy);color:#fff;border:0;border-radius:10px;padding:12px 18px;width:100%;cursor:pointer}
+button:disabled{opacity:.6;cursor:default}
+.msg{padding:12px 14px;border-radius:10px;margin-bottom:14px}
+.err{background:#fdecea;color:var(--bad)}
+.done{background:#e8f5ee;color:var(--ok)}
+</style>
+</head>
+<body>
+<header><span class="ring">A</span><b>Apex practitioner renewals</b></header>
+<main><div class="card" id="box"><p class="sub">Checking your link…</p></div>
+<p class="sub" style="margin-top:14px">This link works once and expires. Apex uses the document only to keep your practitioner record and SETA registration up to date, under POPIA.</p></main>
+<script>
+const FN='https://qszikynltvyplzqootrc.supabase.co/functions/v1/fam-renew';
+const t=new URLSearchParams(location.hash.slice(1)).get('t')||'';
+history.replaceState(null,'',location.pathname+location.hash);
+const box=document.getElementById('box'),esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const fmt=d=>d?new Date(d.length===10?d+'T00:00:00':d).toLocaleDateString('en-ZA',{day:'numeric',month:'long',year:'numeric'}):'';
+const fail=m=>box.innerHTML=`<h1>Link not available</h1><div class="msg err">${esc(m)}</div>`;
+(async()=>{
+  if(!t)return fail('This link is incomplete. Open it straight from the email Apex sent you.');
+  let r;try{const res=await fetch(FN+'?t='+encodeURIComponent(t));r=await res.json();if(!res.ok)return fail(r.error||'This link is not valid.')}catch(e){return fail('Could not reach Apex. Check your connection and refresh.')}
+  box.innerHTML=`<h1>Hi ${esc(r.first||'there')}</h1>
+  <p>Please upload your renewed <b>${esc(r.seta?r.seta+' ':'')}${esc(r.what)}</b>${r.current_expiry?` (currently expires ${fmt(r.current_expiry)})`:''}.</p>
+  <p class="sub">Link valid until ${fmt(r.link_expires)}.</p>
+  <div id="m"></div>
+  <form id="f">
+    <label>Document (PDF, JPG or PNG, max 10 MB)<input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png" required></label>
+    <label>New expiry date<input type="date" name="expiry" required></label>
+    <label>Registration number (if it changed)<input type="text" name="reg_no" maxlength="60" autocomplete="off"></label>
+    <label>Note for Apex (optional)<textarea name="note" maxlength="500"></textarea></label>
+    <label class="chk"><input type="checkbox" name="consent" value="yes" required><span>I consent to Apex storing this document and these details on my practitioner record for SETA compliance.</span></label>
+    <button type="submit">Upload</button>
+  </form>`;
+  const f=document.getElementById('f'),m=document.getElementById('m');
+  f.onsubmit=async ev=>{ev.preventDefault();const b=f.querySelector('button'),file=f.file.files[0];
+    if(file&&file.size>10485760){m.innerHTML='<div class="msg err">The file is larger than 10 MB.</div>';return}
+    b.disabled=true;b.textContent='Uploading…';m.innerHTML='';
+    const fd=new FormData(f);fd.append('t',t);
+    try{const res=await fetch(FN,{method:'POST',body:fd}),j=await res.json();
+      if(!res.ok){m.innerHTML=`<div class="msg err">${esc(j.error||'Upload failed.')}</div>`;b.disabled=false;b.textContent='Upload';return}
+      box.innerHTML='<h1>Thank you</h1><div class="msg done">Your document was received. Apex will review it and update your record. You can close this page.</div>';
+    }catch(e){m.innerHTML='<div class="msg err">Upload failed. Check your connection and try again.</div>';b.disabled=false;b.textContent='Upload'}};
+})();
+</script>
+</body>
+</html>

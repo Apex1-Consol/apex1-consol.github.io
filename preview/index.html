@@ -839,6 +839,7 @@ window.famBell=S=>{const nm=id=>(S.A.find(a=>a.id===id)||{}).full_name||'Practit
   S.D.forEach(x=>{if(x.is_current===false)return;const d=bellDays(x.expiry_date);if(d===null||d>30)return;I.push({k:'doc'+x.id,c:d<0?'bad':'warn',r:d<0?0:1,d,t:`${nm(x.assessor_id)}: ${x.doc_type||'Document'} ${d<0?'expired':'expires in '+d+' days'}`,s:'Document',h:'fam/'+x.assessor_id})});
   S.F.forEach(f=>{if(f.resolved_at||!f.created_at||ago(f.created_at)<7)return;I.push({k:'fu'+f.id,c:'warn',r:2,d:0,t:`${nm(f.assessor_id)}: follow-up open ${Math.floor(ago(f.created_at))} days`,s:'Follow-up'+(f.kind?' · '+f.kind:''),h:'fam/'+f.assessor_id})});
   S.D.forEach(x=>{const u=x.uploaded_at||x.created_at;if(!u||ago(u)>7)return;I.push({k:'up'+x.id,c:'ok',r:3,d:0,t:`${nm(x.assessor_id)}: ${x.doc_type||'Document'} uploaded`,s:'Upload',h:'fam/'+x.assessor_id})});
+  (S.RN||[]).forEach(x=>{if(x.status!=='Uploaded')return;I.push({k:'rn'+x.id,c:'n',r:1.5,d:0,t:`${nm(x.assessor_id)}: renewal uploaded, review needed`,s:'Renewal',h:'fam/calendar'})});
   BELL=I.sort((x,y)=>x.r-y.r||x.d-y.d);renderBell()};
 function renderBell(){
   const unread=BELL.filter(x=>!bellSeen.has(x.k)).length,shown=BELL.slice(0,8);
@@ -1107,7 +1108,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js"></script>
 <script src="qa.js"></script>
-<script src="fam.js?v=20261029a"></script>
+<script src="fam.js?v=20261029b"></script>
 <script src="delivery.js"></script>
 <script src="shell.js?v=20261028e"></script>
 <script src="admin.js"></script>

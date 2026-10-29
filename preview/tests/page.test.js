@@ -45,7 +45,7 @@ function fakeSupabase(log, opts) {
   const chain = (table) => {
     const st = { table, op: 'select' };
     const p = {
-      select() { return p; }, order() { return p; }, limit() { return p; }, eq(k, v) { st.eq = [k, v]; return p; },
+      select() { return p; }, order() { return p; }, limit() { return p; }, eq(k, v) { st.eq = [k, v]; return p; }, in(k, v) { st.eq = [k, v]; return p; },
       update(v) { st.op = 'update'; st.val = v; return p; }, insert(v) { st.op = 'insert'; st.val = v; return p; }, upsert(v, o) { st.op = 'upsert'; st.val = v; st.eq = ['onConflict', o && o.onConflict]; return p; },
       then(res) { if (st.op !== 'select') log.push({ table, op: st.op, val: st.val, eq: st.eq }); const fail = opts.fail && opts.fail === table && st.op !== 'select';
         return Promise.resolve(fail ? { data: null, error: { message: 'denied by RLS' } } : { data: st.op === 'select' ? JSON.parse(JSON.stringify(DATA[table] || [])) : [], error: null }).then(res); }
@@ -401,6 +401,22 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     w.famCal('tab', 'risk'); const fb = d.querySelector('#famprof button[onclick^="famCal(\'cf\'"]');
     ok(fb, 'no at-risk row in fixture'); if (fb) { fb.click(); ok(/Cover for /.test(d.getElementById('famprof').textContent), 'Find cover did not open'); w.famCal('cf', ''); }
     w.toggleRP(); await tick(); ok(w.location.hash === '#fam', 'toggle back');
+  });
+  await t('FAM renewals: Send link, review queue, approve updates the registration', async () => {
+    const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations, n: DATA.fam_renewals };
+    DATA.assessors = [...keep.a, { id: 6, full_name: 'Renew Six', role: 'Assessor', email: 'six@example.com' }];
+    DATA.fam_seta_registrations = [...keep.r, { id: 21, assessor_id: 6, seta_name: 'INSETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(20) }, { id: 22, assessor_id: 6, seta_name: 'MICT SETA', roles: ['Assessor'], status: 'Active', registration_expiry_date: day(40) }];
+    DATA.fam_renewals = [{ id: 9, assessor_id: 6, registration_id: 22, doc_type: 'SETA registration', status: 'Uploaded', created_at: day(-2) + 'T08:00:00Z', expires_at: day(28) + 'T08:00:00Z', file_path: 'apex-preview/6/renewals/9.pdf', file_name: 'mict.pdf', proposed_expiry: day(800), proposed_reg_no: 'M-1' }];
+    try {
+      const { w, d, log } = await boot(sess('admin')); await tick(); await tick();
+      w.location.hash = '#fam'; await tick(); await tick(); w.toggleRP(); await tick(); await tick(); w.famCal('tab', 'renew'); const tx = d.getElementById('famprof').textContent;
+      ok(/Uploaded, waiting for review \(1\)/.test(tx) && /Send link/.test(tx) && /Escalate/.test(tx), tx.slice(0, 400));
+      w.confirm = () => true; await w.famRenewDo(9, true); await tick();
+      const up = log.find(x => x.table === 'fam_seta_registrations' && x.op === 'update'), rn = log.find(x => x.table === 'fam_renewals' && x.op === 'update');
+      ok(up && up.val.registration_expiry_date === day(800) && up.val.registration_number === 'M-1' && rn && rn.val.status === 'Approved', JSON.stringify(log.slice(-3)));
+      w.navigator.clipboard = { writeText: async () => {} }; w.open = () => {}; const nc = require('crypto'); w.TextEncoder = require('util').TextEncoder; Object.defineProperty(w, 'crypto', { value: { getRandomValues: a => { a.set(nc.randomBytes(a.length)); return a; }, subtle: { digest: (al, dt) => nc.webcrypto.subtle.digest(al, Buffer.from(dt)) } }, configurable: true }); await w.famRenew(21); await tick();
+      const ins = log.find(x => x.table === 'fam_renewals' && x.op === 'insert'); ok(ins && /^[0-9a-f]{64}$/.test(ins.val.token_hash) && ins.val.registration_id === 21 && !('token' in ins.val), JSON.stringify(ins));
+    } finally { Object.assign(DATA, { assessors: keep.a, fam_seta_registrations: keep.r, fam_renewals: keep.n }); }
   });
   await t('FAM: triage groups 61-90 days and lapsed, collapse, select group, chip tooltip', async () => {
     const day = n => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10), keep = { a: DATA.assessors, r: DATA.fam_seta_registrations };
