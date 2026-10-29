@@ -925,8 +925,8 @@
       (r.roles?.length ? r.roles : [r.role]).filter(Boolean).forEach(v => x.roles.add(v)); if (r.seta_name) x.setas.add(r.seta_name); if ((r.registration_expiry_date || '') > x.until) x.until = r.registration_expiry_date; }));
     const list = [...out.values()].sort((x, y) => String(x.q.name).localeCompare(String(y.q.name)));
     if (list.length) { const mine = assigns().filter(x => x.a.id === a.id && x.live), P2 = progsNow();
-      list.forEach(x => { const sq = String(x.q.saqa_id || '').trim(), w = qWords(x.q.name);
-        x.progs = P2.filter(p => (sq && new RegExp('\\b' + sq + '\\b').test(p.text)) || (w.length > 8 && qWords(p.text).includes(w))).map(p => {
+      list.forEach(x => { const sqs = String(x.q.saqa_id || '').split(/[^0-9]+/).filter(v => v.length >= 4), w = qWords(x.q.name);
+        x.progs = P2.filter(p => sqs.some(v => new RegExp('\\b' + v + '\\b').test(p.text)) || (w.length > 8 && qWords(p.text).includes(w))).map(p => {
           const on = p.pid ? p.fac === a.id : mine.some(m => m.title === p.title);
           const busy = !on && mine.some(m => m.title !== p.title && (!m.end || !p.start || m.end >= p.start) && (!m.start || !p.end || m.start <= p.end));
           return { ...p, state: on ? 'on' : busy ? 'busy' : 'free', short: !!(x.until && p.end && x.until < p.end) }; }); }); }
