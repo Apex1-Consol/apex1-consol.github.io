@@ -111,6 +111,7 @@ body{font-family:var(--font);background:#0B1220;color:var(--dark);min-height:100
 #report-preview.client-preview-mode #feedback-banner,
 #report-preview.client-preview-mode #lock-banner,
 #report-preview.client-preview-mode #draft-recovery-banner,
+#report-preview.client-preview-mode #carry-over-banner,
 #report-preview.client-preview-mode #report-pages{display:none!important}
 #client-preview-bar{
   display:none;align-items:center;justify-content:space-between;
@@ -839,14 +840,15 @@ tr.att-below-threshold td:first-child{border-left:3px solid #C8272C}
 }
 
 /* ── DRAFT RECOVERY BANNER ── */
-#draft-recovery-banner{
+#draft-recovery-banner,#carry-over-banner{
   display:none;align-items:flex-start;gap:14px;
   margin:0 32px 0;
   background:linear-gradient(135deg,#2d1e00 0%,#3d2a00 100%);
   border:1px solid rgba(212,160,23,.35);border-left:4px solid var(--gold);
   border-radius:var(--r);padding:14px 18px;
 }
-#draft-recovery-banner.show{display:flex}
+#draft-recovery-banner.show,#carry-over-banner.show{display:flex}
+#carry-over-banner{margin-bottom:12px}
 .drb-icon{font-size:18pt;line-height:1;flex-shrink:0;margin-top:1px}
 .drb-body{flex:1;min-width:0}
 .drb-title{font-size:9.5pt;font-weight:800;color:var(--gold2);letter-spacing:.04em;margin-bottom:4px}
@@ -1852,6 +1854,7 @@ body.compact-density .progress-bar-wrap{height:6px}
   #review-bar{margin:0 20px 20px!important}
   #feedback-banner,#lock-banner{margin:0 20px 12px!important}
   #draft-recovery-banner{margin:0 20px 0!important}
+  #carry-over-banner{margin:0 20px 12px!important}
 
   /* Toast stack — keep clear of right edge */
   #toast-stack{right:20px!important}
@@ -2546,6 +2549,15 @@ body.compact-density .progress-bar-wrap{height:6px}
         <button class="drb-btn-use" onclick="applyCloudDraft()">⬇ Use Cloud Draft</button>
         <button class="drb-btn-keep" onclick="dismissDraftRecovery()">Keep Local Draft</button>
       </div>
+    </div>
+  </div>
+  <!-- Carry over banner: offers last month's draft when this month is still empty -->
+  <div id="carry-over-banner" class="no-print">
+    <div class="drb-icon">↪</div>
+    <div class="drb-body">
+      <div class="drb-title" id="cob-title">Carry over</div>
+      <div class="drb-detail" id="cob-detail"></div>
+      <div class="drb-actions" id="cob-actions"></div>
     </div>
   </div>
   <div id="client-preview-bar">
@@ -3887,6 +3899,7 @@ function saveNarratives(showToast=false){
     providerId:document.getElementById('sel-provider')?.value||activeProgramme.provider||'', // never save a blank over the programme's provider
     savedAt:Date.now(),
   };
+  if(narratives?._meta?.carriedFrom)data._meta.carriedFrom=narratives._meta.carriedFrom;
   // If client/programme are local-only (never synced to server, temp id), embed a full
   // copy in the draft itself — otherwise resuming this draft from a different browser
   // cache / fresh file load has nowhere else to recover them from.
@@ -4031,6 +4044,117 @@ function applyCloudDraft(silent){
 function dismissDraftRecovery(){
   _pendingCloudDraft=null;
   document.getElementById('draft-recovery-banner').classList.remove('show');
+}
+
+// ── Carry over ───────────────────────────────────────────────────────────────
+// When a PM opens a month that has no draft content yet (and no report, or one sent
+// back for changes), offer to copy the most recent earlier month's draft. Written
+// sections, learner comments, survey and results carry over; attendance, the
+// attendance notes and the sign-off date are month-specific and start blank.
+const _MONTHS=['january','february','march','april','may','june','july','august','september','october','november','december'];
+function _monthIdx(label){
+  const m=String(label||'').trim().toLowerCase().match(/^([a-z]+)\s+(\d{4})$/);
+  if(!m)return null;const i=_MONTHS.indexOf(m[1]);return i<0?null:(+m[2])*12+i;
+}
+const CARRY_SKIP=new Set(['_meta','_att','_attState','att_register_note','att_summary','signoff_date','no_classes']);
+function _draftHasContent(d){
+  if(!d||typeof d!=='object')return false;
+  return Object.entries(d).some(([k,v])=>{
+    if(k==='_meta'||k==='_att'||k==='_attState'||k==='_eisa'||k.startsWith('signoff_'))return false;
+    if(v&&typeof v==='object')return Object.values(v).some(x=>x!=null&&String(x).trim()!=='');
+    return v!=null&&v!==false&&String(v).trim()!=='';
+  });
+}
+let _carrySource=null;
+const _carryNoteDismissed=new Set();
+function hideCarryOver(){
+  _carrySource=null;
+  document.getElementById('carry-over-banner')?.classList.remove('show');
+}
+function _showCarryBanner(title,detail,actions){
+  document.getElementById('cob-title').textContent=title;
+  document.getElementById('cob-detail').innerHTML=detail;
+  document.getElementById('cob-actions').innerHTML=actions;
+  document.getElementById('carry-over-banner').classList.add('show');
+}
+async function checkCarryOver(progId, month){
+  hideCarryOver();
+  if(IS_ADMIN||!isOnline||!TENANT_DB_ID||!progId||isTempId(progId))return;
+  const cur=_monthIdx(month);if(cur==null)return;
+  const stillHere=()=>activeProgramme&&String(activeProgramme.id)===String(progId)&&document.getElementById('sel-month').value===month;
+  try{
+    const [reps,list]=await Promise.all([
+      sb('reports',`select=status&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${progId}&month=eq.${encodeURIComponent(month)}&order=printed_at.desc&limit=1`),
+      sb('drafts',`select=month,saved_at&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${progId}`),
+    ]);
+    const rep=reps&&reps[0];
+    if(rep&&rep.status!=='needs_changes')return; // locked: nothing to carry into
+    // This month's draft: whichever of local/cloud is newer
+    let local=null;try{local=JSON.parse(localStorage.getItem(`${DRAFT_PREFIX}${progId}_${month}`)||'null');}catch{}
+    let current=local;
+    const curRow=(list||[]).find(r=>r.month===month);
+    if(curRow&&new Date(curRow.saved_at).getTime()>(local?._meta?.savedAt||0)){
+      const rows=await sb('drafts',`select=payload&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${progId}&month=eq.${encodeURIComponent(month)}&limit=1`);
+      const p=rows&&rows[0]&&rows[0].payload;current=typeof p==='string'?JSON.parse(p):p;
+    }
+    if(!stillHere())return;
+    if(current?._meta?.carriedFrom){
+      // Already carried over: remind the PM until the report is sent for review
+      const k=`${progId}|${month}`;
+      if(!rep&&!_carryNoteDismissed.has(k)){
+        _showCarryBanner(`Carried over from ${current._meta.carriedFrom}`,
+          `Update attendance, results, comments and the sign-off date for ${esc(month)} before sending for review.`,
+          `<button class="drb-btn-keep" onclick="_carryNoteDismissed.add('${progId}|${esc(month)}');hideCarryOver()">Got it</button>`);
+      }
+      return;
+    }
+    if(_draftHasContent(current))return;
+    // Most recent earlier month with a draft
+    const prev=(list||[]).map(r=>({month:r.month,i:_monthIdx(r.month)})).filter(r=>r.i!=null&&r.i<cur).sort((a,b)=>b.i-a.i)[0];
+    if(!prev)return;
+    const prows=await sb('drafts',`select=payload&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${progId}&month=eq.${encodeURIComponent(prev.month)}&limit=1`);
+    let payload=prows&&prows[0]&&prows[0].payload;
+    if(typeof payload==='string')payload=JSON.parse(payload);
+    if(!_draftHasContent(payload)||!stillHere())return;
+    _carrySource={progId,month,fromMonth:prev.month,payload};
+    _showCarryBanner(`Carry over from ${prev.month}?`,
+      `${esc(month)} has no draft yet. Carry over copies ${esc(prev.month)}'s written sections, learner comments, survey and results. Attendance, attendance notes and the sign-off date start blank.`,
+      `<button class="drb-btn-use" onclick="doCarryOver()">↪ Carry over</button><button class="drb-btn-keep" onclick="hideCarryOver()">Start blank</button>`);
+  }catch(e){console.warn('checkCarryOver failed:',e?.message||e);}
+}
+async function doCarryOver(){
+  const s=_carrySource;
+  if(!s||IS_ADMIN)return;
+  if(!activeProgramme||String(activeProgramme.id)!==String(s.progId)||document.getElementById('sel-month').value!==s.month){hideCarryOver();return;}
+  // Stop a pending autosave of the blank page from overwriting the carried draft
+  if(autoSaveTimer){clearTimeout(autoSaveTimer);autoSaveTimer=null;}
+  const cur=loadNarratives()||{};
+  const keep=o=>Object.fromEntries(Object.entries(o||{}).filter(([,v])=>v!=null&&String(v).trim()!==''));
+  const data={};
+  Object.entries(s.payload).forEach(([k,v])=>{if(!CARRY_SKIP.has(k))data[k]=v;});
+  // Anything already captured for this month (imported results, attendance) wins
+  data._eisa={...(s.payload._eisa||{}),...keep(cur._eisa)};
+  ['_att','_attState','att_register_note','att_summary','signoff_date','no_classes'].forEach(k=>{if(cur[k]!==undefined)data[k]=cur[k];});
+  data._meta={...(cur._meta||{}),
+    clientId:activeClient?.id,clientName:activeClient?.client_name||'',
+    progId:activeProgramme.id,progName:activeProgramme.programme_name||'',month:s.month,
+    providerId:cur._meta?.providerId||s.payload._meta?.providerId||activeProgramme.provider||'',
+    savedAt:Date.now(),carriedFrom:s.fromMonth};
+  const key=`${DRAFT_PREFIX}${s.progId}_${s.month}`;
+  try{localStorage.setItem(key,JSON.stringify(data));}catch{}
+  hideCarryOver();
+  narratives=loadNarratives();
+  _provSyncedKey=null;
+  _rerenderKeepingPlace();
+  try{
+    await sbUpsert('drafts',{tenant_id:TENANT_DB_ID,programme_id:s.progId,month:s.month,
+      client_name:data._meta.clientName,programme_name:data._meta.progName,payload:data,saved_at:new Date().toISOString()});
+    try{localStorage.setItem(key+'__synced',String(data._meta.savedAt));}catch{}
+    toast(`↪ Carried over from ${s.fromMonth} — update it before sending`,'success',4000);
+  }catch(e){
+    console.warn('Carry over cloud save failed:',e?.message||e);
+    toast('↪ Carried over on this device, but cloud save failed — it will retry on your next edit','warn',5000);
+  }
 }
 
 // Re-render the report without losing the PM's place: keeps page scroll and, if a
@@ -4621,6 +4745,7 @@ function generateReport(skipChecklistGate){
   narratives=loadNarratives(); // also restores attState via loadNarratives
   // Check for a newer cloud draft (async — banner appears once result is ready)
   checkDraftConflict(prog.id, month);
+  checkCarryOver(prog.id, month);
   const pLearners=getProgrammeLearners();
   const attDates=getAttDates();
 
