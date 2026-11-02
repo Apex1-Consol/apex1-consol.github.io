@@ -5301,10 +5301,6 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
         <div style="font-size:8pt;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:${p.gradMid};margin-bottom:6px">Headline</div>
         <div style="font-size:10pt;color:#333;line-height:1.6">${esc(headline)}</div>
       </div>
-      ${(narratives._sc_general_feedback||'').trim()?`<div style="margin-top:14px;padding:2px 0 2px 12px;border-left:2px solid ${p.accentFrom}">
-        <div style="font-size:8pt;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:${p.accentFrom};margin-bottom:5px">Project Manager Feedback</div>
-        <div style="font-size:9.5pt;color:#4A5568;line-height:1.6;font-style:italic">"${esc(narratives._sc_general_feedback.trim().slice(0,220))}${narratives._sc_general_feedback.trim().length>220?'…':''}"</div>
-      </div>`:''}
       <div style="display:flex;gap:6px;margin-top:22px">
         <div style="flex:1;height:5px;border-radius:3px;background:${p.accentFrom}"></div>
         <div style="flex:1;height:5px;border-radius:3px;background:${p.accentTo}"></div>
@@ -5839,7 +5835,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     const taClass=isEdited&&!isMatchingDefault?'comment-customised':isEdited?'comment-default':'comment-empty';
     const risk=getRiskLabel(l);
     const riskCls=risk==='Low'?'low':risk==='Medium'?'medium':risk==='Unknown'?'unknown':'high';
-    const badgeHtml=`<span class="comment-badge risk-pill ${riskCls}">${risk} Risk</span>`;
+    const badgeHtml=`<span class="comment-badge risk-pill ${riskCls}">${risk==='Unknown'?'Not yet assessed':risk+' Risk'}</span>`;
     return`<tr>
       <td>${esc(l.first_name)}</td>
       <td>${esc(l.last_name)}</td>
