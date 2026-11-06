@@ -4522,7 +4522,7 @@ function downloadUsTemplate(){
   if(!activeProgramme||!_usPasteModNum){toast('Open a module\'s Bulk Paste first','warn');return;}
   const roster=getProgrammeLearners();
   if(!roster.length){toast('No learners enrolled on this programme yet','warn');return;}
-  const headerCols=['ID Number','Formative','Summative','Logbook','Learner (reference only — do not paste this column)'];
+  const headerCols=['ID Number','Formative','Summative',...(isPracticalModule(_usPasteModNum)?['Practical']:[]),'Logbook','Learner (reference only — do not paste this column)'];
   const rows=[headerCols];
   roster.forEach(l=>{
     const blanks=headerCols.slice(1,-1).map(()=>'');
@@ -5220,9 +5220,7 @@ function buildExecSummaryPage(prog,client,pLearners,pn){
     usTotalCredits=perLearnerCredits*nCount;
     pLearners.forEach(l=>{
       Object.keys(creditsByMod).forEach(m=>{
-        const fv=legacyFormativeValue(ov,l.id,m)||'';
-        const sv=legacySummativeValue(ov,l.id,m)||'';
-        if(fv==='C'&&sv==='C')usEarnedCredits+=creditsByMod[m];
+        if(legacyModuleAchieved(ov,l.id,m,prog))usEarnedCredits+=creditsByMod[m];
       });
     });
     usPct=usTotalCredits>0?Math.round(usEarnedCredits/usTotalCredits*100):null;
@@ -5634,7 +5632,7 @@ function moduleResultsPending(prog,n,pLearners){
   const ov=narratives._eisa||{};
   let blank;
   if(isLegacyProgramme(prog)){
-    blank=l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n);
+    blank=l=>!legacyFormativeValue(ov,l.id,n)||!legacySummativeValue(ov,l.id,n)||(isPracticalModule(n,prog)&&!legacyPracticalValue(ov,l.id,n));
   }else{
     const ap=moduleAppliesTypes(prog,n)||{km:true,pm:true,wm:true};
     blank=l=>{
@@ -5698,7 +5696,7 @@ function getLearnerRiskLabel(l){
     // standard (see legacyFormativeValue/legacySummativeValue/legacyLogbookValue).
     new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
       if(_modNotStarted(activeProgramme,modNum))return;
-      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
+      legacyResultVals(ov,l.id,modNum).forEach(v=>{
         if(v&&v!=='NS'){total++;if(v==='NYC')nyc++;}
       });
     });
@@ -5937,7 +5935,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
     // Formative/Summative/Logbook are tracked once per learner per module.
     new Set(units.map(u=>u.mod||1)).forEach(modNum=>{
       if(_modNotStarted(activeProgramme,modNum))return;
-      [legacyFormativeValue(ov,l.id,modNum),legacySummativeValue(ov,l.id,modNum),legacyLogbookValue(ov,l.id,modNum)].forEach(v=>{
+      legacyResultVals(ov,l.id,modNum).forEach(v=>{
         if(v&&v!=='NS'){total++;if(v==='NYC')nyc++;}
       });
     });
@@ -5990,8 +5988,7 @@ function buildParticipationPage(pLearners,nar,pn=3){
       const creditsByMod={};
       units.forEach(u=>{const m=u.mod||1;creditsByMod[m]=(creditsByMod[m]||0)+(+u.credits||0);});
       const earned=Object.keys(creditsByMod).reduce((s,m)=>{
-        const fv=legacyFormativeValue(ov,l.id,m),sv=legacySummativeValue(ov,l.id,m);
-        return s+(fv==='C'&&sv==='C'?creditsByMod[m]:0);
+        return s+(legacyModuleAchieved(ov,l.id,m)?creditsByMod[m]:0);
       },0);
       return earned/totalCredits>=0.5;
     }
@@ -6437,8 +6434,9 @@ function _modResultVals(learnerId,m,qctoVals){
     const ov=narratives._eisa||{};
     const _ns=v=>v==='NS'?'':v;
     const f=_ns(legacyFormativeValue(ov,learnerId,m)),su=_ns(legacySummativeValue(ov,learnerId,m)),lb=_ns(legacyLogbookValue(ov,learnerId,m));
-    if(!f&&!su&&!lb)return[];
-    return[f||'-',su||'-',...(lb?[lb]:[])];
+    const hasP=isPracticalModule(m),pr=hasP?_ns(legacyPracticalValue(ov,learnerId,m)):'';
+    if(!f&&!su&&!lb&&!pr)return[];
+    return[f||'-',su||'-',...(hasP?[pr||'-']:[]),...(lb?[lb]:[])];
   }
   return(qctoVals||[]).filter(v=>v);
 }
@@ -6446,6 +6444,57 @@ function legacyFormativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_for
 function legacySummativeKey(learnerId,modNum){return`${learnerId}_m${modNum}_summative`;}
 function legacyFormativeValue(ov,learnerId,modNum){return(ov||{})[legacyFormativeKey(learnerId,modNum)]||'';}
 function legacySummativeValue(ov,learnerId,modNum){return(ov||{})[legacySummativeKey(learnerId,modNum)]||'';}
+// ── Practical (optional, per module, Legacy only) ──
+// Some legacy programmes also assess a Practical per module. Which modules have
+// one is a programme setting (programmes.practical_modules, jsonb array of module
+// numbers; [] = no practical), chosen by the PM from each module's results page.
+// On a practical module, credits need Formative + Summative + Practical all 'C'.
+// Programmes/modules without a practical behave exactly as before.
+function practicalModuleSet(prog){
+  const raw=prog&&prog.practical_modules;
+  const arr=Array.isArray(raw)?raw:(typeof raw==='string'?(()=>{try{return JSON.parse(raw)||[];}catch(e){return[];}})():[]);
+  return new Set(arr.map(Number).filter(n=>n>0));
+}
+function isPracticalModule(modNum,prog){
+  prog=prog||activeProgramme;
+  return!!prog&&isLegacyProgramme(prog)&&practicalModuleSet(prog).has(+modNum);
+}
+function legacyPracticalKey(learnerId,modNum){return`${learnerId}_m${modNum}_practical`;}
+function legacyPracticalValue(ov,learnerId,modNum){return(ov||{})[legacyPracticalKey(learnerId,modNum)]||'';}
+// Module achieved (credits earned): Formative C + Summative C (+ Practical C if the module has one).
+function legacyModuleAchieved(ov,learnerId,modNum,prog){
+  if(legacyFormativeValue(ov,learnerId,modNum)!=='C'||legacySummativeValue(ov,learnerId,modNum)!=='C')return false;
+  return!isPracticalModule(modNum,prog)||legacyPracticalValue(ov,learnerId,modNum)==='C';
+}
+// Every result captured for a learner on a module (risk rating counts these).
+function legacyResultVals(ov,learnerId,modNum,prog){
+  const v=[legacyFormativeValue(ov,learnerId,modNum),legacySummativeValue(ov,learnerId,modNum)];
+  if(isPracticalModule(modNum,prog))v.push(legacyPracticalValue(ov,learnerId,modNum));
+  v.push(legacyLogbookValue(ov,learnerId,modNum));
+  return v;
+}
+async function setModulePractical(n,on){
+  if(!activeProgramme)return;
+  const current=[...practicalModuleSet(activeProgramme)];
+  const next=(on?[...new Set([...current,n])]:current.filter(m=>m!==n)).sort((a,b)=>a-b);
+  activeProgramme.practical_modules=next;
+  const idx=programmes.findIndex(p=>p.id===activeProgramme.id);
+  if(idx>-1)programmes[idx]=activeProgramme;
+  saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
+  _lastGenKey=null;
+  if(isOnline&&!isTempId(activeProgramme.id)){
+    try{await sbPatch('programmes',activeProgramme.id,{practical_modules:next});showSaved();}
+    catch(e){
+      console.warn('Practical setting patch failed:',e.message);
+      enqueueWrite('patch','programmes',{practical_modules:next},activeProgramme.id);
+      updateQueueBadge();
+      toast('Change queued for retry when online','warn');
+    }
+  }else if(!isOnline){toast('Offline — change queued for sync','info',3000);}
+  toast(on?`Module ${n}: Practical added`:`Module ${n}: No practical`,'info',3000);
+  generateReport();
+  updateProgressPanel();
+}
 function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
   const allUnits=unitStandards
     .filter(u=>!u.saqa_id||u.saqa_id===prog.saqa_id)
@@ -6493,15 +6542,19 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
     for(let i=0;i<pLearners.length;i+=SPLIT)chunks.push(pLearners.slice(i,i+SPLIT));
     if(!chunks.length)chunks.push([]);
 
+    const hasPractical=isPracticalModule(modNum,prog);
+    const practicalPicker=`<label class="no-print" style="display:inline-flex;align-items:center;gap:5px;font-size:7.5pt;font-weight:600" title="Does this module have a Practical assessment? Saved for the whole programme.">Practical:
+              <select style="font-size:7.5pt;padding:3px 6px" onchange="setModulePractical(${modNum},this.value==='1')"><option value="0" ${hasPractical?'':'selected'}>No practical</option><option value="1" ${hasPractical?'selected':''}>Has practical</option></select></label>`;
     chunks.forEach((chunk,pageIdx)=>{
       const tableId=`legacy-us-table-m${modNum}-${pageIdx}`;
       const rows=chunk.map(l=>{
         const fKey=legacyFormativeKey(l.id,modNum),sKey=legacySummativeKey(l.id,modNum);
         const fv=legacyFormativeValue(nar._eisa,l.id,modNum);
         const sv=legacySummativeValue(nar._eisa,l.id,modNum);
-        const earned=(fv==='C'&&sv==='C')?modTotalCredits:0;
-        const anyAssessed=[fv,sv].some(v=>v&&v!=='NS');
-        const fsCells=mkFsCell(fKey,fv,'legacy-formative-select')+mkFsCell(sKey,sv,'legacy-summative-select');
+        const pv=hasPractical?legacyPracticalValue(nar._eisa,l.id,modNum):'';
+        const earned=legacyModuleAchieved(nar._eisa,l.id,modNum,prog)?modTotalCredits:0;
+        const anyAssessed=[fv,sv,pv].some(v=>v&&v!=='NS');
+        const fsCells=mkFsCell(fKey,fv,'legacy-formative-select')+mkFsCell(sKey,sv,'legacy-summative-select')+(hasPractical?mkFsCell(legacyPracticalKey(l.id,modNum),pv,'legacy-practical-select'):'');
         const lbKey=logbookKey(l.id,modNum);
         const lbVal=legacyLogbookValue(nar._eisa,l.id,modNum);
         const lbBc=lbVal==='C'?'badge-c':(lbVal==='NYC'||lbVal==='NC')?'badge-nyc':'badge-na';
@@ -6513,12 +6566,13 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         return`<tr data-mod-credits="${modTotalCredits}"><td>${esc(l.first_name)} ${esc(l.last_name)}${terminatedTag(l.id,modNum)}</td>${fsCells}${logbookCell}<td class="legacy-credits-cell" style="text-align:center;font-family:var(--mono);font-size:8pt;white-space:nowrap">${earned} / ${modTotalCredits}</td><td class="legacy-status-cell" style="text-align:center">${status}</td></tr>`;
       }).join('');
       const thead=`<thead style="${thVars()}">
-        <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th><th>Logbook</th><th>Credits</th><th>Status</th></tr>
+        <tr><th>Learner Name</th><th style="text-align:center">Formative</th><th style="text-align:center">Summative</th>${hasPractical?'<th style="text-align:center">Practical</th>':''}<th>Logbook</th><th>Credits</th><th>Status</th></tr>
       </thead>`;
       const body=`<div class="mod-section-header" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;${modHeaderStyle()}">
           <span>Unit Standards Achieved &#8212; Module ${modNum} &nbsp;&middot;&nbsp; ${units.length} unit standard${units.length!==1?'s':''} &nbsp;&middot;&nbsp; ${modTotalCredits} credits</span>${modRail(modNum)}
-          <span class="no-print" style="display:flex;gap:6px">
-            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/Logbook results from Excel">📋 Bulk Paste</button>
+          <span class="no-print" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            ${practicalPicker}
+            <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="openUsResultsPaste(${modNum})" title="Paste Formative/Summative/${hasPractical?'Practical/':''}Logbook results from Excel">📋 Bulk Paste</button>
             <button type="button" id="us-undo-btn-m${modNum}" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px;display:none;color:#f87171;border-color:rgba(248,113,113,.35)" onclick="undoUsPaste(${modNum})" title="Undo last bulk paste for this module">↩ Undo</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','C')">Set all Achieved</button>
             <button type="button" class="btn btn-ghost" style="font-size:7.5pt;padding:4px 9px" onclick="bulkSetLegacyResults('${tableId}','NYC')">Set all Not Yet Trained</button>
@@ -6530,7 +6584,7 @@ function buildLegacyAssessmentPages(pLearners,prog,nar,startPn){
         <div style="overflow-x:auto">
           <table id="${tableId}" class="data-table" style="break-inside:avoid;page-break-inside:avoid">${thead}<tbody>${rows}</tbody></table>
         </div>
-        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Competent</span><span class="badge badge-nyc">Not Yet Trained</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved</span></div>`;
+        <div style="display:flex;gap:12px;margin-top:8px;flex-wrap:wrap"><span class="badge badge-c">Achieved</span><span class="badge badge-nyc">Not Yet Competent</span><span class="badge badge-nyc">Not Yet Trained</span><span class="badge badge-na">Not Yet Started</span><span class="badge badge-na">&#8212; = Not Yet Assessed</span><span style="font-size:8pt;color:var(--muted)">${hasPractical?'Formative, Summative, Practical and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative + Practical all Achieved':'Formative, Summative and Logbook are captured once per learner for the whole module &nbsp;&middot;&nbsp; credit requires Formative + Summative both Achieved'}</span></div>`;
       pages.push(pageShell(pn++,0,activeClient.client_name,`Assessment — Module ${modNum} Unit Standards`+(chunks.length>1?` (${pageIdx+1}/${chunks.length})`:''),body));
     });
   });
@@ -6560,9 +6614,10 @@ function updateLegacyRowCredits(sel){
   const total=+tr.dataset.modCredits||0;
   const fSel=tr.querySelector('select.legacy-formative-select');
   const sSel=tr.querySelector('select.legacy-summative-select');
-  const fv=fSel?fSel.value:'',sv=sSel?sSel.value:'';
-  const earned=(fv==='C'&&sv==='C')?total:0;
-  const anyAssessed=[fv,sv].some(v=>v&&v!=='NS');
+  const pSel=tr.querySelector('select.legacy-practical-select');
+  const fv=fSel?fSel.value:'',sv=sSel?sSel.value:'',pv=pSel?pSel.value:'';
+  const earned=(fv==='C'&&sv==='C'&&(!pSel||pv==='C'))?total:0;
+  const anyAssessed=[fv,sv,pv].some(v=>v&&v!=='NS');
   const logbookSel=tr.querySelector('select.legacy-logbook-select');
   const logbookAchieved=logbookSel&&logbookSel.value==='C';
   const credCell=tr.querySelector('.legacy-credits-cell');
@@ -6577,7 +6632,7 @@ function updateLegacyRowCredits(sel){
 function bulkSetLegacyResults(tableId,value){
   const table=document.getElementById(tableId);
   if(!table)return;
-  table.querySelectorAll('select.legacy-formative-select,select.legacy-summative-select,select.legacy-logbook-select').forEach(sel=>{
+  table.querySelectorAll('select.legacy-formative-select,select.legacy-summative-select,select.legacy-practical-select,select.legacy-logbook-select').forEach(sel=>{
     sel.value=value;
     syncUsResult(sel);
   });
@@ -10887,10 +10942,11 @@ function scanSheet(sheetName,rows){
       const formative=_importLegacyResult(p(['formative','formative result']));
       const summative=_importLegacyResult(p(['summative','summative result']));
       const logbook=_importLegacyResult(p(['logbook','logbook result']));
+      const practical=_importLegacyResult(p(['practical','practical result']));
       const progLink=p(['programme name','program name','qualification','programme','program','course']);
       const month=_importReportMonth(p(['report month','month']));
-      if((resolvedFirst||resolvedLast||idNumber)&&modNum&&(formative||summative||logbook)){
-        legacy.push({_sheet:sheetName,_prog_name:progLink,first_name:resolvedFirst,last_name:resolvedLast,id_number:idNumber,module_number:+modNum,formative,summative,logbook,report_month:month});
+      if((resolvedFirst||resolvedLast||idNumber)&&modNum&&(formative||summative||logbook||practical)){
+        legacy.push({_sheet:sheetName,_prog_name:progLink,first_name:resolvedFirst,last_name:resolvedLast,id_number:idNumber,module_number:+modNum,formative,summative,logbook,practical,report_month:month});
       }
     }
 
@@ -11624,6 +11680,7 @@ module_1_dates:pd.module_1_dates||modDates.module_1_dates||null,
         if(r.formative)g.vals[legacyFormativeKey(lrec.id,r.module_number)]=r.formative;
         if(r.summative)g.vals[legacySummativeKey(lrec.id,r.module_number)]=r.summative;
         if(r.logbook)g.vals[logbookKey(lrec.id,r.module_number)]=r.logbook;
+        if(r.practical)g.vals[legacyPracticalKey(lrec.id,r.module_number)]=r.practical;
       }
       for(const g of Object.values(groups)){
         const prog=programmes.find(x=>String(x.id)===String(g.pid));
@@ -15691,6 +15748,7 @@ function _renderLRC(){
   usUnits.forEach(u=>{const m=u.mod||1;usCreditsByMod[m]=(usCreditsByMod[m]||0)+(+u.credits||0);});
   const usModNums=Object.keys(usCreditsByMod).map(Number).sort((a,b)=>a-b);
   const usTotalCredits=usModNums.reduce((s,m)=>s+usCreditsByMod[m],0);
+  const lrcAnyPractical=usModNums.some(m=>isPracticalModule(m,prog));
   let usEarned=0;
   const ovLrc=narratives._eisa||{};
   const mkLrcB=v=>v?`<span class="lrc-badge ${v==='C'?'c':(v==='NYC'||v==='NC')?'nyc':'na'}">${v==='NS'?'Not Started':v==='NC'?'NYC':v==='NYC'?'NYT':v}</span>`:`<span class="lrc-badge na">—</span>`;
@@ -15698,16 +15756,19 @@ function _renderLRC(){
     const fv=legacyFormativeValue(ovLrc,l.id,modNum);
     const sv=legacySummativeValue(ovLrc,l.id,modNum);
     const lbv=legacyLogbookValue(ovLrc,l.id,modNum);
+    const modHasP=isPracticalModule(modNum,prog);
+    const pv=modHasP?legacyPracticalValue(ovLrc,l.id,modNum):'';
     const cr=usCreditsByMod[modNum];
-    const achieved=fv==='C'&&sv==='C';
+    const achieved=legacyModuleAchieved(ovLrc,l.id,modNum,prog);
     if(achieved)usEarned+=cr;
     return`<tr>
       <td style="text-align:left;padding-left:12px">Module ${modNum}</td>
       <td style="text-align:center">${cr}</td>
       <td style="text-align:center">${mkLrcB(fv)}</td>
       <td style="text-align:center">${mkLrcB(sv)}</td>
+      ${lrcAnyPractical?`<td style="text-align:center">${modHasP?mkLrcB(pv):'<span class="lrc-badge na">N/A</span>'}</td>`:''}
       <td style="text-align:center">${lbv==='C'?'<span class="lrc-badge c">Achieved</span>':lbv==='NC'?'<span class="lrc-badge nyc">Not Yet Competent</span>':lbv==='NYC'?'<span class="lrc-badge nyc">Not Yet Trained</span>':lbv==='NS'?'<span class="lrc-badge na">Not Started</span>':'<span class="lrc-badge na">—</span>'}</td>
-      <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
+      <td style="text-align:center">${achieved&&lbv==='C'?'<span class="lrc-badge c">Complete</span>':(fv||sv||pv||lbv)?'<span class="lrc-badge nyc">In Progress</span>':'<span class="lrc-badge na">Pending</span>'}</td>
     </tr>`;
   }).join('');
   // Read-only reference list of the actual unit standards, grouped by module.
@@ -15769,10 +15830,10 @@ function _renderLRC(){
         ${lrcIsLegacy?`<table class="lrc-eisa-table">
           <thead><tr>
             <th style="text-align:left">Module</th><th style="text-align:center">Credits</th>
-            <th style="text-align:center">Formative</th><th style="text-align:center">Summative</th>
+            <th style="text-align:center">Formative</th><th style="text-align:center">Summative</th>${lrcAnyPractical?'<th style="text-align:center">Practical</th>':''}
             <th style="text-align:center">Logbook</th><th style="text-align:center">Status</th>
           </tr></thead>
-          <tbody>${usRows||`<tr><td colspan="6" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
+          <tbody>${usRows||`<tr><td colspan="${lrcAnyPractical?7:6}" style="text-align:center;color:var(--muted);font-style:italic">No unit standards registered for this programme yet.</td></tr>`}</tbody>
         </table>
         <div style="margin-top:8px;font-size:7.5pt;color:var(--muted)">${usRefList}</div>
         <div style="display:flex;justify-content:flex-end;align-items:center;margin-top:6px;font-size:8.5pt">
@@ -16141,7 +16202,7 @@ function openUsResultsPaste(modNum){
   // Formative/Summative/Logbook are tracked once per learner per module now
   // (not per unit standard) — one column each, regardless of how many unit
   // standards this module lists.
-  const headerCols=['ID Number','Formative','Summative','Logbook'];
+  const headerCols=['ID Number','Formative','Summative',...(isPracticalModule(modNum)?['Practical']:[]),'Logbook'];
   document.getElementById('us-paste-title').textContent=`📋 Bulk Unit Standards Paste — Module ${modNum}`;
   document.getElementById('us-paste-template').textContent=headerCols.join('\t');
   document.getElementById('us-paste-area').value='';
@@ -16167,7 +16228,7 @@ function _usNormResult(v){
 
 function _usColLabel(c){
   if(c.type==='logbook')return'Logbook';
-  return c.role==='formative'?'Formative':'Summative';
+  return c.role==='formative'?'Formative':c.role==='practical'?'Practical':'Summative';
 }
 
 function parseUsPaste(){
@@ -16193,6 +16254,7 @@ function parseUsPaste(){
     if(norm==='LOGBOOK'||norm==='LB')return{col:i+1,type:'logbook',label:h};
     if(norm==='FORMATIVE'||norm==='F')return{col:i+1,type:'unit',role:'formative',label:h};
     if(norm==='SUMMATIVE'||norm==='S')return{col:i+1,type:'unit',role:'summative',label:h};
+    if((norm==='PRACTICAL'||norm==='P')&&isPracticalModule(_usPasteModNum))return{col:i+1,type:'unit',role:'practical',label:h};
     return{col:i+1,type:null,label:h};
   });
   const validCols=allCols.filter(c=>c.type);
@@ -16301,7 +16363,7 @@ function commitUsPaste(){
     const l=r.learner;
     r.cells.forEach(c=>{
       if(!c.value)return; // blank/unrecognised — leave the existing value alone
-      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?legacyFormativeKey(l.id,modNum):legacySummativeKey(l.id,modNum));
+      const key=c.type==='logbook'?logbookKey(l.id,modNum):(c.role==='formative'?legacyFormativeKey(l.id,modNum):c.role==='practical'?legacyPracticalKey(l.id,modNum):legacySummativeKey(l.id,modNum));
       const prev=narratives._eisa[key]||'';
       if(prev===c.value)return; // no-op, keep the undo stack meaningful
       affected.push({key,prev});
