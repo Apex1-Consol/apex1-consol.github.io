@@ -5832,7 +5832,7 @@ function buildOverviewPage(prog,client,pLearners,pn=2){
         <div class="mod-dates-print">${esc(fmtModDates(m.dates)||'—')}</div>
         <div class="mod-units">${m.units}</div>
         ${progressHtml}
-        ${needsInput&&m.num<=4?`<div class="no-print" style="margin-top:6px;text-align:center"><a href="javascript:void(0)" style="font-size:7pt;color:rgba(255,255,255,.35);text-decoration:underline" onclick="if(confirm('Mark Module ${m.num} as not part of this programme? It will stop being required before a report can be sent, and will drop off the report and this timeline. You can restore it later.'))setModuleExcluded(${m.num},true)">Not part of this programme</a></div>`:''}
+        ${needsInput&&m.num<=4?`<div class="no-print" style="margin-top:6px;text-align:center"><a href="javascript:void(0)" style="display:inline-block;font-size:7.5pt;font-weight:700;color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:3px 10px;text-decoration:none" onclick="if(confirm('Mark Module ${m.num} as not part of this programme? It will stop being required before a report can be sent, and will drop off the report and this timeline. You can restore it later.'))setModuleExcluded(${m.num},true)">✕ Not part of this programme</a></div>`:''}
       </div>`;}).join('')}
     </div>
     ${(()=>{
