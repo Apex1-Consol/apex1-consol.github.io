@@ -8907,7 +8907,9 @@ async function downloadPDF(){
  * Fonts link already in the <head>. Gradients, shadows, and backgrounds
  * all render correctly because it's native browser rendering — not canvas.
  */
-function _printReportViaIframe({mode='print'}={}){
+// Builds the print-ready HTML (styles + cloned pages). Shared by printing and by the
+// ClickUp snapshot below, so ClickUp gets exactly what the user prints.
+function _buildReportPrintHtml(){
   const pages=document.getElementById('report-pages');
   if(!pages||!pages.children.length)return;
 
@@ -9006,6 +9008,14 @@ ${styleNodes}
 </head>
 <body>${pagesClone.outerHTML}</body>
 </html>`;
+  return {html,filename};
+}
+
+function _printReportViaIframe({mode='print'}={}){
+  const _built=_buildReportPrintHtml();
+  if(!_built)return;
+  const {html,filename}=_built;
+  _captureReportSnapshot(mode,_built); // ClickUp: PDF of what was printed/downloaded (async, never blocks)
 
   // Create hidden iframe
   const iframe=document.createElement('iframe');
@@ -9246,6 +9256,40 @@ ${styleNodes}
   setTimeout(doPrint,1800);
 }
 
+// ── ClickUp: snapshot of the generated report ──
+// Uploads the print-ready HTML to the private 'client-reports' bucket and queues it
+// (reports.report_files). A server job renders it to PDF with Chrome and attaches it
+// to the report's card in ClickUp → Monthly Client Reports. Fire-and-forget: any
+// failure is logged to the console and never affects printing or submitting.
+let _lastSnapshotSig=null;
+async function _captureReportSnapshot(kind,built){
+  try{
+    if(IS_ADMIN||!isOnline||!activeProgramme)return;
+    const b=built||_buildReportPrintHtml();
+    if(!b||!b.html)return;
+    const month=document.getElementById('sel-month')?.value;
+    if(!month)return;
+    const sig=kind+'|'+activeProgramme.id+'|'+month+'|'+b.html.length+'|'+b.html.slice(-2000);
+    if(kind!=='submitted'&&sig===_lastSnapshotSig)return; // same output printed twice in a row
+    _lastSnapshotSig=sig;
+    const baseHref=location.href.replace(/[?#].*$/,'').replace(/[^/]*$/,'');
+    const html=b.html.replace('<head>','<head>\n<base href="'+baseHref+'">');
+    const path=`${TENANT_DB_ID}/${activeProgramme.id}/${month.replace(/[^A-Za-z0-9]+/g,'-')}/${Date.now()}-${kind}.html`;
+    const up=await fetch(`${SB_URL}/storage/v1/object/client-reports/${path}`,{
+      method:'POST',
+      headers:{apikey:HEADERS.apikey,Authorization:HEADERS.Authorization,'Content-Type':'text/html; charset=utf-8'},
+      body:html
+    });
+    if(!up.ok)throw new Error('snapshot upload '+up.status+' '+(await up.text()).slice(0,200));
+    const q=await fetch(`${SB_URL}/rest/v1/report_files`,{
+      method:'POST',
+      headers:{...HEADERS,'Content-Profile':'reports','Prefer':'return=minimal'},
+      body:JSON.stringify({tenant_id:String(TENANT_DB_ID),programme_id:activeProgramme.id,month,report_id:_currentReportId&&_currentReportId<1e12?_currentReportId:null,kind,html_path:path})
+    });
+    if(!q.ok)throw new Error('snapshot queue '+q.status+' '+(await q.text()).slice(0,200));
+  }catch(e){console.warn('ClickUp report snapshot skipped:',e);}
+}
+
 // ── Log report print to Supabase reports table ──
 function logReportPrint(){
   if(!activeProgramme||!activeClient||!isOnline)return;
@@ -9283,6 +9327,7 @@ function logReportPrint(){
         _currentReportStatus='pending';
         // A resubmission is already announced to admins by transition_report().
         _logAudit(rec.id,resubmit?'resubmitted':'submitted',{newStatus:'pending'});
+        _captureReportSnapshot('submitted'); // ClickUp: PDF of the submitted report
         if(_pendingLateReason){const lr=_pendingLateReason;_pendingLateReason=null;
           _rptRpc('set_late_reason',{p_report_id:Number(rec.id),p_reason:lr}).catch(e=>toast('Delay reason not saved: '+e.message,'error',6000));}
         setTimeout(()=>checkReportStatus(),800);
