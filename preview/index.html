@@ -641,7 +641,7 @@ function navPin(ev,r){ev.preventDefault();ev.stopPropagation();PINS=PINS.include
 function renderNav(cur){curNav=cur;if(!PINS){try{PINS=JSON.parse(localStorage.getItem('navPins.v1'))}catch(e){}const flat=NAV.flatMap(([g,it])=>it);if(!Array.isArray(PINS))PINS=[];PINS=PINS.filter(r=>flat.some(x=>x[1]===r))}const flat=NAV.flatMap(([g,it])=>it),pinned=PINS.map(r=>flat.find(x=>x[1]===r)).filter(Boolean);
   $('nav').innerHTML=(pinned.length?[['Pinned',pinned]]:[]).concat(NAV).map(([g,items])=>`<div class="navgroup"><span>${g}</span>${items.filter(([l,r])=>(!famOnly()||r==='fam')&&(!(window.NAVR&&NAVR[r])||NAVR[r]())).map(([l,r])=>r?`<a class="navlink${r===cur?' on':''}" href="#${r}" title="${esc(l)}"${r===cur?' aria-current="page"':''}>${ico(r)}<span class="lbl">${esc(l)}</span>${NC[r]&&NC[r]()?`<span class="navcount" aria-label="${NC[r]()} waiting">${NC[r]()}</span>`:''}<span class="navpin${PINS.includes(r)?' on':''}" role="button" tabindex="0" aria-pressed="${PINS.includes(r)}" title="${PINS.includes(r)?'Unpin':'Pin to top'}" aria-label="${PINS.includes(r)?'Unpin':'Pin'} ${esc(l)}" onclick="navPin(event,'${r}')" onkeydown="if(event.key==='Enter'||event.key===' ')navPin(event,'${r}')">★</span></a>`:`<a class="navlink dim" href="#" onclick="toast('${esc(l)} not mocked yet');return false">${esc(l)}</a>`).join('')}</div>`).join('');
 }
-function famOnly(){const r=(window.P&&P.roles)||[];return r.length>0&&r.every(x=>x==='fam_admin')}
+function famOnly(){const r=(window.__preview&&window.__preview.roles)||[];return r.length>0&&r.every(x=>x==='fam_admin')}
 function route(){
   if(location.hash.slice(1).split('/')[0]==='assessors'){location.replace('#fam');return;}
   const r=location.hash.slice(1).split('/')[0]||'login';
