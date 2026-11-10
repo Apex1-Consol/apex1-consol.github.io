@@ -15264,16 +15264,16 @@ function _renderDeadlineBanner(){
     sub=`${esc(r.hold_reason||'')}${r.hold_note?' — '+esc(r.hold_note):''} (set by ${esc(_dlStaffName(r.hold_set_by))}). Turns red again if not done by then.`;
     acts=`<button class="dl-btn g" onclick="_openHoldModal()">Edit hold</button>${mainBtn}`;
   }else if(showSendStage){
-    if(t.tone==='dan'){title=`⚠ Overdue: not sent to the client (due ${_dlFmt(dl.send)})`;sub='Nasreen and Stavros can see this on their dashboard. Send it, or put it on hold with a reason.';acts=holdBtn+sendBtn;}
+    if(t.tone==='dan'){title=`⚠ Overdue: not sent to the client (due ${_dlFmt(dl.send)})`;sub='Admins can see this on their dashboard. Send it, or put it on hold with a reason.';acts=holdBtn+sendBtn;}
     else if(t.tone==='warn'){title='📤 Approved, not sent to client yet';sub=`Due to the client by ${_dlFmt(dl.send)}. Email the PDF to the client, then mark it as sent.`;acts=sendBtn;}
     else{title='📤 Approved, ready to send';sub=`Email the PDF to the client, then mark it as sent (due ${_dlFmt(dl.send)}).`;acts=sendBtn;}
   }else if(t.stage==='submit'){
     const nc=r&&r.status==='needs_changes';
-    if(t.tone==='dan'){title=nc?`⚠ Overdue: changes not resubmitted (due ${_dlFmt(dl.submit)})`:`⚠ Overdue: not sent for review (due ${_dlFmt(dl.submit)})`;sub='Nasreen and Stavros can see this on their dashboard. You\'ll be asked for a reason for the delay when you send it.';acts=holdBtn+mainBtn;}
+    if(t.tone==='dan'){title=nc?`⚠ Overdue: changes not resubmitted (due ${_dlFmt(dl.submit)})`:`⚠ Overdue: not sent for review (due ${_dlFmt(dl.submit)})`;sub='Admins can see this on their dashboard. You\'ll be asked for a reason for the delay when you send it.';acts=holdBtn+mainBtn;}
     else if(t.tone==='warn'){title=`⏰ Due for review by ${_dlFmt(dl.submit)}`;sub='Finish the report and send it for review.';acts=mainBtn;}
     else{title=nc?'↩ Changes requested':'Not sent for review yet';sub='';acts=mainBtn;}
   }else{
-    title=t.tone==='dan'?'⚠ Review overdue':'🔍 In review';sub='Waiting for Nasreen to review.';
+    title=t.tone==='dan'?'⚠ Review overdue':'🔍 In review';sub='Waiting for the reviewer.';
   }
   if(t.holdEnded&&t.tone!=='hold')sub+=` Hold ended on ${_dlFmt(_dlParseDate(r.hold_until))}.`;
   el.className='show dl-'+(t.tone==='none'?'info':t.tone);
@@ -15383,7 +15383,7 @@ async function renderSendPanel(){
     .concat(drafts.filter(d=>!withRep.has(String(d.programme_id))).map(d=>({r:null,pid:d.programme_id,cid:(programmes.find(p=>String(p.id)===String(d.programme_id))||{}).client_id,client:d.client_name,prog:d.programme_name,pm:d.pm_email})));
   rows.forEach(x=>{x.t=_rptTone(x.r,month)||{stage:'send',tone:'none',badge:''};});
   const rank={dan:0,warn:1,hold:2,info:3,none:4},stOrd={submit:0,review:1,send:2};
-  const STG={submit:'Not yet sent for review (PM)',review:'Waiting for review (Nasreen)',send:'Approved, not sent to client (PM)'};
+  const STG={submit:'Not yet sent for review (PM)',review:'Waiting for review (reviewer)',send:'Approved, not sent to client (PM)'};
   rows.sort((a,b)=>stOrd[a.t.stage]-stOrd[b.t.stage]||rank[a.t.tone]-rank[b.t.tone]||String(a.client).localeCompare(String(b.client)));
   const cnt=k=>rows.filter(x=>x.t.tone===k).length;
   const counts=[['dan','overdue'],['warn','due soon'],['hold','on hold']].filter(([k])=>cnt(k)).map(([k,l])=>`<span class="ds-b ${k}">${cnt(k)} ${l}</span>`).join(' ');
