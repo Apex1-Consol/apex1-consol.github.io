@@ -3,9 +3,9 @@
    through the fam-relay edge function. Supabase stays for sign-in, qualifications, programmes,
    renewals, audit log, document files and fam_private (rates, ID numbers: writers only). */
 (function () {
-  try { const m = location.search.match(/[?&]cu=([01])/); if (m) localStorage.setItem('famCU', m[1]); } catch (_) {}
-  let on = false; try { on = localStorage.getItem('famCU') === '1'; } catch (_) {}
-  if (!on) return;
+  // Retired 10 Nov 2026: preview now runs on the live DB, where ClickUp is fed server-side (fam-clickup-projector).
+  try { localStorage.removeItem('famCU'); } catch (_) {}
+  return;
   const RELAY = 'fam-relay';
   const CU = new Set(['assessors', 'fam_seta_registrations', 'fam_registration_scope', 'fam_documents', 'fam_follow_ups', 'fam_quality']);
   const cache = {};
