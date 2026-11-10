@@ -26,7 +26,7 @@
   const MAX = 10 * 1024 * 1024, EXT = ['pdf', 'doc', 'docx', 'jpg', 'jpeg', 'png'];
   const S = { A: [], R: [], D: [], F: [], Q: [], SC: [], filter: '', q: '', hist: {}, sort: { k: 'name', dir: 1 }, fRole: '', fSt: '', fSeta: '', view: 'triage', hideTest: true, page: 0, ptab: 'record', loadedAt: null, sel: new Set(), col: new Set(['lapsed', 'none', 'active', 'inactive']), tab: 'overview', mode: 'list', prof: null, cat: null, catQ: '', catSeta: '' };
   /* Filters remembered per browser (item 6). Search text is not kept. */
-  const LSK = 'famFilters.v1', LSF = ['filter', 'fRole', 'fSt', 'fSeta', 'view', 'hideTest'];
+  const LSK = 'famFilters.v1', LSF = ['view', 'hideTest'] // filters reset on every visit so the registry always opens on everyone;
   try { const j = JSON.parse(localStorage.getItem(LSK) || 'null'); if (j) { LSF.forEach(k => { if (k in j) S[k] = j[k]; }); if (Array.isArray(j.col)) S.col = new Set(j.col); } } catch (_) {}
   ['expired', 'due_30', 'due_60'].forEach(g => S.col.delete(g)); // urgent groups always open on load, so the first screen shows names
   const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
