@@ -32,8 +32,8 @@
   const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
   const say = m => window.toast(m);
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
-  const isAdm = () => has('admin');
-  const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist');
+  const isAdm = () => has('admin', 'fam_admin');
+  const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist', 'fam_admin');
   const me = () => P.user?.email || null;
   const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
   const e = s => esc(s ?? '');

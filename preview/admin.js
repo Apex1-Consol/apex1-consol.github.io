@@ -237,7 +237,7 @@
   window.adAuCsv = () => csv('audit-log.csv', ['When', 'User', 'Role', 'Action', 'Table', 'Record', 'Changes'], (AL || []).map(r => [r.created_at, r.user_name, r.user_role, r.action, r.table_name, r.record_id, JSON.stringify(r.changes)]));
 
   /* ---------- User management ---------- */
-  const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer']];
+  const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer'], ['fam_admin', 'FAM Registry only']];
   let US = null;
   async function renderUsers() {
     const v = $('view-users');
