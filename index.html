@@ -513,6 +513,50 @@
 #view-fam .scope-pill.ready{background:rgba(59,109,17,.30);color:#a7e08c;}
 #view-fam select.scope-target{background:var(--bg-secondary);color:var(--text-primary);border:1px solid var(--border-subtle);padding:6px;border-radius:6px;}
 #view-fam .scope-approval-disabled{opacity:.5;cursor:not-allowed!important;}
+/* FAM availability + bookings */
+#view-fam .av-controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--border-subtle);}
+#view-fam .av-controls .grow{flex:1;}
+#view-fam .av-finder{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;align-items:end;padding:14px 18px;}
+#view-fam .av-finder label{display:flex;flex-direction:column;gap:4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-muted);}
+#view-fam .av-legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11px;color:var(--text-muted);padding:8px 18px;}
+#view-fam .av-legend i{display:inline-block;width:14px;height:8px;border-radius:3px;vertical-align:middle;margin-right:5px;}
+#view-fam .av-grid{overflow-x:auto;}
+#view-fam .av-row{display:grid;grid-template-columns:220px 1fr;min-width:860px;border-top:1px solid var(--border-subtle);}
+#view-fam .av-row.h{position:sticky;top:0;background:var(--bg-card);z-index:2;border-top:none;}
+#view-fam .av-name{padding:8px 12px;font-size:12px;border-right:1px solid var(--border-subtle);cursor:pointer;background:none;border-top:none;border-bottom:none;border-left:none;text-align:left;color:var(--text-primary);}
+#view-fam .av-name:hover{background:var(--bg-card-hover);}
+#view-fam .av-name .sub{display:block;font-size:10.5px;color:var(--text-muted);}
+#view-fam .av-weeks{display:grid;font-size:10px;color:var(--text-muted);}
+#view-fam .av-weeks span{padding:8px 0 6px 4px;border-left:1px solid var(--border-subtle);}
+#view-fam .av-track{position:relative;cursor:copy;background-image:linear-gradient(to right,var(--border-subtle) 1px,transparent 1px);}
+#view-fam .av-bar{position:absolute;height:20px;border-radius:5px;font-size:10.5px;line-height:20px;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:none;text-align:left;color:#0C2F52;font-weight:600;}
+#view-fam .av-bar.r-Facilitator{background:#D4A537;}
+#view-fam .av-bar.r-Assessor{background:#6FA8E8;}
+#view-fam .av-bar.r-Moderator{background:#9BC97A;}
+#view-fam .av-bar.st-Planned{opacity:.6;background-image:repeating-linear-gradient(45deg,rgba(255,255,255,.35) 0 4px,transparent 4px 8px);}
+#view-fam .av-bar.risk{outline:2px solid #E08585;outline-offset:-2px;}
+#view-fam .av-bar.clash{box-shadow:0 0 0 2px #E08585;}
+#view-fam .av-dot{position:absolute;width:4px;height:4px;border-radius:50%;background:#0C2F52;opacity:.75;pointer-events:none;}
+#view-fam .av-exp{position:absolute;top:2px;font-size:10px;color:#E08585;transform:translateX(-50%);pointer-events:none;}
+#view-fam .av-today{position:absolute;top:0;bottom:0;width:2px;background:#E8C468;z-index:1;pointer-events:none;}
+#view-fam .av-free{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:10.5px;color:#8FC463;pointer-events:none;}
+#view-fam .lvl{font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;display:inline-block;white-space:nowrap;}
+#view-fam .lvl-ok{background:rgba(59,109,17,.22);color:#8FC463;}
+#view-fam .lvl-warn{background:rgba(212,165,55,.2);color:#E8C468;}
+#view-fam .lvl-bad{background:rgba(166,58,58,.22);color:#E08585;}
+#view-fam .lvl-free{background:rgba(59,109,17,.22);color:#8FC463;}
+#view-fam .lvl-light{background:rgba(55,138,221,.2);color:#6FA8E8;}
+#view-fam .lvl-busy{background:rgba(212,165,55,.2);color:#E8C468;}
+#view-fam .bk-card{border:1px solid var(--border-subtle);border-left:4px solid #D4A537;border-radius:8px;padding:9px 12px;margin-bottom:8px;background:var(--bg-secondary);font-size:11.5px;cursor:pointer;}
+#view-fam .bk-card.r-Assessor{border-left-color:#6FA8E8;} #view-fam .bk-card.r-Moderator{border-left-color:#9BC97A;}
+#view-fam .bk-card .t{font-weight:700;font-size:12px;}
+#view-fam .bk-card .m{color:var(--text-muted);font-size:10.5px;margin-top:2px;}
+#view-fam .av-attn{padding:4px 18px 14px;}
+#view-fam .av-attn li{font-size:12px;margin:6px 0 0 18px;}
+#fam-modal-booking .bk-check{border:1px solid var(--border-subtle);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px;min-height:42px;background:var(--bg-secondary);}
+#fam-modal-booking .bk-check ul{margin:6px 0 0 16px;}
+#fam-modal-booking .bk-check .lvl{margin-right:6px;}
+#fam-modal-booking .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
 @media (max-width:900px){#view-fam #fam-si-tbody{min-width:800px;}}
 </style>
 <style>
@@ -1851,6 +1895,7 @@
                             <div class="container-actions">
                                 <span style="font-size:11px;color:var(--text-muted);">Scope and documents live in the profile panel &rarr;</span>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.loadAll()">&#8635; Refresh</button>
+                                <button class="btn btn-secondary btn-sm" onclick="FAM.openAvailability()" title="Who is booked on what, who is free, and assign people to programmes">&#128197; Availability</button>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.openScopeImport()">Scope Import</button>
                                 <button class="btn btn-secondary btn-sm" onclick="FAM.openBulkIntake()">Bulk Intake</button>
         <button class="btn btn-secondary btn-sm" onclick="FAM.generateComplianceDigest()">&#10024; Compliance Digest</button>
@@ -1951,6 +1996,44 @@
                         </div>
                     </div>
                 </div>
+                <!-- Availability: bookings timeline, who-is-free finder and assigning.
+                     Bookings live in public.fam_bookings (FAM is the system of record). -->
+                <div id="fam-availability" style="display:none;">
+                    <div class="fam-banner">
+                        <span><strong>Availability</strong> &mdash; who is booked on what. Check here before assigning a practitioner; every booking is checked for clashes and registration cover.</span>
+                        <span style="display:flex;gap:8px;"><button class="btn btn-gold btn-sm" onclick="FAM.openBooking({})">+ Assign practitioner</button><button class="btn btn-secondary btn-sm" onclick="FAM.closeAvailability()">Back to registry</button></span>
+                    </div>
+                    <div class="stat-row" id="fam-av-stats"></div>
+                    <div class="content-container">
+                        <div class="container-header"><h2>Find who is free</h2><span style="font-size:11px;color:var(--text-muted);">Checks bookings, SETA registration, scope and expiry for the dates you pick</span></div>
+                        <div class="av-finder">
+                            <label>Programme (optional)<select id="fam-fd-prog" class="filter-select" onchange="FAM.finderProgramme()"></select></label>
+                            <label>Role<select id="fam-fd-role" class="filter-select"><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select></label>
+                            <label>Qualification<select id="fam-fd-qual" class="filter-select"></select></label>
+                            <label>From<input id="fam-fd-from" type="date" class="filter-input"></label>
+                            <label>To<input id="fam-fd-to" type="date" class="filter-input"></label>
+                            <button class="btn btn-gold btn-sm" onclick="FAM.runFinder()">Find people</button>
+                        </div>
+                        <div id="fam-fd-results"></div>
+                    </div>
+                    <div class="content-container">
+                        <div class="container-header"><h2>Bookings calendar</h2><span style="font-size:11px;color:var(--text-muted);">Click a bar to edit &middot; click an empty spot to assign that person</span></div>
+                        <div class="av-controls">
+                            <button class="btn btn-secondary btn-sm" onclick="FAM.avMove(-4)" aria-label="Back 4 weeks">&lsaquo;</button>
+                            <button class="btn btn-secondary btn-sm" onclick="FAM.avMove(0)">Today</button>
+                            <button class="btn btn-secondary btn-sm" onclick="FAM.avMove(4)" aria-label="Forward 4 weeks">&rsaquo;</button>
+                            <span id="fam-av-range" style="font-size:12px;color:var(--text-muted);"></span>
+                            <span class="grow"></span>
+                            <input id="fam-av-q" class="filter-input" placeholder="Search name" oninput="FAM.renderAvailability()" style="width:150px;">
+                            <select id="fam-av-role" class="filter-select" onchange="FAM.renderAvailability()"><option value="">All roles</option><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select>
+                            <select id="fam-av-seta" class="filter-select" onchange="FAM.renderAvailability()"><option value="">All SETAs</option></select>
+                            <select id="fam-av-show" class="filter-select" onchange="FAM.renderAvailability()"><option value="registered">Registered practitioners</option><option value="booked">Booked only</option><option value="all">Everyone</option></select>
+                        </div>
+                        <div class="av-legend"><span><i style="background:#D4A537"></i>Facilitator</span><span><i style="background:#6FA8E8"></i>Assessor</span><span><i style="background:#9BC97A"></i>Moderator</span><span><i style="background:#D4A537;opacity:.6"></i>Planned</span><span><i style="outline:2px solid #E08585;outline-offset:-2px;background:transparent"></i>Registration problem</span><span>&bull; class day</span><span style="color:#E08585">&#9670; registration expires</span><span><i style="background:#E8C468;width:3px"></i>Today</span></div>
+                        <div class="av-grid" id="fam-av-grid"></div>
+                        <div class="av-attn" id="fam-av-attn"></div>
+                    </div>
+                </div>
             </section>
 
         </div>
@@ -2019,6 +2102,38 @@
 </div>
 
 <!-- FAM AI COMPLIANCE SUMMARY MODAL (per-practitioner) -->
+<div class="modal-overlay hidden" id="fam-modal-booking" onclick="if(event.target===this)closeModal('fam-modal-booking')">
+    <div class="modal-card" style="max-width:560px;max-height:92vh;overflow-y:auto;">
+        <h2 style="font-size:16px;margin-bottom:16px;" id="fam-bk-title">Assign practitioner</h2>
+        <div class="modal-error" id="fam-bk-error" style="color:var(--accent-rose);font-size:11.5px;min-height:14px;margin-bottom:6px;"></div>
+        <input type="hidden" id="fam-bk-id">
+        <div class="row2">
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Practitioner *</span><select id="fam-bk-assessor" class="filter-select" style="width:100%;" onchange="FAM.checkBooking()"></select></div>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Role *</span><select id="fam-bk-role" class="filter-select" style="width:100%;" onchange="FAM.checkBooking()"><option>Facilitator</option><option>Assessor</option><option>Moderator</option></select></div>
+        </div>
+        <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Programme</span><select id="fam-bk-prog" class="filter-select" style="width:100%;" onchange="FAM.bookingProgramme()"></select></div>
+        <div class="row2">
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">What *</span><input id="fam-bk-what" class="filter-input" style="width:100%;" placeholder="Programme or assignment"></div>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Client</span><input id="fam-bk-client" class="filter-input" style="width:100%;"></div>
+        </div>
+        <div class="row2">
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">From *</span><input id="fam-bk-start" type="date" class="filter-input" style="width:100%;" onchange="FAM.checkBooking()"></div>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">To *</span><input id="fam-bk-end" type="date" class="filter-input" style="width:100%;" onchange="FAM.checkBooking()"></div>
+        </div>
+        <div class="row2">
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Days per week</span><input id="fam-bk-dpw" type="number" min="0.5" max="7" step="0.5" class="filter-input" style="width:100%;" placeholder="e.g. 2"></div>
+            <div class="filter-group" style="margin-bottom:10px;"><span class="filter-label">Status *</span><select id="fam-bk-status" class="filter-select" style="width:100%;"><option>Confirmed</option><option>Planned</option><option>Done</option><option>Cancelled</option></select></div>
+        </div>
+        <div class="filter-group" style="margin-bottom:12px;"><span class="filter-label">Notes</span><input id="fam-bk-notes" class="filter-input" style="width:100%;"></div>
+        <div class="bk-check" id="fam-bk-check">Pick a practitioner, role and dates to check availability.</div>
+        <label id="fam-bk-override-wrap" style="display:none;align-items:center;gap:8px;font-size:12px;margin-bottom:14px;"><input type="checkbox" id="fam-bk-override" style="width:auto;" onchange="FAM.checkBooking(true)"> I have checked the warnings above and want to book anyway</label>
+        <div style="display:flex;gap:10px;">
+            <button class="btn btn-secondary" id="fam-bk-delete" style="display:none;" onclick="FAM.deleteBooking()">Delete</button>
+            <button class="btn btn-secondary" style="flex:1;" onclick="closeModal('fam-modal-booking')">Cancel</button>
+            <button class="btn btn-gold" style="flex:1;" id="fam-bk-save" onclick="FAM.saveBooking()">Save booking</button>
+        </div>
+    </div>
+</div>
 <div class="modal-overlay hidden" id="fam-ai-summary-modal" onclick="if(event.target===this)closeModal('fam-ai-summary-modal')">
     <div class="modal-card" style="width:600px;max-height:85vh;display:flex;flex-direction:column;">
         <h2 style="font-size:16px;margin-bottom:4px;">AI Compliance Summary</h2>
@@ -10701,6 +10816,9 @@ const FAM = (function () {
     documents: [],
     qualifications: [],
     followUps: [],
+    bookings: [],
+    programmes: [],
+    av: { from: null, weeks: 13 },
     showDismissedFollowUps: false,
     selectedAssessorId: null,
     tenantId: null,
@@ -10742,7 +10860,7 @@ const FAM = (function () {
     fs.loading = true;
     try {
       if (!fs.tenantId) fs.tenantId = await getTenantId();
-      const [assessors, regs, scope, docs, quals, followUps, completeness] = await Promise.all([
+      const [assessors, regs, scope, docs, quals, followUps, completeness, bookings, programmes] = await Promise.all([
         api('assessors?select=id,full_name,id_number,email,phone,physical_address,role&order=full_name.asc'),
         api('fam_seta_registrations?select=*&order=registration_expiry_date.asc'),
         api('fam_registration_scope?select=id,registration_id,qualification_id,qualifications(id,name,qualification_code)'),
@@ -10752,7 +10870,12 @@ const FAM = (function () {
         // Database-derived completeness per practitioner (security_invoker view).
         // Non-fatal: the tab still works if the view is unavailable.
         api('v_fam_completeness?select=assessor_id,registration_count,document_count,missing_or_expired_documents,contract_count,open_follow_ups').catch(e => { console.warn('v_fam_completeness:', e.message); return []; }),
+        // Bookings (availability) + the programmes they can be linked to. Non-fatal.
+        api('fam_bookings?select=*&order=start_date.asc').catch(e => { console.warn('fam_bookings:', e.message); return []; }),
+        api('programmes?select=id,programme_name,qualification_name,qualification_id,saqa_id,start_date,end_date,module_1_dates,module_2_dates,module_3_dates,module_4_dates,module_5_dates,module_6_dates,clients(client_name)&deleted_at=is.null&order=programme_name.asc').catch(e => { console.warn('programmes:', e.message); return []; }),
       ]);
+      fs.bookings = bookings || [];
+      fs.programmes = programmes || [];
       fs.completeness = {};
       (completeness || []).forEach(c => { fs.completeness[String(c.assessor_id)] = c; });
       fs.assessors = assessors || [];
@@ -10771,6 +10894,7 @@ const FAM = (function () {
       renderTabs();
       renderTable();
       renderRenewalQueue();
+      if (document.getElementById('fam-availability')?.style.display === 'block') renderAvailability();
       if (!fs.selectedAssessorId || !fs.assessors.some(a => String(a.id) === String(fs.selectedAssessorId))) fs.selectedAssessorId = fs.assessors[0]?.id || null;
       if (fs.selectedAssessorId) renderDetail(fs.selectedAssessorId);
     } catch (e) {
@@ -11149,6 +11273,13 @@ const FAM = (function () {
           </div>
           <div style="margin-top:8px;">${docsHtml}</div>
         </div>
+        <div>
+          <div class="detail-section-title" style="display:flex;justify-content:space-between;align-items:center;">
+            <span>Bookings &amp; availability</span>
+            <button class="fam-small-link" onclick="FAM.openBooking({ assessorId: ${assessorId} })">+ Assign</button>
+          </div>
+          <div style="margin-top:8px;">${profileBookingsHtml(assessorId)}</div>
+        </div>
       </div>`;
   }
 
@@ -11436,6 +11567,7 @@ function copyAIDigest() {
   function openScopeImport(){
     document.getElementById('fam-main-content').style.display = 'none';
     document.getElementById('fam-bulk-intake').style.display = 'none';
+    document.getElementById('fam-availability').style.display = 'none';
     document.getElementById('fam-scope-import').style.display = 'block';
     const sel = document.getElementById('fam-si-seta');
     sel.innerHTML = '<option value="">All SETAs</option>' + [...new Set(scopeCatalogue.map(row => row.seta))].sort().map(v => `<option>${escapeHtml(v)}</option>`).join('');
@@ -11615,6 +11747,7 @@ function copyAIDigest() {
   function openBulkIntake() {
     document.getElementById('fam-main-content').style.display = 'none';
     document.getElementById('fam-scope-import').style.display = 'none';
+    document.getElementById('fam-availability').style.display = 'none';
     document.getElementById('fam-bulk-intake').style.display = 'block';
     renderBulkIntake();
   }
@@ -11768,6 +11901,379 @@ function copyAIDigest() {
     finally { renderBulkIntake(); }
   }
 
+  // ---------- bookings & availability ----------
+  // public.fam_bookings is the system of record for who is allocated to what.
+  // The modal and the finder use the database check public.fam_availability()
+  // (bookings + SETA registration, role, scope and expiry); the calendar uses
+  // the same rules client-side for its flags.
+  const MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  const val = id => (document.getElementById(id)?.value || '').trim();
+  const setv = (id, v) => { const el = document.getElementById(id); if (el) el.value = v == null ? '' : v; };
+  const isoToday = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+  const mondayOf = iso => addDays(iso, -((new Date(iso + 'T00:00:00Z').getUTCDay() + 6) % 7));
+  const fmtD = iso => iso ? new Date(iso + 'T00:00:00Z').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '—';
+  const fmtShort = iso => iso ? new Date(iso + 'T00:00:00Z').toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', timeZone: 'UTC' }) : '';
+  const liveBk = b => b.status === 'Planned' || b.status === 'Confirmed';
+  const overlaps = (a, b) => a.start_date <= b.end_date && b.start_date <= a.end_date;
+  const rolesOf = r => (r.roles && r.roles.length ? r.roles : [r.role]).filter(Boolean);
+
+  function bookingsFor(aid) { return fs.bookings.filter(b => String(b.assessor_id) === String(aid)); }
+  function regsForRole(aid, role) { return regsFor(aid).filter(r => r.status !== 'Inactive' && rolesOf(r).includes(role)); }
+  function progLabel(p) { return `${p.clients?.client_name || 'No client'} — ${p.programme_name || p.qualification_name || 'Programme ' + p.id}`; }
+  // Programme period from its start/end and module dates ("12 Oct 2026 - 03 Dec 2026", "15 September 2026 - …").
+  function progDates(p) {
+    const ds = [];
+    for (let i = 1; i <= 6; i++) String(p['module_' + i + '_dates'] || '').replace(/(\d{1,2})\s+([A-Za-z]{3,})\s+(\d{4})/g, (m, d, mo, y) => {
+      const k = MON[mo.slice(0, 3).toLowerCase()]; if (k != null) ds.push(new Date(Date.UTC(+y, k, +d)).toISOString().slice(0, 10)); return m; });
+    if (p.start_date) ds.push(p.start_date);
+    if (p.end_date) ds.push(p.end_date);
+    ds.sort();
+    return { start: ds[0] || '', end: ds[ds.length - 1] || '' };
+  }
+  // The qualification a programme is for: its qualification id when the catalogue has it, else its SAQA ID.
+  function progQual(p) {
+    if (!p) return { qid: null, saqa: null };
+    if (p.qualification_id && fs.qualifications.some(q => q.id === p.qualification_id)) return { qid: p.qualification_id, saqa: null };
+    return { qid: null, saqa: (String(p.saqa_id || '').match(/\d{4,}/) || [null])[0] };
+  }
+  // Calendar flag: registration cover for a booking (the modal uses the fuller database check).
+  function bookingRisk(b) {
+    if (!liveBk(b)) return '';
+    const rs = regsForRole(b.assessor_id, b.role);
+    if (!rs.length) return 'No active ' + b.role.toLowerCase() + ' registration';
+    if (rs.some(r => !r.registration_expiry_date)) return '';
+    const last = rs.map(r => r.registration_expiry_date).sort().pop();
+    if (last < b.start_date) return 'Registration expired ' + fmtD(last);
+    if (last < b.end_date) return 'Registration expires ' + fmtD(last) + ', before this booking ends';
+    return '';
+  }
+  // Other live facilitation bookings for the same person that overlap this one, with any shared class days.
+  function overlapsFor(b) {
+    if (!liveBk(b) || b.role !== 'Facilitator') return [];
+    const mine = new Set(b.class_dates || []);
+    return bookingsFor(b.assessor_id).filter(x => x.id !== b.id && liveBk(x) && x.role === 'Facilitator' && overlaps(x, b))
+      .map(x => ({ b: x, sameDays: (x.class_dates || []).filter(d => mine.has(d)) }));
+  }
+
+  // ---------- profile section ----------
+  function profileBookingsHtml(aid) {
+    const t = isoToday(), list = bookingsFor(aid);
+    const cur = list.filter(b => liveBk(b) && b.end_date >= t);
+    const past = list.filter(b => !(liveBk(b) && b.end_date >= t)).reverse();
+    const card = b => {
+      const risk = bookingRisk(b), now = liveBk(b) && b.start_date <= t && b.end_date >= t;
+      const next = (b.class_dates || []).find(d => d >= t);
+      const clash = overlapsFor(b).filter(x => x.sameDays.length);
+      return `<div class="bk-card r-${b.role}" onclick="FAM.openBooking({ bookingId: ${b.id} })" title="Click to edit">
+        <div class="t">${escapeHtml(b.title)}${b.client_name ? ` <span style="font-weight:400;color:var(--text-muted);">· ${escapeHtml(b.client_name)}</span>` : ''}</div>
+        <div class="m">${b.role} · ${fmtD(b.start_date)} – ${fmtD(b.end_date)} · ${b.status}${now ? ' · <strong style="color:#8FC463;">on now</strong>' : ''}${b.days_per_week ? ' · ' + b.days_per_week + ' day(s)/week' : ''}${next ? ' · next class ' + fmtD(next) : ''}</div>
+        ${risk ? `<div class="m" style="color:#E08585;">&#9888; ${escapeHtml(risk)}</div>` : ''}
+        ${clash.length ? `<div class="m" style="color:#E08585;">&#9888; Same class day as ${clash.map(x => escapeHtml(x.b.client_name || x.b.title)).join(', ')}</div>` : ''}
+      </div>`;
+    };
+    return (cur.length ? cur.map(card).join('') : `<div class="empty-note">Free &mdash; no current or upcoming bookings.</div>`)
+      + (past.length ? `<details style="margin-top:6px;"><summary class="fam-small-link" style="cursor:pointer;">Past and cancelled (${past.length})</summary><div style="margin-top:8px;">${past.map(card).join('')}</div></details>` : '');
+  }
+
+  // ---------- availability view ----------
+  function openAvailability() {
+    ['fam-main-content', 'fam-scope-import', 'fam-bulk-intake'].forEach(id => { document.getElementById(id).style.display = 'none'; });
+    document.getElementById('fam-availability').style.display = 'block';
+    if (!fs.av.from) fs.av.from = mondayOf(addDays(isoToday(), -14));
+    fillFinderOptions();
+    renderAvailability();
+    if (!fs.loaded) init();
+  }
+  function closeAvailability() {
+    document.getElementById('fam-availability').style.display = 'none';
+    document.getElementById('fam-main-content').style.display = 'block';
+  }
+  function avMove(weeks) {
+    fs.av.from = weeks ? addDays(fs.av.from || mondayOf(isoToday()), weeks * 7) : mondayOf(addDays(isoToday(), -14));
+    renderAvailability();
+  }
+  function fillFinderOptions() {
+    const ps = document.getElementById('fam-fd-prog'), qs = document.getElementById('fam-fd-qual'), ss = document.getElementById('fam-av-seta');
+    const keepP = ps.value, keepQ = qs.value, keepS = ss.value;
+    ps.innerHTML = '<option value="">Not for a specific programme</option>' + fs.programmes.map(p => `<option value="${p.id}">${escapeHtml(progLabel(p))}</option>`).join('');
+    qs.innerHTML = '<option value="">Any qualification</option>' + fs.qualifications.map(q => `<option value="${escapeHtml(q.id)}">${q.saqa_id ? escapeHtml(q.saqa_id) + ' · ' : ''}${escapeHtml(q.name)}</option>`).join('');
+    const setas = [...new Set(fs.registrations.flatMap(r => String(r.seta_name || '').split(/\s*,\s*/)).filter(x => x && !/^n\/?a$/i.test(x)))].sort();
+    ss.innerHTML = '<option value="">All SETAs</option>' + setas.map(x => `<option>${escapeHtml(x)}</option>`).join('');
+    ps.value = keepP; qs.value = keepQ; ss.value = keepS;
+    if (!val('fam-fd-from')) setv('fam-fd-from', isoToday());
+    if (!val('fam-fd-to')) setv('fam-fd-to', addDays(isoToday(), 90));
+  }
+  function finderProgramme() {
+    const p = fs.programmes.find(x => String(x.id) === val('fam-fd-prog'));
+    if (!p) return;
+    const { qid, saqa } = progQual(p);
+    const q = qid || (saqa && fs.qualifications.find(x => new RegExp('(^|\\D)' + saqa + '(\\D|$)').test(String(x.saqa_id || '')))?.id) || '';
+    setv('fam-fd-qual', q);
+    const d = progDates(p);
+    if (d.start) setv('fam-fd-from', d.start < isoToday() ? isoToday() : d.start);
+    if (d.end) setv('fam-fd-to', d.end);
+    runFinder();
+  }
+  async function runFinder() {
+    const role = val('fam-fd-role'), qid = val('fam-fd-qual'), from = val('fam-fd-from'), to = val('fam-fd-to');
+    const box = document.getElementById('fam-fd-results');
+    const note = (html, color) => `<div class="empty-note" style="padding:0 18px 14px;${color ? 'color:' + color + ';' : ''}">${html}</div>`;
+    if (!from || !to || to < from) { box.innerHTML = note('Pick a from date and a to date on or after it.'); return; }
+    box.innerHTML = note('Checking bookings and registrations&hellip;');
+    const { data, error } = await sb.rpc('fam_availability', { p_start: from, p_end: to, p_role: role, p_qualification_id: qid || null, p_saqa: null, p_exclude_booking: null });
+    if (error) { box.innerHTML = note('Could not check availability: ' + escapeHtml(error.message), 'var(--accent-rose)'); return; }
+    const rank = r => ({ ok: 0, warn: 1, bad: 2 }[r.eligibility] * 3 + ({ free: 0, light: 1, busy: 2 }[r.clash_level]));
+    const rows = (data || []).sort((a, b) => rank(a) - rank(b) || String(a.full_name).localeCompare(String(b.full_name)));
+    const good = rows.filter(r => r.eligibility !== 'bad'), bad = rows.filter(r => r.eligibility === 'bad');
+    const prog = val('fam-fd-prog') || 'null';
+    const tr = r => `<tr>
+      <td><button class="fam-small-link" style="font-size:12.5px;color:var(--text-primary);font-weight:600;" onclick="FAM.closeAvailability();FAM.openAssessor(${r.assessor_id})">${escapeHtml(r.full_name)}</button>
+        <div style="font-size:10.5px;color:var(--text-muted);margin-top:2px;">${r.active_bookings ? r.active_bookings + ' active booking' + (r.active_bookings === 1 ? '' : 's') : 'No active bookings'}</div></td>
+      <td><span class="lvl lvl-${r.clash_level}">${{ free: 'Free', light: 'Assessing / moderating', busy: 'Already facilitating' }[r.clash_level]}</span>
+        ${(r.clashes || []).map(c => `<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">${escapeHtml(c.role)} · ${escapeHtml(c.client || c.title)} · ${fmtShort(c.start)} – ${fmtShort(c.end)}${c.class_days_in_period ? ' · ' + c.class_days_in_period + ' class day(s) in this period' : ''}</div>`).join('')}</td>
+      <td><span class="lvl lvl-${r.eligibility}">${{ ok: 'Eligible', warn: 'Check first', bad: 'Not eligible' }[r.eligibility]}</span>
+        ${(r.reasons || []).map(x => `<div style="font-size:10.5px;color:var(--text-muted);margin-top:3px;">${escapeHtml(x)}</div>`).join('')}</td>
+      <td style="text-align:right;">${r.eligibility === 'bad' ? '' : `<button class="btn btn-secondary btn-sm" onclick="FAM.openBooking({ assessorId: ${r.assessor_id}, role: '${role}', start: '${from}', end: '${to}', programmeId: ${prog} })">Assign</button>`}</td>
+    </tr>`;
+    const table = list => `<div class="table-wrapper"><table class="data-table"><thead><tr><th>Practitioner</th><th>Workload in this period</th><th>Registration for this work</th><th></th></tr></thead><tbody>${list.map(tr).join('')}</tbody></table></div>`;
+    const free = good.filter(r => r.clash_level === 'free' && r.eligibility === 'ok').length;
+    box.innerHTML = note(`<strong style="font-style:normal;color:var(--text-primary);">${free}</strong> eligible and free · ${good.length} with a valid ${escapeHtml(role.toLowerCase())} registration · ${fmtD(from)} – ${fmtD(to)}`)
+      + (good.length ? table(good) : note(`Nobody holds a valid ${escapeHtml(role.toLowerCase())} registration for these dates.`))
+      + (bad.length ? `<details style="padding:8px 18px 14px;"><summary class="fam-small-link" style="cursor:pointer;">Not eligible (${bad.length})</summary><div style="margin-top:8px;">${table(bad)}</div></details>` : '');
+  }
+
+  function renderAvailability() {
+    const grid = document.getElementById('fam-av-grid');
+    if (!grid) return;
+    const t = isoToday(), W = fs.av.weeks, from = fs.av.from || (fs.av.from = mondayOf(addDays(t, -14))), to = addDays(from, W * 7), span = W * 7;
+    document.getElementById('fam-av-range').textContent = fmtD(from) + ' – ' + fmtD(addDays(to, -1));
+    const q = val('fam-av-q').toLowerCase(), role = val('fam-av-role'), seta = val('fam-av-seta'), show = val('fam-av-show') || 'registered';
+    const pct = d => Math.max(0, Math.min(100, (Date.parse(d) - Date.parse(from)) / 864e5 / span * 100));
+    const live = fs.bookings.filter(liveBk);
+    const regsValid = a => regsFor(a.id).filter(r => r.status !== 'Inactive' && (!r.registration_expiry_date || r.registration_expiry_date >= t));
+
+    // headline numbers
+    const onNow = new Set(live.filter(b => b.start_date <= t && b.end_date >= t).map(b => String(b.assessor_id)));
+    const freeNow = fs.assessors.filter(a => !onNow.has(String(a.id)) && regsValid(a).length).length;
+    const in30 = addDays(t, 30);
+    const comingFree = [...onNow].filter(id => live.filter(b => String(b.assessor_id) === id && b.end_date >= t).every(b => b.end_date <= in30)).length;
+    const clashes = [];
+    live.filter(b => b.role === 'Facilitator').forEach(b => overlapsFor(b).forEach(x => { if (x.sameDays.length && b.id < x.b.id) clashes.push([b, x.b, x.sameDays]); }));
+    const risks = live.filter(b => b.end_date >= t && bookingRisk(b));
+    const stat = (l, v, c, tip) => `<div class="stat-card" title="${escapeHtml(tip)}"><div class="stat-label">${l}</div><div class="stat-value"${c ? ` style="color:${c};"` : ''}>${v}</div></div>`;
+    document.getElementById('fam-av-stats').innerHTML =
+      stat('On a programme now', onNow.size, '', 'Practitioners with a confirmed or planned booking covering today')
+      + stat('Free now &amp; registered', freeNow, '#8FC463', 'Valid registration and no booking covering today')
+      + stat('Coming free &le;30 days', comingFree, '#E8C468', 'Booked now, but every current booking ends within 30 days')
+      + stat('Same-day clashes', clashes.length, clashes.length ? '#E08585' : '', 'Two facilitation bookings with a class on the same day')
+      + stat('Registration risks', risks.length, risks.length ? '#E08585' : '', 'Current bookings without registration cover for their whole period')
+      + stat('Active bookings', live.filter(b => b.end_date >= t).length, '', 'Confirmed or planned bookings that have not ended');
+
+    // people
+    const people = fs.assessors.map(a => {
+      const regs = regsFor(a.id).filter(r => r.status !== 'Inactive');
+      const bks = bookingsFor(a.id).filter(b => b.status !== 'Cancelled' && b.start_date < to && b.end_date >= from && (!role || b.role === role));
+      return { a, regs, bks };
+    }).filter(({ a, regs, bks }) => {
+      if (q && !String(a.full_name || '').toLowerCase().includes(q)) return false;
+      if (role && !regs.some(r => rolesOf(r).includes(role)) && !bks.length) return false;
+      if (seta && !regs.some(r => String(r.seta_name || '').split(/\s*,\s*/).includes(seta))) return false;
+      if (show === 'booked' && !bks.length) return false;
+      if (show === 'registered' && !regs.length && !bks.length) return false;
+      return true;
+    }).sort((x, y) => (onNow.has(String(y.a.id)) - onNow.has(String(x.a.id))) || (y.bks.length > 0) - (x.bks.length > 0) || String(x.a.full_name).localeCompare(String(y.a.full_name)));
+
+    const weeks = [...Array(W)].map((_, i) => addDays(from, i * 7));
+    const tpos = t >= from && t < to ? pct(t) + 50 / span : null;
+    const bar = (b, lane) => {
+      const s = b.start_date > from ? b.start_date : from, e = b.end_date < to ? addDays(b.end_date, 1) : to;
+      const l = pct(s), w = Math.max(1.2, pct(e) - l), risk = bookingRisk(b), clash = overlapsFor(b).filter(x => x.sameDays.length);
+      const tip = `${b.role} · ${b.title}${b.client_name ? ' · ' + b.client_name : ''}\n${fmtD(b.start_date)} – ${fmtD(b.end_date)} · ${b.status}`
+        + ((b.class_dates || []).length ? `\n${b.class_dates.length} class day(s) recorded` : '') + (risk ? '\n⚠ ' + risk : '')
+        + (clash.length ? '\n⚠ Same class day as ' + clash.map(x => x.b.client_name || x.b.title).join(', ') : '') + '\nClick to edit';
+      return `<button class="av-bar r-${b.role} st-${b.status}${risk ? ' risk' : ''}${clash.length ? ' clash' : ''}" style="left:${l}%;width:${w}%;top:${6 + lane * 28}px;${b.status === 'Done' ? 'opacity:.45;' : ''}" title="${escapeHtml(tip)}" onclick="event.stopPropagation();FAM.openBooking({ bookingId: ${b.id} })">${escapeHtml(b.client_name || b.title)}</button>`
+        + (b.class_dates || []).filter(d => d >= from && d < to).map(d => `<span class="av-dot" style="left:calc(${pct(d) + 50 / span}% - 2px);top:${6 + lane * 28 + 22}px;"></span>`).join('');
+    };
+    const rows = people.map(({ a, regs, bks }) => {
+      const lanes = [];
+      const placed = bks.slice().sort((x, y) => x.start_date.localeCompare(y.start_date)).map(b => {
+        let i = lanes.findIndex(end => end < b.start_date); if (i < 0) { i = lanes.length; lanes.push(''); }
+        lanes[i] = b.end_date; return [b, i];
+      });
+      const exps = regs.filter(r => r.registration_expiry_date && r.registration_expiry_date >= from && r.registration_expiry_date < to && (!role || rolesOf(r).includes(role)))
+        .map(r => `<span class="av-exp" style="left:${pct(r.registration_expiry_date)}%;" title="">&#9670;</span>`).join('');
+      const roles = [...new Set(regs.flatMap(rolesOf))];
+      const nowN = bks.filter(b => liveBk(b) && b.start_date <= t && b.end_date >= t).length;
+      const status = nowN ? `${nowN} on now` : bks.some(b => liveBk(b) && b.start_date > t) ? 'booked later' : (regsValid(a).length ? 'free' : 'no valid registration');
+      return `<div class="av-row">
+        <button class="av-name" onclick="FAM.closeAvailability();FAM.openAssessor(${a.id})" title="Open profile">${escapeHtml(a.full_name)}<span class="sub">${escapeHtml(roles.join(', ') || 'No registration')} · ${status}</span></button>
+        <div class="av-track" style="min-height:${Math.max(1, lanes.length) * 28 + 10}px;background-size:calc(100% / ${W}) 100%;" onclick="FAM.avAssignAt(${a.id}, event)" title="Click to assign ${escapeHtml(a.full_name)} from this week">
+          ${tpos != null ? `<span class="av-today" style="left:${tpos}%;"></span>` : ''}
+          ${placed.map(([b, i]) => bar(b, i)).join('')}${exps}
+          ${!bks.length ? `<span class="av-free">${regsValid(a).length ? 'Free' : ''}</span>` : ''}
+        </div></div>`;
+    }).join('');
+    grid.innerHTML = `<div class="av-row h"><span class="av-name" style="cursor:default;">${people.length} practitioner${people.length === 1 ? '' : 's'}</span>
+      <div class="av-weeks" style="grid-template-columns:repeat(${W},1fr);">${weeks.map(w => `<span>${fmtShort(w)}</span>`).join('')}</div></div>`
+      + (rows || `<div class="empty-note" style="padding:14px 18px;">No practitioners match these filters.</div>`);
+
+    // what needs attention
+    const items = [
+      ...clashes.map(([a, b, days]) => `<li><strong>${escapeHtml(fs.assessors.find(x => String(x.id) === String(a.assessor_id))?.full_name || '#' + a.assessor_id)}</strong> has classes for <a class="fam-small-link" onclick="FAM.openBooking({ bookingId: ${a.id} })">${escapeHtml(a.client_name || a.title)}</a> and <a class="fam-small-link" onclick="FAM.openBooking({ bookingId: ${b.id} })">${escapeHtml(b.client_name || b.title)}</a> on the same day: ${days.slice(0, 4).map(fmtD).join(', ')}${days.length > 4 ? ' …' : ''}</li>`),
+      ...risks.map(b => `<li><strong>${escapeHtml(fs.assessors.find(x => String(x.id) === String(b.assessor_id))?.full_name || '#' + b.assessor_id)}</strong> · <a class="fam-small-link" onclick="FAM.openBooking({ bookingId: ${b.id} })">${escapeHtml(b.client_name || b.title)}</a> (${b.role.toLowerCase()}): ${escapeHtml(bookingRisk(b))}</li>`),
+    ];
+    document.getElementById('fam-av-attn').innerHTML = items.length
+      ? `<div class="detail-section-title" style="margin-top:12px;">Needs attention (${items.length})</div><ul>${items.join('')}</ul>`
+      : `<div class="empty-note" style="margin-top:10px;">No same-day clashes or registration risks on current bookings.</div>`;
+  }
+  function avAssignAt(aid, ev) {
+    const r = ev.currentTarget.getBoundingClientRect();
+    const day = addDays(fs.av.from, Math.max(0, Math.floor((ev.clientX - r.left) / r.width * fs.av.weeks * 7)));
+    const start = mondayOf(day) < isoToday() ? isoToday() : mondayOf(day);
+    openBooking({ assessorId: aid, start, end: addDays(mondayOf(day), 4) < start ? start : addDays(mondayOf(day), 4) });
+  }
+
+  // ---------- assign / edit modal ----------
+  let bkCheckSeq = 0;
+  fs.bkCheck = null;
+  function openBooking(o) {
+    o = o || {};
+    const b = o.bookingId ? fs.bookings.find(x => x.id === o.bookingId) : null;
+    document.getElementById('fam-bk-assessor').innerHTML = '<option value="">Choose a practitioner…</option>'
+      + fs.assessors.map(a => `<option value="${a.id}">${escapeHtml(a.full_name)}</option>`).join('');
+    const progs = fs.programmes.slice();
+    if (b?.programme_id && !progs.some(p => p.id === b.programme_id)) progs.unshift({ id: b.programme_id, programme_name: b.title, clients: { client_name: b.client_name } });
+    document.getElementById('fam-bk-prog').innerHTML = '<option value="">Not linked to a programme</option>'
+      + progs.map(p => `<option value="${p.id}">${escapeHtml(progLabel(p))}</option>`).join('');
+    setv('fam-bk-id', b?.id || '');
+    setv('fam-bk-assessor', b?.assessor_id || o.assessorId || '');
+    setv('fam-bk-role', b?.role || o.role || 'Facilitator');
+    setv('fam-bk-prog', b?.programme_id || o.programmeId || '');
+    setv('fam-bk-what', b?.title || '');
+    setv('fam-bk-client', b?.client_name || '');
+    setv('fam-bk-start', b?.start_date || o.start || '');
+    setv('fam-bk-end', b?.end_date || o.end || '');
+    setv('fam-bk-dpw', b?.days_per_week || '');
+    setv('fam-bk-status', b?.status || 'Confirmed');
+    setv('fam-bk-notes', b?.notes || '');
+    if (!b && o.programmeId) bookingProgramme(true);
+    document.getElementById('fam-bk-title').textContent = b ? 'Edit booking' : 'Assign practitioner';
+    document.getElementById('fam-bk-delete').style.display = b && isAdmin() ? '' : 'none';
+    document.getElementById('fam-bk-error').textContent = '';
+    document.getElementById('fam-bk-override').checked = false;
+    openModal('fam-modal-booking');
+    checkBooking();
+  }
+  function bookingProgramme(keepDates) {
+    const p = fs.programmes.find(x => String(x.id) === val('fam-bk-prog'));
+    if (p) {
+      setv('fam-bk-what', p.programme_name || p.qualification_name || 'Programme ' + p.id);
+      setv('fam-bk-client', p.clients?.client_name || '');
+      const d = progDates(p);
+      if (keepDates !== true || !val('fam-bk-start')) { if (d.start) setv('fam-bk-start', d.start); if (d.end) setv('fam-bk-end', d.end); }
+    }
+    checkBooking();
+  }
+  let bkTimer = null;
+  function checkBooking(now) {
+    clearTimeout(bkTimer);
+    bkTimer = setTimeout(runBookingCheck, now === true ? 0 : 200);
+  }
+  async function runBookingCheck() {
+    const box = document.getElementById('fam-bk-check'), wrap = document.getElementById('fam-bk-override-wrap'), save = document.getElementById('fam-bk-save');
+    const aid = val('fam-bk-assessor'), role = val('fam-bk-role'), start = val('fam-bk-start'), end = val('fam-bk-end'), status = val('fam-bk-status');
+    const seq = ++bkCheckSeq;
+    const done = (html, needsOverride) => {
+      if (seq !== bkCheckSeq) return;
+      box.innerHTML = html;
+      fs.bkCheck = { needsOverride: !!needsOverride, html };
+      wrap.style.display = needsOverride ? 'flex' : 'none';
+      const ok = !needsOverride || document.getElementById('fam-bk-override').checked;
+      save.disabled = !ok; save.style.opacity = ok ? '' : '.5';
+      save.textContent = needsOverride ? 'Book anyway' : 'Save booking';
+    };
+    if (!aid || !role || !start || !end) return done('<span style="color:var(--text-muted);">Pick a practitioner, role and dates to check availability.</span>', false);
+    if (end < start) return done('<span style="color:#E08585;">The end date is before the start date.</span>', false);
+    if (status === 'Done' || status === 'Cancelled') return done(`<span style="color:var(--text-muted);">${status} bookings are not checked for clashes.</span>`, false);
+    box.innerHTML = '<span style="color:var(--text-muted);">Checking…</span>';
+    const p = fs.programmes.find(x => String(x.id) === val('fam-bk-prog'));
+    const { qid, saqa } = progQual(p);
+    const { data, error } = await sb.rpc('fam_availability', { p_start: start, p_end: end, p_role: role, p_qualification_id: qid, p_saqa: saqa, p_exclude_booking: val('fam-bk-id') ? Number(val('fam-bk-id')) : null });
+    if (error) return done(`<span style="color:#E08585;">Could not run the check (${escapeHtml(error.message)}). You can still save.</span>`, false);
+    const r = (data || []).find(x => String(x.assessor_id) === aid);
+    if (!r) return done('<span style="color:var(--text-muted);">Practitioner not found.</span>', false);
+    const fac = (r.clashes || []).filter(c => c.role === 'Facilitator');
+    const prog = val('fam-bk-prog'), bkId = val('fam-bk-id');
+    const dup = prog && fs.bookings.find(b => liveBk(b) && String(b.assessor_id) === aid && b.role === role && String(b.programme_id) === prog && String(b.id) !== bkId);
+    const dupHtml = dup ? `<div class="bk-why" style="margin-top:8px;"><span class="lvl lvl-bad">Already booked</span><ul><li>Already booked as ${escapeHtml(role.toLowerCase())} on this programme (${fmtD(dup.start_date)} – ${fmtD(dup.end_date)}). Edit that booking instead.</li></ul></div>` : '';
+    const elig = `<div class="bk-why"><span class="lvl lvl-${r.eligibility}">${{ ok: 'Eligible', warn: 'Check first', bad: 'Not eligible' }[r.eligibility]}</span>${r.eligibility === 'ok' ? `Valid ${escapeHtml(role.toLowerCase())} registration for the whole period${p ? ' with this qualification in scope' : ''}.` : ''}${(r.reasons || []).length ? `<ul>${r.reasons.map(x => `<li>${escapeHtml(x)}</li>`).join('')}</ul>` : ''}</div>`;
+    const load = (r.clashes || []).length
+      ? `<div style="margin-top:8px;"><span class="lvl lvl-${fac.length ? 'busy' : 'light'}">${fac.length ? 'Already facilitating' : 'Other work'}</span>${r.clashes.length} other booking${r.clashes.length === 1 ? '' : 's'} in these dates:<ul>${r.clashes.map(c => `<li>${escapeHtml(c.role)} · ${escapeHtml(c.client || c.title)} · ${fmtD(c.start)} – ${fmtD(c.end)} (${escapeHtml(c.status)})${c.class_days_in_period ? ` · ${c.class_days_in_period} class day(s) in this period` : ''}</li>`).join('')}</ul></div>`
+      : `<div style="margin-top:8px;"><span class="lvl lvl-free">Free</span>No other bookings in these dates.</div>`;
+    // Running several programmes in parallel on different days is normal, so overlaps are shown, not blocked.
+    // Only a missing/expired registration needs an explicit "book anyway".
+    const tip = fac.length && role === 'Facilitator' ? '<div style="margin-top:6px;color:var(--text-muted);font-size:11px;">Check the class days don\'t fall on the same days as their other programmes.</div>' : '';
+    done(dupHtml + elig + load + tip, r.eligibility === 'bad' || !!dup);
+  }
+  async function saveBooking() {
+    const err = document.getElementById('fam-bk-error');
+    err.textContent = '';
+    const id = val('fam-bk-id'), aid = val('fam-bk-assessor'), role = val('fam-bk-role'), title = val('fam-bk-what'), start = val('fam-bk-start'), end = val('fam-bk-end');
+    if (!aid || !role || !title || !start || !end) { err.textContent = 'Practitioner, role, what, from and to are required.'; return; }
+    if (end < start) { err.textContent = 'The end date is before the start date.'; return; }
+    const dpw = val('fam-bk-dpw');
+    if (dpw && !(Number(dpw) > 0 && Number(dpw) <= 7)) { err.textContent = 'Days per week must be between 0.5 and 7.'; return; }
+    const override = fs.bkCheck?.needsOverride;
+    if (override && !document.getElementById('fam-bk-override').checked) { err.textContent = 'Tick the box to confirm you want to book despite the warnings.'; return; }
+    let notes = val('fam-bk-notes');
+    if (override) {
+      const me = (await sb.auth.getUser().catch(() => null))?.data?.user?.email || 'unknown';
+      const why = [...document.querySelectorAll('#fam-bk-check .bk-why li')].map(li => li.textContent).join('; ');
+      notes = (notes ? notes + ' | ' : '') + `Booked despite warnings (${me}, ${fmtD(isoToday())}): ${why}`.slice(0, 600);
+    }
+    const body = {
+      assessor_id: Number(aid), role, title, client_name: val('fam-bk-client') || null,
+      programme_id: val('fam-bk-prog') ? Number(val('fam-bk-prog')) : null,
+      start_date: start, end_date: end, days_per_week: dpw ? Number(dpw) : null,
+      status: val('fam-bk-status'), notes: notes || null,
+    };
+    const btn = document.getElementById('fam-bk-save');
+    btn.disabled = true;
+    try {
+      if (id) {
+        const rows = await api(`fam_bookings?id=eq.${Number(id)}`, { method: 'PATCH', body: JSON.stringify(body) });
+        if (!rows || !rows.length) throw new Error('You can only edit bookings you created (or ask a FAM admin).');
+      } else {
+        await api('fam_bookings', { method: 'POST', body: JSON.stringify({ ...body, tenant_id: fs.tenantId }) });
+      }
+      closeModal('fam-modal-booking');
+      showToast('success', `${id ? 'Booking updated' : 'Booked'}: ${fs.assessors.find(a => String(a.id) === aid)?.full_name || ''} · ${title}`);
+      await reloadBookings();
+    } catch (e) {
+      err.textContent = 'Could not save: ' + e.message;
+    } finally { btn.disabled = false; }
+  }
+  async function deleteBooking() {
+    const id = Number(val('fam-bk-id'));
+    if (!id || !confirm('Delete this booking? It cannot be undone. To keep a record, set the status to Cancelled instead.')) return;
+    try {
+      const rows = await api(`fam_bookings?id=eq.${id}`, { method: 'DELETE' });
+      if (!rows || !rows.length) throw new Error('Only a FAM admin can delete bookings.');
+      closeModal('fam-modal-booking');
+      showToast('success', 'Booking deleted');
+      await reloadBookings();
+    } catch (e) { document.getElementById('fam-bk-error').textContent = 'Could not delete: ' + e.message; }
+  }
+  async function reloadBookings() {
+    fs.bookings = (await api('fam_bookings?select=*&order=start_date.asc').catch(() => fs.bookings)) || [];
+    if (document.getElementById('fam-availability')?.style.display === 'block') {
+      renderAvailability();
+      if (document.getElementById('fam-fd-results')?.innerHTML) runFinder();
+    }
+    if (fs.selectedAssessorId) renderDetail(fs.selectedAssessorId);
+  }
+
   fs.activeTab = 'all';
 
   return {
@@ -11780,6 +12286,8 @@ function copyAIDigest() {
     openScopeImport, closeScopeImport, renderScopeImport, updateScopeReadiness, updateApproveButton, approveScope,
         generateAssessorSummary, copyAISummary, generateComplianceDigest, copyAIDigest,
     openBulkIntake, closeBulkIntake, addBulkFiles, biSet, biRemove, approveBulkIntake,
+    openAvailability, closeAvailability, renderAvailability, avMove, avAssignAt,
+    finderProgramme, runFinder, openBooking, bookingProgramme, checkBooking, saveBooking, deleteBooking,
   };
 })();
 </script>
