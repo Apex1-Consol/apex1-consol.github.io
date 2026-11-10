@@ -1414,6 +1414,48 @@ body.compact-density .progress-bar-wrap{height:6px}
 #lock-banner.needs-changes .lb-title{color:#f87171;}
 .lb-meta{font-size:8pt;color:rgba(255,255,255,.5);line-height:1.55;}
 .lb-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+/* ── Send-to-client deadlines (banner, popups, dashboard panel) ── */
+#dl-banner{display:none;margin:0 32px 12px;border-radius:var(--r2);padding:12px 18px;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap;border:1px solid;border-left-width:4px}
+#dl-banner.show{display:flex}
+#dl-banner .dl-t{font-size:9.5pt;font-weight:800;letter-spacing:.02em}
+#dl-banner .dl-s{font-size:8.5pt;color:#4A5568;margin-top:3px;line-height:1.5}
+.dl-info{background:#EBF2FF;border-color:#C9D9F2!important;border-left-color:#2D4A7A!important}.dl-info .dl-t{color:#2D4A7A}
+.dl-warn{background:#FFF8EC;border-color:#F5D9A8!important;border-left-color:#CC6B00!important}.dl-warn .dl-t{color:#CC6B00}
+.dl-dan{background:#FFF0F0;border-color:#F2B8B8!important;border-left-color:#C8272C!important}.dl-dan .dl-t{color:#C8272C}
+.dl-hold{background:#EEF1F5;border-color:#D5DBE4!important;border-left-color:#5A6576!important}.dl-hold .dl-t{color:#5A6576}
+.dl-ok{background:#EDFBF3;border-color:#BFE8D0!important;border-left-color:#1B7A4A!important}.dl-ok .dl-t{color:#1B7A4A}
+.dl-acts{display:flex;gap:8px;flex-wrap:wrap}
+.dl-btn{border:none;border-radius:999px;font-family:inherit;font-weight:700;font-size:8.5pt;padding:8px 14px;cursor:pointer;white-space:nowrap}
+.dl-btn.p{background:var(--red,#E03E15);color:#fff}.dl-btn.g{background:rgba(255,255,255,.1);color:#fff;border:1px solid rgba(255,255,255,.25)}
+.dl-btn.sm{font-size:7.5pt;padding:5px 11px}
+#dl-banner .dl-btn.g{background:#fff;color:#1A365D;border:1px solid #DEE5EF}
+.dl-btn:disabled{opacity:.45;cursor:not-allowed}
+.dl-rec{width:100%;border-collapse:collapse;font-size:8pt;margin-top:8px}
+.dl-rec td{padding:3px 10px 3px 0;color:#1E2533;vertical-align:top}.dl-rec td:first-child{color:#718096;white-space:nowrap}
+.dl-tag{font-size:7pt;font-weight:700;color:#CC6B00;background:#FFF8EC;border:1px solid #F5D9A8;border-radius:999px;padding:1px 7px;margin-left:4px}
+#dlm-ov{position:fixed;inset:0;background:rgba(5,10,20,.7);z-index:10050;display:flex;align-items:center;justify-content:center;padding:16px}
+#dlm-ov .dlm{background:#fff;border-radius:14px;box-shadow:0 12px 40px rgba(0,0,0,.45);width:100%;max-width:460px;overflow:hidden;color:#1E2533;font-family:inherit}
+.dlm-h{background:linear-gradient(135deg,#10223B,#1A365D);color:#fff;padding:14px 18px;font-weight:800;font-size:11pt;border-bottom:3px solid #E03E15}
+.dlm-h.dan{border-bottom-color:#C8272C}.dlm-h.hold{background:linear-gradient(135deg,#2B323D,#4A5568);border-bottom-color:#5A6576}
+.dlm-b{padding:16px 18px;font-size:9.5pt;color:#4A5568;line-height:1.5;max-height:70vh;overflow:auto}
+.dlm-b label{display:block;font-size:7.5pt;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#718096;margin:12px 0 4px}
+.dlm-b label.chk{display:flex;gap:8px;align-items:center;text-transform:none;letter-spacing:0;font-size:9pt;color:#1E2533;cursor:pointer}
+.dlm-b input:not([type=checkbox]),.dlm-b select,.dlm-b textarea{width:100%;font-family:inherit;font-size:9.5pt;padding:8px 10px;border:1px solid #DEE5EF;border-radius:8px;color:#1E2533;background:#fff;box-sizing:border-box}
+.dlm-b textarea{min-height:60px;resize:vertical}
+.dlm-lock{display:flex;justify-content:space-between;background:#F8FAFC;border:1px solid #DEE5EF;border-radius:8px;padding:8px 10px;font-weight:700;color:#1E2533}.dlm-lock small{font-weight:500;color:#718096}
+.dlm-alert{background:#FFF0F0;color:#C8272C;border-radius:8px;padding:8px 10px;font-size:8.5pt;font-weight:700}
+.dlm-hint{font-size:8pt;color:#718096;margin-top:4px}
+.dlm-f{padding:12px 18px;background:#F8FAFC;border-top:1px solid #DEE5EF;display:flex;gap:8px;justify-content:flex-end}
+.dlm-f .dl-btn.g{background:#fff;color:#1A365D;border:1px solid #DEE5EF}
+.req{color:#E03E15}
+#dash-send{background:#131e35;border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:16px 20px;margin-bottom:20px}
+#dash-send table{width:100%;border-collapse:collapse;font-size:8.5pt}
+#dash-send th{text-align:left;font-size:7pt;letter-spacing:.1em;text-transform:uppercase;color:rgba(255,255,255,.4);padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1)}
+#dash-send td{padding:9px 10px;border-bottom:1px solid rgba(255,255,255,.06);color:rgba(255,255,255,.8);vertical-align:middle}
+#dash-send .ds-grp td{background:rgba(255,255,255,.04);font-size:7.5pt;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.55)}
+.ds-b{display:inline-block;border-radius:999px;padding:3px 9px;font-size:7.5pt;font-weight:700;white-space:nowrap}
+.ds-b.dan{background:rgba(248,113,113,.18);color:#f87171}.ds-b.warn{background:rgba(245,158,11,.18);color:#fbbf24}.ds-b.hold{background:rgba(148,163,184,.18);color:#cbd5e1}.ds-b.info{background:rgba(96,165,250,.18);color:#93c5fd}.ds-b.none{background:rgba(255,255,255,.08);color:rgba(255,255,255,.6)}
+@media(max-width:700px){#dl-banner{margin:0 16px 12px}#dash-send .hide-sm{display:none}}
 .lb-unlock-btn{
   background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(200,39,44,.4);
   border-radius:999px;padding:6px 16px;font-size:8.5pt;font-weight:700;
@@ -2425,6 +2467,7 @@ body.compact-density .progress-bar-wrap{height:6px}
     </div>
   </div>
   <div id="dash-alerts"></div>
+  <div id="dash-send" style="display:none"></div>
   <div class="dash-grid" id="dash-stats"></div>
   <div id="dash-charts-panel" style="display:none;background:#131e35;border:1px solid rgba(255,255,255,.1);border-radius:var(--r2);padding:20px 24px;margin-bottom:20px">
     <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px">
@@ -2531,7 +2574,8 @@ body.compact-density .progress-bar-wrap{height:6px}
     </div>
   </div>
   <!-- Report lock banner (shown when report is submitted / approved) -->
-  <div id="lock-banner">
+  <div id="dl-banner"></div>
+<div id="lock-banner">
     <div class="lb-icon" id="lb-icon">🔒</div>
     <div class="lb-body">
       <div class="lb-title" id="lb-title">Report Submitted for Review</div>
@@ -2770,10 +2814,11 @@ async function checkReportStatus(){
   const month=document.getElementById('sel-month').value;
   try{
     const rows=await sb('reports',
-      `select=id,status,reviewer_note,reviewed_by,reviewed_at,printed_at,sent_at,sent_by,archived_at,archived_by&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${activeProgramme.id}&month=eq.${encodeURIComponent(month)}&order=printed_at.desc&limit=1`
+      `select=id,status,reviewer_note,reviewed_by,reviewed_at,printed_at,sent_at,sent_by,archived_at,archived_by,submitted_by_email,sent_to,sent_declared_on,late_reason,hold_until,hold_reason,hold_note,hold_set_by,remind_pm_at&tenant_id=eq.${TENANT_DB_ID}&programme_id=eq.${activeProgramme.id}&month=eq.${encodeURIComponent(month)}&order=printed_at.desc&limit=1`
     );
     const r=rows[0];
-    if(!r){_currentReportStatus=null;_applyReportLock(null);return;}
+    _curRep=r||null;
+    if(!r){_currentReportStatus=null;_applyReportLock(null);_renderDeadlineBanner();return;}
     _currentReportId=r.id;
     _currentReportStatus=r.status;
     const fb=document.getElementById('feedback-banner');
@@ -2812,6 +2857,8 @@ async function checkReportStatus(){
       } else {
         sub.textContent='Pending review — approve or request changes below';
       }
+      const _dt=_rptTone(r,month);
+      if(_dt&&r.status!=='sent_to_client'&&r.status!=='archived')sub.innerHTML+=` <span class="ds-b ${_dt.tone}" style="margin-left:6px">${esc(_dt.badge)}</span>`;
       // Swap action buttons depending on status
       const actionsWrap=document.querySelector('#review-bar .review-bar-actions > div[style*="flex-direction:column"]');
       if(actionsWrap){
@@ -2826,6 +2873,7 @@ async function checkReportStatus(){
     }
     // Apply lock state based on report status (PM only)
     if(!IS_ADMIN) _applyReportLock(r.status, r.printed_at, r.reviewed_at, r.reviewed_by, r.sent_at, r.sent_by);
+    _renderDeadlineBanner();
   }catch(e){console.warn('checkReportStatus failed:',e.message);}
 }
 
@@ -8782,6 +8830,9 @@ async function sendForReview(){
   if(await _finalizeGate())return;
   if(!(await _confirmUneditedComments()))return;
   if(!(await _confirmMissingDetails()))return;
+  const _lr=await _askLateSubmitReason();
+  if(_lr===false)return;
+  _pendingLateReason=_lr||null;
   _stampSignoffDate();
   logReportPrint();
 }
@@ -9232,6 +9283,9 @@ function logReportPrint(){
         _currentReportStatus='pending';
         // A resubmission is already announced to admins by transition_report().
         _logAudit(rec.id,resubmit?'resubmitted':'submitted',{newStatus:'pending'});
+        if(_pendingLateReason){const lr=_pendingLateReason;_pendingLateReason=null;
+          _rptRpc('set_late_reason',{p_report_id:Number(rec.id),p_reason:lr}).catch(e=>toast('Delay reason not saved: '+e.message,'error',6000));}
+        setTimeout(()=>checkReportStatus(),800);
       }
     }
   }).catch(e=>{console.warn('Report log failed:',e.message);if(resubmit)toast('Resubmission not saved: '+e.message,'error',6000);});
@@ -11968,6 +12022,7 @@ function renderDashCharts(eisaRows,attRows,programmes,legacyDraftsByProg){
 
 function showDashboard(){
   document.getElementById('dashboard').classList.add('show');
+  renderSendPanel();
   document.getElementById('loading-state').style.display='none';
   document.getElementById('report-preview').classList.remove('show');
   renderDashboard();
@@ -15109,16 +15164,249 @@ async function _loadMoreHistory(){
 // ── PM: mark the current report as sent to the client ──
 async function markSentToClient(){
   if(!_currentReportId){toast('No report record found','warn',3500);return;}
-  if(!confirm('Confirm this report has been sent to the client? This will notify the admin.'))return;
-  try{
-    // transition_report() stamps sent_at/sent_by and notifies the admins.
-    const upd=await sbTransitionReport(_currentReportId,'sent_to_client',null);
-    toast('📤 Marked as sent to client — admin notified','success',4500);
-    _applyReportLock('sent_to_client', null, null, null, upd?.sent_at||new Date().toISOString(), upd?.sent_by||ADMIN_NAME);
-  }catch(e){
-    console.warn('markSentToClient failed:',e.message);
-    toast('Not saved: '+e.message,'error',6000);
+  _openSendModal();
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// SEND-TO-CLIENT TRACKING + DEADLINES
+// A month's reports are due for review by the 5th and sent to the client by
+// the 7th of the following month; a weekend deadline moves to the Friday before.
+// Review is due the day before the send deadline (or on it, if that's a weekend).
+// ══════════════════════════════════════════════════════════════
+let _curRep=null, _pendingLateReason=null;
+const _DL_MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+function _dlDay(d){return new Date(d.getFullYear(),d.getMonth(),d.getDate());}
+function _dlAdd(d,n){const x=new Date(d);x.setDate(x.getDate()+n);return x;}
+function _dlFri(d){const w=d.getDay();return w===6?_dlAdd(d,-1):w===0?_dlAdd(d,-2):d;}
+function _dlFmt(d){return d?new Date(d).toLocaleDateString('en-GB',{day:'numeric',month:'short'}):'';}
+function _dlFmtT(d){return d?new Date(d).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';}
+function _dlParseDate(s){if(!s)return null;const [y,m,d]=String(s).slice(0,10).split('-').map(Number);return new Date(y,m-1,d);}
+function _rptDeadlines(month){
+  const m=/^([A-Za-z]+)\s+(\d{4})$/.exec(String(month||'').trim());if(!m)return null;
+  const mi=_DL_MONTHS.indexOf(m[1]);if(mi<0)return null;
+  const y=+m[2],ny=mi===11?y+1:y,nm=(mi+1)%12;
+  const submit=_dlFri(new Date(ny,nm,5)),send=_dlFri(new Date(ny,nm,7));
+  const pre=_dlAdd(send,-1),review=(pre.getDay()===0||pre.getDay()===6)?send:pre;
+  return{submit,review,send,submitWarn:_dlAdd(submit,-2),sendWarn:_dlAdd(send,-1)};
+}
+// Stage + colour for a report row (r may be null = not submitted yet).
+// Returns null when nothing needs showing.
+function _rptTone(r,month,today){
+  const st=r?r.status:null;
+  if(st==='sent_to_client'||st==='archived')return null;
+  const dl=_rptDeadlines(month);if(!dl)return null;
+  const t=_dlDay(today||new Date());
+  const hu=r&&r.hold_until?_dlParseDate(r.hold_until):null;
+  const stage=(!st||st==='needs_changes')?'submit':st==='pending'?'review':'send';
+  if(hu&&t<=hu)return{stage,tone:'hold',badge:'On hold → '+_dlFmt(hu),dl,holdActive:true};
+  const holdEnded=hu&&t>hu;
+  let tone='none',badge='';
+  if(stage==='submit'){
+    if(t>dl.submit){tone='dan';badge=(st?'Changes overdue':'Overdue')+' · due '+_dlFmt(dl.submit);}
+    else if(t>=dl.submitWarn){tone='warn';badge='Due for review '+_dlFmt(dl.submit);}
+    else badge=st?'Changes requested':'Not submitted';
+  }else if(stage==='review'){
+    if(t>dl.review){tone='dan';badge='Review overdue · due '+_dlFmt(dl.review);}
+    else if(t>=dl.review){tone='warn';badge='Review due today';}
+    else{tone='info';badge='In review';}
+  }else{
+    if(t>dl.send){tone='dan';badge='Send overdue · due '+_dlFmt(dl.send);}
+    else if(t>=dl.sendWarn){tone='warn';badge='Send by '+_dlFmt(dl.send);}
+    else{tone='info';badge='Ready to send';}
   }
+  return{stage,tone,badge,dl,holdEnded,lateSubmit:t>dl.submit,lateSend:t>dl.send};
+}
+async function _rptRpc(fn,body){
+  if(!isOnline)throw new Error('You are offline — reconnect and try again');
+  const r=await fetch(`${SB_URL}/rest/v1/rpc/${fn}`,{method:'POST',
+    headers:{...HEADERS,'Content-Profile':'reports','Accept-Profile':'reports'},body:JSON.stringify(body)});
+  if(!r.ok){let msg=await r.text();try{msg=JSON.parse(msg).message||msg;}catch{}throw new Error(msg);}
+  return r.json();
+}
+function _dlStaffName(email){
+  if(!email)return'';const n=String(email).split('@')[0];return n.charAt(0).toUpperCase()+n.slice(1);
+}
+// ── Banner above the report (PM view; admins see the colour in the review bar) ──
+function _renderDeadlineBanner(){
+  const el=document.getElementById('dl-banner');if(!el)return;
+  el.className='';el.innerHTML='';
+  if(!activeProgramme)return;
+  const month=document.getElementById('sel-month')?.value;
+  const r=_curRep;
+  if(r&&r.status==='sent_to_client'){
+    // Audit record of the send
+    const decl=r.sent_declared_on?`${_dlFmt(_dlParseDate(r.sent_declared_on))} ${_dlParseDate(r.sent_declared_on).getFullYear()} <span class="dl-tag">declared by ${esc(_dlStaffName(r.sent_by))}</span>`:'';
+    el.className='show dl-ok';
+    el.innerHTML=`<div style="flex:1;min-width:0"><div class="dl-t">📋 Send record</div><table class="dl-rec">
+      <tr><td>Recorded (system)</td><td><b>${esc(_dlFmtT(r.sent_at))}</b></td></tr>
+      <tr><td>Marked sent by</td><td>${esc(r.sent_by||'')}</td></tr>
+      ${r.sent_to?`<tr><td>Sent to</td><td>${esc(r.sent_to)}</td></tr>`:''}
+      ${decl?`<tr><td>Actually sent</td><td>${decl}</td></tr>`:''}
+      ${r.late_reason?`<tr><td>Reason for delay</td><td>${esc(r.late_reason)}</td></tr>`:''}
+      ${r.reviewed_at?`<tr><td>Approved</td><td>${esc(_dlFmtT(r.reviewed_at))} by ${esc(r.reviewed_by||'')}</td></tr>`:''}
+      ${r.printed_at?`<tr><td>Submitted</td><td>${esc(_dlFmtT(r.printed_at))}${r.submitted_by_email?' by '+esc(r.submitted_by_email):''}</td></tr>`:''}
+    </table></div>`;
+    return;
+  }
+  if(IS_ADMIN)return;
+  const t=_rptTone(r,month);if(!t)return;
+  const showSendStage=t.stage==='send';
+  if(t.tone==='none'&&!(r&&r.remind_pm_at))return;
+  if(t.stage==='review'&&t.tone!=='hold'&&!(r&&r.remind_pm_at))return; // lock banner already covers "in review"
+  const dl=t.dl,remind=r&&r.remind_pm_at?`<br>🔔 Reminder from the admin on ${esc(_dlFmtT(r.remind_pm_at))}.`:'';
+  let title='',sub='',acts='';
+  const sendBtn=`<button class="dl-btn p" onclick="markSentToClient()">📤 Send to client →</button>`;
+  const holdBtn=r?`<button class="dl-btn g" onclick="_openHoldModal()">⏸ On hold</button>`:'';
+  const mainBtn=t.stage==='send'?sendBtn:(t.stage==='submit'?`<button class="dl-btn p" onclick="sendForReview()">Send for review →</button>`:'');
+  if(t.tone==='hold'){
+    title=`⏸ On hold until ${_dlFmt(_dlParseDate(r.hold_until))}`;
+    sub=`${esc(r.hold_reason||'')}${r.hold_note?' — '+esc(r.hold_note):''} (set by ${esc(_dlStaffName(r.hold_set_by))}). Turns red again if not done by then.`;
+    acts=`<button class="dl-btn g" onclick="_openHoldModal()">Edit hold</button>${mainBtn}`;
+  }else if(showSendStage){
+    if(t.tone==='dan'){title=`⚠ Overdue: not sent to the client (due ${_dlFmt(dl.send)})`;sub='Admins can see this on their dashboard. Send it, or put it on hold with a reason.';acts=holdBtn+sendBtn;}
+    else if(t.tone==='warn'){title='📤 Approved, not sent to client yet';sub=`Due to the client by ${_dlFmt(dl.send)}. Email the PDF to the client, then mark it as sent.`;acts=sendBtn;}
+    else{title='📤 Approved, ready to send';sub=`Email the PDF to the client, then mark it as sent (due ${_dlFmt(dl.send)}).`;acts=sendBtn;}
+  }else if(t.stage==='submit'){
+    const nc=r&&r.status==='needs_changes';
+    if(t.tone==='dan'){title=nc?`⚠ Overdue: changes not resubmitted (due ${_dlFmt(dl.submit)})`:`⚠ Overdue: not sent for review (due ${_dlFmt(dl.submit)})`;sub='Admins can see this on their dashboard. You\'ll be asked for a reason for the delay when you send it.';acts=holdBtn+mainBtn;}
+    else if(t.tone==='warn'){title=`⏰ Due for review by ${_dlFmt(dl.submit)}`;sub='Finish the report and send it for review.';acts=mainBtn;}
+    else{title=nc?'↩ Changes requested':'Not sent for review yet';sub='';acts=mainBtn;}
+  }else{
+    title=t.tone==='dan'?'⚠ Review overdue':'🔍 In review';sub='Waiting for the reviewer.';
+  }
+  if(t.holdEnded&&t.tone!=='hold')sub+=` Hold ended on ${_dlFmt(_dlParseDate(r.hold_until))}.`;
+  el.className='show dl-'+(t.tone==='none'?'info':t.tone);
+  el.innerHTML=`<div style="flex:1;min-width:200px"><div class="dl-t">${title}</div><div class="dl-s">${sub}${remind}</div></div><div class="dl-acts">${acts}</div>`;
+}
+// ── Generic popup ──
+function _dlModal(head,headCls,body,okLabel,onOk,{noCancel=false}={}){
+  document.getElementById('dlm-ov')?.remove();
+  const ov=document.createElement('div');ov.id='dlm-ov';
+  ov.innerHTML=`<div class="dlm" role="dialog" aria-modal="true"><div class="dlm-h ${headCls||''}">${head}</div><div class="dlm-b">${body}</div>
+    <div class="dlm-f">${noCancel?'':'<button class="dl-btn g" id="dlm-x">Cancel</button>'}<button class="dl-btn p" id="dlm-ok" disabled>${okLabel}</button></div></div>`;
+  document.body.appendChild(ov);
+  const close=()=>ov.remove();
+  ov.querySelector('#dlm-x')?.addEventListener('click',()=>{close();ov._onCancel&&ov._onCancel();});
+  ov.querySelector('#dlm-ok').addEventListener('click',async()=>{
+    const b=ov.querySelector('#dlm-ok');b.disabled=true;b.textContent='Saving…';
+    try{const ok=await onOk(ov);if(ok!==false)close();else{b.disabled=false;b.textContent=okLabel;}}
+    catch(e){toast('Not saved: '+e.message,'error',6000);b.disabled=false;b.textContent=okLabel;}
+  });
+  return ov;
+}
+function _dlToday(){const t=new Date();return`${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;}
+// ── "Send to client" popup ──
+function _openSendModal(){
+  const month=document.getElementById('sel-month')?.value;
+  const t=_rptTone(_curRep,month)||{};
+  const late=!!t.lateSend;
+  const name=esc((activeClient?.client_name||'')+(activeProgramme?' · '+activeProgramme.programme_name:''));
+  const ov=_dlModal('Mark as sent to client',late?'dan':'',`
+    ${late?`<div class="dlm-alert">⚠ Due to the client by ${_dlFmt(t.dl.send)}</div>`:''}
+    <b style="color:#1E2533">${name}</b> — ${esc(month||'')}
+    <label>Recorded date</label><div class="dlm-lock">${esc(_dlFmtT(new Date()))} <small>🔒 set by the system</small></div>
+    <label>Sent to <span class="req">*</span></label><input id="dls-to" type="email" placeholder="client contact email">
+    <label class="chk"><input id="dls-lt" type="checkbox"> I emailed it to the client earlier</label>
+    <div id="dls-late" style="display:none"><label>Date actually sent <span class="req">*</span></label><input id="dls-ld" type="date" max="${_dlToday()}">
+    <div class="dlm-hint">Saved as "declared by ${esc(ADMIN_NAME)}". The recorded date above stays as it is.</div></div>
+    ${late?'<label>Reason for the delay <span class="req">*</span></label><textarea id="dls-why" placeholder="e.g. Waited for the client\'s HR contact to return"></textarea>':''}`,
+    'Confirm sent',async o=>{
+      const to=o.querySelector('#dls-to').value.trim(),lt=o.querySelector('#dls-lt').checked,ld=o.querySelector('#dls-ld').value;
+      const why=o.querySelector('#dls-why')?.value.trim()||null;
+      const upd=await _rptRpc('mark_report_sent',{p_report_id:Number(_currentReportId),p_sent_to:to,p_declared_on:lt?ld:null,p_late_reason:why});
+      toast('📤 Marked as sent to client — admin notified','success',4500);
+      _currentReportStatus='sent_to_client';
+      _applyReportLock('sent_to_client',null,null,null,upd?.sent_at||new Date().toISOString(),upd?.sent_by||ADMIN_NAME);
+      _historyFetchedAt=0;checkReportStatus();
+    });
+  const v=()=>{const to=ov.querySelector('#dls-to').value.trim(),lt=ov.querySelector('#dls-lt').checked,ld=ov.querySelector('#dls-ld').value;
+    const why=ov.querySelector('#dls-why');
+    ov.querySelector('#dls-late').style.display=lt?'':'none';
+    ov.querySelector('#dlm-ok').disabled=!(/.+@.+\..+/.test(to)&&(!lt||(ld&&ld<=_dlToday()))&&(!why||why.value.trim().length>3));};
+  ov.querySelectorAll('input,textarea').forEach(i=>i.addEventListener('input',v));ov.querySelector('#dls-lt').addEventListener('change',v);
+  ov.querySelector('#dls-to').focus();
+}
+// ── "On hold" popup ──
+function _openHoldModal(){
+  const r=_curRep;if(!r){toast('Send it for review first','warn',3500);return;}
+  const ov=_dlModal('⏸ Put on hold','hold',`
+    <label>Reason <span class="req">*</span></label><select id="dlh-r"><option value="">Choose…</option>
+      ${['Client asked to wait','Waiting for client sign-off','Corrections requested by client','Other'].map(o=>`<option${r.hold_reason===o?' selected':''}>${o}</option>`).join('')}</select>
+    <label>Hold until <span class="req">*</span></label><input id="dlh-d" type="date" min="${_dlToday()}" value="${r.hold_until&&r.hold_until>=_dlToday()?esc(r.hold_until):''}">
+    <label>Note (optional)</label><input id="dlh-n" value="${esc(r.hold_note||'')}" placeholder="e.g. Client's year-end, resend on the 20th">
+    <div class="dlm-hint">If it's still not done on that date, it turns red again.</div>
+    ${r.hold_until?'<div style="margin-top:10px"><button class="dl-btn g sm" id="dlh-clear" style="background:#fff;color:#C8272C;border:1px solid #F2B8B8">Remove hold</button></div>':''}`,
+    'Put on hold',async o=>{
+      const rec=await _rptRpc('set_report_hold',{p_report_id:Number(r.id),p_until:o.querySelector('#dlh-d').value,p_reason:o.querySelector('#dlh-r').value,p_note:o.querySelector('#dlh-n').value||null});
+      _curRep={..._curRep,...rec};toast('⏸ On hold — saved to the report history','success',4000);_renderDeadlineBanner();
+    });
+  const v=()=>{ov.querySelector('#dlm-ok').disabled=!(ov.querySelector('#dlh-r').value&&ov.querySelector('#dlh-d').value>=_dlToday());};
+  ov.querySelectorAll('input,select').forEach(i=>{i.addEventListener('input',v);i.addEventListener('change',v);});v();
+  ov.querySelector('#dlh-clear')?.addEventListener('click',async()=>{
+    try{const rec=await _rptRpc('set_report_hold',{p_report_id:Number(r.id),p_until:null});_curRep={..._curRep,...rec};ov.remove();toast('Hold removed','info',3000);_renderDeadlineBanner();}
+    catch(e){toast('Not saved: '+e.message,'error',6000);}
+  });
+}
+// ── Late submission reason (asked before sending for review after the deadline) ──
+// Resolves to the reason, '' when not late, or false if the PM cancels.
+function _askLateSubmitReason(){
+  const month=document.getElementById('sel-month')?.value;
+  const t=_rptTone(_curRep,month);
+  if(!t||t.stage!=='submit'||!t.lateSubmit)return Promise.resolve('');
+  return new Promise(res=>{
+    const ov=_dlModal('Send for review','dan',`<div class="dlm-alert">⚠ Reports for ${esc(month)} were due for review by ${_dlFmt(t.dl.submit)}</div>
+      <label>Reason for the delay <span class="req">*</span></label><textarea id="dll-why" placeholder="e.g. Waiting for the assessor's results"></textarea>
+      <div class="dlm-hint">Saved to the report's history.</div>`,'Continue',o=>{res(o.querySelector('#dll-why').value.trim());});
+    ov._onCancel=()=>res(false);
+    const w=ov.querySelector('#dll-why');w.addEventListener('input',()=>{ov.querySelector('#dlm-ok').disabled=w.value.trim().length<4;});w.focus();
+  });
+}
+// ── Dashboard panel (admins): everything not yet sent for the reporting month ──
+async function renderSendPanel(){
+  const el=document.getElementById('dash-send');if(!el)return;
+  if(!IS_ADMIN||!isOnline){el.style.display='none';return;}
+  const now=new Date(),pm=new Date(now.getFullYear(),now.getMonth()-1,1);
+  const month=`${_DL_MONTHS[pm.getMonth()]} ${pm.getFullYear()}`;
+  const dl=_rptDeadlines(month);
+  el.style.display='';
+  el.innerHTML=`<div style="color:rgba(255,255,255,.4);font-size:8.5pt">Loading ${esc(month)} reports…</div>`;
+  let reps=[],drafts=[];
+  try{
+    [reps,drafts]=await Promise.all([
+      sb('reports',`select=id,programme_id,client_id,client_name_snapshot,programme_name_snapshot,submitted_by_email,status,hold_until,hold_reason,remind_pm_at&tenant_id=eq.${TENANT_DB_ID}&month=eq.${encodeURIComponent(month)}&status=in.(pending,needs_changes,approved,sent_to_client)&limit=300`),
+      sb('drafts',`select=programme_id,client_name,programme_name,pm_email&tenant_id=eq.${TENANT_DB_ID}&month=eq.${encodeURIComponent(month)}&limit=300`)
+    ]);
+  }catch(e){el.innerHTML=`<div style="color:#f87171;font-size:8.5pt">Couldn't load ${esc(month)} reports: ${esc(e.message)}</div>`;return;}
+  const withRep=new Set(reps.map(r=>String(r.programme_id)));
+  const rows=reps.filter(r=>r.status!=='sent_to_client').map(r=>({r,pid:r.programme_id,cid:r.client_id,client:r.client_name_snapshot,prog:r.programme_name_snapshot,pm:r.submitted_by_email}))
+    .concat(drafts.filter(d=>!withRep.has(String(d.programme_id))).map(d=>({r:null,pid:d.programme_id,cid:(programmes.find(p=>String(p.id)===String(d.programme_id))||{}).client_id,client:d.client_name,prog:d.programme_name,pm:d.pm_email})));
+  rows.forEach(x=>{x.t=_rptTone(x.r,month)||{stage:'send',tone:'none',badge:''};});
+  const rank={dan:0,warn:1,hold:2,info:3,none:4},stOrd={submit:0,review:1,send:2};
+  const STG={submit:'Not yet sent for review (PM)',review:'Waiting for review (reviewer)',send:'Approved, not sent to client (PM)'};
+  rows.sort((a,b)=>stOrd[a.t.stage]-stOrd[b.t.stage]||rank[a.t.tone]-rank[b.t.tone]||String(a.client).localeCompare(String(b.client)));
+  const cnt=k=>rows.filter(x=>x.t.tone===k).length;
+  const counts=[['dan','overdue'],['warn','due soon'],['hold','on hold']].filter(([k])=>cnt(k)).map(([k,l])=>`<span class="ds-b ${k}">${cnt(k)} ${l}</span>`).join(' ');
+  let body='',last='';
+  rows.forEach(x=>{
+    if(x.t.stage!==last){last=x.t.stage;body+=`<tr class="ds-grp"><td colspan="4">${STG[last]}</td></tr>`;}
+    const rem=x.r&&x.t.tone==='dan'&&x.t.stage!=='review'
+      ?(x.r.remind_pm_at?`<span style="font-size:7.5pt;color:#4ade80;font-weight:700">✓ Reminded ${esc(_dlFmt(x.r.remind_pm_at))}</span>`:`<button class="dl-btn p sm" onclick="dashRemindPM(${Number(x.r.id)},this)">Remind PM</button>`):'';
+    body+=`<tr><td><div style="font-weight:800;color:#fff">${esc(x.client||'')}</div><div style="font-size:7.5pt;color:rgba(255,255,255,.45)">${esc(x.prog||'')}</div></td>
+      <td class="hide-sm">${esc(_dlStaffName(x.pm))}</td><td><span class="ds-b ${x.t.tone}">${esc(x.t.badge)}</span></td>
+      <td style="text-align:right;white-space:nowrap">${x.cid?`<button class="dl-btn g sm" onclick="dashGoTo(${Number(x.cid)},${Number(x.pid)},'${esc(month)}')">Open</button>`:''} ${rem}</td></tr>`;
+  });
+  el.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+     <div><div style="font-size:10pt;font-weight:800;color:#fff">📤 ${esc(month)} reports not yet sent</div>
+     <div style="font-size:7.5pt;color:rgba(255,255,255,.45);margin-top:2px">Review by ${_dlFmt(dl.submit)} · send to client by ${_dlFmt(dl.send)}</div></div>
+     <div>${counts}</div></div>
+   ${rows.length?`<table><thead><tr><th>Client</th><th class="hide-sm">PM</th><th>Status</th><th></th></tr></thead><tbody>${body}</tbody></table>`
+     :'<div style="color:#4ade80;font-size:8.5pt;font-weight:700">✓ Every report for this month is marked sent.</div>'}`;
+}
+async function dashRemindPM(id,btn){
+  btn.disabled=true;
+  try{await _rptRpc('remind_pm',{p_report_id:Number(id)});btn.outerHTML='<span style="font-size:7.5pt;color:#4ade80;font-weight:700">✓ Reminded</span>';}
+  catch(e){btn.disabled=false;toast('Not saved: '+e.message,'error',6000);}
 }
 
 // ── Admin: archive a report after client delivery is confirmed ──
