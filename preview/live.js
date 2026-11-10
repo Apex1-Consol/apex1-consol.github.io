@@ -1,15 +1,14 @@
 /* ApexOne redesign preview — live data layer.
-   Talks ONLY to the separate free Supabase project "apexone-preview" (test data).
+   Talks to the LIVE ApexOne project (apex-one, nducwhlmudksgxggjrbo) since 10 Nov 2026 (Stavros:
+   the new UI is the one to use). Writes here are real.
    It never calls ClickUp: writes land in Supabase, the database queues them in the
    outbox, and the preview adapter (server-side, token never in the browser) delivers
    them to the "Z. Redesign Preview (TEST)" folder in ApexOne Operations. */
 (function () {
   const CFG = window.PREVIEW_CFG || {
-    url: 'https://qszikynltvyplzqootrc.supabase.co',
-    key: 'sb_publishable_pP_daaZNEJOTl1mZVraZZg_fOK6LZQt',
-    liveRef: 'nducwhlmudksgxggjrbo'
+    url: 'https://nducwhlmudksgxggjrbo.supabase.co',
+    key: 'sb_publishable_G2BvFAbvXlrq9nwIl4Gupw_3qyTRe2b'
   };
-  if (CFG.url.includes(CFG.liveRef)) throw Error('Preview must never point at the live project');
   // Messages from this layer are real, so drop the mock's " (mock)" suffix.
   const toast = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
   const sb = window.supabase.createClient(CFG.url, CFG.key);
@@ -52,7 +51,7 @@
     let e = form.querySelector('.err'); if (e) e.remove();
     if (error) form.insertAdjacentHTML('beforeend', `<div class="err" role="alert">${esc(error.message)}</div>`);
   };
-  form.querySelector('.ts').textContent = 'Preview project · test data only';
+  form.querySelector('.ts').textContent = 'Live ApexOne data · sign in with your ApexOne account';
   // Sign out must never wait on the auth lock: clear the local session first, then tell the server in the background.
   function hardSignOut() {
     P.user = null; P.roles = []; P.tenant = null;
@@ -70,11 +69,11 @@
     const am = P.user?.app_metadata || {};
     P.roles = Array.isArray(am.role) ? am.role : am.role ? [am.role] : [];
     P.tenant = am.tenant || null;
-    if (P.user && !P.tenant) { toast('This account is not on the preview allow-list'); hardSignOut(); return; }
+    if (P.user && !P.tenant) { toast('This account has no ApexOne tenant'); hardSignOut(); return; }
     if (P.user) {
       document.querySelector('.me .avatar').textContent = (P.user.email || '?')[0].toUpperCase();
       document.querySelector('.me div div').textContent = P.user.email;
-      document.querySelector('.me div div+div').textContent = (P.roles.join(', ') || 'no role') + ' · PREVIEW';
+      document.querySelector('.me div div+div').textContent = (P.roles.join(', ') || 'no role') + ' · NEW UI';
       const now = new Date(), h = now.getHours(), who = (P.user.email || '').split(/[@+.]/)[0];
       const g = $('greet'), gd = $('greetdate');
       if (g) g.textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who[0].toUpperCase() + who.slice(1) : '');
@@ -140,7 +139,7 @@
   function applyDashboard() {
     const d = P.data, linked = new Set(d.enrol.filter(e => e.status === 'active').map(e => e.learner_id));
     const unlinked = d.learners.filter(l => !linked.has(l.id)).length, openRecs = d.recs.filter(r => !r.resolved).length;
-    $('kpis').innerHTML = [['Learners', d.learners.length, 'on record (test data)', 'var(--muted)', 'learners'], ['Active enrolments', d.enrol.filter(e => e.status === 'active').length, unlinked + ' learners unlinked', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
+    $('kpis').innerHTML = [['Learners', d.learners.length, 'on record', 'var(--muted)', 'learners'], ['Active enrolments', d.enrol.filter(e => e.status === 'active').length, unlinked + ' learners unlinked', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
       ['Active programmes', d.progs.filter(p => p.status === 'active').length, 'in delivery', 'var(--muted)', 'programmes'], ['Open recommendations', openRecs, 'from monitoring visits', openRecs ? 'var(--bad)' : 'var(--muted)', 'recs'],
       ['Waiting for sign-off', d.signoffs.filter(s => s.status === 'waiting').length, 'admin decisions', 'var(--muted)', 'signoff']]
       .map(([l, v, n, c, h]) => `<a class="kpi" href="#${h}"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${c}">${n}</span></a>`).join('');
@@ -162,7 +161,7 @@
       LEARNERS.push({ id: l.id, n: (l.first_name + ' ' + l.last_name).trim(), idn: l.id ? '••••••••' + String(l.id_number || '').slice(-4) : '', p: e ? progName(e.programme_id) : '', a: null, s: e ? 'Active' : 'Unlinked' }); });
     LEARNERS.forEach(l => l.id = l.idn);
     lLoaded = true;
-    const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.length + ' on record · preview test data';
+    const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.length + ' on record';
   }
   renderLearners = function () {
     const q = ($('lq').value || '').trim().toLowerCase(), all = LEARNERS.length, act = LEARNERS.filter(l => l.s === 'Active').length;

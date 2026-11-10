@@ -1037,10 +1037,12 @@
     return ['ok', 'Registered until ' + fmt(exp)];
   };
   function assigns() {
-    const out = [], byName = n => S.A.find(x => nm(x.full_name) === nm(n));
-    (typeof MOD !== 'undefined' ? MOD : []).forEach(r => [12, 13, 14].forEach(k => splitNames(r[k]).forEach(n => { const a = byName(n); if (a) out.push({ a, role: ROLE3[k - 12], title: String(r[4] || ''), seta: r[15] || null, start: d10(r[9]), end: d10(r[10]), src: 'Moderation list' }); })));
-    ((P.data && P.data.progs) || []).forEach(p => { const a = S.A.find(x => x.id === p.facilitator_id); if (a && !/complete|closed|cancel/i.test(p.status || '')) out.push({ a, role: 'Facilitator', title: p.qualification_name || p.programme_name || 'Programme ' + p.id, seta: null, start: d10(p.start_date), end: d10(p.end_date), src: 'Programmes', pid: p.id }); });
-    out.forEach(x => { x.el = eligOf(x.a, x.role, x.seta, x.end); x.now = (!x.start || x.start <= today()) && (!x.end || x.end >= today()); x.live = !x.end || x.end >= today(); });
+    // public.fam_bookings is the only source of who is booked on what (Stavros, 10 Nov 2026). Cancelled bookings are ignored.
+    const out = [], progs = (P.data && P.data.progs) || [];
+    (S.BK || []).filter(b => b.status !== 'Cancelled').forEach(b => { const a = S.A.find(x => x.id === b.assessor_id); if (!a) return;
+      const p = progs.find(x => x.id === b.programme_id);
+      out.push({ a, bid: b.id, bk: b, role: b.role, title: b.title || p?.programme_name || 'Booking', seta: null, start: d10(b.start_date), end: d10(b.end_date), pid: b.programme_id || null, src: 'FAM booking · ' + (b.status || 'Planned'), done: b.status === 'Done' }); });
+    out.forEach(x => { x.el = eligOf(x.a, x.role, x.seta, x.end); x.now = (!x.start || x.start <= today()) && (!x.end || x.end >= today()); x.live = !x.done && (!x.end || x.end >= today()); if (x.done) x.now = false; });
     return out;
   }
   const suitable = a => regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today())).map(r => {
@@ -1051,7 +1053,7 @@
   const qWords = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/^(nc|fc|gc|nd) /, '').trim();
   const progsNow = () => [
     ...((P.data && P.data.progs) || []).filter(p => !/complete|closed|cancel/i.test(p.status || '') && (!d10(p.end_date) || d10(p.end_date) >= today())).map(p => ({ pid: p.id, title: p.programme_name || p.qualification_name || 'Programme', text: [p.saqa_id, p.qualification_name, p.programme_name].join(' '), start: d10(p.start_date), end: d10(p.end_date), fac: p.facilitator_id })),
-    ...(typeof MOD !== 'undefined' ? MOD : []).filter(r => !d10(r[10]) || d10(r[10]) >= today()).map(r => ({ pid: null, title: String(r[4] || ''), text: String(r[4] || ''), start: d10(r[9]), end: d10(r[10]) }))];
+  ];
   const canDo = a => {
     const out = new Map(), ok = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
     ok.forEach(r => scopeOf(r.id).forEach(s => { const q = qual(s.qualification_id); if (!q) return; if (!out.has(q.id)) out.set(q.id, { q, roles: new Set(), setas: new Set(), until: '' }); const x = out.get(q.id);
@@ -1060,7 +1062,7 @@
     if (list.length) { const mine = assigns().filter(x => x.a.id === a.id && x.live), P2 = progsNow();
       list.forEach(x => { const sqs = String(x.q.saqa_id || '').split(/[^0-9]+/).filter(v => v.length >= 4), w = qWords(x.q.name);
         x.progs = P2.filter(p => sqs.some(v => new RegExp('\\b' + v + '\\b').test(p.text)) || (w.length > 8 && qWords(p.text).includes(w))).map(p => {
-          const on = p.pid ? p.fac === a.id : mine.some(m => m.title === p.title);
+          const on = mine.some(m => p.pid ? m.pid === p.pid : m.title === p.title) || (p.pid && p.fac === a.id);
           const busy = !on && mine.some(m => m.title !== p.title && (!m.end || !p.start || m.end >= p.start) && (!m.start || !p.end || m.start <= p.end));
           const aw = !on && awayIn(a, p.start, p.end); return { ...p, state: on ? 'on' : aw ? 'away' : busy ? 'busy' : 'free', short: !!(x.until && p.end && x.until < p.end) }; }); }); }
     return { list, noScope: ok.filter(r => !scopeOf(r.id).length) };
@@ -1144,6 +1146,66 @@
   window.famVet = id => { const f = fx(S.A.find(x => x.id === id));
     modal('Recruitment and vetting', `<div class="qagrid">${selV('stage', 'Stage', STAGES, stageOf({ fields: f }))}${fld('exp_years', 'Years of occupational experience', 'number', `min="0" max="60" value="${e(f.exp_years)}"`)}${fld('exp_field', 'Field or trade', 'text', `value="${e(f.exp_field)}"`)}${fld('ref_at', 'References checked on', 'date', `value="${e(f.ref_at)}"`)}${selV('ref_outcome', 'Reference outcome', ['Satisfactory', 'Concerns'], f.ref_outcome)}${fld('ref_by', 'Checked by', 'text', `value="${e(f.ref_by)}"`)}${fld('bg_at', 'Background check on (optional)', 'date', `value="${e(f.bg_at)}"`)}${selV('bg_outcome', 'Background check outcome', ['Clear', 'Record found'], f.bg_outcome)}</div><p class="sub" style="margin:0">Keep the CV on the Documents tab as evidence of experience. Applicants and vetted people show as not ready in Suitable people; Not approved blocks allocation.</p>`,
       async F => { need(); const g = val(F, 'stage') || 'Active'; await setFx(id, { stage: g, exp_years: val(F, 'exp_years'), exp_field: val(F, 'exp_field'), ref_at: val(F, 'ref_at'), ref_outcome: val(F, 'ref_outcome'), ref_by: val(F, 'ref_by'), bg_at: val(F, 'bg_at'), bg_outcome: val(F, 'bg_outcome'), ...(g !== (f.stage || 'Active') ? { stage_at: today(), stage_by: me() } : {}) }); say('Recruitment details saved'); }); };
+  /* ---------- bookings (public.fam_bookings) with the database check public.fam_availability() ---------- */
+  const BKST = ['Planned', 'Confirmed', 'Done', 'Cancelled'];
+  window.famBook = (id, aid, pid) => {
+    const b = (S.BK || []).find(x => x.id === id) || {}, progs = ((P.data && P.data.progs) || []).filter(p => !/cancel/i.test(p.status || '')).sort((x, y) => String(x.programme_name).localeCompare(String(y.programme_name)));
+    const o = (v, l, cur) => `<option value="${e(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${e(l)}</option>`;
+    const cur = { aid: b.assessor_id || aid || '', pid: b.programme_id || pid || '' };
+    modal(id ? 'Edit booking' : 'New booking', `<div class="qagrid">
+      <label>Practitioner *<select name="aid" required>${o('', 'Choose…', cur.aid)}${vis().map(a => o(a.id, shownName(a), cur.aid)).join('')}</select></label>
+      <label>Role *<select name="role" required>${ROLE3.map(r => o(r, r, b.role || 'Facilitator')).join('')}</select></label>
+      <label>Programme<select name="pid">${o('', 'Not linked', cur.pid)}${progs.map(p => o(p.id, p.programme_name || 'Programme ' + p.id, cur.pid)).join('')}</select></label>
+      ${fld('title', 'What *', 'text', `required value="${e(b.title || '')}" placeholder="e.g. NC: Generic Management, cohort 2"`)}
+      ${fld('client', 'Client', 'text', `value="${e(b.client_name || '')}"`)}
+      ${fld('start', 'From *', 'date', `required value="${e(b.start_date || '')}"`)}${fld('end', 'To *', 'date', `required value="${e(b.end_date || '')}"`)}
+      ${fld('dpw', 'Days per week', 'number', `min="0.5" max="7" step="0.5" value="${e(b.days_per_week ?? '')}"`)}
+      <label>Status<select name="status">${BKST.map(x => o(x, x, b.status || 'Planned')).join('')}</select></label></div>
+      ${fld('notes', 'Notes', 'text', `value="${e(b.notes || '')}"`)}
+      <div id="fambkchk" class="sub" style="padding:8px 0">Pick a practitioner, role and dates to check availability.</div>
+      <label id="fambkok" style="display:none;flex-direction:row;gap:8px;align-items:center"><input type="checkbox" name="override" style="width:auto"> Book anyway (reason is written to the notes)</label>
+      ${id && isAdm() ? `<button type="button" class="btn sm" style="color:var(--bad)" onclick="famBookDel(${id})">Delete booking</button>` : ''}`,
+      async F => { need();
+        const aidv = Number(val(F, 'aid')), role = val(F, 'role'), title = val(F, 'title'), start = val(F, 'start'), end = val(F, 'end');
+        if (!aidv || !role || !title || !start || !end) throw new Error('Practitioner, role, what, from and to are required.');
+        if (end < start) throw new Error('The end date is before the start date.');
+        let notes = val(F, 'notes');
+        if (S.bkNeed) { if (!F.override.checked) throw new Error('Tick "Book anyway" to save despite the warnings.');
+          notes = ((notes ? notes + ' | ' : '') + `Booked despite warnings (${P.user?.email || 'unknown'}, ${fmt(today())}): ${S.bkNeed}`).slice(0, 600); }
+        const body = { assessor_id: aidv, role, title, client_name: val(F, 'client'), programme_id: val(F, 'pid') ? Number(val(F, 'pid')) : null, start_date: start, end_date: end,
+          days_per_week: val(F, 'dpw') ? Number(val(F, 'dpw')) : null, status: val(F, 'status') || 'Planned', notes };
+        if (id) { const r = await write('Booking', () => sb.from('fam_bookings').update({ ...body, updated_by: P.user?.email || null }).eq('id', id).select('id'));
+          if (!r?.length) throw new Error('You can only edit bookings you created (or ask a FAM admin).'); }
+        else await write('Booking', () => sb.from('fam_bookings').insert({ ...body, tenant_id: P.tenant, source: 'manual', created_by: P.user?.email || null }));
+        say(id ? 'Booking updated' : 'Booked'); });
+    const f = $('famform'); f.oninput = f.onchange = ev => { if (ev.target.name === 'pid') { const p = progs.find(x => String(x.id) === f.pid.value);
+        if (p) { if (!f.title.value) f.title.value = p.programme_name || ''; if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
+      if (ev.target.name !== 'notes' && ev.target.name !== 'override') bkCheck(id); };
+    S.bkNeed = null; bkCheck(id);
+  };
+  async function bkCheck(id) {
+    const f = $('famform'), box = $('fambkchk'), ok = $('fambkok'); if (!f || !box) return;
+    const aid = f.aid.value, role = f.role.value, start = f.start.value, end = f.end.value, st = f.status.value, pid = f.pid.value;
+    const set = (h, need) => { box.innerHTML = h; S.bkNeed = need || null; ok.style.display = need ? 'flex' : 'none'; };
+    if (!aid || !role || !start || !end) return set('Pick a practitioner, role and dates to check availability.');
+    if (end < start) return set('<span style="color:var(--bad)">The end date is before the start date.</span>');
+    if (st === 'Done' || st === 'Cancelled') return set(st + ' bookings are not checked for clashes.');
+    box.textContent = 'Checking…'; const tk = (S.bkTk = (S.bkTk || 0) + 1);
+    const p = ((P.data && P.data.progs) || []).find(x => String(x.id) === pid);
+    const { data, error } = await sb.rpc('fam_availability', { p_start: start, p_end: end, p_role: role, p_qualification_id: null, p_saqa: p?.saqa_id || null, p_exclude_booking: id || null });
+    if (tk !== S.bkTk) return;
+    if (error) return set(`<span style="color:var(--bad)">Could not run the check (${e(error.message)}). You can still save.</span>`);
+    const r = (data || []).find(x => String(x.assessor_id) === String(aid)); if (!r) return set('Practitioner not found.');
+    const why = (r.reasons || []).map(x => typeof x === 'string' ? x : x.text || x.reason || JSON.stringify(x));
+    const dup = pid && (S.BK || []).find(b => b.status !== 'Cancelled' && b.status !== 'Done' && String(b.assessor_id) === String(aid) && b.role === role && String(b.programme_id) === pid && b.id !== id);
+    const cl = r.clashes || [], lvl = { ok: ['b-ok', 'Eligible'], warn: ['b-warn', 'Check first'], bad: ['b-bad', 'Not eligible'] }[r.eligibility] || ['', r.eligibility];
+    const need = [...(r.eligibility === 'bad' ? why : []), ...(dup ? [`Already booked as ${role.toLowerCase()} on this programme`] : [])].join('; ');
+    set(`<span class="badge ${lvl[0]}">${lvl[1]}</span> ${e(why.join(' · '))}${dup ? ' <span class="badge b-bad">Already booked on this programme</span>' : ''}
+      <div style="margin-top:6px">${cl.length ? `<span class="badge b-warn">${cl.length} other booking${cl.length === 1 ? '' : 's'} in these dates</span> ${e(cl.map(c => `${c.role || ''} · ${c.title || ''} (${fmt(c.start)} – ${fmt(c.end)})`).join('; '))}` : '<span class="badge b-ok">Free</span> No other bookings in these dates.'}</div>`, need);
+  }
+  window.famBookDel = async id => { if (!confirm('Delete this booking? It cannot be undone. To keep a record, set the status to Cancelled instead.')) return;
+    try { const r = await write('Delete', () => sb.from('fam_bookings').delete().eq('id', id).select('id')); if (!r?.length) return say('Only a FAM admin can delete bookings.');
+      close(); say('Booking deleted'); await load(); } catch (_) {} };
   window.famCap = id => { const f = fx(S.A.find(x => x.id === id));
     modal('Workload', `<div class="qagrid">${fld('max_cohorts', 'Most cohorts at the same time', 'number', `min="1" max="50" value="${e(f.max_cohorts)}"`)}</div><p class="sub" style="margin:0">Leave empty for no limit. Suitable people shows anyone at this number as Full, and Today flags anyone over it.</p>`,
       async F => { need(); await setFx(id, { max_cohorts: val(F, 'max_cohorts') }); say('Workload saved'); }); };
@@ -1244,7 +1306,7 @@
     const exp30 = S.R.filter(r => active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= addD(today(), 30) && vis().some(a => a.id === r.assessor_id));
     const bar = (x, li) => { const s = x.start && x.start > from ? x.start : from, en = x.end && x.end < to ? x.end : to; if ((x.end && x.end < from) || (x.start && x.start >= to)) return '';
       const l = pct(s), w = Math.max(1.2, pct(en) - l), bad = x.el[0] !== 'ok';
-      return `<button class="fcbar ${RCH[x.role] || ''}${bad ? ' fcrisk' : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${x.role} · ${x.title}${x.seta ? ' · ' + x.seta : ''}\n${fmt(x.start)} – ${fmt(x.end)}\n${x.el[1]}\nSource: ${x.src}\nClick to open practitioner`)}" onclick="location.hash='fam/${x.a.id}'">${bad ? '⚠ ' : ''}${e(x.title)}</button>`; };
+      return `<button class="fcbar ${RCH[x.role] || ''}${bad ? ' fcrisk' : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${x.role} · ${x.title}${x.seta ? ' · ' + x.seta : ''}\n${fmt(x.start)} – ${fmt(x.end)}\n${x.el[1]}\nSource: ${x.src}\nClick to open the booking`)}" onclick="${x.bid ? `famBook(${x.bid})` : `location.hash='fam/${x.a.id}'`}">${bad ? '⚠ ' : ''}${e(x.title)}</button>`; };
     const marks = a => regsFor(a.id).filter(r => r.registration_expiry_date && r.registration_expiry_date >= from && r.registration_expiry_date < to).map(r => `<span class="fcexp${r.registration_expiry_date < today() ? ' past' : ''}" style="left:${pct(r.registration_expiry_date)}%" title="${e(`${r.seta_name || 'Registration'} expires ${fmt(r.registration_expiry_date)}`)}">◆</span>`).join('')
       + S.D.filter(d => d.assessor_id === a.id && d.is_current !== false && d.expiry_date && d.expiry_date >= from && d.expiry_date < to).map(d => `<span class="fcexp doc" style="left:${pct(d.expiry_date)}%" title="${e(`${d.doc_type} expires ${fmt(d.expiry_date)}`)}">◇</span>`).join('');
     const grid = people.map(a => { const m = mine(a); return `<div class="fcrow"><button class="fcname" onclick="location.hash='fam/${a.id}'" title="Open profile">${e(shownName(a))}<span class="sub">${m.filter(x => x.now).length ? m.filter(x => x.now).length + ' now' : busy.has(a.id) ? 'upcoming' : 'free'}</span></button>
@@ -1321,13 +1383,13 @@
       <span class="sub">${fmt(from)} – ${fmt(addD(to, -1))}</span><span style="flex-grow:1"></span>
       <input type="search" placeholder="Search name" value="${e(C.q || '')}" oninput="famCal('q',this.value)" aria-label="Search practitioner">
       <select aria-label="Role" onchange="famCal('role',this.value)">${opt('', 'All roles', C.role)}${ROLE3.map(r => opt(r, r, C.role)).join('')}</select>
-      <select aria-label="SETA" onchange="famCal('seta',this.value)">${opt('', 'All SETAs', C.seta)}${setas.map(x => opt(x, x, C.seta)).join('')}</select></div>
+      <select aria-label="SETA" onchange="famCal('seta',this.value)">${opt('', 'All SETAs', C.seta)}${setas.map(x => opt(x, x, C.seta)).join('')}</select>${canWrite() ? '<button class="btn y" onclick="famBook()">+ Book</button>' : ''}</div>
     <div class="fckpis">${[['On a programme now', new Set(nowA.map(x => x.a.id)).size, ''], ['Free and registered', free.length, 'var(--ok)'], ['At-risk allocations', risk.length, risk.length ? 'var(--bad)' : ''], ['Expiring in 30 days', exp30.length, exp30.length ? 'var(--warn)' : '']].map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v"${c ? ` style="color:${c}"` : ''}>${v}</span></div>`).join('')}</div>
     <div class="fclegend"><span><i class="famc-f"></i>Facilitator</span><span><i class="famc-a"></i>Assessor</span><span><i class="famc-m"></i>Moderator</span><span><i style="outline:2px solid var(--bad);outline-offset:-2px"></i>Eligibility problem</span><span style="color:var(--bad)">◆ registration expires</span><span>◇ document expires</span><span><i style="background:#FBDC00;width:3px"></i>Today</span></div>
     <div class="fcgrid"><div class="fcrow h"><span style="padding:8px 12px;border-right:1px solid var(--line)">${people.length} practitioner${people.length === 1 ? '' : 's'}</span><div class="fcwks">${wk.map(w => `<span>${fmt(w).slice(0, 5)}</span>`).join('')}</div></div>${grid}</div>
     <div class="tabs" role="tablist" style="margin-top:4px">${TABS.map(([k, l, n]) => `<button role="tab" type="button" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" onclick="famCal('tab','${k}')">${l}${n != null ? ` <span class="badge${k === 'risk' && n ? ' b-bad' : ''}" style="margin-left:4px">${n}</span>` : ''}</button>`).join('')}</div>
     <section class="card" style="padding:0;overflow:hidden">${TABS.find(x => x[0] === tab)[3]}</section>
-    <div class="sub">Allocations come from the moderation list (facilitator, assessor and moderator names matched to the registry) and programme facilitators. Anyone allocated elsewhere shows as free.</div>`;
+    <div class="sub">Bookings come from the FAM Registry (fam_bookings), the only source of who is booked on what. Click a bar to edit it; overlaps are shown, not blocked.</div>`;
     loadCalAudit();
   }
   async function loadCalAudit() {
@@ -1440,7 +1502,7 @@
   /* ---------- data ---------- */
   async function load() {
     const q = async (n, p) => { const { data, error } = await p; if (error) { say('Could not load ' + n + ': ' + error.message); return []; } return data || []; };
-    const [A, R, D, F, Q, SC, RN, QL, PV] = await Promise.all([
+    const [A, R, D, F, Q, SC, RN, QL, PV, BK] = await Promise.all([
       q('practitioners', sb.from('assessors').select('id,full_name,role,email,phone,id_number,physical_address,fields').order('full_name')),
       q('registrations', sb.from('fam_seta_registrations').select('*')),
       q('documents', sb.from('fam_documents').select('id,assessor_id,doc_type,status,doc_date,expiry_date,file_url,file_name,is_current,version,superseded_at,created_at,uploaded_at,uploaded_by')),
@@ -1449,10 +1511,11 @@
       q('scope', sb.from('fam_registration_scope').select('id,registration_id,qualification_id')),
       q('renewals', sb.from('fam_renewals').select('id,assessor_id,registration_id,doc_type,status,expires_at,sent_to,created_at,uploaded_at,file_path,file_name,proposed_expiry,proposed_reg_no,practitioner_note,review_note,reviewed_at,proposed_profile,consent_at').order('created_at', { ascending: false })),
       q('quality record', sb.from('fam_quality').select('*').order('created_at', { ascending: false })),
-      q('rates', sb.from('fam_private').select('*'))]);
+      q('rates', sb.from('fam_private').select('*')),
+      q('bookings', sb.from('fam_bookings').select('*').order('start_date'))]);
     R.forEach(r => { if (r.seta_name) r.seta_name = r.seta_name.split(/\s*,\s*/).map(x => SETAK[x.toLowerCase().replace(/[^a-z&]/g, '')] || x).join(', '); });
     setTimeout(() => { try { if (typeof renderM === 'function') renderM(); } catch (_) {} }, 0); // Moderation page eligibility badges
-    Object.assign(S, { A, R, D, F, Q, SC, RN, QL, PV: Object.fromEntries(PV.map(x => [x.assessor_id, x])), loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
+    Object.assign(S, { A, R, D, F, Q, SC, RN, QL, BK, PV: Object.fromEntries(PV.map(x => [x.assessor_id, x])), loadedAt: new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) });
     try { window.famBell && window.famBell(S); } catch (_) {}
     try { renderToday(); } catch (_) {}
     const ids = new Set(A.map(a => a.id)); [...S.sel].forEach(id => ids.has(id) || S.sel.delete(id));

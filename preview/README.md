@@ -1,6 +1,6 @@
 # ApexOne redesign preview (isolated)
 
-A working preview of the redesign, wired to a **separate free Supabase project** (`apexone-preview`) with test data only.
+A working preview of the redesign, **Now wired to the LIVE ApexOne project (`apex-one`) since 10 Nov 2026.** FAM bookings use `fam_bookings` + `fam_availability()`. Screens built on preview-only tables (QA/ETQA, LEISA, sign-offs) show load errors on live.
 Live ApexOne (`/index.html`, project `apex-one`) and its ClickUp lists are untouched.
 
 - `index.html`: the redesign mock, plus sign-in and live data (`live.js`) and the QA/ETQA screens (`qa.js`: Tracker, Moderation & Verification, Accreditation, LEISA file, real .xlsx exports), and the delivery screens (`delivery.js`: Programmes with Form 3, Attendance register and PoE tracker, EISA readiness), and the app shell (`shell.js`: ApexU brand colours and logos, menu that closes to an icon rail, right side panel with Details / Activity / Assistant, "My work" home per role with hide-for-today bulk action, Ctrl K search). Logo sources are in `assets/`.
