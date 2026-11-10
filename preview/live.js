@@ -116,7 +116,10 @@
     Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes });
     applyAll();
     const bad = Object.keys(P.errors);
-    if (bad.length) toast('Could not load: ' + bad.join(', '));
+    // Tables that exist only in the old TEST project (QA/ETQA, LEISA, sign-offs): expected to be missing on live, so stay quiet about them.
+    const DEMO = ['qcto_tracker', 'moderation_items', 'accreditation_items', 'legacy_qualifications', 'signoff_items', 'leisa_learner', 'eisa_windows', 'leisa_settings'];
+    const real = bad.filter(x => !DEMO.includes(x));
+    if (real.length) toast('Could not load: ' + real.join(', '));
   }
   window.previewReload = loadAll;
 
