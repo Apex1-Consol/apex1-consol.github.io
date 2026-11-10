@@ -1591,7 +1591,7 @@
       if (t === 'Bulk Intake') { b.removeAttribute('onclick'); b.onclick = () => canWrite() ? (location.hash = 'fam/bulk') : say('You do not have FAM write access'); }
     });
     const tb = btns[0]?.parentElement;
-    tb?.insertAdjacentHTML('afterbegin', '<button class="btn" onclick="location.hash=\'fam/calendar\'">Calendar</button><button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><details class="famfum famio"><summary class="btn">Import / Export ▾</summary><div><button class="btn sm" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button></div></details>');
+    tb?.insertAdjacentHTML('afterbegin', '<a class="btn" href="https://claude.ai/artifact/55EisMHguuvRiE2M6YJe2q" target="_blank" rel="noopener" title="Open the FAM user guide">? Help</a><button class="btn" onclick="location.hash=\'fam/calendar\'">Calendar</button><button class="btn" onclick="location.hash=\'fam/queue\'">Action queue</button><details class="famfum famio"><summary class="btn">Import / Export ▾</summary><div><button class="btn sm" onclick="famExport(false)" title="Exports the list as shown (filter, search and sort)">Export to Excel</button></div></details>');
     const io = tb?.querySelector('.famio');
     if (io) { [...btns].filter(b => /^(Scope Import|Bulk Intake)$/.test(b.textContent.trim())).forEach(b => { b.classList.add('sm'); io.lastChild.appendChild(b); });
       io.lastChild.addEventListener('click', () => { io.open = false; }); document.addEventListener('click', ev => { if (io.open && !io.contains(ev.target)) io.open = false; }); }
