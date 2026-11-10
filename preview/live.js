@@ -342,5 +342,5 @@
   }
 
   /* banner */
-  document.body.insertAdjacentHTML('afterbegin', '<div id="pvbanner" style="position:sticky;top:0;z-index:50;background:#FBDC00;color:#25247B;font-weight:700;text-align:center;padding:6px 12px;font-size:13px">PREVIEW · separate test project · test data only · live ApexOne is unchanged</div>');
+  document.body.insertAdjacentHTML('afterbegin', '<div id="pvbanner" style="position:sticky;top:0;z-index:50;background:#FBDC00;color:#25247B;font-weight:700;text-align:center;padding:6px 12px;font-size:13px">NEW UI · live ApexOne data · changes here are real</div>');
 })();
