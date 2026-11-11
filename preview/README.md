@@ -21,7 +21,7 @@ One module at a time. When a module is complete here, the old app's menu item re
 |---|---|---|
 | FAM Registry | **Moved** (apexone PR #68, 11 Nov) | Data capture; user guide kept current |
 | Recommendations | **Moved** (apexone PR #69, 11 Nov): add, edit owner/due date/programme/visit, resolve, reopen; overdue in red | Nothing |
-| Clients | **Ready to move** (search, MOU badge, detail with programmes, add, edit; same fields as the old app) | Merge apexone PR #70 |
+| Clients | **Moved** (apexone PR #70, 11 Nov): search, MOU badge, detail with programmes, add, edit; same fields as the old app | Nothing |
 | Monitoring visits | Real visits; KMA scores, type, judgement save | Evidence checklist persistence; AI report stays off |
 | Data quality | Real issues; decisions write; merge request to sign-off | Merge procedure after approval (approver not decided) |
 | Learners / Enrolments | Real lists | Add/import learner, enrol/link |
