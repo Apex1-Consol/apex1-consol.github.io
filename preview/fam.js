@@ -35,7 +35,8 @@
   const isAdm = () => has('admin', 'fam_admin');
   const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist', 'fam_admin');
   const me = () => P.user?.email || null;
-  const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
+  const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmt = s => { if (!s) return '—'; const x = String(s).slice(0, 10); if (!/^\d{4}-\d\d-\d\d$/.test(x)) return String(s); const [y, m, d] = x.split('-'); return `${+d} ${MONS[+m - 1]} ${y}`; };
   const e = s => esc(s ?? '');
   const ymdL = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
   const today = () => ymdL(new Date());
@@ -1188,8 +1189,13 @@
         say(id ? 'Booking updated' : 'Booked'); });
     const f = $('famform'); f.oninput = f.onchange = ev => { if (ev.target.name === 'pid') { const p = progs.find(x => String(x.id) === f.pid.value);
         if (p) { if (!f.title.value) f.title.value = pn(p); if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
+      if (['role', 'start', 'end'].includes(ev.target.name)) bkOpts();
       if (ev.target.name !== 'notes' && ev.target.name !== 'override') bkCheck(id); };
-    S.bkNeed = null; bkCheck(id);
+    const bkOpts = () => { const role = f.role.value, st = f.start.value || today(), en = f.end.value || addD(st, 90), cur = f.aid.value, AS = assigns();
+      const L = vis().map(a => { const el = eligOf(a, role, null, en), pk = peak(AS.filter(x => x.a.id === a.id && x.live && x.bid !== id), st, en), k = el[0] === 'bad' ? 2 : el[0] === 'ok' && pk < dpwLim(a) ? 0 : 1; return [k, pk, a, el]; })
+        .sort((p, q) => p[0] - q[0] || p[1] - q[1] || shownName(p[2]).localeCompare(shownName(q[2])));
+      f.aid.innerHTML = o('', 'Choose…', cur) + L.map(([k, pk, a, el]) => o(a.id, `${k === 0 ? '✓ ' : ''}${shownName(a)} · ${k === 2 ? el[1] : pk + ' d/wk booked'}`, cur)).join(''); };
+    bkOpts(); S.bkNeed = null; bkCheck(id);
   };
   async function bkCheck(id) {
     const f = $('famform'), box = $('fambkchk'), ok = $('fambkok'); if (!f || !box) return;
@@ -1207,16 +1213,21 @@
     const why = (r.reasons || []).map(x => typeof x === 'string' ? x : x.text || x.reason || JSON.stringify(x));
     const dup = pid && (S.BK || []).find(b => b.status !== 'Cancelled' && b.status !== 'Done' && String(b.assessor_id) === String(aid) && b.role === role && String(b.programme_id) === pid && b.id !== id);
     const cl = r.clashes || [], lvl = { ok: ['b-ok', 'Eligible'], warn: ['b-warn', 'Check first'], bad: ['b-bad', 'Not eligible'] }[r.eligibility] || ['', r.eligibility];
-    const need = [...(r.eligibility === 'bad' ? why : []), ...(dup ? [`Already booked as ${role.toLowerCase()} on this programme`] : [])].join('; ');
+    const a = S.A.find(x => String(x.id) === String(aid)), fake = { a, start, end, pid: pid ? Number(pid) : null, role, bk: { days_per_week: Number(f.dpw.value) || 0 } }, AS2 = assigns().filter(x => a && x.a.id === a.id && x.live && x.bid !== id), ex = [];
+    if (a) { const pk = peak([...AS2, fake], start, end), lim = dpwLim(a); if (pk > lim) ex.push(`${pk} days a week at the busiest (limit ${lim})`);
+      const w = awayIn(a, start, end); if (w) ex.push(`Unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + w.reason + ')' : ''}`);
+      docsBefore(a, fake).slice(0, 2).forEach(d => ex.push(`${d.doc_type} ${d.expiry_date < today() ? 'expired' : 'expires'} ${fmt(d.expiry_date)}`));
+      const oth = role === 'Moderator' ? 'Assessor' : role === 'Assessor' ? 'Moderator' : null; if (oth && pid && AS2.some(y => y.pid === Number(pid) && y.role === oth)) ex.push(`Also the ${oth.toLowerCase()} on this programme`); }
+    const need = [...(r.eligibility === 'bad' ? why : []), ...(dup ? [`Already booked as ${role.toLowerCase()} on this programme`] : []), ...ex].join('; ');
     set(`<span class="badge ${lvl[0]}">${lvl[1]}</span> ${e(why.join(' · '))}${dup ? ' <span class="badge b-bad">Already booked on this programme</span>' : ''}
-      <div style="margin-top:6px">${cl.length ? `<span class="badge b-warn">${cl.length} other booking${cl.length === 1 ? '' : 's'} in these dates</span> ${e(cl.map(c => `${c.role || ''} · ${c.title || ''} (${fmt(c.start)} – ${fmt(c.end)})`).join('; '))}` : '<span class="badge b-ok">Free</span> No other bookings in these dates.'}</div>`, need);
+      <div style="margin-top:6px">${cl.length ? `<span class="badge b-warn">${cl.length} other booking${cl.length === 1 ? '' : 's'} in these dates</span> ${e(cl.map(c => `${c.role || ''} · ${c.title || ''} (${fmt(c.start)} – ${fmt(c.end)})`).join('; '))}` : '<span class="badge b-ok">Free</span> No other bookings in these dates.'}</div>${ex.length ? `<div style="margin-top:6px"><span class="badge b-warn">Check</span> ${e(ex.join(' · '))}</div>` : ''}`, need);
   }
   window.famBookDel = async id => { if (!confirm('Delete this booking? It cannot be undone. To keep a record, set the status to Cancelled instead.')) return;
     try { const r = await write('Delete', () => sb.from('fam_bookings').delete().eq('id', id).select('id')); if (!r?.length) return say('Only a FAM admin can delete bookings.');
       close(); say('Booking deleted'); await load(); } catch (_) {} };
   window.famCap = id => { const f = fx(S.A.find(x => x.id === id));
-    modal('Workload', `<div class="qagrid">${fld('max_cohorts', 'Most cohorts at the same time', 'number', `min="1" max="50" value="${e(f.max_cohorts)}"`)}</div><p class="sub" style="margin:0">Leave empty for no limit. Suitable people shows anyone at this number as Full, and Today flags anyone over it.</p>`,
-      async F => { need(); await setFx(id, { max_cohorts: val(F, 'max_cohorts') }); say('Workload saved'); }); };
+    modal('Workload', `<div class="qagrid">${fld('max_cohorts', 'Most cohorts at the same time', 'number', `min="1" max="50" value="${e(f.max_cohorts)}"`)}${fld('max_dpw', 'Most days a week (default 5)', 'number', `min="0.5" max="7" step="0.5" value="${e(f.max_dpw)}"`)}</div><p class="sub" style="margin:0">Leave empty for no limit. Suitable people shows anyone at this number as Full, and Today flags anyone over it.</p>`,
+      async F => { need(); await setFx(id, { max_cohorts: val(F, 'max_cohorts'), max_dpw: val(F, 'max_dpw') }); say('Workload saved'); }); };
   window.famMem = id => modal('Professional membership', `<div class="qagrid">${fld('body', 'Professional body *', 'text', 'required placeholder="e.g. SAIPA, ECSA, SACAP"')}${fld('no', 'Membership number', 'text', '')}${fld('expiry', 'Expiry date', 'date', '')}</div><p class="sub" style="margin:0">Upload the certificate on the Documents tab. Today shows memberships expiring in 30 days.</p>`,
     async F => { need(); const a = S.A.find(x => x.id === id); await setFx(id, { members: [...(fx(a).members || []), { body: val(F, 'body'), no: val(F, 'no'), expiry: val(F, 'expiry') }] }); say('Membership added'); });
   window.famMemDel = async (id, i) => { const a = S.A.find(x => x.id === id); if (!a || !confirm('Remove this membership?')) return; try { await setFx(id, { members: (fx(a).members || []).filter((_, k) => k !== i) }); await load(); } catch (_) {} };
@@ -1296,14 +1307,78 @@
       say(ok ? 'Renewal approved and registration updated' : 'Renewal rejected'); await load();
     } catch (_) {}
   };
-  window.famCal = (k, v) => { S.cal = S.cal || {}; if (k === 'move') S.cal.from = addD(S.cal.from || monday(today()), v * 7); else if (k === 'today') S.cal.from = monday(today()); else S.cal[k] = v; renderCal(); };
+  const DPW_DEF = 5, dpwLim = a => +fx(a).max_dpw > 0 ? +fx(a).max_dpw : DPW_DEF;
+  const ovl = (s1, e1, s2, e2) => (!s1 || !e2 || s1 <= e2) && (!e1 || !s2 || e1 >= s2);
+  const peak = (M, f, t2) => { let m = 0; for (let w = monday(f || today()), i = 0; w <= (t2 || addD(today(), 182)) && i < 60; w = addD(w, 7), i++) { const we = addD(w, 6); m = Math.max(m, M.filter(x => ovl(x.start, x.end, w, we)).reduce((s2, x) => s2 + (+(x.bk && x.bk.days_per_week) || 0), 0)); } return m; };
+  const docsBefore = (a, x) => S.D.filter(d => d.assessor_id === a.id && d.is_current !== false && d.expiry_date && d.expiry_date < (x.end || addD(today(), 365))).sort((p, q) => p.expiry_date.localeCompare(q.expiry_date));
+  const renPend = a => (S.RN || []).some(y => y.assessor_id === a.id && (y.status === 'Uploaded' || (y.status === 'Sent' && !(y.expires_at < new Date().toISOString()))));
+  const overLoad = (a, AS) => { const M = AS.filter(x => x.a.id === a.id && x.live); return M.length && peak(M, today(), addD(today(), 182)) > dpwLim(a); };
+  const unbooked = AS => progsNow().filter(p => p.pid && p.start && p.start <= addD(today(), 30) && (!p.end || p.end >= today()) && !AS.some(x => x.live && x.pid === p.pid));
+  const calF = (f, a, AS) => !f || (f === 'now' ? AS.some(x => x.a.id === a.id && x.now) : f === 'risk' ? AS.some(x => x.a.id === a.id && x.live && x.el[0] !== 'ok') : f === 'load' ? !!overLoad(a, AS) : f === 'free' ? !AS.some(x => x.a.id === a.id && x.live) && suitable(a).length > 0 : true);
+  function calNeeds(AS) {
+    const V = new Set(vis().map(a => a.id)), t = today(), out = [], byA = {}, nm2 = a => `<a href="#fam/${a.id}">${e(shownName(a))}</a>`, fix = (bid, l) => `<button class="btn sm" onclick="famCal('sel',${bid})">${l || 'Fix'}</button>`;
+    AS.filter(x => x.live && V.has(x.a.id)).forEach(x => (byA[x.a.id] = byA[x.a.id] || []).push(x));
+    Object.values(byA).forEach(M => { const a = M[0].a, rk = M.filter(x => x.el[0] !== 'ok');
+      if (rk.length) { const w = rk.find(x => x.el[0] === 'bad') || rk[0], rp = renPend(a);
+        out.push({ lvl: w.el[0] === 'bad' && !rp ? 'bad' : 'warn', html: `${nm2(a)}: ${e(w.el[1])} · ${rk.length > 1 ? rk.length + ' bookings' : e(w.title)}${rp ? ' <span class="badge b-warn">Renewal in progress</span>' : ''}`, btn: fix(w.bid) }); }
+      const dx = M.map(x => [x, docsBefore(a, x)]).find(([, d]) => d.length);
+      if (dx) { const [x, d] = dx; out.push({ lvl: d[0].expiry_date < t ? 'bad' : 'warn', html: `${nm2(a)}: ${e(d[0].doc_type)} ${d[0].expiry_date < t ? 'expired' : 'expires'} ${fmt(d[0].expiry_date)}, before ${e(x.title)} ends`, btn: fix(x.bid) }); }
+      const pk = peak(M, t, addD(t, 182)), lim = dpwLim(a);
+      if (pk > lim) out.push({ lvl: 'warn', html: `${nm2(a)}: ${pk} days a week at the busiest, over the ${lim}-day limit`, btn: `<button class="btn sm" onclick="famCal('who',${a.id})">Review</button>` });
+      M.forEach(x => { const w = awayIn(a, x.start, x.end); if (w) out.push({ lvl: 'warn', html: `${nm2(a)}: unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + e(w.reason) + ')' : ''} during ${e(x.title)}`, btn: fix(x.bid) }); });
+      M.filter(x => x.role === 'Moderator' && x.pid && M.some(y => y.role === 'Assessor' && y.pid === x.pid)).forEach(x => out.push({ lvl: 'bad', html: `${nm2(a)}: assessor and moderator on ${e(x.title)}`, btn: fix(x.bid) })); });
+    const ub = unbooked(AS), C = S.cal || {};
+    if (ub.length) out.push({ lvl: 'warn', html: `${ub.length} programme${ub.length === 1 ? '' : 's'} running or starting within 30 days with no one booked`, btn: `<button class="btn sm" onclick="famCal('unb',${!C.unb})">${C.unb ? 'Hide' : 'View'}</button>`,
+      more: C.unb ? ub.slice(0, 40).map(p => `<div class="fcnd" style="padding-left:22px"><span style="flex-grow:1">${e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span></span>${canWrite() ? `<button class="btn sm" onclick="famBook(null,null,${p.pid})">Book</button>` : ''}</div>`).join('') + (ub.length > 40 ? `<div class="sub" style="padding-left:22px">and ${ub.length - 40} more</div>` : '') : '' });
+    return out.sort((p, q) => (p.lvl === 'bad' ? 0 : 1) - (q.lvl === 'bad' ? 0 : 1));
+  }
+  const swapCands = (x, AS) => vis().filter(b => b.id !== x.a.id).map(b => { const el = eligOf(b, x.role, null, x.end); if (el[0] !== 'ok') return null;
+    const M = AS.filter(y => y.a.id === b.id && y.live && y.bid !== x.bid); if (x.pid && M.some(y => y.pid === x.pid && ((x.role === 'Moderator' && y.role === 'Assessor') || (x.role === 'Assessor' && y.role === 'Moderator')))) return null;
+    return { b, el, after: peak([...M, x], x.start && x.start > today() ? x.start : today(), x.end || addD(today(), 182)), lim: dpwLim(b), away: awayIn(b, x.start, x.end) }; }).filter(Boolean).sort((p, q) => (p.away ? 1 : 0) - (q.away ? 1 : 0) || (p.after > p.lim) - (q.after > q.lim) || p.after - q.after).slice(0, 6);
+  function calPanel(C, AS) {
+    const t = today(), hd = (h, sub) => `<div style="display:flex;gap:8px;align-items:flex-start"><div style="flex-grow:1"><b style="font-size:16px">${h}</b>${sub ? `<div class="sub">${sub}</div>` : ''}</div><button class="btn sm" onclick="famCal('close')" aria-label="Close">✕</button></div>`;
+    const msg = (lvl, txt) => `<div class="fcmsg ${lvl}">${lvl === 'ok' ? '✓' : '⚠'} ${e(txt)}</div>`;
+    if (C.who) { const a = S.A.find(y => y.id === +C.who); if (!a) return '';
+      const M = AS.filter(y => y.a.id === a.id && y.live), pk = peak(M, t, addD(t, 182)), lim = dpwLim(a), nod = M.filter(x => !(+(x.bk && x.bk.days_per_week))).length;
+      const regs = regsFor(a.id).filter(active).map(r => `<div>${e(r.seta_name || 'Registration')} · ${e((r.roles?.length ? r.roles : [r.role]).filter(Boolean).join(', '))} · <span style="color:${r.registration_expiry_date && r.registration_expiry_date < t ? 'var(--bad)' : 'inherit'}">${r.registration_expiry_date ? (r.registration_expiry_date < t ? 'expired ' : 'until ') + fmt(r.registration_expiry_date) : 'no expiry date'}</span></div>`).join('') || '<div class="sub">No active registrations.</div>';
+      const aw = (fx(a).away || []).filter(w => w.to >= t).map(w => `<div>${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' · ' + e(w.reason) : ''}</div>`).join('');
+      return hd(e(shownName(a)), `${M.length} current or upcoming booking${M.length === 1 ? '' : 's'}`) + `<div class="fcp2"><div><div class="sub">Registrations</div>${regs}</div><div><div class="sub">Busiest week (next 6 months)</div><b>${pk} of ${lim} days</b>
+        <div class="fcmeter"><i style="width:${Math.min(100, pk / lim * 100)}%;background:${pk > lim ? 'var(--bad)' : 'var(--ok)'}"></i></div>${pk > lim ? msg('warn', 'Over the limit. Click one of their bars and swap it to someone with space.') : ''}${nod ? `<div class="sub">${nod} booking${nod === 1 ? ' has' : 's have'} no days per week, so ${nod === 1 ? 'it is' : 'they are'} not counted.</div>` : ''}
+        ${aw ? `<div class="sub" style="margin-top:6px">Unavailable</div>${aw}` : ''}</div></div><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"><button class="btn sm" onclick="location.hash='fam/${a.id}'">Open profile</button>${canWrite() ? `<button class="btn sm" onclick="famCap(${a.id})">Set workload limit</button>` : ''}</div>`; }
+    const x = AS.find(y => y.bid === +C.sel); if (!x) return '';
+    const a = x.a, M = AS.filter(y => y.a.id === a.id && y.live), pr = [];
+    if (x.el[0] !== 'ok') pr.push([x.el[0], x.el[1]]);
+    docsBefore(a, x).slice(0, 3).forEach(d => pr.push([d.expiry_date < t ? 'bad' : 'warn', `${d.doc_type} ${d.expiry_date < t ? 'expired' : 'expires'} ${fmt(d.expiry_date)}${d.expiry_date < t ? '' : ', before this booking ends'}`]));
+    const w = awayIn(a, x.start, x.end); if (w) pr.push(['warn', `Unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + w.reason + ')' : ''}`]);
+    const other = x.role === 'Assessor' ? 'Moderator' : x.role === 'Moderator' ? 'Assessor' : null;
+    if (other && x.pid && M.some(y => y.pid === x.pid && y.role === other)) pr.push(['bad', `Also the ${other.toLowerCase()} on this programme. A moderator should not moderate their own assessments.`]);
+    const pk = peak(M, x.start && x.start > t ? x.start : t, x.end || addD(t, 182)), lim = dpwLim(a); if (pk > lim) pr.push(['warn', `${pk} days a week at the busiest during this booking (limit ${lim})`]);
+    const r0 = regsFor(a.id).filter(r => regCovers(r, x.role, null)).sort((p, q) => String(q.registration_expiry_date || '').localeCompare(String(p.registration_expiry_date || '')))[0];
+    const rn = r0 && (S.RN || []).filter(y => y.registration_id === r0.id).sort((p, q) => String(q.created_at).localeCompare(String(p.created_at)))[0];
+    const regIss = x.el[0] !== 'ok', docIss = pr.some(z => /expire/.test(z[1]));
+    const acts = canWrite() ? [regIss && r0 ? (rn && (rn.status === 'Uploaded' || (rn.status === 'Sent' && !(rn.expires_at < new Date().toISOString()))) ? `<span class="badge b-warn">${rn.status === 'Sent' ? 'Renewal link sent ' + fmt(rn.created_at) : 'New certificate uploaded, review it on the Renewals tab'}</span>` : `<button class="btn sm" onclick="famRenew(${r0.id})">Send renewal link</button>`) : '',
+      regIss || docIss ? `<button class="btn sm" onclick="location.hash='fam/${a.id}'">Upload new certificate</button>` : '', `<button class="btn sm" onclick="famBook(${x.bid})">Edit booking</button>`, `<button class="btn sm" onclick="famCal('who',${a.id})">${e(shownName(a))}'s workload</button>`].filter(Boolean).join(' ') : '';
+    const cand = pr.length && canWrite() ? swapCands(x, AS) : [];
+    return hd(e(x.title), `${e(shownName(a))} · ${e(x.role)} · ${fmt(x.start)} – ${fmt(x.end)}${x.bk && x.bk.days_per_week ? ' · ' + x.bk.days_per_week + ' d/wk' : ''} · ${e(x.bk ? x.bk.status || 'Planned' : '')}`)
+      + (pr.length ? pr.map(([l, z]) => msg(l === 'bad' ? 'bad' : 'warn', z)).join('') : msg('ok', x.el[1] + '. No problems.'))
+      + `<div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">${acts}</div>`
+      + (pr.length && canWrite() ? `<div class="sub" style="margin-top:6px">Or swap in someone registered as ${e(x.role.toLowerCase())} until the end date (least busy first):</div>${cand.length ? cand.map(c => `<div class="fcnd"><span style="flex-grow:1"><a href="#fam/${c.b.id}">${e(shownName(c.b))}</a> <span class="sub">· ${e(c.el[1])} · would be ${c.after} d/wk${c.after > c.lim ? '' : ''}</span>${c.after > c.lim ? ' <span class="badge b-warn">Over limit</span>' : ''}${c.away ? ' <span class="badge b-warn">Unavailable part of it</span>' : ''}</span><button class="btn sm" onclick="famCalSwap(${x.bid},${c.b.id})">Swap in</button></div>`).join('') : '<div class="sub">No one else is eligible. Renew the registration instead.</div>'}` : '');
+  }
+  window.famCalSwap = async (bid, aid) => { const b = (S.BK || []).find(y => y.id === bid), a0 = b && S.A.find(y => y.id === b.assessor_id), a1 = S.A.find(y => y.id === aid); if (!b || !a1) return;
+    if (!confirm(`Swap ${shownName(a1)} in for ${shownName(a0 || {})} on “${b.title || 'this booking'}”?`)) return;
+    const notes = ((b.notes ? b.notes + ' | ' : '') + `Swapped from ${shownName(a0 || {})} to ${shownName(a1)} (${me() || 'unknown'}, ${fmt(today())})`).slice(0, 600);
+    try { const r = await write('Booking', () => sb.from('fam_bookings').update({ assessor_id: aid, notes, updated_by: me() }).eq('id', bid).select('id'));
+      if (!r?.length) return say('Could not swap. Only the person who made the booking or a FAM admin can change it.'); S.cal.sel = ''; say('Swapped'); await load(); } catch (_) {} };
+  window.famCal = (k, v) => { S.cal = S.cal || {}; const C = S.cal; if (k === 'move') C.from = addD(C.from || monday(today()), v * 7); else if (k === 'today') C.from = monday(today());
+    else if (k === 'open') { C.open = C.open || {}; const key = decodeURIComponent(v); C.open[key] = !C.open[key]; } else if (k === 'regroup') C.open = {}; else if (k === 'close') C.sel = C.who = ''; else if (k === 'sel') { C.sel = v; C.who = ''; } else if (k === 'who') { C.who = v; C.sel = ''; } else if (k === 'f') C.f = C.f === v ? '' : v; else C[k] = v;
+    renderCal(); if ((k === 'sel' || k === 'who') && v) setTimeout(() => $('fcpanel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0); };
   function renderCal() {
     const box = $('famprof'), C = S.cal = S.cal || {}, from = C.from || (C.from = monday(today())), WK = 13, to = addD(from, WK * 7), span = WK * 7;
     $('heading').textContent = 'FAM Calendar'; $('crumb').textContent = 'Quality / FAM Registry';
     const AS = assigns(), q = (C.q || '').toLowerCase(), qual = (S.Q || []).find(x => String(x.id) === String(C.qual));
     const setas = [...new Set(S.R.flatMap(r => (r.seta_name || '').split(/\s*,\s*/)).filter(x => x && !/^n\/?a$/i.test(x)))].sort();
     const fits = a => (!q || nm(a.full_name).includes(nm(q))) && (!C.role && !C.seta || regsFor(a.id).some(r => active(r) && (!C.role || regCovers(r, C.role, null)) && (!C.seta || (r.seta_name || '').split(/\s*,\s*/).includes(C.seta))));
-    const people = vis().filter(fits), mine = a => AS.filter(x => x.a.id === a.id && x.live);
+    const mine = a => AS.filter(x => x.a.id === a.id && x.live), NE = calNeeds(AS), people = vis().filter(fits).filter(a => calF(C.f, a, AS));
     people.sort((a, b) => (mine(b).length > 0) - (mine(a).length > 0) || shownName(a).localeCompare(shownName(b)));
     const pct = d => Math.max(0, Math.min(100, (new Date(d + 'T00:00:00') - new Date(from + 'T00:00:00')) / 864e5 / span * 100));
     const wk = [...Array(WK)].map((_, i) => addD(from, i * 7)), tpos = today() >= from && today() < to ? pct(today()) : null;
@@ -1313,12 +1388,19 @@
     const free = vis().filter(a => !busy.has(a.id) && suitable(a).length);
     const exp30 = S.R.filter(r => active(r) && r.registration_expiry_date && r.registration_expiry_date >= today() && r.registration_expiry_date <= addD(today(), 30) && vis().some(a => a.id === r.assessor_id));
     const bar = (x, li) => { const s = x.start && x.start > from ? x.start : from, en = x.end && x.end < to ? x.end : to; if ((x.end && x.end < from) || (x.start && x.start >= to)) return '';
-      const l = pct(s), w = Math.max(1.2, pct(en) - l), bad = x.el[0] !== 'ok';
-      return `<button class="fcbar ${RCH[x.role] || ''}${bad ? ' fcrisk' : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${x.role} · ${x.title}${x.seta ? ' · ' + x.seta : ''}\n${fmt(x.start)} – ${fmt(x.end)}\n${x.el[1]}\nSource: ${x.src}\nClick to open the booking`)}" onclick="${x.bid ? `famBook(${x.bid})` : `location.hash='fam/${x.a.id}'`}">${bad ? '⚠ ' : ''}${e(x.title)}</button>`; };
+      const l = pct(s), w = Math.max(1.2, pct(en) - l), bad = x.el[0] !== 'ok', rp = bad && renPend(x.a), sel = C.sel && +C.sel === x.bid;
+      return `<button class="fcbar ${RCH[x.role] || ''}${bad ? (rp ? ' fcren' : ' fcrisk') : ''}${sel ? ' fcsel' : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${x.role} · ${x.title}${x.seta ? ' · ' + x.seta : ''}\n${fmt(x.start)} – ${fmt(x.end)}\n${x.el[1]}\nSource: ${x.src}\nClick for details and fixes`)}" onclick="${x.bid ? `famCal('sel',${x.bid})` : `location.hash='fam/${x.a.id}'`}">${bad && !rp ? '⚠ ' : ''}${e(x.title)}</button>`; };
+    const gbar = (L, key, li) => { const st = L.map(x => x.start || from).sort()[0], en0 = L.map(x => x.end || to).sort().pop(), s = st > from ? st : from, en = en0 < to ? en0 : to; if (en0 < from || st >= to) return '';
+      const l = pct(s), w = Math.max(1.2, pct(en) - l), bad = L.some(x => x.el[0] !== 'ok'), rp = bad && renPend(L[0].a);
+      return `<button class="fcbar ${RCH[L[0].role] || ''}${bad ? (rp ? ' fcren' : ' fcrisk') : ''}" style="left:${l}%;width:${w}%;top:${6 + li * 28}px" title="${e(`${L.length} cohorts · ${L[0].role}\nClick to show each one`)}" onclick="famCal('open','${encodeURIComponent(key).replace(/'/g, '%27')}')">${bad && !rp ? '⚠ ' : ''}${e(L[0].title.replace(/ · .*$/, ''))} <b>×${L.length} ▾</b></button>`; };
+    const awayB = a => (fx(a).away || []).filter(v => v.from && v.to && v.to >= from && v.from < to).map(v => { const l = pct(v.from > from ? v.from : from), w = Math.max(0.8, pct(addD(v.to, 1) < to ? addD(v.to, 1) : to) - l); return `<span class="fcaway" style="left:${l}%;width:${w}%" title="${e(`Unavailable ${fmt(v.from)} – ${fmt(v.to)}${v.reason ? ' · ' + v.reason : ''}`)}"></span>`; }).join('');
     const marks = a => regsFor(a.id).filter(r => r.registration_expiry_date && r.registration_expiry_date >= from && r.registration_expiry_date < to).map(r => `<span class="fcexp${r.registration_expiry_date < today() ? ' past' : ''}" style="left:${pct(r.registration_expiry_date)}%" title="${e(`${r.seta_name || 'Registration'} expires ${fmt(r.registration_expiry_date)}`)}">◆</span>`).join('')
       + S.D.filter(d => d.assessor_id === a.id && d.is_current !== false && d.expiry_date && d.expiry_date >= from && d.expiry_date < to).map(d => `<span class="fcexp doc" style="left:${pct(d.expiry_date)}%" title="${e(`${d.doc_type} expires ${fmt(d.expiry_date)}`)}">◇</span>`).join('');
-    const grid = people.map(a => { const m = mine(a); return `<div class="fcrow"><button class="fcname" onclick="location.hash='fam/${a.id}'" title="Open profile">${e(shownName(a))}<span class="sub">${m.filter(x => x.now).length ? m.filter(x => x.now).length + ' now' : busy.has(a.id) ? 'upcoming' : 'free'}</span></button>
-      <div class="fctrack" style="min-height:${Math.max(1, m.length) * 28 + 12}px">${tpos != null ? `<span class="fctoday" style="left:${tpos}%"></span>` : ''}${m.map((x, li) => bar(x, li)).join('')}${marks(a)}</div></div>`; }).join('') || '<div class="sub" style="padding:14px">No practitioners match these filters.</div>';
+    const grid = people.map(a => { const m = mine(a), G = {}, rows = [], pk = peak(m, today(), addD(today(), 182)), lim = dpwLim(a), nowN = m.filter(x => x.now).length;
+      m.forEach(x => { const k = a.id + '|' + x.role + '|' + x.title.replace(/ · .*$/, '').toLowerCase(); (G[k] = G[k] || []).push(x); });
+      Object.entries(G).forEach(([k, L]) => { if (L.length > 1 && !(C.open || {})[k]) rows.push({ L, k }); else L.forEach(x => rows.push({ x })); });
+      return `<div class="fcrow"><button class="fcname" onclick="famCal('who',${a.id})" title="Workload and registrations">${e(shownName(a))}<span class="sub">${nowN ? nowN + ' now' : busy.has(a.id) ? 'upcoming' : 'free'}${pk ? ` · <span style="color:${pk > lim ? 'var(--bad)' : 'inherit'};font-weight:${pk > lim ? 600 : 400}">${pk} d/wk</span>` : ''}</span></button>
+      <div class="fctrack" style="min-height:${Math.max(1, rows.length) * 28 + 12}px">${tpos != null ? `<span class="fctoday" style="left:${tpos}%"></span>` : ''}${awayB(a)}${rows.map((r, li) => r.x ? bar(r.x, li) : gbar(r.L, r.k, li)).join('')}${marks(a)}</div></div>`; }).join('') || '<div class="sub" style="padding:14px">No practitioners match these filters.</div>';
     // who can cover
     let cover = '<div class="sub">Pick a qualification above to see who can cover it.</div>';
     if (qual) { const rows2 = vis().map(a => { const rs = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
@@ -1378,7 +1460,12 @@
       .fctrack{position:relative;background-image:repeating-linear-gradient(90deg,transparent 0,transparent calc(100%/${WK} - 1px),var(--line) calc(100%/${WK} - 1px),var(--line) calc(100%/${WK}))}
       .fcwks{display:grid;grid-template-columns:repeat(${WK},1fr)}.fcwks span{padding:8px 4px;text-align:center;border-left:1px solid var(--line);white-space:nowrap;overflow:hidden}
       .fcbar{position:absolute;height:24px;border:0;border-radius:6px;font:inherit;font-size:12px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left}
-      .fcrisk{outline:2px solid var(--bad);outline-offset:-2px}
+      .fcrisk{outline:2px solid var(--bad);outline-offset:-2px}.fcren{outline:2px solid var(--warn,#B26A00);outline-offset:-2px}.fcsel{box-shadow:0 0 0 3px #25247B}
+      .fcaway{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(128,128,128,.22) 0 6px,transparent 6px 12px);cursor:help}
+      .fcneed{padding:14px 18px;display:flex;flex-direction:column;gap:2px}.fcnd{display:flex;gap:8px;align-items:center;padding:6px 0;border-top:1px solid var(--line);font-size:14px}
+      .fckpis .kpi{cursor:pointer}.fckpis .kpi.on{outline:2px solid #25247B}.fcchips{display:flex;gap:6px;flex-wrap:wrap}.fcchips button{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:4px 12px;font:inherit;font-size:13px;cursor:pointer}.fcchips button.on{background:#25247B;color:#fff;border-color:#25247B}
+      #fcpanel{padding:14px 18px;border:2px solid #25247B}.fcmsg{padding:8px 10px;border-radius:8px;margin-top:8px;font-size:14px}.fcmsg.bad{background:rgba(200,40,40,.1);color:var(--bad)}.fcmsg.warn{background:rgba(224,161,0,.14);color:var(--warn,#8a5a00)}.fcmsg.ok{background:rgba(30,150,80,.1);color:var(--ok)}
+      .fcp2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:10px;font-size:14px}.fcmeter{height:8px;background:var(--line);border-radius:4px;margin:6px 0;overflow:hidden}.fcmeter i{display:block;height:8px}
       .fcexp{position:absolute;top:50%;transform:translate(-50%,-50%);color:var(--bad);font-size:14px;pointer-events:auto;cursor:help}.fcexp.doc{color:var(--warn,#B26A00)}.fcexp.past{opacity:.5}
       .fctoday{position:absolute;top:0;bottom:0;width:2px;background:#FBDC00;z-index:1}
       .fccols{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px}.fccard{padding:16px 18px;display:flex;flex-direction:column;gap:8px}.fccard h3{font-size:16px;margin:0}
@@ -1392,12 +1479,15 @@
       <input type="search" placeholder="Search name" value="${e(C.q || '')}" oninput="famCal('q',this.value)" aria-label="Search practitioner">
       <select aria-label="Role" onchange="famCal('role',this.value)">${opt('', 'All roles', C.role)}${ROLE3.map(r => opt(r, r, C.role)).join('')}</select>
       <select aria-label="SETA" onchange="famCal('seta',this.value)">${opt('', 'All SETAs', C.seta)}${setas.map(x => opt(x, x, C.seta)).join('')}</select>${canWrite() ? '<button class="btn y" onclick="famBook()">+ Book</button>' : ''}</div>
-    <div class="fckpis">${[['On a programme now', new Set(nowA.map(x => x.a.id)).size, ''], ['Free and registered', free.length, 'var(--ok)'], ['At-risk allocations', risk.length, risk.length ? 'var(--bad)' : ''], ['Expiring in 30 days', exp30.length, exp30.length ? 'var(--warn)' : '']].map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v"${c ? ` style="color:${c}"` : ''}>${v}</span></div>`).join('')}</div>
-    <div class="fclegend"><span><i class="famc-f"></i>Facilitator</span><span><i class="famc-a"></i>Assessor</span><span><i class="famc-m"></i>Moderator</span><span><i style="outline:2px solid var(--bad);outline-offset:-2px"></i>Eligibility problem</span><span style="color:var(--bad)">◆ registration expires</span><span>◇ document expires</span><span><i style="background:#FBDC00;width:3px"></i>Today</span></div>
-    <div class="fcgrid"><div class="fcrow h"><span style="padding:8px 12px;border-right:1px solid var(--line)">${people.length} practitioner${people.length === 1 ? '' : 's'}</span><div class="fcwks">${wk.map(w => `<span>${fmt(w).slice(0, 5)}</span>`).join('')}</div></div>${grid}</div>
+    <section class="card fcneed"><h3 style="margin:0 0 4px;font-size:16px">Needs you ${NE.length ? `<span class="badge b-bad">${NE.length}</span>` : ''}</h3>${NE.length ? (C.allN ? NE : NE.slice(0, 6)).map(n => `<div class="fcnd"><span style="color:var(--${n.lvl === 'bad' ? 'bad' : 'warn'})">⚠</span><span style="flex-grow:1">${n.html}</span>${n.btn}</div>${n.more || ''}`).join('') + (NE.length > 6 ? `<div style="padding-top:6px"><button class="btn sm" onclick="famCal('allN',${!C.allN})">${C.allN ? 'Show fewer' : 'Show all ' + NE.length}</button></div>` : '') : '<div class="fcnd" style="color:var(--ok)">✓ Nothing needs you. Every booking is covered.</div>'}</section>
+    <div class="fckpis">${[['now', 'On a programme now', new Set(nowA.map(x => x.a.id)).size, ''], ['free', 'Free and registered', free.length, 'var(--ok)'], ['risk', 'At-risk allocations', risk.length, risk.length ? 'var(--bad)' : ''], ['load', 'Over workload', vis().filter(a => overLoad(a, AS)).length, 'var(--warn)'], ['exp', 'Expiring in 30 days', exp30.length, exp30.length ? 'var(--warn)' : '']].map(([k, l, v, c]) => `<div class="kpi${C.f === k ? ' on' : ''}" role="button" tabindex="0" onclick="${k === 'exp' ? "famCal('tab','renew')" : `famCal('f','${k}')`}" title="${k === 'exp' ? 'Open the Renewals tab' : 'Show only these practitioners'}"><span class="l">${l}</span><span class="v"${c && v ? ` style="color:${c}"` : ''}>${v}</span></div>`).join('')}</div>
+    <div class="fcchips">${[['', 'Everyone'], ['risk', 'At risk'], ['load', 'Over workload'], ['free', 'Free']].map(([k, l]) => `<button type="button" class="${(C.f || '') === k ? 'on' : ''}" onclick="famCal('f','${k}')">${l}</button>`).join('')}${Object.values(C.open || {}).some(Boolean) ? `<button type="button" onclick="famCal('regroup')">Group cohorts again</button>` : ''}</div>
+    <div class="fclegend"><span><i class="famc-f"></i>Facilitator</span><span><i class="famc-a"></i>Assessor</span><span><i class="famc-m"></i>Moderator</span><span><i style="outline:2px solid var(--bad);outline-offset:-2px"></i>Problem</span><span><i style="outline:2px solid var(--warn,#B26A00);outline-offset:-2px"></i>Renewal in progress</span><span><i style="background:repeating-linear-gradient(45deg,rgba(128,128,128,.35) 0 3px,transparent 3px 6px)"></i>Unavailable</span><span>×4 = cohorts grouped, click to show</span><span style="color:var(--bad)">◆ registration expires</span><span>◇ document expires</span><span><i style="background:#FBDC00;width:3px"></i>Today</span></div>
+    <div class="fcgrid"><div class="fcrow h"><span style="padding:8px 12px;border-right:1px solid var(--line)">${people.length} practitioner${people.length === 1 ? '' : 's'}</span><div class="fcwks">${wk.map(w => `<span>${fmt(w).replace(/ \d{4}$/, '')}</span>`).join('')}</div></div>${grid}</div>
+    ${C.sel || C.who ? `<section class="card" id="fcpanel">${calPanel(C, AS)}</section>` : ''}
     <div class="tabs" role="tablist" style="margin-top:4px">${TABS.map(([k, l, n]) => `<button role="tab" type="button" aria-selected="${k === tab}" class="${k === tab ? 'on' : ''}" onclick="famCal('tab','${k}')">${l}${n != null ? ` <span class="badge${k === 'risk' && n ? ' b-bad' : ''}" style="margin-left:4px">${n}</span>` : ''}</button>`).join('')}</div>
     <section class="card" style="padding:0;overflow:hidden">${TABS.find(x => x[0] === tab)[3]}</section>
-    <div class="sub">Bookings come from the FAM Registry (fam_bookings), the only source of who is booked on what. Click a bar to edit it; overlaps are shown, not blocked.</div>`;
+    <div class="sub">Bookings come from the FAM Registry (fam_bookings), the only source of who is booked on what. Click a bar for details and fixes, or a name for workload. Workload counts days per week on each booking.</div>`;
     loadCalAudit();
   }
   async function loadCalAudit() {
