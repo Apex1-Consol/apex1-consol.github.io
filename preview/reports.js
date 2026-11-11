@@ -31,16 +31,17 @@ function queue() {
       <tr id="rph-${r.id}" hidden><td colspan="5"></td></tr>`; }).join('')}</tbody></table></div>`;
 }
 /* Saved drafts from the Report Generator (reports.drafts; each PM sees only their own, admins all) */
-let DR = null, DRALL = false;
+let DR = null, DRALL = false, DROPEN = false;
 async function loadDr() { const r = await R.from('drafts').select('id,programme_id,client_name,programme_name,month,pm_email,saved_at,updated_at').order('updated_at', { ascending: false }); DR = r.error ? { err: r.error.message } : r.data || []; }
 function drafts() {
   if (DR === null) return '';
   if (DR.err) return `<section class="card"><b>Saved drafts</b><div class="famas">Could not load: ${esc(DR.err)}</div></section>`;
   const rows = DRALL ? DR : DR.slice(0, 10);
   return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
-    <h2 style="flex-grow:1;font-size:18px">Saved drafts <span class="famas">(${DR.length})</span></h2>${DR.length > 10 ? `<button class="btn sm" onclick="rpDrAll()">${DRALL ? 'Show latest 10' : 'Show all ' + DR.length}</button>` : ''}<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Open in Report Generator ↗</a></div>
-    ${DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => `<tr><td><b>${esc(d.client_name || '')}</b></td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(d.pm_email || '')}</td><td>${esc(when(d.saved_at || d.updated_at))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
+    <h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpDrOpen()">${DROPEN ? '▾' : '▸'} Saved drafts <span style="font-weight:400;color:var(--muted)">(${DR.length})</span></h2>${!DROPEN ? '' : DR.length > 10 ? `<button class="btn sm" onclick="rpDrAll()">${DRALL ? 'Show latest 10' : 'Show all ' + DR.length}</button>` : ''}<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Open in Report Generator ↗</a></div>
+    ${!DROPEN ? '' : DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => `<tr><td><b>${esc(d.client_name || '')}</b></td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(pmName(d.pm_email))}</td><td>${esc(when(d.saved_at || d.updated_at))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
 }
+window.rpDrOpen = () => { DROPEN = !DROPEN; render(); };
 window.rpDrAll = () => { DRALL = !DRALL; render(); };
 /* ---------- Monthly progress + deadline tracker (same rules as the Report Generator dashboard) ---------- */
 const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
@@ -86,6 +87,8 @@ async function loadTR() {
   });
   TR = { byM, cur: mName(cur) }; if (!TRM || !byM[TRM]) TRM = byM[TR.cur] ? TR.cur : Object.keys(byM).pop();
 }
+const acts = x => { if (!x.r) return []; const q = (Q || []).find(r => r.id === x.r.id); return ((q && q.next_actions) || []).filter(a => a !== 'archived' && a !== 'pending'); };
+window.rpNote = id => { const t = $('rpn-row-' + id); if (t) { t.hidden = !t.hidden; if (!t.hidden) $('rpn-' + id).focus(); } };
 const pmName = e => String(e || 'Unassigned').split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 function tracker() {
   if (TR === null) return '';
@@ -106,11 +109,14 @@ function tracker() {
     <div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 20px">${months.slice(-4).map(bar).join('')}</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 12px">${chips}${TRS ? '<button class="btn sm ghost" style="color:var(--ink)" onclick="rpTS(\'\')">Show all</button>' : ''}</div>
     <div class="tw"><table class="dense"><thead><tr><th>Client / programme</th><th>PM</th><th>Stage</th><th>Deadline</th><th></th></tr></thead><tbody>
-    ${rows.map(x => `<tr><td><b>${esc(x.client || '')}</b><div class="famas">${esc(x.prog || '')}</div></td><td>${esc(pmName(x.pm))}</td>
+    ${rows.map(x => `<tr><td><b>${esc(x.client || '')}</b><div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(x.prog || '')}${x.r ? ` · <a href="#" onclick="rpHist(${+x.r.id});return false" style="color:inherit">History</a>` : ''}</div></td><td>${esc(pmName(x.pm))}</td>
       <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${STC[x.stage]};margin-right:6px"></span>${STAGE[x.stage]}</td>
-      <td><span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>${x.r && x.r.remind_pm_at ? `<div class="famas">Reminded ${esc(fmtD(new Date(x.r.remind_pm_at)))}</div>` : ''}</td>
-      <td style="white-space:nowrap;text-align:right">${x.r ? `<a class="btn sm" href="/report-generator.html?report=${+x.r.id}" target="_blank" rel="noopener">Open ↗</a>` : `<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Generator ↗</a>`}
-        ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? ` <button class="btn sm y" onclick="rpRemind(${+x.r.id},this)">Remind PM</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="famas" style="padding:16px 20px">No reports for ${esc(TRM)}${TRS ? ' at this stage' : ''}.</td></tr>`}
+      <td><span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>${x.r && x.r.remind_pm_at ? `<div style="font-size:12.5px;color:var(--muted);margin-top:2px">Reminded ${esc(fmtD(new Date(x.r.remind_pm_at)))}</div>` : ''}</td>
+      <td style="text-align:right;line-height:2.4">${x.r ? `<a class="btn sm" href="/report-generator.html?report=${+x.r.id}" target="_blank" rel="noopener">Open ↗</a>` : `<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Generator ↗</a>`}
+        ${acts(x).map(a => a === 'needs_changes' ? ` <button class="btn sm" onclick="rpNote(${+x.r.id})">Request changes</button>` : ` <button class="btn sm y" onclick="rpAct(${+x.r.id},'${a}',this)">${esc(ACT[a] || a)}</button>`).join('')}
+        ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? ` <button class="btn sm" onclick="rpRemind(${+x.r.id},this)">Remind PM</button>` : ''}</td></tr>
+      ${x.r ? `<tr id="rpn-row-${+x.r.id}" hidden><td colspan="5"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><textarea id="rpn-${+x.r.id}" class="cellin" rows="2" placeholder="Note for the PM: what needs to change" style="flex:1 1 320px"></textarea><button class="btn sm y" onclick="rpAct(${+x.r.id},'needs_changes',this)">Send to PM</button><button class="btn sm" onclick="rpNote(${+x.r.id})">Cancel</button></div></td></tr>
+      <tr id="rph-${+x.r.id}" hidden><td colspan="5"></td></tr>` : ''}`).join('') || `<tr><td colspan="5" class="famas" style="padding:16px 20px">No reports for ${esc(TRM)}${TRS ? ' at this stage' : ''}.</td></tr>`}
     </tbody></table></div><p class="note" style="margin:12px 20px">Deadlines as in the Report Generator: to the reviewer by the 5th, to the client by the 7th of the next month (Friday if that falls on a weekend). "Not started" = reported on last month, nothing yet this month.</p></section>`;
 }
 window.rpTM = m => { TRM = m; TRS = ''; render(); };
@@ -128,7 +134,7 @@ window.rpAct = async (id, to, btn) => {
   btn.disabled = true;
   const r = await R.rpc('transition_report', { p_report_id: id, p_to_status: to, p_note: n || null });
   if (r.error) { btn.disabled = false; return say('Not saved: ' + r.error.message); }
-  say('Report ' + (ST[to] || [to])[0].toLowerCase()); await rpReload();
+  say('Report ' + (ST[to] || [to])[0].toLowerCase()); Q = null; await loadQ(); await rpTR();
 };
 window.rpHist = async id => {
   const tr = $('rph-' + id); if (!tr) return; tr.hidden = !tr.hidden; if (tr.hidden) return;
@@ -182,10 +188,6 @@ function render() {
   v.innerHTML = `<div style="display:flex;flex-direction:column;gap:20px">
     <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
     ${tracker()}
-    ${reviewer ? `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
-      <h2 style="flex-grow:1;font-size:18px">Monthly report reviews</h2>
-      <button class="btn sm ${QF === 'open' ? 'y' : ''}" onclick="rpQF('open')">Needs action</button><button class="btn sm ${QF === 'all' ? 'y' : ''}" onclick="rpQF('all')">All</button><button class="btn sm" onclick="rpReload()">Refresh</button></div>
-      ${queue()}</section>` : ''}
     ${drafts()}
     <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
       <h2 style="flex-grow:1;font-size:18px;align-self:center">Downloads</h2>
