@@ -30,6 +30,18 @@ function queue() {
         <div style="display:flex;gap:6px;flex-wrap:wrap">${acts.map(a => `<button class="btn sm ${a === 'needs_changes' ? '' : 'y'}" onclick="rpAct(${+r.id},'${esc(a)}',this)">${esc(ACT[a] || a)}</button>`).join('')}</div>` : '<span class="famas">No action for you</span>'}</td></tr>
       <tr id="rph-${r.id}" hidden><td colspan="5"></td></tr>`; }).join('')}</tbody></table></div>`;
 }
+/* Saved drafts from the Report Generator (reports.drafts; each PM sees only their own, admins all) */
+let DR = null, DRALL = false;
+async function loadDr() { const r = await R.from('drafts').select('id,client_name,programme_name,month,pm_email,saved_at,updated_at').order('updated_at', { ascending: false }); DR = r.error ? { err: r.error.message } : r.data || []; }
+function drafts() {
+  if (DR === null) return '';
+  if (DR.err) return `<section class="card"><b>Saved drafts</b><div class="famas">Could not load: ${esc(DR.err)}</div></section>`;
+  const rows = DRALL ? DR : DR.slice(0, 10);
+  return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
+    <h2 style="flex-grow:1;font-size:18px">Saved drafts <span class="famas">(${DR.length})</span></h2>${DR.length > 10 ? `<button class="btn sm" onclick="rpDrAll()">${DRALL ? 'Show latest 10' : 'Show all ' + DR.length}</button>` : ''}<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Open in Report Generator ↗</a></div>
+    ${DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => `<tr><td><b>${esc(d.client_name || '')}</b></td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(d.pm_email || '')}</td><td>${esc(when(d.saved_at || d.updated_at))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
+}
+window.rpDrAll = () => { DRALL = !DRALL; render(); };
 window.rpQF = f => { QF = f; render(); };
 window.rpReload = async () => { Q = null; render(); await loadQ(); render(); };
 window.rpAct = async (id, to, btn) => {
@@ -95,6 +107,7 @@ function render() {
       <h2 style="flex-grow:1;font-size:18px">Monthly report reviews</h2>
       <button class="btn sm ${QF === 'open' ? 'y' : ''}" onclick="rpQF('open')">Needs action</button><button class="btn sm ${QF === 'all' ? 'y' : ''}" onclick="rpQF('all')">All</button><button class="btn sm" onclick="rpReload()">Refresh</button></div>
       ${queue()}</section>` : ''}
+    ${drafts()}
     <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
       <h2 style="flex-grow:1;font-size:18px;align-self:center">Downloads</h2>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Client<select class="cellin" style="height:36px;max-width:260px" onchange="rpF('client',this.value)">${opt(clients, F.client, 'All clients')}</select></label>
@@ -106,7 +119,7 @@ function render() {
   </div>`;
 }
 ROUTES.reports = ['Reports', 'Outputs'];
-async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await loadQ(); render(); } }
+async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await Promise.all([loadQ(), loadDr()]); render(); } }
 addEventListener('hashchange', () => setTimeout(onRoute, 0));
 const w = setInterval(() => { if (P.user && D().progs) { clearInterval(w); onRoute(); } }, 400);
 })();
