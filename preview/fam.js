@@ -37,7 +37,8 @@
   const me = () => P.user?.email || null;
   const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '—';
   const e = s => esc(s ?? '');
-  const today = () => new Date().toISOString().slice(0, 10);
+  const ymdL = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0');
+  const today = () => ymdL(new Date());
   const CLOSED = ['Dismissed', 'Resolved', 'Done'];
 
   /* ---------- rules (same as fam-registry.html) ---------- */
@@ -1023,8 +1024,8 @@
 
   /* ---------- FAM Calendar (#fam/calendar): who is on what, suitability, cover, risks, renewals, data issues, changes ---------- */
   const d10 = v => { const x = v ? String(v).slice(0, 10) : ''; return /^\d{4}-\d\d-\d\d$/.test(x) ? x : null; };
-  const addD = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
-  const monday = d => { const x = new Date(d + 'T00:00:00'), w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return x.toISOString().slice(0, 10); };
+  const addD = (d, n) => { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + n); return ymdL(x); };
+  const monday = d => { const x = new Date(d + 'T00:00:00'), w = (x.getDay() + 6) % 7; x.setDate(x.getDate() - w); return ymdL(x); };
   const ROLE3 = ['Facilitator', 'Assessor', 'Moderator'];
   const eligOf = (a, role, seta, end) => { const w = rtw(a, end), r0 = eligReg(a, role, seta, end), r = w && (rwBad(w) || r0[0] === 'ok') ? w : r0, g = stageOf(a), b = stBad(g); if (!b || r[0] === 'bad') return r; return b === 2 ? ['bad', 'Not approved in recruitment'] : r[0] === 'ok' ? ['warn', `Still in recruitment (${g})`] : r; };
   const eligReg = (a, role, seta, end) => {
