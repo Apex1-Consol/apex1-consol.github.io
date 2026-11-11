@@ -113,6 +113,78 @@
       || '<tr><td colspan="4" class="sub">No modules set up for this programme yet.</td></tr>';
   };
 
+
+  /* ---------- Programmes: search, edit (typed columns + the old app's field keys), lifecycle, CSV ----------
+     Lifecycle: initiated -> (PI/Compliance/Head of Ops sign-off, old app only) -> handed_over -> activate_programme -> active -> close_programme -> closed. */
+  const CLASSIC = '/?classic=1#view=programmes';
+  let pQ = '';
+  const pf = p => p.fields || {};
+  const pv = (p, col, key) => p[col] ?? pf(p)[key] ?? '';
+  const _renderProg2 = renderProg;
+  renderProg = function () {
+    _renderProg2();
+    if (!P.user) return;
+    const side = $('pstatus')?.parentElement; if (!side) return;
+    if (!$('pq')) $('pstatus').insertAdjacentHTML('afterend', '<input id="pq" type="search" placeholder="Search programmes" oninput="dvPQ(this.value)" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink)">');
+    const q = pQ.toLowerCase(); if (q) [...$('plist').children].forEach(b => { b.hidden = !b.textContent.toLowerCase().includes(q); });
+    const nb = [...side.querySelectorAll('button')].find(b => /New programme/.test(b.textContent));
+    if (nb) { nb.textContent = '+ New programme (old app)'; nb.onclick = () => { location.href = CLASSIC; }; }
+    if (!$('pcsv')) side.insertAdjacentHTML('beforeend', '<button class="btn" id="pcsv" onclick="dvProgCsv()">Export CSV</button>');
+    const p = prog(dProg), hd = $('view-programmes').querySelector('.dark'); if (!p || !hd || hd.hidden) return;
+    const box = hd.lastElementChild, st = p.status || 'initiated', pm = has('project_manager'), lead = has('pi_specialist', 'compliance_officer', 'head_of_ops');
+    const btns = [];
+    if (CAN() || pm) btns.push(`<button class="btn ghost" onclick="dvProgEdit(${p.id})">Edit</button>`);
+    if (st === 'initiated' && lead) btns.push(`<a class="btn y" href="${CLASSIC}">Sign-off (old app)</a>`);
+    if (st === 'handed_over' && pm) btns.push(`<button class="btn y" onclick="dvStage(${p.id},'activate_programme','Mark this programme as Active? This confirms you are taking it on.')">Activate</button>`);
+    if (st === 'active' && pm) btns.push(`<button class="btn ghost" onclick="dvStage(${p.id},'close_programme','Mark this programme as Closed? This is the final stage.')">Close</button>`);
+    box.innerHTML = btns.join('');
+    const sp = hd.querySelectorAll('span'); if (sp[0]) sp[0].textContent = `${{ initiated: 'Initiated · awaiting sign-off', handed_over: 'Handed over · awaiting activation', active: 'Active', closed: 'Closed' }[st] || st} · ${p.programme_type || p.qualification_type || 'Programme'}${p.display_id ? ' · ' + p.display_id : ''}`;
+  };
+  window.dvPQ = v => { pQ = v || ''; renderProg(); };
+  window.dvStage = async (id, fn, msg) => {
+    if (!confirm(msg)) return;
+    const { error } = await sb.rpc(fn, { p_id: id });
+    if (error) return say('Update failed: ' + (error.message || 'you may not have permission for this stage change'));
+    say(fn === 'activate_programme' ? 'Programme marked Active' : 'Programme marked Closed'); await window.previewReload();
+  };
+  window.dvProgEdit = id => {
+    const p = prog(id); if (!p) return; const f = pf(p), cl = D().clients || [];
+    const i = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${esc(v ?? '')}" ${ex}></label>`;
+    const o = (list, v) => '<option value="">—</option>' + (v && !list.includes(v) ? [v, ...list] : list).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const d = v => v ? String(v).slice(0, 10) : '';
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Edit programme"><form class="card" id="pform"><h2>Edit programme</h2><div class="qagrid">
+      ${i('progid', 'Prog ID *', pv(p, 'display_id', 'Prog ID'), 'text', 'required')}${i('qual', 'Qualification / programme name *', p.qualification_name || f.Qualification || p.programme_name, 'text', 'required')}
+      <label>Client *<select name="client" required><option value="">—</option>${cl.filter(c => !c.deleted_at).sort((a, b) => String(a.client_name).localeCompare(String(b.client_name))).map(c => `<option value="${c.id}" ${c.id === p.client_id ? 'selected' : ''}>${esc(c.client_name)}</option>`).join('')}</select></label>
+      ${i('entity', 'Entity', pv(p, 'entity', 'Entity'))}${i('pm', 'Project manager', pv(p, 'project_manager_name', 'Project Manager'))}${i('type', 'Type', pv(p, 'programme_type', 'Type'))}
+      ${i('saqa', 'SAQA ID', pv(p, 'saqa_id', 'SAQA ID'))}${i('qcto', 'QCTO code', pv(p, 'qualification_code', 'QCTO Code'))}${i('nqf', 'NQF level', pv(p, 'nqf_level', 'NQF'))}
+      ${i('cohort', 'Cohort', pv(p, 'group_name', 'Cohort'))}${i('learners', 'Learners (planned)', pv(p, 'group_size', 'Learners'), 'number')}<label>Employment status<select name="emp">${o(['Employed', 'Unemployed'], f['Employment Status'])}</select></label>
+      <label>Mode of delivery<select name="mode">${o(['Face to Face', 'Online', 'Blended'], f['Mode of Delivery'])}</select></label>${i('seta', 'SETA', f.SETA)}<label>Programme status<select name="pst">${o(['Active', 'Completed', 'Suspended', 'Cancelled'], p.programme_status || f.Status)}</select></label>
+      ${i('start', 'Start date', d(pv(p, 'start_date', 'Start Date')), 'date')}${i('end', 'End date', d(pv(p, 'end_date', 'End Date')), 'date')}${i('accred', 'Accreditation period end', d(pv(p, 'accreditation_end_date', 'Accreditation Period End Date')), 'date')}
+      ${i('eisas', 'EISA start', d(pv(p, 'eisa_start_date', 'EISA Start')), 'date')}${i('eisae', 'EISA end', d(pv(p, 'eisa_end_date', 'EISA End')), 'date')}${i('fac', 'Facilitator', f.Facilitator)}${i('ass', 'Assessor', f.Assessor)}</div>
+      <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Comments<textarea name="comments" rows="3" style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)">${esc(f.Comments || '')}</textarea></label>
+      <p class="sub">Lifecycle stage (initiated, handed over, active, closed) changes only through Sign-off, Activate and Close.</p>
+      <div class="sub" id="perr" style="color:var(--bad)"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="psave">Save</button></div></form></div>`);
+    $('pform').onsubmit = async ev => {
+      ev.preventDefault(); const el = $('pform').elements, v = n => el[n].value.trim(), dn = n => v(n) || null, b = $('psave'); b.disabled = true; b.textContent = 'Saving…';
+      const c = cl.find(x => String(x.id) === v('client'));
+      const fields = { ...f, 'Prog ID': v('progid'), Qualification: v('qual'), Client: c ? (c.fields?.['Company Name'] || c.client_name) : '', Entity: v('entity'), 'Project Manager': v('pm'), Type: v('type'), 'SAQA ID': v('saqa'), 'QCTO Code': v('qcto'), NQF: v('nqf'),
+        Cohort: v('cohort'), Learners: v('learners') === '' ? null : +v('learners'), 'Employment Status': v('emp'), 'Mode of Delivery': v('mode'), SETA: v('seta'), Status: v('pst') || f.Status || 'Active', 'Start Date': dn('start'), 'End Date': dn('end'),
+        'Accreditation Period End Date': dn('accred'), 'EISA Start': dn('eisas'), 'EISA End': dn('eisae'), Facilitator: v('fac'), Assessor: v('ass'), Comments: v('comments') };
+      Object.keys(fields).forEach(k => { if ((fields[k] === null || fields[k] === '') && !(k in f)) delete fields[k]; });
+      const row = { fields, display_id: v('progid'), programme_name: v('qual') || v('progid'), qualification_name: v('qual') || null, client_id: c ? c.id : null, entity: v('entity') || null, project_manager_name: v('pm') || null, programme_type: v('type') || null,
+        saqa_id: v('saqa') || null, qualification_code: v('qcto') || null, nqf_level: v('nqf') || null, group_name: v('cohort') || null, group_size: v('learners') === '' ? null : +v('learners'), programme_status: v('pst') || null,
+        start_date: dn('start'), end_date: dn('end'), accreditation_end_date: dn('accred'), eisa_start_date: dn('eisas'), eisa_end_date: dn('eisae') };
+      try { await write('Programme', () => sb.from('programmes').update(row).eq('id', id).select('id')); $('famov').remove(); say('Programme saved'); await window.previewReload(); }
+      catch (err) { $('perr').textContent = err.message || String(err); b.disabled = false; b.textContent = 'Save'; }
+    };
+  };
+  window.dvProgCsv = () => {
+    const rows = progs().filter(p => PST[pStatus](p.status)), cols = [['Prog ID', p => p.display_id], ['Programme', p => p.programme_name], ['Client', p => client(p)?.client_name], ['Stage', p => p.status], ['Type', p => p.programme_type], ['SAQA ID', p => p.saqa_id], ['NQF', p => p.nqf_level], ['Project manager', p => p.project_manager_name], ['Start', p => day(p.start_date)], ['End', p => day(p.end_date)], ['Learners enrolled', p => learnersOf(p.id).length]];
+    const t = [cols.map(c => c[0]), ...rows.map(p => cols.map(c => c[1](p) ?? ''))].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+    try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = `Programmes-${pStatus}.csv`; document.body.appendChild(a); a.click(); a.remove(); } catch (_) {}
+    say(`Exported ${rows.length} programmes`);
+  };
+
   /* ---------- Form 3 (QCTO programme implementation) ---------- */
   function form3(p) {
     const s = (D().leisaSettings || []).find(x => x.provider === (p.provider || 'apex')) || (D().leisaSettings || [])[0] || {};
@@ -179,7 +251,7 @@
     if (!p) { $('register').innerHTML = '<tbody><tr><td class="sub">No programmes with learners.</td></tr></tbody>'; $('poetable').innerHTML = ''; return; }
     const ls = learnersOf(p.id), ss = sessOf(p.id), ed = CAN(), lim = absenceLimit(p);
     const hint = $('regcard').querySelector('p.sub');
-    if (hint) hint.innerHTML = (ed ? 'Tap a cell to cycle Present → Reason → Absent. Changes save automatically. ' : 'Read only for your role. ') + `R means absent with a valid reason (proof attached). The absence limit for this programme is ${lim} days.`;
+    if (hint) hint.innerHTML = (ed ? 'Tap a cell to cycle Present → Late → Absent. Changes save automatically. ' : 'Read only for your role. ') + `R means late (counts as attended, as in the old app). The absence limit for this programme is ${lim} days.`;
     const head = $('regcard').firstElementChild;
     if (head && !$('dvadd')) head.insertAdjacentHTML('beforeend', '<button class="btn sm" onclick="dvAttCsv()">Export CSV</button><button class="btn sm" id="dvadd" onclick="dvAddToggle()">+ Add session</button>');
     if ($('dvadd')) $('dvadd').hidden = !ed;

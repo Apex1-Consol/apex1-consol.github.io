@@ -375,7 +375,7 @@ body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href=
           <div style="display:flex;align-items:baseline"><h2 style="flex-grow:1">Attendance</h2><span class="sub">Threshold [75%]</span></div>
           <span class="disp" style="font-size:40px;line-height:1">[—%]</span>
           <div class="att" id="att" aria-label="Last 20 sessions"></div>
-          <div class="legend"><span><i style="background:var(--navy2)"></i>Present</span><span><i style="background:#E0A100"></i>Reason given</span><span><i style="background:var(--bad)"></i>Absent</span></div>
+          <div class="legend"><span><i style="background:var(--navy2)"></i>Present</span><span><i style="background:#E0A100"></i>Late</span><span><i style="background:var(--bad)"></i>Absent</span></div>
         </section>
         <section class="card" style="flex:1 1 340px">
           <div style="display:flex;align-items:baseline;margin-bottom:8px"><h2 style="flex-grow:1">Portfolio of evidence</h2><a href="#" onclick="toast('Gap analysis');return false" style="font-weight:600">Gap analysis</a></div>
@@ -480,8 +480,8 @@ body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href=
       </div>
       <div class="tabs" id="atabs"></div>
       <section class="card" style="padding:0" id="regcard">
-        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 20px"><h2 style="flex-grow:1">Session register</h2><span class="legend"><span><i style="background:var(--navy2)"></i>P Present</span><span><i style="background:#E0A100"></i>R Reason</span><span><i style="background:var(--bad)"></i>A Absent</span></span></div>
-        <p class="sub" style="margin:0 20px 10px">Tap a cell to cycle Present → Reason → Absent. Changes save automatically.</p>
+        <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 20px"><h2 style="flex-grow:1">Session register</h2><span class="legend"><span><i style="background:var(--navy2)"></i>P Present</span><span><i style="background:#E0A100"></i>R Late</span><span><i style="background:var(--bad)"></i>A Absent</span></span></div>
+        <p class="sub" style="margin:0 20px 10px">Tap a cell to cycle Present → Late → Absent. Changes save automatically.</p>
         <div class="tw tall"><table id="register" style="min-width:720px"></table></div>
       </section>
       <section class="card" style="padding:0" id="poecard" hidden>
@@ -1110,11 +1110,11 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261111k"></script>
+<script src="live.js?v=20261111l"></script>
 <script src="qa.js"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261111q"></script>
-<script src="delivery.js?v=20261111y"></script>
+<script src="delivery.js?v=20261112a"></script>
 <script src="shell.js?v=20261028f"></script>
 <script src="admin.js"></script>
 </body>

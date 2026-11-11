@@ -167,6 +167,12 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
     const u = log.find(x => x.table === 'enrolments' && x.op === 'insert'); ok(u && JSON.stringify(u.val).includes('"learner_id":2') && !JSON.stringify(u.val).includes('"learner_id":1'), JSON.stringify(u));
   });
+  await t('Programme: edit writes typed columns and old-app field keys', async () => {
+    const { w, d, log } = await boot(sess('admin')); w.location.hash = 'programmes'; await tick();
+    w.dvProgEdit(100); const f = d.getElementById('pform'); f.elements.progid.value = 'APX-100'; f.elements.client.value = '7'; f.elements.pst.value = 'Active';
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    const u = log.find(x => x.table === 'programmes'); ok(u && u.val.display_id === 'APX-100' && u.val.fields['Prog ID'] === 'APX-100' && u.val.client_id === 7, JSON.stringify(u && u.val));
+  });
   await t('Recommendation: Mark resolved writes resolved=true', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'recs'; await tick();
     const b = [...d.querySelectorAll('#reclist button')].find(x => /Mark resolved/.test(x.textContent)); b.click(); await tick();
