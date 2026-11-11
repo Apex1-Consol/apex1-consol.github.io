@@ -12392,6 +12392,8 @@ const HO = (() => {
 
   // ---------- open / load ----------
   async function open(pid, tab) {
+    // Sign-off / hand-over moved to the new look (preview/handover.js); ?classic=1 keeps this screen.
+    if (!/classic=1/.test(location.search)) { location.href = '/preview/#handover/' + pid; return; }
     s.pid = String(pid); s.tab = tab || 'overview'; s.g = null; s.err = null; s.assignable = {}; s.open = new Set();
     switchTab('programme-detail');
     render();
