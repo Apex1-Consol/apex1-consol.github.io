@@ -68,7 +68,7 @@
         ${gaps ? `<span class="badge b-warn">${gaps} missing qualification or dates</span>` : '<span class="badge b-ok">Data complete</span>'}</button>`;
     }).join('');
     v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager, from the programmes in ApexOne',
-      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button><button class="btn y" onclick="toast('New programmes start in Programme Initiation')">+ Add programme</button>`)
+      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button><button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
       + `<div class="grid">${cards || '<div class="empty"><b>No programmes yet</b></div>'}</div>
       <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}

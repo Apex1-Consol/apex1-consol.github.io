@@ -128,7 +128,7 @@
     if (!$('pq')) $('pstatus').insertAdjacentHTML('afterend', '<input id="pq" type="search" placeholder="Search programmes" oninput="dvPQ(this.value)" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink)">');
     const q = pQ.toLowerCase(); if (q) [...$('plist').children].forEach(b => { b.hidden = !b.textContent.toLowerCase().includes(q); });
     const nb = [...side.querySelectorAll('button')].find(b => /New programme/.test(b.textContent));
-    if (nb) { nb.textContent = '+ New programme (old app)'; nb.onclick = () => { location.href = CLASSIC; }; }
+    if (nb) { nb.textContent = '+ New programme'; nb.onclick = () => (CAN() || has('pi_specialist')) ? dvProgEdit(null) : say('Ask a project manager or PI specialist to add programmes'); }
     if (!$('pcsv')) side.insertAdjacentHTML('beforeend', '<button class="btn" id="pcsv" onclick="dvProgCsv()">Export CSV</button>');
     const p = prog(dProg), hd = $('view-programmes').querySelector('.dark'); if (!p || !hd || hd.hidden) return;
     const box = hd.lastElementChild, st = p.status || 'initiated', pm = has('project_manager'), lead = has('pi_specialist', 'compliance_officer', 'head_of_ops');
@@ -148,33 +148,34 @@
     say(fn === 'activate_programme' ? 'Programme marked Active' : 'Programme marked Closed'); await window.previewReload();
   };
   window.dvProgEdit = id => {
-    const p = prog(id); if (!p) return; const f = pf(p), cl = D().clients || [];
+    const p = id ? prog(id) : { fields: {} }; if (!p) return; const f = pf(p), cl = D().clients || [];   // id null = new programme
     const i = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${esc(v ?? '')}" ${ex}></label>`;
     const o = (list, v) => '<option value="">—</option>' + (v && !list.includes(v) ? [v, ...list] : list).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
     const d = v => v ? String(v).slice(0, 10) : '';
-    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Edit programme"><form class="card" id="pform"><h2>Edit programme</h2><div class="qagrid">
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Edit programme"><form class="card" id="pform"><h2>${id ? 'Edit programme' : 'New programme'}</h2><div class="qagrid">
       ${i('progid', 'Prog ID *', pv(p, 'display_id', 'Prog ID'), 'text', 'required')}${i('qual', 'Qualification / programme name *', p.qualification_name || f.Qualification || p.programme_name, 'text', 'required')}
       <label>Client *<select name="client" required><option value="">—</option>${cl.filter(c => !c.deleted_at).sort((a, b) => String(a.client_name).localeCompare(String(b.client_name))).map(c => `<option value="${c.id}" ${c.id === p.client_id ? 'selected' : ''}>${esc(c.client_name)}</option>`).join('')}</select></label>
-      ${i('entity', 'Entity', pv(p, 'entity', 'Entity'))}${i('pm', 'Project manager', pv(p, 'project_manager_name', 'Project Manager'))}${i('type', 'Type', pv(p, 'programme_type', 'Type'))}
+      ${i('entity', 'Entity', pv(p, 'entity', 'Entity'))}${i('pm', 'Project manager', pv(p, 'project_manager_name', 'Project Manager'))}<label>Type<select name="type"><option value="">—</option>${[['occupational', 'Occupational (QCTO)'], ['legacy', 'Legacy (SETA)']].map(([k, l]) => `<option value="${k}" ${p.programme_type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
       ${i('saqa', 'SAQA ID', pv(p, 'saqa_id', 'SAQA ID'))}${i('qcto', 'QCTO code', pv(p, 'qualification_code', 'QCTO Code'))}${i('nqf', 'NQF level', pv(p, 'nqf_level', 'NQF'))}
       ${i('cohort', 'Cohort', pv(p, 'group_name', 'Cohort'))}${i('learners', 'Learners (planned)', pv(p, 'group_size', 'Learners'), 'number')}<label>Employment status<select name="emp">${o(['Employed', 'Unemployed'], f['Employment Status'])}</select></label>
       <label>Mode of delivery<select name="mode">${o(['Face to Face', 'Online', 'Blended'], f['Mode of Delivery'])}</select></label>${i('seta', 'SETA', f.SETA)}<label>Programme status<select name="pst">${o(['Active', 'Completed', 'Suspended', 'Cancelled'], p.programme_status || f.Status)}</select></label>
       ${i('start', 'Start date', d(pv(p, 'start_date', 'Start Date')), 'date')}${i('end', 'End date', d(pv(p, 'end_date', 'End Date')), 'date')}${i('accred', 'Accreditation period end', d(pv(p, 'accreditation_end_date', 'Accreditation Period End Date')), 'date')}
       ${i('eisas', 'EISA start', d(pv(p, 'eisa_start_date', 'EISA Start')), 'date')}${i('eisae', 'EISA end', d(pv(p, 'eisa_end_date', 'EISA End')), 'date')}${i('fac', 'Facilitator', f.Facilitator)}${i('ass', 'Assessor', f.Assessor)}</div>
       <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Comments<textarea name="comments" rows="3" style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)">${esc(f.Comments || '')}</textarea></label>
-      <p class="sub">Lifecycle stage (initiated, handed over, active, closed) changes only through Sign-off, Activate and Close.</p>
+      <p class="sub">${id ? 'Lifecycle stage (initiated, handed over, active, closed) changes only through Sign-off, Activate and Close.' : 'The programme starts as Initiated. Next: Sign-off & hand-over to the project manager.'}</p>
       <div class="sub" id="perr" style="color:var(--bad)"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="psave">Save</button></div></form></div>`);
     $('pform').onsubmit = async ev => {
       ev.preventDefault(); const el = $('pform').elements, v = n => el[n].value.trim(), dn = n => v(n) || null, b = $('psave'); b.disabled = true; b.textContent = 'Saving…';
       const c = cl.find(x => String(x.id) === v('client'));
-      const fields = { ...f, 'Prog ID': v('progid'), Qualification: v('qual'), Client: c ? (c.fields?.['Company Name'] || c.client_name) : '', Entity: v('entity'), 'Project Manager': v('pm'), Type: v('type'), 'SAQA ID': v('saqa'), 'QCTO Code': v('qcto'), NQF: v('nqf'),
+      const fields = { ...f, 'Prog ID': v('progid'), Qualification: v('qual'), Client: c ? (c.fields?.['Company Name'] || c.client_name) : '', Entity: v('entity'), 'Project Manager': v('pm'), Type: v('type') ? { occupational: 'Occupational', legacy: 'Legacy' }[v('type')] : (f.Type || ''), 'SAQA ID': v('saqa'), 'QCTO Code': v('qcto'), NQF: v('nqf'),
         Cohort: v('cohort'), Learners: v('learners') === '' ? null : +v('learners'), 'Employment Status': v('emp'), 'Mode of Delivery': v('mode'), SETA: v('seta'), Status: v('pst') || f.Status || 'Active', 'Start Date': dn('start'), 'End Date': dn('end'),
         'Accreditation Period End Date': dn('accred'), 'EISA Start': dn('eisas'), 'EISA End': dn('eisae'), Facilitator: v('fac'), Assessor: v('ass'), Comments: v('comments') };
       Object.keys(fields).forEach(k => { if ((fields[k] === null || fields[k] === '') && !(k in f)) delete fields[k]; });
       const row = { fields, display_id: v('progid'), programme_name: v('qual') || v('progid'), qualification_name: v('qual') || null, client_id: c ? c.id : null, entity: v('entity') || null, project_manager_name: v('pm') || null, programme_type: v('type') || null,
         saqa_id: v('saqa') || null, qualification_code: v('qcto') || null, nqf_level: v('nqf') || null, group_name: v('cohort') || null, group_size: v('learners') === '' ? null : +v('learners'), programme_status: v('pst') || null,
         start_date: dn('start'), end_date: dn('end'), accreditation_end_date: dn('accred'), eisa_start_date: dn('eisas'), eisa_end_date: dn('eisae') };
-      try { await write('Programme', () => sb.from('programmes').update(row).eq('id', id).select('id')); $('famov').remove(); say('Programme saved'); await window.previewReload(); }
+      try { const r = await write('Programme', () => id ? sb.from('programmes').update(row).eq('id', id).select('id') : sb.from('programmes').insert({ ...row, tenant_id: P.tenant, initiated_by_email: P.user?.email || null }).select('id'));
+        $('famov').remove(); say(id ? 'Programme saved' : 'Programme created'); await window.previewReload(); const nid = !id && r && r[0] && r[0].id; if (nid && window.dvProg) { location.hash = 'programmes'; setTimeout(() => dvProg(nid), 300); } }
       catch (err) { $('perr').textContent = err.message || String(err); b.disabled = false; b.textContent = 'Save'; }
     };
   };
@@ -414,7 +415,6 @@
     renderProg(); renderAtt(); renderE();
     if (bound) return; bound = true;
     const np = [...document.querySelectorAll('#view-programmes button')].find(b => /New programme/.test(b.textContent));
-    if (np) np.onclick = () => say('New programmes start in programme initiation (live app); the preview uses the test programmes.');
     [...document.querySelectorAll('#view-attendance button, #view-eisa button')].filter(b => /^AI /.test(b.textContent.trim())).forEach(b => { b.hidden = true; });
   };
 })();

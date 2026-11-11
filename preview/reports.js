@@ -57,6 +57,8 @@ const STAGE = { notstarted: 'Not started', draft: 'With PM (draft)', changes: 'C
 const STC = { notstarted: '#B42318', draft: '#9A3412', changes: '#C2410C', review: '#3A3994', approved: '#0F6B45', sent: '#25247B' };
 function tone(x, month) {
   if (x.stage === 'sent') return ['', 'Sent'];
+  const curI = (() => { const n = new Date(); return n.getFullYear() * 12 + n.getMonth() - 1; })();
+  if (x.stage === 'approved' && mIdx(month) < curI) return ['', 'Approved'];   // earlier months: approved counts as done
   const r = x.r, t = day(new Date()), dl = dls(month), hu = r && r.hold_until ? new Date(r.hold_until + 'T00:00') : null;
   if (hu && t <= hu) return ['hold', 'On hold to ' + fmtD(hu)];
   const st = ['notstarted', 'draft', 'changes'].includes(x.stage) ? 'submit' : x.stage === 'review' ? 'review' : 'send';
@@ -95,10 +97,10 @@ function trackerM() {
   if (TR === null) return '';
   if (TR.err) return `<section class="card"><b>Monthly reports</b><div class="famas">Could not load: ${esc(TR.err)}</div></section>`;
   const admin = has(), months = Object.keys(TR.byM), f = rows => rows.filter(x => !TRPM || x.pm === TRPM);
-  const bar = m => { const rows = f(TR.byM[m]), n = rows.length, sent = rows.filter(x => x.stage === 'sent').length, od = rows.filter(x => x.t[0] === 'dan').length;
+  const bar = m => { const rows = f(TR.byM[m]), n = rows.length, sent = rows.filter(x => x.stage === 'sent' || (x.stage === 'approved' && x.t[1] === 'Approved')).length, od = rows.filter(x => x.t[0] === 'dan').length;
     const segs = Object.keys(STAGE).map(k => { const c = rows.filter(x => x.stage === k).length; return c ? `<span title="${STAGE[k]}: ${c}" style="flex:${c};background:${STC[k]}"></span>` : ''; }).join('');
     return `<button onclick="rpTM('${m}')" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;border:${m === TRM ? '2px solid var(--accent)' : '1px solid var(--line)'};background:var(--surface);min-width:180px;flex:1 1 180px">
-      <span style="display:flex;justify-content:space-between;gap:8px"><b>${esc(m)}${m === TR.cur ? ' <span class="badge b-warn">Current</span>' : ''}</b><span class="famas">${sent} of ${n} sent</span></span>
+      <span style="display:flex;justify-content:space-between;gap:8px"><b>${esc(m)}${m === TR.cur ? ' <span class="badge b-warn">Current</span>' : ''}</b><span style="font-size:12.5px;color:var(--muted)">${sent} of ${n} done</span></span>
       <span style="display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--line2)">${segs}</span>
       <span class="famas">${od ? `<span style="color:var(--bad);font-weight:600">${od} overdue</span>` : n ? 'Nothing overdue' : 'No reports'}</span></button>`; };
   const rows = f(TR.byM[TRM] || []).filter(x => !TRS || x.stage === TRS).sort((a, b) => ({ dan: 0, warn: 1, hold: 2, '': 3 }[a.t[0]] - { dan: 0, warn: 1, hold: 2, '': 3 }[b.t[0]]) || Object.keys(STAGE).indexOf(a.stage) - Object.keys(STAGE).indexOf(b.stage) || String(a.client).localeCompare(String(b.client)));
@@ -159,7 +161,7 @@ window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };
 window.rpTR = async () => { TR = null; render(); await loadDr(); await loadTR(); render(); };
 window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };
-window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => x.stage === 'sent').length, od: rows.filter(x => x.t[0] === 'dan').length }; };
+window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => x.stage === 'sent' || (x.stage === 'approved' && x.t[1] === 'Approved')).length, od: rows.filter(x => x.t[0] === 'dan').length }; };
 window.rpLoadTR = async () => { if (TR === null) { await loadDr(); await loadTR(); } return window.rpSummary(); };
 window.rpQF = f => { QF = f; render(); };
 window.rpReload = async () => { Q = null; render(); await loadQ(); render(); };
@@ -241,7 +243,7 @@ async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
   const sm = await window.rpLoadTR(); const v = $('view-' + r); if (!sm || !v) return;
   const html = `<section class="card" id="rpdash-${r}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px"><div style="flex:1 1 260px"><b>${esc(sm.month)} reports</b>
-    <div class="famas">${sm.sent} of ${sm.n} sent to clients${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} overdue</span>` : ''}</div></div>
+    <div style="font-size:12.5px;color:var(--muted)">${sm.sent} of ${sm.n} sent to clients${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} overdue</span>` : ''}</div></div>
     <span style="flex:1 1 160px;height:10px;border-radius:6px;background:var(--line2);overflow:hidden;display:flex"><span style="width:${sm.n ? Math.round(100 * sm.sent / sm.n) : 0}%;background:#25247B"></span></span>
     <a class="btn sm y" href="#reports">Open monthly reports</a></section>`;
   const old = $('rpdash-' + r); if (old) old.outerHTML = html; else v.insertAdjacentHTML('afterbegin', html);

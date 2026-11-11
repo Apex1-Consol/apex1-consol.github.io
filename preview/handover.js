@@ -9,7 +9,7 @@ const showToast = (t, m) => { m = m === undefined ? t : m; window.toast(m); cons
 const state = { get programmes() { return (P.data.progsAll || P.data.progs || []).map(p => ({ id: p.id, fields: Object.assign({ Qualification: p.programme_name, 'Prog ID': p.display_id, __stage: p.status }, p.fields || {}, { __stage: p.status }) })); },
   get currentUserEmail() { return P.user && P.user.email; }, get currentUser() { return P.user && P.user.email; } };
 const loadProgrammes = () => window.previewReload && window.previewReload();
-const notifyAdmins = () => {};
+const notifyAdmins = async (type, message) => { try { await sb.schema('reports').from('notifications').insert({ tenant_id: P.tenant, recipient_role: 'admin', type, message }); } catch (e) { console.warn('notifyAdmins failed (non-blocking)', e); } };   // same as the old app
 const programmeStageBadge = st => `<span class="pill">${escapeHtml({ initiated: 'Initiated', handed_over: 'Handed over', active: 'Active', closed: 'Closed' }[st] || st)}</span>`;
 const programmeStageActions = () => '';
 const openEditProgramme = id => { location.hash = 'programmes'; setTimeout(() => window.dvProgEdit && window.dvProgEdit(+id), 300); };

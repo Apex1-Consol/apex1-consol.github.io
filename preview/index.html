@@ -298,7 +298,7 @@ body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href=
     <main id="view-dashboard" hidden>
       <div style="display:flex;flex-wrap:wrap;align-items:flex-end;gap:16px">
         <div style="flex-grow:1"><p class="sub" style="margin:0" id="greetdate">Wednesday, 21 October 2026</p><h1 style="font-size:30px;margin-top:4px" id="greet">Good morning, Stavros</h1></div>
-        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="toast('Snapshot exported')">Export snapshot</button><a class="btn y" href="#programmes">+ New programme</a></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn" onclick="location.hash='reports'">Downloads</button><button class="btn y" onclick="window.dvProgEdit?dvProgEdit(null):location.hash='programmes'">+ New programme</button></div>
       </div>
       <div class="grid" id="kpis"></div>
       <div class="row" style="align-items:stretch">
@@ -325,7 +325,7 @@ body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href=
         <section class="card" style="flex:1 1 280px;padding:16px;display:flex;flex-direction:column;gap:10px">
           <div class="seg" id="pstatus"></div>
           <div id="plist" style="display:flex;flex-direction:column;gap:10px"></div>
-          <button class="btn" style="border-style:dashed;color:var(--navy2)" onclick="toast('New programme form')">+ New programme</button>
+          <button class="btn" style="border-style:dashed;color:var(--navy2)" onclick="window.dvProgEdit?dvProgEdit(null):toast('Loading…')">+ New programme</button>
         </section>
         <section style="flex:3 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
           <div class="dark" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-start">
@@ -1114,10 +1114,10 @@ function learnerRules(){return `<div class="row">
 <script src="qa.js"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261111r"></script>
-<script src="delivery.js?v=20261112c"></script>
-<script src="handover.js?v=20261112b"></script>
+<script src="delivery.js?v=20261112d"></script>
+<script src="handover.js?v=20261112c"></script>
 <script src="shell.js?v=20261028f"></script>
-<script src="admin.js?v=20261111e"></script>
-<script src="reports.js?v=20261111i"></script>
+<script src="admin.js?v=20261111f"></script>
+<script src="reports.js?v=20261111j"></script>
 </body>
 </html>
