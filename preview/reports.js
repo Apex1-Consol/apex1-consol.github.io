@@ -32,7 +32,7 @@ function queue() {
 }
 /* Saved drafts from the Report Generator (reports.drafts; each PM sees only their own, admins all) */
 let DR = null, DRALL = false;
-async function loadDr() { const r = await R.from('drafts').select('id,client_name,programme_name,month,pm_email,saved_at,updated_at').order('updated_at', { ascending: false }); DR = r.error ? { err: r.error.message } : r.data || []; }
+async function loadDr() { const r = await R.from('drafts').select('id,programme_id,client_name,programme_name,month,pm_email,saved_at,updated_at').order('updated_at', { ascending: false }); DR = r.error ? { err: r.error.message } : r.data || []; }
 function drafts() {
   if (DR === null) return '';
   if (DR.err) return `<section class="card"><b>Saved drafts</b><div class="famas">Could not load: ${esc(DR.err)}</div></section>`;
@@ -42,6 +42,84 @@ function drafts() {
     ${DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => `<tr><td><b>${esc(d.client_name || '')}</b></td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(d.pm_email || '')}</td><td>${esc(when(d.saved_at || d.updated_at))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
 }
 window.rpDrAll = () => { DRALL = !DRALL; render(); };
+/* ---------- Monthly progress + deadline tracker (same rules as the Report Generator dashboard) ---------- */
+const MN = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const dAdd = (d, n) => { const x = new Date(d); x.setDate(x.getDate() + n); return x; };
+const fri = d => { const w = d.getDay(); return w === 6 ? dAdd(d, -1) : w === 0 ? dAdd(d, -2) : d; };
+const day = d => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+const fmtD = d => d ? d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+const mIdx = m => { const x = /^([A-Za-z]+)\s+(\d{4})$/.exec(m || ''); return x ? +x[2] * 12 + MN.indexOf(x[1]) : -1; };
+const mName = i => MN[i % 12] + ' ' + Math.floor(i / 12);
+function dls(month) { const i = mIdx(month) + 1, y = Math.floor(i / 12), m = i % 12, submit = fri(new Date(y, m, 5)), send = fri(new Date(y, m, 7)), pre = dAdd(send, -1);
+  return { submit, send, review: pre.getDay() % 6 === 0 ? send : pre, submitWarn: dAdd(submit, -2), sendWarn: dAdd(send, -1) }; }
+const STAGE = { notstarted: 'Not started', draft: 'With PM (draft)', changes: 'Changes requested', review: 'Waiting for review', approved: 'Approved, not sent', sent: 'Sent to client' };
+const STC = { notstarted: '#B42318', draft: '#9A3412', changes: '#C2410C', review: '#3A3994', approved: '#0F6B45', sent: '#25247B' };
+function tone(x, month) {
+  if (x.stage === 'sent') return ['', 'Sent'];
+  const r = x.r, t = day(new Date()), dl = dls(month), hu = r && r.hold_until ? new Date(r.hold_until + 'T00:00') : null;
+  if (hu && t <= hu) return ['hold', 'On hold to ' + fmtD(hu)];
+  const st = ['notstarted', 'draft', 'changes'].includes(x.stage) ? 'submit' : x.stage === 'review' ? 'review' : 'send';
+  const due = dl[st], warn = st === 'submit' ? dl.submitWarn : st === 'send' ? dl.sendWarn : dl.review;
+  if (t > due) return ['dan', 'Overdue · due ' + fmtD(due)];
+  if (t >= warn) return ['warn', 'Due ' + fmtD(due)];
+  return ['', 'Due ' + fmtD(due)];
+}
+let TR = null, TRM = null, TRS = '', TRPM = '';
+async function loadTR() {
+  const r = await R.from('reports').select('id,programme_id,client_name_snapshot,programme_name_snapshot,month,status,submitted_by_email,hold_until,remind_pm_at').neq('status', 'archived');
+  if (r.error) { TR = { err: r.error.message }; return; }
+  const reps = r.data || [], drs = Array.isArray(DR) ? DR : [], cur = (() => { const n = new Date(); return n.getFullYear() * 12 + n.getMonth() - 1; })();
+  const months = new Set([...reps.map(x => x.month), ...drs.map(x => x.month), mName(cur)].filter(m => mIdx(m) >= 0));
+  const byM = {};
+  [...months].sort((a, b) => mIdx(a) - mIdx(b)).forEach(m => {
+    const rows = [], seen = new Set();
+    reps.filter(x => x.month === m).forEach(x => { seen.add(String(x.programme_id)); rows.push({ r: x, pid: x.programme_id, client: x.client_name_snapshot, prog: x.programme_name_snapshot, pm: x.submitted_by_email,
+      stage: { needs_changes: 'changes', pending: 'review', approved: 'approved', sent_to_client: 'sent' }[x.status] || 'review' }); });
+    drs.filter(d => d.month === m && !seen.has(String(d.programme_id))).forEach(d => { seen.add(String(d.programme_id)); rows.push({ r: null, pid: d.programme_id, client: d.client_name, prog: d.programme_name, pm: d.pm_email, stage: 'draft' }); });
+    // Not started: reported on last month, nothing yet this month
+    const prev = mName(mIdx(m) - 1);
+    if (mIdx(m) <= cur) [...reps.filter(x => x.month === prev).map(x => ({ pid: x.programme_id, client: x.client_name_snapshot, prog: x.programme_name_snapshot, pm: x.submitted_by_email })),
+      ...drs.filter(d => d.month === prev).map(d => ({ pid: d.programme_id, client: d.client_name, prog: d.programme_name, pm: d.pm_email }))]
+      .forEach(x => { if (seen.has(String(x.pid))) return; seen.add(String(x.pid)); const p = (D().progsAll || []).find(q => q.id === x.pid); if (p && (p.deleted_at || p.status === 'closed')) return; rows.push({ r: null, ...x, stage: 'notstarted' }); });
+    rows.forEach(x => { x.t = tone(x, m); });
+    byM[m] = rows;
+  });
+  TR = { byM, cur: mName(cur) }; if (!TRM || !byM[TRM]) TRM = byM[TR.cur] ? TR.cur : Object.keys(byM).pop();
+}
+const pmName = e => String(e || 'Unassigned').split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+function tracker() {
+  if (TR === null) return '';
+  if (TR.err) return `<section class="card"><b>Monthly reports</b><div class="famas">Could not load: ${esc(TR.err)}</div></section>`;
+  const admin = has(), months = Object.keys(TR.byM), f = rows => rows.filter(x => !TRPM || x.pm === TRPM);
+  const bar = m => { const rows = f(TR.byM[m]), n = rows.length, sent = rows.filter(x => x.stage === 'sent').length, od = rows.filter(x => x.t[0] === 'dan').length;
+    const segs = Object.keys(STAGE).map(k => { const c = rows.filter(x => x.stage === k).length; return c ? `<span title="${STAGE[k]}: ${c}" style="flex:${c};background:${STC[k]}"></span>` : ''; }).join('');
+    return `<button onclick="rpTM('${m}')" style="all:unset;cursor:pointer;display:flex;flex-direction:column;gap:6px;padding:12px 14px;border-radius:12px;border:${m === TRM ? '2px solid var(--accent)' : '1px solid var(--line)'};background:var(--surface);min-width:180px;flex:1 1 180px">
+      <span style="display:flex;justify-content:space-between;gap:8px"><b>${esc(m)}${m === TR.cur ? ' <span class="badge b-warn">Current</span>' : ''}</b><span class="famas">${sent} of ${n} sent</span></span>
+      <span style="display:flex;height:10px;border-radius:6px;overflow:hidden;background:var(--line2)">${segs}</span>
+      <span class="famas">${od ? `<span style="color:var(--bad);font-weight:600">${od} overdue</span>` : n ? 'Nothing overdue' : 'No reports'}</span></button>`; };
+  const rows = f(TR.byM[TRM] || []).filter(x => !TRS || x.stage === TRS).sort((a, b) => ({ dan: 0, warn: 1, hold: 2, '': 3 }[a.t[0]] - { dan: 0, warn: 1, hold: 2, '': 3 }[b.t[0]]) || Object.keys(STAGE).indexOf(a.stage) - Object.keys(STAGE).indexOf(b.stage) || String(a.client).localeCompare(String(b.client)));
+  const all = f(TR.byM[TRM] || []), pms = [...new Set(months.flatMap(m => TR.byM[m].map(x => x.pm)).filter(Boolean))].sort();
+  const chips = Object.keys(STAGE).map(k => { const c = all.filter(x => x.stage === k).length; return c ? `<button class="btn sm ${TRS === k ? 'y' : ''}" onclick="rpTS('${k}')"><span style="width:8px;height:8px;border-radius:50%;background:${STC[k]};display:inline-block;margin-right:6px"></span>${STAGE[k]} ${c}</button>` : ''; }).join('');
+  const TB = { dan: 'b-bad', warn: 'b-warn', hold: '', '': 'b-ok' };
+  return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
+    <h2 style="flex-grow:1;font-size:18px">Monthly reports</h2>${admin && pms.length > 1 ? `<select class="cellin" style="height:36px" onchange="rpTP(this.value)"><option value="">All PMs</option>${pms.map(p => `<option value="${esc(p)}"${p === TRPM ? ' selected' : ''}>${esc(pmName(p))}</option>`).join('')}</select>` : ''}<button class="btn sm" onclick="rpTR()">Refresh</button></div>
+    <div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 20px">${months.slice(-4).map(bar).join('')}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 12px">${chips}${TRS ? '<button class="btn sm ghost" style="color:var(--ink)" onclick="rpTS(\'\')">Show all</button>' : ''}</div>
+    <div class="tw"><table class="dense"><thead><tr><th>Client / programme</th><th>PM</th><th>Stage</th><th>Deadline</th><th></th></tr></thead><tbody>
+    ${rows.map(x => `<tr><td><b>${esc(x.client || '')}</b><div class="famas">${esc(x.prog || '')}</div></td><td>${esc(pmName(x.pm))}</td>
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${STC[x.stage]};margin-right:6px"></span>${STAGE[x.stage]}</td>
+      <td><span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>${x.r && x.r.remind_pm_at ? `<div class="famas">Reminded ${esc(fmtD(new Date(x.r.remind_pm_at)))}</div>` : ''}</td>
+      <td style="white-space:nowrap;text-align:right">${x.r ? `<a class="btn sm" href="/report-generator.html?report=${+x.r.id}" target="_blank" rel="noopener">Open ↗</a>` : `<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Generator ↗</a>`}
+        ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? ` <button class="btn sm y" onclick="rpRemind(${+x.r.id},this)">Remind PM</button>` : ''}</td></tr>`).join('') || `<tr><td colspan="5" class="famas" style="padding:16px 20px">No reports for ${esc(TRM)}${TRS ? ' at this stage' : ''}.</td></tr>`}
+    </tbody></table></div><p class="note" style="margin:12px 20px">Deadlines as in the Report Generator: to the reviewer by the 5th, to the client by the 7th of the next month (Friday if that falls on a weekend). "Not started" = reported on last month, nothing yet this month.</p></section>`;
+}
+window.rpTM = m => { TRM = m; TRS = ''; render(); };
+window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
+window.rpTP = v => { TRPM = v; render(); };
+window.rpTR = async () => { TR = null; render(); await loadDr(); await loadTR(); render(); };
+window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };
+window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => x.stage === 'sent').length, od: rows.filter(x => x.t[0] === 'dan').length }; };
+window.rpLoadTR = async () => { if (TR === null) { await loadDr(); await loadTR(); } return window.rpSummary(); };
 window.rpQF = f => { QF = f; render(); };
 window.rpReload = async () => { Q = null; render(); await loadQ(); render(); };
 window.rpAct = async (id, to, btn) => {
@@ -103,6 +181,7 @@ function render() {
   const reviewer = true;   // the database returns only the reports this user may see
   v.innerHTML = `<div style="display:flex;flex-direction:column;gap:20px">
     <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
+    ${tracker()}
     ${reviewer ? `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
       <h2 style="flex-grow:1;font-size:18px">Monthly report reviews</h2>
       <button class="btn sm ${QF === 'open' ? 'y' : ''}" onclick="rpQF('open')">Needs action</button><button class="btn sm ${QF === 'all' ? 'y' : ''}" onclick="rpQF('all')">All</button><button class="btn sm" onclick="rpReload()">Refresh</button></div>
@@ -119,7 +198,19 @@ function render() {
   </div>`;
 }
 ROUTES.reports = ['Reports', 'Outputs'];
-async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await Promise.all([loadQ(), loadDr()]); render(); } }
+async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await Promise.all([loadQ(), loadDr().then(loadTR)]); render(); } }
+/* Dashboard and My work: a one-line card for the current reporting month */
+async function homeCard() {
+  const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
+  const sm = await window.rpLoadTR(); const v = $('view-' + r); if (!sm || !v) return;
+  const html = `<section class="card" id="rpdash-${r}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px"><div style="flex:1 1 260px"><b>${esc(sm.month)} reports</b>
+    <div class="famas">${sm.sent} of ${sm.n} sent to clients${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} overdue</span>` : ''}</div></div>
+    <span style="flex:1 1 160px;height:10px;border-radius:6px;background:var(--line2);overflow:hidden;display:flex"><span style="width:${sm.n ? Math.round(100 * sm.sent / sm.n) : 0}%;background:#25247B"></span></span>
+    <a class="btn sm y" href="#reports">Open monthly reports</a></section>`;
+  const old = $('rpdash-' + r); if (old) old.outerHTML = html; else v.insertAdjacentHTML('afterbegin', html);
+}
+addEventListener('hashchange', () => setTimeout(homeCard, 300));
+setTimeout(function hc() { if (P.user && D().progs) homeCard(); else setTimeout(hc, 500); }, 800);
 addEventListener('hashchange', () => setTimeout(onRoute, 0));
 const w = setInterval(() => { if (P.user && D().progs) { clearInterval(w); onRoute(); } }, 400);
 })();

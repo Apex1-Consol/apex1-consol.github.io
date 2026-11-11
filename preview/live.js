@@ -168,9 +168,10 @@
 
   /* ---------- dashboard ---------- */
   function applyDashboard() {
-    const d = P.data, linked = new Set(d.enrol.filter(e => e.status === 'active').map(e => e.learner_id));
-    const unlinked = d.learners.filter(l => !linked.has(l.id)).length, openRecs = d.recs.filter(r => !r.resolved).length;
-    $('kpis').innerHTML = [['Learners', d.learners.length, 'on record', 'var(--muted)', 'learners'], ['Active enrolments', d.enrol.filter(e => e.status === 'active').length, unlinked + ' learners unlinked', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
+    const d = P.data, test = new Set(d.learners.filter(lTest).map(l => l.id)), realL = d.learners.filter(l => !test.has(l.id));   // test records left out of the counts
+    const actE = d.enrol.filter(e => !test.has(e.learner_id) && enLive(e)), linked = new Set(actE.map(e => e.learner_id));
+    const unlinked = realL.filter(l => !linked.has(l.id)).length, openRecs = d.recs.filter(r => !r.resolved).length;
+    $('kpis').innerHTML = [['Learners', realL.length, 'on record', 'var(--muted)', 'learners'], ['Active enrolments', actE.length, unlinked + ' learners unlinked', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
       ['Active programmes', d.progs.filter(p => p.status === 'active').length, 'in delivery', 'var(--muted)', 'programmes'], ['Open recommendations', openRecs, 'from monitoring visits', openRecs ? 'var(--bad)' : 'var(--muted)', 'recs'],
       ['Waiting for sign-off', d.signoffs.filter(s => s.status === 'waiting').length, 'admin decisions', 'var(--muted)', 'signoff']]
       .map(([l, v, n, c, h]) => `<a class="kpi" href="#${h}"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${c}">${n}</span></a>`).join('');

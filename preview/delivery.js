@@ -241,11 +241,21 @@
 
   /* ---------- Attendance & PoE ---------- */
   let addOpen = false;
+  /* Attendance below 80% per programme (as the Report Generator dashboard warns). R = late counts as attended. */
+  function attWarn() {
+    const by = {}; (D().att || []).forEach(a => { const st = String(a.status || (a.fields || {}).Status || '').toUpperCase().slice(0, 1); if (!'PAR'.includes(st) || !st) return; const o = by[a.programme_id] = by[a.programme_id] || [0, 0]; o[1]++; if (st !== 'A') o[0]++; });
+    const low = Object.entries(by).map(([pid, [ok, n]]) => ({ p: prog(+pid), pct: Math.round(100 * ok / n), n })).filter(x => x.p && !x.p.deleted_at && x.p.status !== 'closed' && x.pct < 80).sort((a, b) => a.pct - b.pct);
+    let el = $('attwarn'); if (!el) { $('atabs').insertAdjacentHTML('beforebegin', '<section class="card" id="attwarn" style="margin-bottom:12px"></section>'); el = $('attwarn'); }
+    el.hidden = !low.length;
+    el.innerHTML = low.length ? `<b>Attendance below 80%</b> <span class="sub">(${low.length} programme${low.length === 1 ? '' : 's'})</span><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${low.map(x => `<button class="btn sm" onclick="dvAttPick(${x.p.id})"><span class="badge ${x.pct < 50 ? 'b-bad' : 'b-warn'}">${x.pct}%</span>&nbsp;${esc(x.p.programme_name || '')}${x.p.group_name ? ' · ' + esc(x.p.group_name) : ''}</button>`).join('')}</div>` : '';
+  }
+  window.dvAttPick = id => { dProg = id; aTab = 'Register'; renderAtt(); };
   const _renderAtt = renderAtt;
   renderAtt = function () {
     if (!P.user) return _renderAtt();
     const p = ensure();
     picker('#view-attendance select', renderAtt);
+    attWarn();
     $('atabs').innerHTML = ['Register', 'PoE tracker', 'Documents'].map(t => `<button class="${t === aTab ? 'on' : ''}" onclick="aTab='${t}';renderAtt()">${t}</button>`).join('');
     $('regcard').hidden = aTab !== 'Register'; $('poecard').hidden = aTab !== 'PoE tracker'; renderDocs(p);
     if (!p) { $('register').innerHTML = '<tbody><tr><td class="sub">No programmes with learners.</td></tr></tbody>'; $('poetable').innerHTML = ''; return; }
