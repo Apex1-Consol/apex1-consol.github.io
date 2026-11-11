@@ -1037,7 +1037,8 @@
     return ['ok', 'Registered until ' + fmt(exp)];
   };
   const niceN = v => { const n = String(v || '').replace(/\s+/g, ' ').trim(); return n === n.toLowerCase() || n === n.toUpperCase() ? n.toLowerCase().replace(/(^|[\s:(\/-])([a-z])/g, (m, s, c) => s + c.toUpperCase()) : n; };
-  const grpTag = (p, progs) => p && progs.filter(x => niceN(x.programme_name).toLowerCase() === niceN(p.programme_name).toLowerCase()).length > 1 ? ' · ' + (p.group_name || '#' + p.id) : '';
+  const grpTag = (p, progs) => { if (!p) return ''; const k = niceN(p.programme_name).toLowerCase(), same = progs.filter(x => niceN(x.programme_name).toLowerCase() === k); if (same.length < 2) return '';
+    const g = p.group_name && same.filter(x => x.group_name === p.group_name).length === 1 ? p.group_name : (p.group_name ? p.group_name + ' ' : '') + '#' + p.id; return ' · ' + g; };
   function assigns() {
     // public.fam_bookings is the only source of who is booked on what (Stavros, 10 Nov 2026). Cancelled bookings are ignored.
     const out = [], progs = (P.data && P.data.progs) || [];
@@ -1155,7 +1156,7 @@
     const o = (v, l, cur) => `<option value="${e(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${e(l)}</option>`;
     const pn = p => niceN(p.programme_name) || 'Programme ' + p.id;
     const pk = p => pn(p).toLowerCase(), pc = {}; progs.forEach(p => pc[pk(p)] = (pc[pk(p)] || 0) + 1);
-    const pl = p => pn(p) + (pc[pk(p)] > 1 ? ' · ' + (p.group_name || '#' + p.id) : '');
+    const pl = p => pn(p) + grpTag(p, progs);
     progs.sort((x, y) => pl(x).localeCompare(pl(y), undefined, { numeric: true }));
     const cur = { aid: b.assessor_id || aid || '', pid: b.programme_id || pid || '' };
     modal(id ? 'Edit booking' : 'New booking', `<div class="qagrid">
