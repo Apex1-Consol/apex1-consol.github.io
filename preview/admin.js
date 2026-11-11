@@ -241,29 +241,40 @@
   /* ---------- User management ---------- */
   const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer'], ['fam_admin', 'FAM Registry only']];
   let US = null;
+  // Live: the user-admin Edge Function (service key stays server-side; it re-checks the caller is admin). Same calls as the old app.
+  async function ua(action, payload) {
+    const { data, error } = await sb.functions.invoke('user-admin', { body: { action, ...payload } });
+    if (error) { let m = error.message || 'Request failed'; try { const c = await error.context?.json?.(); if (c?.error) m = c.error; } catch (_) {} throw new Error(m); }
+    if (data?.error) throw new Error(data.error);
+    return data;
+  }
+  const rl = r => Array.isArray(r) ? r.filter(Boolean).map(String) : r ? [String(r)] : [];
   async function renderUsers() {
     const v = $('view-users');
     if (!has()) { v.innerHTML = locked('User management', 'admin'); return; }
-    if (!US) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>'; const r = await sb.rpc('preview_list_users'); if (r.error) { US = null; v.innerHTML = head('User management', 'Who can sign in and what they can do') + `<div class="empty"><b>User management is not set up yet</b><span>Run migrations/preview_user_admin.sql in the Supabase SQL editor for apexone-preview. (${esc(r.error.message)})</span></div>`; return; } US = r.data || []; }
+    if (!US) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>'; try { US = ((await ua('list', {})).users || []).sort((a, b) => (a.email || '').localeCompare(b.email || '')); } catch (e) { v.innerHTML = head('User management', 'Who can sign in and what they can do') + `<div class="empty"><b>Could not load users</b><span>${esc(e.message)}</span></div>`; return; } }
     const me = (P.user?.email || '').toLowerCase();
     v.innerHTML = head('User management', 'Who can sign in and what they can do. A role change applies when that person next signs in.', '<button class="btn y" onclick="adUserAdd()">+ Add user</button>')
-      + `<section class="card" style="padding:0"><div class="tw"><table class="dense">${H(['Email', 'Roles', 'Signed up', 'Last sign-in', 'Note', ''])}<tbody>
-      ${US.map((u, i) => `<tr><td><b>${esc(u.email)}</b>${u.email === me ? ' <span class="badge">You</span>' : ''}</td>
-        <td><div style="display:flex;flex-wrap:wrap;gap:4px 12px">${ROLES.map(([k, l]) => `<label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-u="${i}" value="${k}"${(u.roles || []).includes(k) ? ' checked' : ''}> ${l}</label>`).join('')}</div></td>
-        <td>${u.signed_up ? '<span class="badge b-ok">Yes</span>' : '<span class="badge b-warn">Not yet</span>'}</td><td>${u.last_sign_in_at ? fmtD(day(u.last_sign_in_at)) : 'never'}</td><td>${esc(u.note || '')}</td>
-        <td style="white-space:nowrap"><button class="btn sm y" onclick="adUserSave(${i})">Save</button>${u.email === me ? '' : ` <button class="btn sm" style="color:var(--bad)" onclick="adUserRemove(${i})">Remove</button>`}</td></tr>`).join('') || none(6, 'No users.')}
-      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Remove takes away roles and access; the sign-in account itself is kept. Every change is written to the audit log.</p></section>`;
+      + `<section class="card" style="padding:0"><div class="tw"><table class="dense">${H(['Email', 'Name', 'Roles', 'Last sign-in', ''])}<tbody>
+      ${US.map((u, i) => `<tr><td><b>${esc(u.email)}</b>${(u.email || '').toLowerCase() === me ? ' <span class="badge">You</span>' : ''}</td>
+        <td><input class="cellin" id="un-${i}" value="${esc(u.name || '')}" style="height:32px;min-width:140px"></td>
+        <td><div style="display:flex;flex-wrap:wrap;gap:4px 12px">${ROLES.map(([k, l]) => `<label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-u="${i}" value="${k}"${rl(u.role).includes(k) ? ' checked' : ''}> ${l}</label>`).join('')}</div></td>
+        <td>${u.last_sign_in_at ? fmtD(day(u.last_sign_in_at)) : '<span class="badge b-warn">never</span>'}</td>
+        <td style="white-space:nowrap"><button class="btn sm y" onclick="adUserSave(${i})">Save</button>${(u.email || '').toLowerCase() === me ? '' : ` <button class="btn sm" style="color:var(--bad)" onclick="adUserRemove(${i})">Delete</button>`}</td></tr>`).join('') || none(5, 'No users.')}
+      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email.</p></section>`;
   }
-  const setRoles = async (email, roles, note) => { try { await write('User', () => sb.rpc('preview_set_user_roles', { p_email: email, p_roles: roles, p_note: note || null })); US = null; say('Saved. Applies at their next sign-in.'); renderUsers(); } catch (e) {} };
-  window.adUserSave = i => { const roles = [...document.querySelectorAll(`#view-users input[data-u="${i}"]:checked`)].map(x => x.value); if (!roles.length) return say('Pick at least one role, or use Remove'); setRoles(US[i].email, roles); };
-  window.adUserRemove = async i => { if (!confirm(`Remove access for ${US[i].email}?`)) return; try { await write('User', () => sb.rpc('preview_remove_user', { p_email: US[i].email })); US = null; say('Access removed'); renderUsers(); } catch (e) {} };
+  const run = async (fn, ok) => { try { await fn(); US = null; say(ok); renderUsers(); } catch (e) { say('Not saved: ' + e.message); } };
+  window.adUserSave = i => { const roles = [...document.querySelectorAll(`#view-users input[data-u="${i}"]:checked`)].map(x => x.value); if (!roles.length) return say('Pick at least one role, or use Delete'); const u = US[i];
+    run(() => ua('update', { user_id: u.id, role: roles, name: ($('un-' + i)?.value || '').trim(), tenant: u.tenant || 'apex-academy' }), 'Saved. Applies at their next sign-in.'); };
+  window.adUserRemove = i => { const u = US[i]; if (!confirm(`Delete the sign-in account of ${u.email}? This cannot be undone.`)) return; run(() => ua('delete', { user_id: u.id }), 'User deleted'); };
   window.adUserAdd = () => {
     const email = (prompt('Email address (@apexu.co.za)') || '').trim().toLowerCase(); if (!email) return;
     if (!/^[^@\s]+@apexu\.co\.za$/.test(email)) return say('Only @apexu.co.za addresses');
     const r = prompt('Roles, comma separated: ' + ROLES.map(x => x[0]).join(', '), 'project_manager'); if (!r) return;
     const roles = r.split(',').map(x => x.trim()).filter(Boolean), bad = roles.filter(x => !ROLES.some(y => y[0] === x));
     if (bad.length) return say('Unknown role: ' + bad.join(', '));
-    setRoles(email, roles, prompt('Note (optional)', '') || null);
+    const name = (prompt('Full name', '') || '').trim();
+    run(() => ua('invite', { email, role: roles, name, tenant: 'apex-academy' }), 'Invitation sent to ' + email);
   };
 
   /* ---------- routing ---------- */
