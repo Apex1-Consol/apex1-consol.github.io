@@ -833,7 +833,7 @@
     const kgrp = (title, ks, bar) => { const ks2 = K.filter(x => ks.includes(x[0])), tot = ks2.reduce((n, x) => n + x[2], 0);
       return `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}${bar && tot ? `<div class="famstack" aria-hidden="true">${ks2.filter(x => x[2]).map(([, l, v, c]) => `<i style="flex:${v};background:${c}" title="${l}: ${v}"></i>`).join('')}</div>` : ''}<div class="famgk">${ks2.filter(x => x[2] || S.filter === x[0]).map(kbtn).join('')}</div>${ks2.some(x => !x[2] && S.filter !== x[0]) ? `<div class="famzero">${ks2.filter(x => !x[2] && S.filter !== x[0]).map(([k, l]) => `<button class="famz" onclick="famFilter('${k}')">${l} <b>0</b></button>`).join('')}</div>` : ''}</div>`; };
     $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
-    renderStrip(); renderCov(); renderRows(); renderPanel();
+    renderStrip(); renderCov(); renderRows(); renderPanel(); try { famBadge(); } catch (_) {}
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue(); else if (S.mode === 'calendar') renderCal();
   }
 
@@ -1328,21 +1328,21 @@
   const unbooked = AS => progsNow().filter(p => p.pid && p.start && p.start <= addD(today(), 30) && (!p.end || p.end >= today()) && !AS.some(x => x.live && x.pid === p.pid));
   const calF = (f, a, AS) => !f || (f === 'now' ? AS.some(x => x.a.id === a.id && x.now) : f === 'risk' ? AS.some(x => x.a.id === a.id && x.live && x.el[0] !== 'ok') : f === 'load' ? !!overLoad(a, AS) : f === 'free' ? !AS.some(x => x.a.id === a.id && x.live) && suitable(a).length > 0 : true);
   function calNeeds(AS) {
-    const V = new Set(vis().map(a => a.id)), t = today(), out = [], byA = {}, nm2 = a => `<a href="#fam/${a.id}">${e(shownName(a))}</a>`, fix = (bid, l) => `<button class="btn sm" onclick="famCal('sel',${bid})">${l || 'Fix'}</button>`;
+    const V = new Set(vis().map(a => a.id)), t = today(), out = [], byA = {}, nm2 = a => `<a href="#fam/${a.id}">${e(shownName(a))}</a>`, fix = (bid, l) => `<button class="btn sm" onclick="famFix(${bid})">${l || 'Fix'}</button>`;
     AS.filter(x => x.live && V.has(x.a.id)).forEach(x => (byA[x.a.id] = byA[x.a.id] || []).push(x));
     Object.values(byA).forEach(M => { const a = M[0].a, rk = M.filter(x => x.el[0] !== 'ok');
       if (rk.length) { const w = rk.find(x => x.el[0] === 'bad') || rk[0], rp = renPend(a);
-        out.push({ lvl: w.el[0] === 'bad' && !rp ? 'bad' : 'warn', html: `${nm2(a)}: ${e(w.el[1])} · ${rk.length > 1 ? rk.length + ' bookings' : e(w.title)}${rp ? ' <span class="badge b-warn">Renewal in progress</span>' : ''}`, btn: fix(w.bid) }); }
+        out.push({ k: 'risk', aid: a.id, bid: w.bid, lvl: w.el[0] === 'bad' && !rp ? 'bad' : 'warn', html: `${nm2(a)}: ${e(w.el[1])} · ${rk.length > 1 ? rk.length + ' bookings' : e(w.title)}${rp ? ' <span class="badge b-warn">Renewal in progress</span>' : ''}`, btn: fix(w.bid) }); }
       const dx = M.map(x => [x, docsBefore(a, x)]).find(([, d]) => d.length);
-      if (dx) { const [x, d] = dx; out.push({ lvl: d[0].expiry_date < t ? 'bad' : 'warn', html: `${nm2(a)}: ${e(d[0].doc_type)} ${d[0].expiry_date < t ? 'expired' : 'expires'} ${fmt(d[0].expiry_date)}, before ${e(x.title)} ends`, btn: fix(x.bid) }); }
+      if (dx) { const [x, d] = dx; out.push({ k: 'doc', aid: a.id, bid: x.bid, lvl: d[0].expiry_date < t ? 'bad' : 'warn', html: `${nm2(a)}: ${e(d[0].doc_type)} ${d[0].expiry_date < t ? 'expired' : 'expires'} ${fmt(d[0].expiry_date)}, before ${e(x.title)} ends`, btn: fix(x.bid) }); }
       const pk = peak(M, t, addD(t, 182)), lim = dpwLim(a);
-      if (pk > lim) out.push({ lvl: 'warn', html: `${nm2(a)}: ${pk} days a week at the busiest, over the ${lim}-day limit`, btn: `<button class="btn sm" onclick="famCal('who',${a.id})">Review</button>` });
-      M.forEach(x => { const w = awayIn(a, x.start, x.end); if (w) out.push({ lvl: 'warn', html: `${nm2(a)}: unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + e(w.reason) + ')' : ''} during ${e(x.title)}`, btn: fix(x.bid) }); });
-      M.filter(x => x.role === 'Moderator' && x.pid && M.some(y => y.role === 'Assessor' && y.pid === x.pid)).forEach(x => out.push({ lvl: 'bad', html: `${nm2(a)}: assessor and moderator on ${e(x.title)}`, btn: fix(x.bid) })); });
+      if (pk > lim) out.push({ k: 'load', aid: a.id, lvl: 'warn', html: `${nm2(a)}: ${pk} days a week at the busiest, over the ${lim}-day limit`, btn: `<button class="btn sm" onclick="famFix(${a.id},'who')">Review</button>` });
+      M.forEach(x => { const w = awayIn(a, x.start, x.end); if (w) out.push({ k: 'away', aid: a.id, bid: x.bid, lvl: 'warn', html: `${nm2(a)}: unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + e(w.reason) + ')' : ''} during ${e(x.title)}`, btn: fix(x.bid) }); });
+      M.filter(x => x.role === 'Moderator' && x.pid && M.some(y => y.role === 'Assessor' && y.pid === x.pid)).forEach(x => out.push({ k: 'conf', aid: a.id, bid: x.bid, lvl: 'bad', html: `${nm2(a)}: assessor and moderator on ${e(x.title)}`, btn: fix(x.bid) })); });
     const ub = unbooked(AS), C = S.cal || {}, fin = (S.BK || []).filter(b => (b.status === 'Planned' || b.status === 'Confirmed') && d10(b.end_date) && d10(b.end_date) < t && V.has(b.assessor_id));
-    if (fin.length) out.push({ lvl: 'warn', html: `${fin.length} booking${fin.length === 1 ? ' has' : 's have'} ended but ${fin.length === 1 ? 'is' : 'are'} not marked Done`, btn: `<button class="btn sm" onclick="famCal('fin',${!C.fin})">${C.fin ? 'Hide' : 'Review'}</button>`,
+    if (fin.length) out.push({ k: 'fin', lvl: 'warn', html: `${fin.length} booking${fin.length === 1 ? ' has' : 's have'} ended but ${fin.length === 1 ? 'is' : 'are'} not marked Done`, btn: `<button class="btn sm" onclick="famCal('fin',${!C.fin})">${C.fin ? 'Hide' : 'Review'}</button>`,
       more: C.fin ? fin.map(b => `<div class="fcnd" style="padding-left:22px"><span style="flex-grow:1">${e(shownName(S.A.find(a => a.id === b.assessor_id) || {}))} · ${e(niceN(b.title))} <span class="sub">ended ${fmt(b.end_date)}</span></span>${canWrite() ? `<button class="btn sm" onclick="famBkDone([${b.id}])">Mark Done</button>` : ''}</div>`).join('') + (canWrite() && fin.length > 1 ? `<div style="padding:6px 0 0 22px"><button class="btn sm" onclick="famBkDone([${fin.map(b => b.id).join(',')}])">Mark all ${fin.length} Done</button></div>` : '') : '' });
-    if (ub.length) out.push({ lvl: 'warn', html: `${ub.length} programme${ub.length === 1 ? '' : 's'} running or starting within 30 days with no one booked`, btn: `<button class="btn sm" onclick="famCal('unb',${!C.unb})">${C.unb ? 'Hide' : 'View'}</button>`,
+    if (ub.length) out.push({ k: 'unb', lvl: 'warn', html: `${ub.length} programme${ub.length === 1 ? '' : 's'} running or starting within 30 days with no one booked`, btn: `<button class="btn sm" onclick="famCal('unb',${!C.unb})">${C.unb ? 'Hide' : 'View'}</button>`,
       more: C.unb ? ub.slice(0, 40).map(p => `<div class="fcnd" style="padding-left:22px"><span style="flex-grow:1">${e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span></span>${canWrite() ? `<button class="btn sm" onclick="famBook(null,null,${p.pid})">Book</button>` : ''}</div>`).join('') + (ub.length > 40 ? `<div class="sub" style="padding-left:22px">and ${ub.length - 40} more</div>` : '') : '' });
     return out.sort((p, q) => (p.lvl === 'bad' ? 0 : 1) - (q.lvl === 'bad' ? 0 : 1));
   }
@@ -1382,6 +1382,13 @@
     const tb = C.ptab === 'p' || !x ? 'p' : 'b';
     return (x ? `<div class="fcptabs" role="tablist"><button type="button" role="tab" aria-selected="${tb === 'b'}" class="${tb === 'b' ? 'on' : ''}" onclick="famCal('ptab','b')">This booking</button><button type="button" role="tab" aria-selected="${tb === 'p'}" class="${tb === 'p' ? 'on' : ''}" onclick="famCal('ptab','p')">${e(shownName(a))}</button></div>` : '') + (tb === 'p' ? pView(a) : bView(x));
   }
+  window.famFix = (id, mode) => { if (window.famToday) famToday(false); S.cal = S.cal || {}; if (mode === 'unb' || mode === 'fin') S.cal[mode] = true;
+    const go = () => { if (mode === 'unb' || mode === 'fin') famCal('allN', true); else famCal(mode === 'who' ? 'who' : 'sel', id); };
+    if (!/^#fam\/calendar/.test(location.hash)) { location.hash = 'fam/calendar'; setTimeout(go, 350); } else go(); };
+  window.famBadge = () => { const b = $('rpbtn'); if (!b) return; let x = $('rpbadge'); const n = /^#fam/.test(location.hash) && S.A && S.A.length ? calNeeds(assigns()).filter(i => i.lvl === 'bad').length : 0;
+    if (!x) { b.style.position = 'relative'; b.insertAdjacentHTML('beforeend', '<span id="rpbadge" style="position:absolute;top:-4px;right:-4px;min-width:18px;height:18px;border-radius:9px;background:var(--bad,#C62828);color:#fff;font-size:11px;font-weight:700;line-height:18px;text-align:center;padding:0 4px;box-sizing:border-box;pointer-events:none"></span>'); x = $('rpbadge'); }
+    x.textContent = n; x.style.display = n ? '' : 'none'; b.title = n ? `Today: ${n} problem${n === 1 ? '' : 's'} need action` : b.title; };
+  window.addEventListener('hashchange', () => setTimeout(() => { try { famBadge(); } catch (_) {} }, 0));
   window.famBkDone = async ids => { if (!confirm(`Mark ${ids.length} booking${ids.length === 1 ? '' : 's'} as Done?`)) return;
     try { const r = await write('Booking', () => sb.from('fam_bookings').update({ status: 'Done', updated_by: me() }).in('id', ids).select('id'));
       say(r?.length === ids.length ? 'Marked Done' : `Marked ${r?.length || 0} of ${ids.length}. You can only change bookings you created, or ask a FAM admin.`); await load(); } catch (_) {} };
@@ -1392,7 +1399,7 @@
       if (!r?.length) return say('Could not swap. Only the person who made the booking or a FAM admin can change it.'); S.cal.sel = ''; say('Swapped'); await load(); } catch (_) {} };
   window.famCal = (k, v) => { S.cal = S.cal || {}; const C = S.cal; if (k === 'move') C.from = addD(C.from || monday(today()), v * 7); else if (k === 'today') C.from = monday(today());
     else if (k === 'open') { C.open = C.open || {}; const key = decodeURIComponent(v); C.open[key] = !C.open[key]; } else if (k === 'regroup') C.open = {}; else if (k === 'close') C.sel = C.who = ''; else if (k === 'sel') { C.sel = v; C.who = ''; C.ptab = 'b'; } else if (k === 'who') { const b = (S.BK || []).find(y => y.id === +C.sel); if (!b || b.assessor_id !== +v) C.sel = ''; C.who = v; C.ptab = 'p'; } else if (k === 'f') C.f = C.f === v ? '' : v; else C[k] = v;
-    renderCal(); if ((k === 'sel' || k === 'who') && v) setTimeout(() => $('fcpanel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0); };
+    renderCal(); try { famBadge(); } catch (_) {} if ((k === 'sel' || k === 'who') && v) setTimeout(() => $('fcpanel')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 0); };
   function renderCal() {
     const box = $('famprof'), C = S.cal = S.cal || {}, from = C.from || (C.from = monday(today())), WK = 13, to = addD(from, WK * 7), span = WK * 7;
     $('heading').textContent = 'FAM Calendar'; $('crumb').textContent = 'Quality / FAM Registry';
@@ -1548,12 +1555,15 @@
     // every row: sec, main html, btns html, over/week flags, follow-up ref (for claim/snooze), owner
     const I = [], mine = me(), w7 = addD(t, 7);
     const fuBtns = x => !x.ref || !canWrite() ? '' : (x.owner === mine ? '' : `<button class="btn sm" onclick="TDfu('claim',${x.n})">Assign to me</button>`) + `<button class="btn sm" onclick="TDfu('snooze',${x.n})" title="Hide from Today for 7 days">Snooze</button><button class="btn sm" onclick="TDfu('note',${x.n})">Note</button>` + (x.sec === 3 ? `<button class="btn sm" onclick="TDfu('due',${x.n})">Due date</button>` : '');
-    const ct = id => { const a = A(id); return !a ? '' : (a.email ? `<a class="btn sm" href="mailto:${e(a.email)}" title="${e(a.email)}">Email</a>` : '') + (a.phone ? `<a class="btn sm" href="tel:${e(String(a.phone).replace(/[^\d+]/g, ''))}" title="${e(a.phone)}">Call</a>` : ''); };
+    const ct = id => { const a = A(id); return !a ? '' : (a.email ? `<a class="btn sm" href="mailto:${e(a.email)}" title="${e(a.email)}">Email</a>` : '') + (a.phone ? `<a class="btn sm" href="tel:${e(String(a.phone).replace(/[^\d+]/g, ''))}" title="${e(a.phone)}">Call</a>` : '') + (!a.email && !a.phone ? `<span class="sub" style="font-size:12px;align-self:center">No email or phone</span>${canWrite() ? `<button class="btn sm" onclick="famTodayGo('fam/${a.id}')">Add</button>` : ''}` : ''); };
     const add = x => { const f = x.ref ? fu(x.ref[0], x.ref[1]) : null; if (x.fu) Object.assign(x, { owner: x.fu.assigned_to || null, snz: x.fu.snoozed_until }); else if (f) Object.assign(x, { owner: CLOSED.includes(f.status) ? null : f.assigned_to || null, snz: f.snoozed_until }); x.n = I.length; I.push(x); };
     // at risk
-    const rk = x => `${x.a.id}|${x.role}|${x.title}|${x.start || ''}`; TD.rk = [];
-    assigns().filter(x => x.live && x.el[0] !== 'ok' && vids.has(x.a.id)).sort((a, b) => (a.start || '').localeCompare(b.start || ''))
-      .forEach(x => add({ sec: 0, aid: x.a.id, over: x.el[0] === 'bad', week: !!x.start && x.start <= w7, main: `${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">${e(x.el[1])}</div>`, btns: `<button class="btn sm" onclick="famTodayCover(${TD.rk.push(rk(x)) - 1},'risk')">Find cover</button>` }));
+    TD.rk = []; const AS0 = assigns();
+    calNeeds(AS0).forEach(n => add({ sec: 0, aid: n.aid, over: n.lvl === 'bad', week: false, ref: n.k === 'risk' ? ['practitioner', n.aid * 10 + 3, n.aid, 'pending'] : null,
+      main: `<div style="color:var(--${n.lvl === 'bad' ? 'bad' : 'warn'});font-size:12px;font-weight:600">${{ risk: 'Registration', doc: 'Document', load: 'Workload', away: 'Unavailable', conf: 'Conflict', fin: 'Bookings', unb: 'Programmes' }[n.k] || ''}</div>${n.html.replace(/<a href="#fam\//g, '<a onclick="famToday(false)" href="#fam/')}`,
+      btns: n.k === 'unb' || n.k === 'fin' ? `<button class="btn sm" onclick="famFix(0,'${n.k}')">Open on calendar</button>` : n.k === 'load' ? `<button class="btn sm" onclick="famFix(${n.aid},'who')">Review</button>` : `<button class="btn sm" onclick="famFix(${n.bid})">Fix</button>` }));
+    AS0.filter(x => x.live && x.start && x.start >= t && x.start <= w7 && vids.has(x.a.id)).sort((a, b) => a.start.localeCompare(b.start))
+      .forEach(x => add({ sec: 6, aid: x.a.id, week: true, d: x.start, main: `${pl(x.a)} <span class="sub">· ${e(x.role)} · ${e(x.title)}</span><div class="sub">Starts ${fmt(x.start)}${x.bk && x.bk.client_name ? ' · ' + e(x.bk.client_name) : ''}</div>`, btns: `<button class="btn sm" onclick="famFix(${x.bid})">Open</button>` }));
     // renewals to review
     (S.RN || []).filter(x => x.status === 'Uploaded' && vids.has(x.assessor_id)).forEach(x => { const r = S.R.find(y => y.id === x.registration_id);
       add({ sec: 1, aid: x.assessor_id, week: true, main: `${pl(A(x.assessor_id))}<div class="sub">${e(r?.seta_name ? r.seta_name + ' registration' : x.doc_type)}${x.proposed_expiry ? ' · new expiry ' + fmt(x.proposed_expiry) : ''}</div>`,
@@ -1587,7 +1597,7 @@
         btns: canWrite() ? `<button class="btn sm" onclick="famFU('done','${e(f.source_type)}',${f.source_id},${f.assessor_id},'${e(f.kind)}')">Done</button>` : '' }));
     TD.I = I;
     const live = I.filter(x => !(x.snz && x.snz > t)), snoozed = I.length - live.length;
-    const CH = [['over', 'Overdue', x => x.over, 'b-bad'], ['week', 'This week', x => x.week, 'b-warn'], ['unas', 'Unassigned', x => x.ref && !x.owner, ''], ['mine', 'Mine', x => x.owner === mine, 'b-ok']];
+    const CH = [['over', 'Urgent', x => x.over, 'b-bad'], ['week', 'Due or starting this week', x => x.week, 'b-warn'], ['unas', 'Unassigned', x => x.ref && !x.owner, ''], ['mine', 'Mine', x => x.owner === mine, 'b-ok']];
     const cf = CH.find(c => c[0] === TD.f), list = TD.snz ? I.filter(x => x.snz && x.snz > t) : cf ? live.filter(cf[2]) : live;
     const chips = CH.map(([k, l, fn, c]) => `<button class="tdchip${TD.f === k && !TD.snz ? ' on' : ''}" onclick="TDf('${k}')" aria-pressed="${TD.f === k && !TD.snz}"><span class="badge ${c}">${live.filter(fn).length}</span> ${l}</button>`).join('')
       + (snoozed ? `<button class="tdchip${TD.snz ? ' on' : ''}" onclick="TDsnz()" aria-pressed="${!!TD.snz}"><span class="badge">${snoozed}</span> Snoozed</button>` : '');
@@ -1595,7 +1605,7 @@
     const DT = [...S.F.filter(f => vids.has(f.assessor_id) && f.status === 'Done' && (f.resolved_at || '').slice(0, 10) === t).map(f => `${pl(A(f.assessor_id))} <span class="sub">· ${e(f.source_type === 'manual' ? (f.notes || 'Follow-up') : (KIND[f.kind] || f.kind))}</span>`),
       ...(S.RN || []).filter(x => vids.has(x.assessor_id) && x.status === 'Approved' && (x.reviewed_at || '').slice(0, 10) === t).map(x => `${pl(A(x.assessor_id))} <span class="sub">· Renewal approved</span>`)];
     const done = DT.length ? `<details class="card" style="padding:12px 14px"><summary style="cursor:pointer;font-weight:600">Done today <span class="badge b-ok">${DT.length}</span></summary>${DT.map(h => `<div class="tdi">${h}</div>`).join('')}</details>` : '';
-    const SECS = ['At risk allocations', 'Renewals to review', 'Expired or expiring in 30 days', 'Follow-ups', 'Compliance and POPIA', 'Delivery reviews due'];
+    const SECS = ['Needs action', 'Renewals to review', 'Expired or expiring in 30 days', 'Follow-ups', 'Compliance and POPIA', 'Delivery reviews due', 'Starting this week'];
     const body = SECS.map((s, k) => { const L = list.filter(x => x.sec === k).sort((a, b) => k === 2 ? (b.esc ? 1 : 0) - (a.esc ? 1 : 0) || a.d.localeCompare(b.d) : 0); return L.length ? `<section class="card" style="padding:12px 14px"><h3>${s} <span class="badge">${L.length}</span></h3>${L.map(row).join('')}</section>` : ''; }).join('');
     const { dup, iss } = calIssues(), nIss = dup.length + iss.length;
     const people = vis().slice().sort((a, b) => shownName(a).localeCompare(shownName(b)));
