@@ -30,5 +30,5 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Programmes | **Moved** (#72, sign-off #73): stages, search, overview, Form 3 (program_modules.components added on live), edit, Activate/Close, CSV | Sign-off queue, + Add Programme and PM Tracker stay in the old app (?classic=1) |
 | Dashboard | Real counts (home page) | Confirm KPI definitions |
 | Data quality | Real issues; decisions write | Merge procedure (approver not decided) |
-| QCTO Tracker, Moderation, Accreditation, Sign-off queue | Tables on live since 11 Nov (migration qa_tables_live), empty; no ClickUp sync | Fill tracker from enrolments; import spreadsheets |
+| QCTO Tracker, Moderation, Accreditation, Sign-off queue | On live since 11 Nov (qa_tables_live). Tracker has one row per real enrolment (257) + trigger qcto_tracker_add on new enrolments. Moderation/Accreditation empty (no spreadsheets); no ClickUp sync | Staff capture |
 | Reports, Audit, Users | Stay in the old app | — |
