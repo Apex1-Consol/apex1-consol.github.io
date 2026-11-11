@@ -90,6 +90,7 @@ function render() {
   const opt = (list, cur, all) => `<option value="">${all}</option>` + list.map(([k, l]) => `<option value="${esc(k)}"${k === cur ? ' selected' : ''}>${esc(l)}</option>`).join('');
   const reviewer = true;   // the database returns only the reports this user may see
   v.innerHTML = `<div style="display:flex;flex-direction:column;gap:20px">
+    <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
     ${reviewer ? `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
       <h2 style="flex-grow:1;font-size:18px">Monthly report reviews</h2>
       <button class="btn sm ${QF === 'open' ? 'y' : ''}" onclick="rpQF('open')">Needs action</button><button class="btn sm ${QF === 'all' ? 'y' : ''}" onclick="rpQF('all')">All</button><button class="btn sm" onclick="rpReload()">Refresh</button></div>
