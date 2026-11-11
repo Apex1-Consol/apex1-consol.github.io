@@ -65,7 +65,7 @@ function tone(x, month) {
   if (t >= warn) return ['warn', 'Due ' + fmtD(due)];
   return ['', 'Due ' + fmtD(due)];
 }
-let TR = null, TRM = null, TRS = '', TRPM = '';
+let TR = null, TRM = null, TRS = '', TRPM = '', TRV = 'prog';
 async function loadTR() {
   const r = await R.from('reports').select('id,programme_id,client_name_snapshot,programme_name_snapshot,month,status,submitted_by_email,hold_until,remind_pm_at').neq('status', 'archived');
   if (r.error) { TR = { err: r.error.message }; return; }
@@ -85,12 +85,13 @@ async function loadTR() {
     rows.forEach(x => { x.t = tone(x, m); });
     byM[m] = rows;
   });
-  TR = { byM, cur: mName(cur) }; if (!TRM || !byM[TRM]) TRM = byM[TR.cur] ? TR.cur : Object.keys(byM).pop();
+  TR = { byM, cur: mName(cur), curI: cur, reps }; if (!TRM || !byM[TRM]) TRM = byM[TR.cur] ? TR.cur : Object.keys(byM).pop();
 }
 const acts = x => { if (!x.r) return []; const q = (Q || []).find(r => r.id === x.r.id); return ((q && q.next_actions) || []).filter(a => a !== 'archived' && a !== 'pending'); };
 window.rpNote = id => { const t = $('rpn-row-' + id); if (t) { t.hidden = !t.hidden; if (!t.hidden) $('rpn-' + id).focus(); } };
 const pmName = e => String(e || 'Unassigned').split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-function tracker() {
+function tracker() { const h = trackerM(); if (TRV !== 'prog' || !h.includes('<!--TRBODY-->')) return h; return h.slice(0, h.indexOf('<!--TRBODY-->')) + progView() + '</section>'; }
+function trackerM() {
   if (TR === null) return '';
   if (TR.err) return `<section class="card"><b>Monthly reports</b><div class="famas">Could not load: ${esc(TR.err)}</div></section>`;
   const admin = has(), months = Object.keys(TR.byM), f = rows => rows.filter(x => !TRPM || x.pm === TRPM);
@@ -105,7 +106,8 @@ function tracker() {
   const chips = Object.keys(STAGE).map(k => { const c = all.filter(x => x.stage === k).length; return c ? `<button class="btn sm ${TRS === k ? 'y' : ''}" onclick="rpTS('${k}')"><span style="width:8px;height:8px;border-radius:50%;background:${STC[k]};display:inline-block;margin-right:6px"></span>${STAGE[k]} ${c}</button>` : ''; }).join('');
   const TB = { dan: 'b-bad', warn: 'b-warn', hold: '', '': 'b-ok' };
   return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
-    <h2 style="flex-grow:1;font-size:18px">Monthly reports</h2>${admin && pms.length > 1 ? `<select class="cellin" style="height:36px" onchange="rpTP(this.value)"><option value="">All PMs</option>${pms.map(p => `<option value="${esc(p)}"${p === TRPM ? ' selected' : ''}>${esc(pmName(p))}</option>`).join('')}</select>` : ''}<button class="btn sm" onclick="rpTR()">Refresh</button></div>
+    <h2 style="flex-grow:1;font-size:18px">Monthly reports</h2><span class="seg" style="display:inline-flex;gap:4px"><button class="btn sm ${TRV === 'prog' ? 'y' : ''}" onclick="rpTV('prog')">By programme</button><button class="btn sm ${TRV === 'month' ? 'y' : ''}" onclick="rpTV('month')">By month</button></span>${admin && pms.length > 1 ? `<select class="cellin" style="height:36px" onchange="rpTP(this.value)"><option value="">All PMs</option>${pms.map(p => `<option value="${esc(p)}"${p === TRPM ? ' selected' : ''}>${esc(pmName(p))}</option>`).join('')}</select>` : ''}<button class="btn sm" onclick="rpTR()">Refresh</button></div>
+<!--TRBODY-->
     <div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 20px">${months.slice(-4).map(bar).join('')}</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 12px">${chips}${TRS ? '<button class="btn sm ghost" style="color:var(--ink)" onclick="rpTS(\'\')">Show all</button>' : ''}</div>
     <div class="tw"><table class="dense"><thead><tr><th>Client / programme</th><th>PM</th><th>Stage</th><th>Deadline</th><th></th></tr></thead><tbody>
@@ -119,6 +121,39 @@ function tracker() {
       <tr id="rph-${+x.r.id}" hidden><td colspan="5"></td></tr>` : ''}`).join('') || `<tr><td colspan="5" class="famas" style="padding:16px 20px">No reports for ${esc(TRM)}${TRS ? ' at this stage' : ''}.</td></tr>`}
     </tbody></table></div><p class="note" style="margin:12px 20px">Deadlines as in the Report Generator: to the reviewer by the 5th, to the client by the 7th of the next month (Friday if that falls on a weekend). "Not started" = reported on last month, nothing yet this month.</p></section>`;
 }
+/* By programme: one block per month of the programme's run, coloured by that month's report; click opens it. */
+const PV = { sent_to_client: ['Sent', '#25247B'], archived: ['Archived', '#5F5E5A'], approved: ['Approved', '#0F6E56'], pending: ['Waiting for review', '#534AB7'], needs_changes: ['Changes requested', '#D85A30'], draft: ['Draft', '#BA7517'], missing: ['Missing, overdue', '#A32D2D'], due: ['Due, not started', '#EF9F27'] };
+const monthsOfProg = p => { const a = p.start_date && new Date(p.start_date), b = p.end_date && new Date(p.end_date); if (!a || !b || b < a) return null; const out = []; for (let i = a.getFullYear() * 12 + a.getMonth(); i <= b.getFullYear() * 12 + b.getMonth() && out.length < 60; i++) out.push(i); return out; };
+function progView() {
+  const admin = has(), reps = TR.reps || [], drs = Array.isArray(DR) ? DR : [], cur = TR.curI;
+  const mine = new Set([...reps.map(r => r.programme_id), ...drs.map(d => d.programme_id)].map(String));
+  let progs = (D().progs || []).filter(p => mine.has(String(p.id)) || (admin && ['active', 'handed_over'].includes(p.status)));
+  if (TRPM) progs = progs.filter(p => reps.some(r => r.programme_id === p.id && r.submitted_by_email === TRPM) || drs.some(d => d.programme_id === p.id && d.pm_email === TRPM));
+  const cname = p => (D().clients || []).find(c => c.id === p.client_id)?.client_name || reps.find(r => r.programme_id === p.id)?.client_name_snapshot || drs.find(d => d.programme_id === p.id)?.client_name || 'No client';
+  const groups = {}; progs.forEach(p => (groups[cname(p)] = groups[cname(p)] || []).push(p));
+  const cell = (p, i) => {
+    const m = mName(i), r = reps.find(x => x.programme_id === p.id && x.month === m), d = !r && drs.find(x => x.programme_id === p.id && x.month === m);
+    const k = r ? r.status : d ? 'draft' : i > cur ? null : (day(new Date()) > dls(m).submit ? 'missing' : 'due');
+    const lab = MN[i % 12].slice(0, 3) + (i % 12 === 0 || i === cur ? ' ' + String(Math.floor(i / 12)).slice(2) : '');
+    const tip = m + ' · ' + (k ? PV[k][0] : 'Upcoming'), href = r ? '/report-generator.html?report=' + r.id : '/report-generator.html';
+    return `<a href="${href}" target="_blank" rel="noopener" title="${esc(tip)}" style="flex:1;min-width:34px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;${k ? `background:${PV[k][1]};color:#fff` : 'background:var(--surface2);color:var(--muted);border:1px dashed var(--border2)'};${i === cur ? 'outline:2px solid var(--ink);outline-offset:1px;' : ''}">${lab}</a>`;
+  };
+  const row = p => {
+    const ms = monthsOfProg(p), have = [...new Set([...reps, ...drs].filter(x => x.programme_id === p.id).map(x => mIdx(x.month)).filter(i => i >= 0))].sort((a, b) => a - b);
+    const list = ms || have, pos = ms ? ms.indexOf(cur) : -1, pm = reps.find(r => r.programme_id === p.id)?.submitted_by_email || drs.find(d => d.programme_id === p.id)?.pm_email || p.project_manager_name;
+    const where = ms ? (pos >= 0 ? `Month ${pos + 1} of ${ms.length}` : cur < ms[0] ? `Starts ${mName(ms[0])}` : `Ended ${mName(ms[ms.length - 1])} · ${ms.length} months`) : 'No start or end date';
+    return `<div style="padding:10px 20px;border-top:1px solid var(--line2);display:grid;gap:6px;grid-template-columns:minmax(0,1fr)">
+      <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(p.programme_name || '')}${p.group_name ? ` <span style="font-weight:400;color:var(--muted)">· ${esc(p.group_name)}</span>` : ''}</b><span style="font-size:12.5px;color:var(--muted)">${esc(where)} · ${esc(pmName(pm))}</span></div>
+      ${list.length ? `<div style="display:flex;gap:3px;flex-wrap:wrap">${list.map(i => cell(p, i)).join('')}</div>` : '<div style="font-size:12.5px;color:var(--muted)">No reports yet.</div>'}
+      ${ms ? '' : `<div style="font-size:12.5px;color:var(--warn)">Add the programme's start and end dates to see all its months.</div>`}</div>`;
+  };
+  const lg = Object.values(PV).filter(v => v[0] !== 'Archived').map(([l, c]) => `<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:${c}"></span>${l}</span>`).join('') + '<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;border:1px dashed var(--border2)"></span>Upcoming</span>';
+  const names = Object.keys(groups).sort();
+  return `<div style="display:flex;flex-wrap:wrap;gap:12px;padding:12px 20px;font-size:12.5px;color:var(--muted)">${lg}</div>
+    ${names.map(c => `<details open style="border-top:1px solid var(--line)"><summary style="padding:12px 20px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;gap:8px"><span>${esc(c)}</span><span style="font-weight:400;color:var(--muted);font-size:12.5px">${groups[c].length} programme${groups[c].length === 1 ? '' : 's'}</span></summary>${groups[c].sort((a, b) => (a.programme_name || '').localeCompare(b.programme_name || '')).map(row).join('')}</details>`).join('') || '<div class="empty"><b>No programmes with reports yet</b></div>'}
+    <p class="note" style="margin:12px 20px">Each block is one month of the programme, from its start to its end date. The outlined block is the current reporting month. Click a month to open its report in the Report Generator.</p>`;
+}
+window.rpTV = v => { TRV = v; render(); };
 window.rpTM = m => { TRM = m; TRS = ''; render(); };
 window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };
