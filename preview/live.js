@@ -299,29 +299,98 @@
     catch (e) {}
   };
 
-  /* ---------- Visits (writes KMA scores) ---------- */
-  let curVisit = null;
+  /* ---------- Monitoring visits: list, add, full edit, print (same fields as the old app) ---------- */
+  // fields jsonb keys: 'Visit ID','Date of Visit',Venue,'QCTO Personnel',Programme ["<id>"],'Programme Name',KMA1..KMA6 ("1".."4", KMA6 may be "N/A"),
+  // 'Overall Judgment','EISA Readiness','Logbook Status','Next Monitoring Date' (older rows: 'Next Visit Date'),'Learners Enrolled','Learners on Course for EISA',
+  // Dropouts,'Dropout Reasons','Special Needs Count','Knowledge Facilitator','Practical Facilitator','Workplace Mentor','MOU Signed','Visit Notes'
+  const VKMA = ['Programme Implementation', 'Human Resources', 'Assessment Strategy', 'Progress on Implementation', 'General Responsiveness', 'E-learning'];
+  const VDROP = ['Employment Secured', 'Relocated', 'Financial Constraints', 'Health/Medical', 'Family/Personal', 'Academic Performance', 'Disciplinary', 'Lost Interest', 'Transport Issues', 'Other'];
+  let vFilt = 'All', vCur = null;
+  const vF = v => v.fields || {};
+  const vDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+  const vProg = v => v.programme_id || +((vF(v).Programme || [])[0]) || null;
+  const vLabel = v => vF(v)['Visit ID'] || 'VIS-' + String(v.id).padStart(3, '0');
+  const vNext = v => vF(v)['Next Monitoring Date'] || vF(v)['Next Visit Date'] || '';
+  const vJudge = j => j ? { 4: 'b-ok', 3: 'b-ok', 2: 'b-warn', 1: 'b-bad' }[+j] || 'b-n' : 'b-n';
   function applyVisits() {
-    VISITS.length = 0; P.data.visits.forEach(v => VISITS.push(['VIS-' + v.id, v.fields?.Status || 'Draft', v.fields?.Judgement || '—', v.id]));
-    renderVisits(); if (!curVisit && P.data.visits[0]) previewOpenVisit(P.data.visits[0].id, true);
+    const today = new Date().toISOString().slice(0, 10), all = P.data.visits.slice().sort((a, b) => String(vF(b)['Date of Visit'] || '').localeCompare(String(vF(a)['Date of Visit'] || '')));
+    const head = document.querySelector('#view-visits h1')?.parentElement; const btn = head?.querySelector('button'); if (btn) { btn.textContent = '+ Add visit'; btn.onclick = () => previewVisitAdd(); btn.removeAttribute('onclick'); }
+    const due = all.filter(v => vNext(v) && vNext(v) <= today), openRecs = id => P.data.recs.filter(r => !r.resolved && (r.fields?.Visit || []).map(String).includes(String(id))).length;
+    $('vkpis').innerHTML = [['Visits', all.length, ''], ['Next visit due or overdue', due.length, due.length ? 'var(--bad)' : ''], ['Open recommendations', P.data.recs.filter(r => !r.resolved).length, ''], ['Average judgement', (() => { const j = all.map(v => +vF(v)['Overall Judgment']).filter(Boolean); return j.length ? (j.reduce((a, b) => a + b, 0) / j.length).toFixed(1) + ' / 4' : '—'; })(), '']]
+      .map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="${c ? 'color:' + c : ''}">${v}</span></div>`).join('');
+    const th = $('vrows').closest('table').querySelector('thead tr'); if (th) th.innerHTML = '<th>Visit</th><th>Programme · Venue</th><th>Date</th><th>QCTO personnel</th><th>Judgement</th><th>Next visit</th>';
+    $('vfilter').innerHTML = ['All', 'Next visit due', 'Has open recommendations'].map(s => `<button class="${s === vFilt ? 'on' : ''}" onclick="previewVisitFilter('${s}')">${s}</button>`).join('');
+    const rows = all.filter(v => vFilt === 'All' || (vFilt === 'Next visit due' ? due.includes(v) : openRecs(v.id) > 0));
+    $('vrows').innerHTML = rows.map(v => { const f = vF(v), nx = vNext(v), late = nx && nx <= today;
+      return `<tr style="cursor:pointer" onclick="previewOpenVisit(${v.id})"><td><b>${esc(vLabel(v))}</b></td><td>${esc(vProg(v) ? progName(vProg(v)) : (f['Programme Name'] || [])[0] || '—')}<div class="sub">${esc(f.Venue || '')}</div></td><td>${vDate(f['Date of Visit'])}</td><td>${esc(f['QCTO Personnel'] || '—')}</td>
+        <td>${f['Overall Judgment'] ? `<span class="badge ${vJudge(f['Overall Judgment'])}">${esc(f['Overall Judgment'])} / 4</span>` : '<span class="sub">Not scored</span>'}</td>
+        <td>${nx ? `<span style="${late ? 'color:var(--bad);font-weight:600' : ''}">Next ${vDate(nx)}</span>` : '<span class="sub">No next date</span>'}${openRecs(v.id) ? `<div class="sub">${openRecs(v.id)} open recommendation${openRecs(v.id) > 1 ? 's' : ''}</div>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="sub">No visits</td></tr>';
+    if (location.hash.startsWith('#visit/')) renderVisit(+location.hash.split('/')[1]);
   }
-  window.previewOpenVisit = function (id, quiet) {
-    const v = P.data.visits.find(x => x.id === id); if (!v) return; curVisit = v;
-    const s = v.fields?.Scores || {}; Object.keys(scores).forEach(k => scores[k] = s[k] || 0);
-    vType = (v.fields?.['QCTO Type'] || 'Implementation') + ' monitoring'; if (!EVID[vType]) vType = 'Implementation monitoring';
-    vAnn = v.fields?.Announced || 'Announced'; renderKma(); if (!quiet) ROUTES.visit[0] = 'VIS-' + id;
-  };
-  const _rk = renderKma;
-  renderKma = function () {
-    _rk();
-    document.querySelectorAll('#kmas .score').forEach(b => { const old = b.onclick; b.onclick = async ev => { old && old.call(b, ev); await saveVisit(); }; });
-  };
-  async function saveVisit() {
-    if (!curVisit) return;
-    const f = Object.assign({}, curVisit.fields, { Scores: { ...scores }, 'QCTO Type': vType.replace(' monitoring', ''), Announced: vAnn, Judgement: $('judge').textContent.replace(' (draft)', '') });
-    try { await write('Visit', () => sb.from('monitoring_visits').update({ fields: f }).eq('id', curVisit.id)); curVisit.fields = f; } catch (e) {}
+  window.previewVisitFilter = s => { vFilt = s; applyVisits(); };
+  window.previewOpenVisit = function (id) { location.hash = 'visit/' + id; setTimeout(() => renderVisit(id), 0); };
+  addEventListener('hashchange', () => { if (location.hash.startsWith('#visit/')) renderVisit(+location.hash.split('/')[1]); });
+  function renderVisit(id) {
+    const v = P.data.visits.find(x => x.id === id), box = $('view-visit'); if (!box) return;
+    if (!v) { box.innerHTML = '<a class="back" href="#visits">← All visits</a><p class="sub">Visit not found.</p>'; return; }
+    vCur = v; try { ROUTES.visit[0] = vLabel(v); } catch (_) {}
+    const f = vF(v), o = (list, val) => `<option value="">—</option>` + (val && !list.includes(String(val)) ? [String(val), ...list] : list).map(x => `<option ${String(val) === x ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const inp = (n, l, val, t = 'text') => `<label>${l}<input name="${n}" type="${t}" value="${esc(val ?? '')}"></label>`;
+    const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
+    const recs = P.data.recs.filter(r => (r.fields?.Visit || []).map(String).includes(String(v.id)));
+    box.innerHTML = `<a class="back" href="#visits">← All visits</a>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="font-size:26px;flex-grow:1">${esc(vLabel(v))} · ${esc(vProg(v) ? progName(vProg(v)) : 'No programme')}</h1><button class="btn" onclick="previewVisitPrint(${v.id})">Print report</button><button class="btn y" form="vform">Save visit</button></div>
+      <form id="vform" class="card vform" style="display:flex;flex-direction:column;gap:14px">
+        <h2 style="font-size:15px">Visit</h2><div class="qagrid">${inp('date', 'Date of visit', f['Date of Visit'], 'date')}<label>Programme<select name="prog"><option value="">—</option>${progs.map(p => `<option value="${p.id}" ${p.id === vProg(v) ? 'selected' : ''}>${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>${inp('venue', 'Venue', f.Venue)}${inp('pers', 'QCTO personnel', f['QCTO Personnel'])}</div>
+        <h2 style="font-size:15px">Key monitoring areas (1 = Not yet adequate … 4 = Exceeds)</h2><div class="qagrid">${VKMA.map((l, i) => `<label>KMA${i + 1} · ${l}<select name="KMA${i + 1}">${o(i === 5 ? ['1', '2', '3', '4', 'N/A'] : ['1', '2', '3', '4'], f['KMA' + (i + 1)])}</select></label>`).join('')}
+          <label><b>Overall judgement</b><select name="overall">${o(['1', '2', '3', '4'], f['Overall Judgment'])}</select></label></div>
+        <h2 style="font-size:15px">Learners and readiness</h2><div class="qagrid">${inp('enrolled', 'Learners enrolled', f['Learners Enrolled'], 'number')}${inp('oneisa', 'On course for EISA', f['Learners on Course for EISA'], 'number')}${inp('drop', 'Dropouts', f.Dropouts, 'number')}<label>Dropout reasons<select name="dropwhy">${o(VDROP, f['Dropout Reasons'])}</select></label>${inp('special', 'Special needs count', f['Special Needs Count'], 'number')}
+          <label>EISA readiness<select name="eisa">${o(['Ready', 'Not Ready', 'In Progress'], f['EISA Readiness'])}</select></label><label>Logbook status<select name="logbook">${o(['Signed', 'Not Signed', 'Partial'], f['Logbook Status'])}</select></label>${inp('next', 'Next monitoring date', vNext(v), 'date')}</div>
+        <h2 style="font-size:15px">People</h2><div class="qagrid">${inp('kf', 'Knowledge facilitator', f['Knowledge Facilitator'])}${inp('pf', 'Practical facilitator', f['Practical Facilitator'])}${inp('wm', 'Workplace mentor', f['Workplace Mentor'])}<label style="flex-direction:row;align-items:center;gap:8px;margin-top:18px"><input name="mou" type="checkbox" style="height:auto" ${f['MOU Signed'] ? 'checked' : ''}> MOU signed</label></div>
+        <label>Visit notes<textarea name="notes" rows="4" style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)">${esc(f['Visit Notes'] || '')}</textarea></label>
+        <div class="sub" id="verr" style="color:var(--bad)"></div></form>
+      <section class="card" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><h2 style="flex-grow:1;font-size:15px">Recommendations from this visit (${recs.length})</h2><button class="btn sm y" onclick="previewRecAdd(${v.id})">+ Add</button></div>
+        ${recs.map(r => `<div style="display:flex;gap:8px;align-items:baseline"><span class="badge ${r.resolved ? 'b-ok' : 'b-warn'}">${r.resolved ? 'Resolved' : 'Open'}</span><span style="flex-grow:1">${esc(r.fields?.Text || '')}<span class="sub"> · ${esc(r.fields?.Owner || 'No owner')}${r.fields?.['Due Date'] ? ' · due ' + vDate(r.fields['Due Date']) : ''}</span></span><button class="btn sm" onclick="previewRecEdit(${r.id})">Edit</button></div>`).join('') || '<p class="sub">None yet.</p>'}</section>`;
+    if (!$('vformcss')) document.head.insertAdjacentHTML('beforeend', '<style id="vformcss">.vform .qagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.vform label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.vform input,.vform select{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)}</style>');
+    $('vform').onsubmit = async ev => {
+      ev.preventDefault(); const el = $('vform').elements, val = n => el[n].value.trim(), num = n => val(n) === '' ? null : +val(n);
+      if (val('date') && val('next') && val('next') <= val('date')) { $('verr').textContent = 'Next monitoring date must be after the visit date.'; return; }
+      const nf = { ...f, 'Date of Visit': val('date') || null, Venue: val('venue') || null, 'QCTO Personnel': val('pers') || null, 'Overall Judgment': val('overall') || null, 'EISA Readiness': val('eisa') || null, 'Logbook Status': val('logbook') || null,
+        'Next Monitoring Date': val('next') || null, 'Next Visit Date': val('next') || null, 'Learners Enrolled': num('enrolled'), 'Learners on Course for EISA': num('oneisa'), Dropouts: num('drop'), 'Dropout Reasons': val('dropwhy') || null, 'Special Needs Count': num('special'),
+        'Knowledge Facilitator': val('kf') || null, 'Practical Facilitator': val('pf') || null, 'Workplace Mentor': val('wm') || null, 'MOU Signed': el.mou.checked, 'Visit Notes': val('notes') || null, Programme: val('prog') ? [val('prog')] : [] };
+      VKMA.forEach((_, i) => { nf['KMA' + (i + 1)] = val('KMA' + (i + 1)) || null; });
+      Object.keys(nf).forEach(k => { if (nf[k] === null) delete nf[k]; });
+      try { await write('Visit', () => sb.from('monitoring_visits').update({ fields: nf, programme_id: val('prog') ? +val('prog') : null }).eq('id', v.id).select('id')); toast2('Visit saved'); await loadAll(); } catch (err) { $('verr').textContent = err.message || String(err); }
+    };
   }
-  document.addEventListener('click', e => { if (e.target.closest('#vrows a')) { const id = +e.target.textContent.replace('VIS-', ''); if (id) previewOpenVisit(id); } });
+  const toast2 = m => { try { const t = $('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1600); } catch (_) {} };
+  window.previewVisitAdd = () => {
+    const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Add visit"><form class="card" id="vaform"><h2>Add monitoring visit</h2><div class="qagrid">
+      <label>Programme *<select name="prog" required><option value="">—</option>${progs.map(p => `<option value="${p.id}">${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label><label>Date of visit *<input name="date" type="date" required></label><label>Venue<input name="venue"></label><label>QCTO personnel<input name="pers"></label></div>
+      <div class="sub" id="vaerr" style="color:var(--bad)"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y">Save</button></form></div>`);
+    $('vaform').onsubmit = async ev => {
+      ev.preventDefault(); const el = $('vaform').elements, prog = el.prog.value, date = el.date.value;
+      if (date > new Date().toISOString().slice(0, 10) && !confirm('The visit date is in the future. Add it anyway?')) return;
+      if (P.data.visits.some(v => String(vProg(v)) === prog && vF(v)['Date of Visit'] === date) && !confirm('A visit for this programme on this date already exists. Add anyway?')) return;
+      const nums = P.data.visits.map(v => vF(v)['Visit ID'] || '').filter(x => /^VIS-\d+$/.test(x)).map(x => +x.slice(4)), nextId = 'VIS-' + String((nums.length ? Math.max(...nums) : P.data.visits.length) + 1).padStart(3, '0');
+      const p = P.data.progs.find(x => String(x.id) === prog);
+      const fields = { 'Visit ID': nextId, Programme: [prog], 'Programme Name': p ? [p.programme_name] : [], 'Date of Visit': date }; if (el.venue.value.trim()) fields.Venue = el.venue.value.trim(); if (el.pers.value.trim()) fields['QCTO Personnel'] = el.pers.value.trim();
+      try { if (!P.tenant) throw new Error('No tenant on your account.'); const r = await write('Visit', () => sb.from('monitoring_visits').insert({ tenant_id: P.tenant, programme_id: +prog, fields }).select('id')); $('famov').remove(); await loadAll(); if (r?.[0]?.id) previewOpenVisit(r[0].id); }
+      catch (err) { $('vaerr').textContent = err.message || String(err); }
+    };
+  };
+  window.previewVisitPrint = id => {
+    const v = P.data.visits.find(x => x.id === id); if (!v) return; const f = vF(v), w = window.open('', '_blank'); if (!w) return;
+    const row = (k, val) => val || val === 0 ? `<tr><th>${k}</th><td>${esc(String(val))}</td></tr>` : '';
+    const recs = P.data.recs.filter(r => (r.fields?.Visit || []).map(String).includes(String(v.id)));
+    w.document.write(`<!doctype html><title>${esc(vLabel(v))}</title><style>body{font:14px system-ui,sans-serif;color:#111;margin:32px;max-width:800px}h1{color:#25247B;margin:0 0 4px}table{border-collapse:collapse;width:100%;margin:12px 0}th,td{border:1px solid #ccc;padding:6px 8px;text-align:left;vertical-align:top}th{width:40%;background:#f4f4f8}.k{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.k div{border:1px solid #ccc;padding:8px;border-radius:6px}.k b{font-size:22px;display:block;color:#25247B}</style>
+      <h1>Monitoring visit report · ${esc(vLabel(v))}</h1><div>${esc(vProg(v) ? progName(vProg(v)) : '')} · ${vDate(f['Date of Visit'])}</div>
+      <h2>Key monitoring areas</h2><div class="k">${VKMA.map((l, i) => `<div><b>${esc(f['KMA' + (i + 1)] || '—')}</b>KMA${i + 1} · ${l}</div>`).join('')}</div>
+      <table>${row('Overall judgement (1–4)', f['Overall Judgment'])}${row('Venue', f.Venue)}${row('QCTO personnel', f['QCTO Personnel'])}${row('Learners enrolled', f['Learners Enrolled'])}${row('On course for EISA', f['Learners on Course for EISA'])}${row('Dropouts', f.Dropouts)}${row('Dropout reasons', f['Dropout Reasons'])}${row('Special needs count', f['Special Needs Count'])}${row('EISA readiness', f['EISA Readiness'])}${row('Logbook status', f['Logbook Status'])}${row('Next monitoring date', vDate(vNext(v)))}${row('Knowledge facilitator', f['Knowledge Facilitator'])}${row('Practical facilitator', f['Practical Facilitator'])}${row('Workplace mentor', f['Workplace Mentor'])}${row('MOU signed', f['MOU Signed'] ? 'Yes' : '')}${row('Notes', f['Visit Notes'])}</table>
+      ${recs.length ? `<h2>Recommendations</h2><table>${recs.map(r => `<tr><td>${esc(r.fields?.Text || '')}</td><td>${esc(r.fields?.Owner || '')}</td><td>${vDate(r.fields?.['Due Date'])}</td><td>${r.resolved ? 'Resolved' : 'Open'}</td></tr>`).join('')}</table>` : ''}<script>print()<\/script>`);
+    w.document.close();
+  };
 
   /* ---------- Recommendations: list, add, edit, resolve ---------- */
   // fields jsonb (same keys as the live app): Text, Owner, 'Due Date' (yyyy-mm-dd), Status (Open|Resolved), Visit (["<visit id>"])
@@ -367,7 +436,7 @@
     };
     $('recform').elements.Text.focus();
   }
-  window.previewRecAdd = () => recForm(null);
+  window.previewRecAdd = visitId => { recForm(null); if (visitId) { const el = $('recform').elements; el.Visit.value = String(visitId); el.Visit.dispatchEvent(new Event('change', { bubbles: true })); } };
   window.previewRecEdit = id => { const r = P.data.recs.find(x => x.id === id); if (r) recForm(r); };
   window.previewRecResolve = async (id, done) => {
     const r = P.data.recs.find(x => x.id === id); if (!r) return;

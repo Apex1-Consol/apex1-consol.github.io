@@ -146,10 +146,11 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const { w, log } = await boot(sess('project_manager')); await w.soAct(0, 'approved'); await tick();
     ok(!log.some(x => x.rpc === 'signoff_decide'), 'PM decided');
   });
-  await t('Visit: KMA score click saves scores to the visit', async () => {
-    const { w, d, log } = await boot(sess('admin')); w.location.hash = 'visit'; await tick();
-    d.querySelectorAll('#kmas .score')[3].click(); await tick();
-    const u = log.find(x => x.table === 'monitoring_visits'); ok(u && u.val.fields.Scores.KMA1 === 4 && u.eq[1] === 80, JSON.stringify(u && u.val));
+  await t('Visit: edit form saves KMA1 and overall judgement in the old-app keys', async () => {
+    const { w, d, log } = await boot(sess('admin')); w.location.hash = 'visit/80'; await tick(); await tick();
+    const f = d.getElementById('vform'); ok(f, 'no visit form'); f.elements.KMA1.value = '4'; f.elements.overall.value = '3';
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    const u = log.find(x => x.table === 'monitoring_visits'); ok(u && u.val.fields.KMA1 === '4' && u.val.fields['Overall Judgment'] === '3' && u.eq[1] === 80, JSON.stringify(u && u.val));
   });
   await t('Recommendation: Mark resolved writes resolved=true', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'recs'; await tick();
