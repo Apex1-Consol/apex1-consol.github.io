@@ -53,6 +53,17 @@
     let e = form.querySelector('.err'); if (e) e.remove();
     if (error) form.insertAdjacentHTML('beforeend', `<div class="err" role="alert">${esc(error.message)}</div>`);
   };
+  // Forgot password: real reset email (needs the email above and the security check).
+  form.querySelector('a[onclick*="Reset link flow"]').onclick = async ev => {
+    ev.preventDefault(); const em = form.querySelector('input[type=email]').value.trim();
+    let e = form.querySelector('.err'); if (e) e.remove();
+    const say = (m, ok) => form.insertAdjacentHTML('beforeend', `<div class="err" role="alert"${ok ? ' style="color:#166534;background:#dcfce7"' : ''}>${esc(m)}</div>`);
+    if (!em) return say('Type your email above first.');
+    if (!window._pvCap && window.turnstile) return say('Please wait for the security check to finish, then try again.');
+    const { error } = await sb.auth.resetPasswordForEmail(em, { redirectTo: location.origin + location.pathname + '#login', ...(window._pvCap ? { captchaToken: window._pvCap } : {}) });
+    window._pvCap = null; try { window.turnstile && turnstile.reset('#pv-ts'); } catch (_) {}
+    say(error ? error.message : 'If that email has an account, a reset link is on its way.', !error);
+  };
   // Live ApexOne auth has captcha protection on: same Turnstile site key as the live app.
   const ts = form.querySelector('.ts'); ts.className = ''; ts.innerHTML = '<div id="pv-ts"></div>';
   window._pvTsLoad = () => turnstile.render('#pv-ts', { sitekey: '0x4AAAAAAE4gMGMxYC7Zn1qJ', callback: t => { window._pvCap = t; }, 'expired-callback': () => { window._pvCap = null; } });
@@ -68,7 +79,18 @@
 
   // Supabase holds its auth lock while this callback runs, so awaiting other sb calls inside it can deadlock.
   // Defer the real work to the next tick.
-  sb.auth.onAuthStateChange((_e, session) => { setTimeout(() => onAuth(session), 0); });
+  sb.auth.onAuthStateChange((_e, session) => { setTimeout(() => onAuth(session), 0); if (_e === 'PASSWORD_RECOVERY') setTimeout(pvNewPw, 300); });
+  // Reset link from "Forgot password?" lands here signed in: ask for the new password.
+  async function pvNewPw() {
+    for (;;) {
+      const a = prompt('Choose a new password (at least 8 characters):'); if (a == null) return;
+      if (a.length < 8) { alert('At least 8 characters, please.'); continue; }
+      if (prompt('Type the new password again:') !== a) { alert('The two passwords did not match.'); continue; }
+      const { error } = await sb.auth.updateUser({ password: a });
+      if (error) { alert(error.message); continue; }
+      alert('Password changed.'); return;
+    }
+  }
   async function onAuth(session) {
     P.user = session?.user || null;
     const am = P.user?.app_metadata || {};
