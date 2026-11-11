@@ -120,7 +120,7 @@
       q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email').order('last_name')),
       q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at')),
       q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields')),
-      q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager')),
+      q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager,sales_person,fields,deleted_at')),
       q('qcto_tracker', sb.from('qcto_tracker').select('*').order('id')),
       q('moderation_items', sb.from('moderation_items').select('*').order('id')),
       q('accreditation_items', sb.from('accreditation_items').select('*').order('id')),
@@ -382,9 +382,72 @@
     if (!$('famkpis').dataset.fam) $('famkpis').innerHTML = [['Practitioners', P.data.famc.length], ['Registrations', P.data.famc.reduce((t, a) => t + a.registration_count, 0)], ['Open follow-ups', P.data.famc.reduce((t, a) => t + a.open_follow_ups, 0)]]
       .map(([l, v]) => `<div class="kpi" style="min-width:150px;padding:12px 16px;gap:2px"><span class="l">${l}</span><span class="v" style="font-size:24px">${v}</span></div>`).join('');
   }
-  function applyClients() {
-    $('clientcards').innerHTML = P.data.clients.map((c, i) => `<button class="pick${i === 0 ? ' on' : ''}"><b>${esc(c.client_name)}</b><span class="sub">PM: ${esc(c.project_manager || '—')}</span><span class="sub">${P.data.progs.filter(p => p.client_id === c.id).length} programmes</span></button>`).join('');
+  /* ---------- Clients: list, search, detail, add, edit ---------- */
+  // Same storage as the old app: typed columns + fields jsonb ('Company Name', 'Contact Person', Email, Phone, Address, Sector, 'BEE Level', 'MOU Status', 'MOU Date Signed', 'MOU Expiry Date').
+  const CL_SECTORS = ['Agriculture', 'Construction', 'Education & Training', 'Energy', 'Financial Services', 'Government/Public Sector', 'Healthcare', 'Hospitality & Tourism', 'ICT', 'Insurance', 'Manufacturing', 'Mining', 'Retail & Wholesale', 'Transport & Logistics', 'Other'];
+  const CL_BEE = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6', 'Level 7', 'Level 8', 'Non-Compliant'];
+  const CL_MOU = ['Signed', 'Pending', 'Expired', 'Not Required'];
+  let clPick = null, clQ = '';
+  const clF = c => c.fields || {};
+  const clName = c => c.client_name || clF(c)['Company Name'] || 'Client ' + c.id;
+  const clDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+  function clMou(c) {
+    const f = clF(c), exp = f['MOU Expiry Date'] || f['MOU Expiry'] || '', today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+    let s = f['MOU Status'] || '';
+    if (exp && exp < today && s !== 'Not Required') s = 'Expired';
+    const cls = s === 'Signed' ? (exp && exp <= soon ? 'b-warn' : 'b-ok') : s === 'Expired' ? 'b-bad' : s === 'Pending' ? 'b-warn' : 'b-n';
+    return { s: s || 'No MOU recorded', exp, cls, note: s === 'Signed' && exp && exp <= soon ? 'expires ' + clDate(exp) : '' };
   }
+  function applyClients() {
+    const list = P.data.clients.filter(c => !c.deleted_at).sort((a, b) => clName(a).localeCompare(clName(b)));
+    if (!list.find(c => c.id === clPick)) clPick = list[0]?.id ?? null;
+    const head = document.querySelector('#view-clients h1')?.parentElement;
+    if (head && !$('clq')) head.insertAdjacentHTML('beforeend', '<input id="clq" type="search" placeholder="Search clients, contacts, PM" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--surface);color:var(--ink);min-width:220px" oninput="previewClSearch(this.value)">');
+    const q = clQ.toLowerCase(), shown = list.filter(c => !q || [clName(c), c.contact_person, c.project_manager, c.sales_person, clF(c).Sector].join(' ').toLowerCase().includes(q));
+    $('clientcards').innerHTML = shown.map(c => { const m = clMou(c), n = P.data.progs.filter(p => p.client_id === c.id).length;
+      return `<button class="pick${c.id === clPick ? ' on' : ''}" onclick="previewClPick(${c.id})"><b>${esc(clName(c))}</b><span class="sub">${esc(clF(c).Sector || 'Sector not set')} · PM ${esc(c.project_manager || '—')}</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge ${m.cls}">MOU ${esc(m.s)}${m.note ? ' · ' + m.note : ''}</span><span class="sub">${n} programme${n === 1 ? '' : 's'}</span></span></button>`; }).join('') || '<p class="sub">No clients match.</p>';
+    const c = list.find(x => x.id === clPick), aside = document.querySelector('#view-clients aside');
+    if (!aside) return;
+    if (!c) { aside.innerHTML = '<p class="sub">No client selected.</p>'; return; }
+    const f = clF(c), m = clMou(c), kv = (k, v) => v ? `<div style="display:flex;gap:8px"><span class="sub" style="min-width:110px">${k}</span><span>${v}</span></div>` : '';
+    const progs = P.data.progs.filter(p => p.client_id === c.id).sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
+    aside.innerHTML = `<div style="display:flex;gap:8px;align-items:flex-start"><h2 style="flex-grow:1">${esc(clName(c))}</h2><button class="btn sm" onclick="previewClEdit(${c.id})">Edit</button></div>
+      <span class="sub">${esc([f.Sector, f.Address].filter(Boolean).join(' · ') || 'Sector and address not set')}</span>
+      <div style="display:flex;flex-direction:column;gap:6px">${kv('Contact', esc(c.contact_person || f['Contact Person'] || ''))}${kv('Email', (c.contact_email || f.Email) ? `<a href="mailto:${esc(c.contact_email || f.Email)}">${esc(c.contact_email || f.Email)}</a>` : '')}${kv('Phone', esc(c.contact_number || f.Phone || ''))}
+      ${kv('Project manager', esc(c.project_manager || ''))}${kv('Sales person', esc(c.sales_person || ''))}${kv('BEE level', esc(f['BEE Level'] || ''))}
+      ${kv('MOU', `<span class="badge ${m.cls}">${esc(m.s)}</span>`)}${kv('MOU signed', clDate(f['MOU Date Signed']))}${kv('MOU expiry', clDate(m.exp))}</div>
+      <h2 style="font-size:15px;margin-top:8px">Programmes (${progs.length})</h2>
+      <div class="list">${progs.map(p => `<a href="#programmes"><span style="flex-grow:1"><b style="display:block">${esc(p.programme_name || 'Programme ' + p.id)}</b><span class="sub">${esc([p.status, p.start_date ? clDate(p.start_date) + (p.end_date ? ' – ' + clDate(p.end_date) : '') : ''].filter(Boolean).join(' · '))}</span></span></a>`).join('') || '<p class="sub">No programmes yet.</p>'}</div>`;
+  }
+  window.previewClPick = id => { clPick = id; applyClients(); };
+  window.previewClSearch = v => { clQ = v || ''; applyClients(); };
+  function clForm(c) {
+    const f = c ? clF(c) : {}, o = (list, v) => `<option value="">—</option>` + list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const inp = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${esc(v || '')}" ${ex}></label>`;
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Client"><form class="card" id="clform"><h2>${c ? 'Edit' : 'Add'} client</h2><div class="qagrid">
+      ${inp('name', 'Company name *', c ? clName(c) : '', 'text', 'required')}${inp('contact', 'Contact person', c?.contact_person || f['Contact Person'])}${inp('email', 'Email', c?.contact_email || f.Email, 'email')}${inp('phone', 'Phone', c?.contact_number || f.Phone, 'tel')}
+      ${inp('address', 'Physical address', f.Address)}<label>Sector<select name="sector">${o(CL_SECTORS, f.Sector)}</select></label><label>BEE level<select name="bee">${o(CL_BEE, f['BEE Level'])}</select></label>
+      ${inp('pm', 'Project manager', c?.project_manager)}${inp('sales', 'Sales person', c?.sales_person)}
+      <label>MOU status<select name="mou">${o(CL_MOU, f['MOU Status'])}</select></label>${inp('mousigned', 'MOU date signed', f['MOU Date Signed'], 'date')}${inp('mouexp', 'MOU expiry date', f['MOU Expiry Date'] || f['MOU Expiry'], 'date')}</div>
+      <div class="sub" id="clerr" style="color:var(--bad)"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="clsave">Save</button></div></form></div>`);
+    $('clform').onsubmit = async ev => {
+      ev.preventDefault(); const el = $('clform').elements, v = n => el[n].value.trim(), btn = $('clsave'); btn.disabled = true; btn.textContent = 'Saving…';
+      const name = v('name'), dup = P.data.clients.find(x => !x.deleted_at && x.id !== c?.id && clName(x).trim().toLowerCase() === name.toLowerCase());
+      if (dup) { $('clerr').textContent = `A client called “${clName(dup)}” already exists.`; btn.disabled = false; btn.textContent = 'Save'; return; }
+      const fields = { ...f, 'Company Name': name, 'Contact Person': v('contact'), Email: v('email'), Phone: v('phone'), Address: v('address'), Sector: v('sector'), 'BEE Level': v('bee'), 'MOU Status': v('mou') };
+      ['MOU Date Signed', 'MOU Expiry Date'].forEach((k, i) => { const d = v(i ? 'mouexp' : 'mousigned'); if (d) fields[k] = d; else delete fields[k]; }); delete fields['MOU Expiry'];
+      const row = { client_name: name, contact_person: v('contact') || null, contact_email: v('email') || null, contact_number: v('phone') || null, project_manager: v('pm') || null, sales_person: v('sales') || null, fields };
+      try {
+        if (c) await write('Client', () => sb.from('clients').update(row).eq('id', c.id).select('id'));
+        else { if (!P.tenant) throw new Error('No tenant on your account.'); const r = await write('Client', () => sb.from('clients').insert({ tenant_id: P.tenant, ...row }).select('id')); clPick = r?.[0]?.id ?? clPick; }
+        $('famov').remove(); await loadAll();
+      } catch (err) { $('clerr').textContent = err.message || String(err); btn.disabled = false; btn.textContent = 'Save'; }
+    };
+    $('clform').elements.name.focus();
+  }
+  window.previewClAdd = () => clForm(null);
+  window.previewClEdit = id => { const c = P.data.clients.find(x => x.id === id); if (c) clForm(c); };
 
   /* ---------- ClickUp sync status (read; only for roles that may see the outbox) ---------- */
   function applySync() {
