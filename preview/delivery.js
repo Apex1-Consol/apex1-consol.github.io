@@ -326,7 +326,9 @@
 
   /* ---------- wire up after every data load (called from live.js applyAll) ---------- */
   let bound = false;
+  addEventListener('hashchange', () => { if (location.hash === '#attendance/documents') { aTab = 'Documents'; renderAtt(); } });
   window.previewDelivery = function () {
+    if (location.hash === '#attendance/documents') aTab = 'Documents';
     renderProg(); renderAtt(); renderE();
     if (bound) return; bound = true;
     const np = [...document.querySelectorAll('#view-programmes button')].find(b => /New programme/.test(b.textContent));
