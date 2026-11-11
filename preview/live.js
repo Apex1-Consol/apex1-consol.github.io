@@ -241,7 +241,7 @@
     box.innerHTML = `<a class="back" href="#learners">← All learners</a>
       <div class="card" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center"><span style="width:64px;height:64px;border-radius:50%;background:var(--navy);color:var(--yellow);font-family:Poppins;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center">${esc(ini)}</span>
         <div style="flex-grow:1"><h1 style="font-size:24px">${esc(lName(l))}</h1><span class="sub" style="font-size:14px">${lIdn(l) ? 'ID ••••••••' + esc(lIdn(l).slice(-4)) : 'No ID number'}${f.Employment ? ' · ' + esc(f.Employment) : ''}</span></div>
-        <button class="btn" onclick="previewLearnerEdit(${l.id})">Edit details</button><button class="btn y" onclick="previewEnrolAdd(null,${l.id})">+ Enrol</button></div>
+        <button class="btn" onclick="previewLearnerAI(${l.id})">✨ Progress summary</button><button class="btn" onclick="previewLearnerEdit(${l.id})">Edit details</button><button class="btn y" onclick="previewEnrolAdd(null,${l.id})">+ Enrol</button></div>
       <div class="row"><section class="card" style="flex:1 1 320px;display:flex;flex-direction:column;gap:6px"><h2 style="font-size:15px">Details</h2>${kv('Email', l.email || f.Email)}${kv('Phone', l.phone || f.Phone)}${kv('Date of birth', f.DOB)}${kv('Gender', f.Gender)}${kv('Province', f.Province)}${kv('Employment', f.Employment)}</section>
       <section class="card" style="flex:2 1 420px;display:flex;flex-direction:column;gap:8px"><h2 style="font-size:15px">Enrolments (${en.length})</h2>
         ${en.map(e => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge ${enLive(e) ? 'b-ok' : 'b-n'}">${esc(enSt(e))}</span><b style="flex-grow:1">${esc(progName(e.programme_id))}</b><span class="sub">${esc([ef(e)['Statement Status'] && 'Statement ' + ef(e)['Statement Status'], ef(e)['Funding Type'], ef(e).Site].filter(Boolean).join(' · '))}</span><button class="btn sm" onclick="previewEnrolEdit(${e.id})">Edit</button></div>`).join('') || '<p class="sub">Not enrolled yet.</p>'}</section></div>`;
@@ -481,7 +481,7 @@
         <h2 style="font-size:15px">People</h2><div class="qagrid">${inp('kf', 'Knowledge facilitator', f['Knowledge Facilitator'])}${inp('pf', 'Practical facilitator', f['Practical Facilitator'])}${inp('wm', 'Workplace mentor', f['Workplace Mentor'])}<label style="flex-direction:row;align-items:center;gap:8px;margin-top:18px"><input name="mou" type="checkbox" style="height:auto" ${f['MOU Signed'] ? 'checked' : ''}> MOU signed</label></div>
         <label>Visit notes<textarea name="notes" rows="4" style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)">${esc(f['Visit Notes'] || '')}</textarea></label>
         <div class="sub" id="verr" style="color:var(--bad)"></div></form>
-      <section class="card" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><h2 style="flex-grow:1;font-size:15px">Recommendations from this visit (${recs.length})</h2><button class="btn sm y" onclick="previewRecAdd(${v.id})">+ Add</button></div>
+      <section class="card" style="display:flex;flex-direction:column;gap:10px"><div style="display:flex;align-items:center;gap:8px"><h2 style="flex-grow:1;font-size:15px">Recommendations from this visit (${recs.length})</h2><button class="btn sm" onclick="previewRecAI(${v.id})">✨ Suggest</button><button class="btn sm y" onclick="previewRecAdd(${v.id})">+ Add</button></div>
         ${recs.map(r => `<div style="display:flex;gap:8px;align-items:baseline"><span class="badge ${r.resolved ? 'b-ok' : 'b-warn'}">${r.resolved ? 'Resolved' : 'Open'}</span><span style="flex-grow:1">${esc(r.fields?.Text || '')}<span class="sub"> · ${esc(r.fields?.Owner || 'No owner')}${r.fields?.['Due Date'] ? ' · due ' + vDate(r.fields['Due Date']) : ''}</span></span><button class="btn sm" onclick="previewRecEdit(${r.id})">Edit</button></div>`).join('') || '<p class="sub">None yet.</p>'}</section>`;
     if (!$('vformcss')) document.head.insertAdjacentHTML('beforeend', '<style id="vformcss">.vform .qagrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}.vform label{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}.vform input,.vform select{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)}</style>');
     $('vform').onsubmit = async ev => {
@@ -512,23 +512,44 @@
       catch (err) { $('vaerr').textContent = err.message || String(err); }
     };
   };
-  /* AI visit report: same Edge Function and request as the old app (ai-generate, type visit_report); the server builds the text from the saved visit. */
-  window.previewVisitAI = async id => {
-    lCss(); document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="AI visit report"><div class="card" style="max-width:760px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px"><h2>AI visit report</h2>
-      <div id="aivr" class="sub" style="white-space:pre-wrap;overflow:auto;flex:1;color:var(--ink)">Generating report… (up to 45 seconds)</div>
-      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="aivrcopy" disabled>Copy</button><button class="btn y" onclick="document.getElementById('famov').remove()">Close</button></div></div></div>`);
-    const out = $('aivr'), ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), 45000);
+  /* AI helpers: all use the ai-generate Edge Function (same types as the old app); the server builds the text from saved data. */
+  const aiCall = async body => {
+    const ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), 45000);
     try {
       const { data } = await sb.auth.getSession(); const tok = data.session && data.session.access_token; if (!tok) throw new Error('Not signed in. Please sign in again.');
-      const res = await fetch(sb.supabaseUrl + '/functions/v1/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ type: 'visit_report', visit_id: Number(id) }), signal: ctrl.signal });
+      const res = await fetch(sb.supabaseUrl + '/functions/v1/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify(body), signal: ctrl.signal });
       const j = await res.json().catch(() => null);
       if (!res.ok || !j || j.ok === false) throw new Error(res.status === 401 ? 'Not authorised to use AI features. Please sign in again.' : (j && j.error) || res.statusText || 'AI request failed');
-      const txt = j.report || ''; if (!out.isConnected) return;
-      out.textContent = txt || '(No report text returned)';
-      const c = $('aivrcopy'); if (txt) { c.disabled = false; c.onclick = () => navigator.clipboard.writeText(txt).then(() => toast('Report copied'), () => toast('Copy failed')); }
-    } catch (e) { if (out.isConnected) out.textContent = 'Could not generate the report: ' + (e.name === 'AbortError' ? 'it took too long, please try again.' : e.message); }
+      return j;
+    } catch (e) { throw e.name === 'AbortError' ? new Error('it took too long, please try again.') : e; }
     finally { clearTimeout(tm); }
   };
+  const aiBox = title => { lCss(); document.getElementById('famov')?.remove(); document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="${esc(title)}"><div class="card" style="max-width:760px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px"><h2>${esc(title)}</h2>
+      <div id="aivr" class="sub" style="white-space:pre-wrap;overflow:auto;flex:1;color:var(--ink)">Generating… (up to 45 seconds)</div><div class="sub" style="font-size:12px">AI draft from saved data. Check it before you use it.</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="aivrcopy" disabled>Copy</button><button class="btn y" onclick="document.getElementById('famov').remove()">Close</button></div></div></div>`); return $('aivr'); };
+  window.previewAI = async (title, body, key) => {
+    const out = aiBox(title);
+    try {
+      const j = await aiCall(body), txt = String(j[key] || '').trim(); if (!out.isConnected) return;
+      const un = j.fact_check && j.fact_check.unverified_numbers;
+      out.textContent = (txt || '(No text returned)') + (un && un.length ? '\n\n⚠ Check these numbers, they could not be matched to the data: ' + un.join(', ') : '');
+      const c = $('aivrcopy'); if (txt) { c.disabled = false; c.onclick = () => navigator.clipboard.writeText(txt).then(() => toast('Copied'), () => toast('Copy failed')); }
+    } catch (e) { if (out.isConnected) out.textContent = 'Could not generate: ' + e.message; }
+  };
+  window.previewVisitAI = id => previewAI('AI visit report', { type: 'visit_report', visit_id: Number(id) }, 'report');
+  window.previewLearnerAI = id => previewAI('AI learner progress', { type: 'learner_progress', learner_id: Number(id) }, 'narrative');
+  window.previewProgAI = id => previewAI('AI programme summary', { type: 'programme_summary', programme_id: Number(id) }, 'narrative');
+  /* Suggest recommendations: one AI draft per key monitoring area scored 1 or 2 on the saved visit; "Use" opens the + Add form pre-filled. */
+  window.previewRecAI = async visitId => {
+    const v = P.data.visits.find(x => x.id === visitId); if (!v) return; const f = vF(v);
+    const low = VKMA.map((l, i) => ({ k: 'KMA' + (i + 1), l, s: Number(f['KMA' + (i + 1)]) })).filter(x => x.s === 1 || x.s === 2);
+    if (!low.length) return toast('No monitoring area is scored 1 or 2 on the saved visit, so nothing needs a recommendation.');
+    const out = aiBox('Suggested recommendations'); out.style.whiteSpace = 'normal';
+    const rs = await Promise.all(low.map(x => aiCall({ type: 'recommendation_draft', visit_id: Number(visitId), kma_domain: x.k, score: x.s }).then(j => ({ x, t: String(j.draft || '').trim() }), e => ({ x, err: e.message }))));
+    if (!out.isConnected) return; window.__recAI = rs.map(r => r.t || '');
+    out.innerHTML = rs.map((r, i) => `<div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"><b>${r.x.k} · ${esc(r.x.l)} (scored ${r.x.s})</b><div style="white-space:pre-wrap">${esc(r.t || 'Could not generate: ' + (r.err || 'no text'))}</div>${r.t ? `<div><button class="btn sm y" onclick="previewRecUseAI(${visitId},${i})">Use</button></div>` : ''}</div>`).join('');
+  };
+  window.previewRecUseAI = (visitId, i) => { const t = (window.__recAI || [])[i]; document.getElementById('famov')?.remove(); previewRecAdd(visitId); const el = $('recform')?.elements; if (el && t) el.Text.value = t; };
   window.previewVisitPrint = id => {
     const v = P.data.visits.find(x => x.id === id); if (!v) return; const f = vF(v), w = window.open('', '_blank'); if (!w) return;
     const row = (k, val) => val || val === 0 ? `<tr><th>${k}</th><td>${esc(String(val))}</td></tr>` : '';
