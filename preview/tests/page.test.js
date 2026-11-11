@@ -323,7 +323,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: completeness, sort, expiry strip, QUAL label, Excel export', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
-    ok(/Incompleteprofiles3/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), d.getElementById('famkpis').textContent);
+    ok(/Tocapture/.test((d.getElementById('famcap')||{}).textContent.replace(/\s/g, '')), (d.getElementById('famcap')||{}).textContent);
     w.famMode('table');
     ok(/no registration/.test(d.getElementById('famrows').textContent), 'no gaps shown');
     w.famSort('status'); ok(/Ass Two/.test(d.querySelector('#famrows tr').textContent), 'expired not first');
@@ -391,7 +391,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('FAM: role/status/SETA filters, test records hidden, KPI cards kept, Bulk Intake page', async () => {
     const { w, d } = await boot(sess('admin')); await tick(); await tick();
-    ok(/NoID\/certificate/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')), 'KPI cards overwritten');
+    ok(/Opennbsp?follow-ups|Openfollow-ups/.test(d.getElementById('famkpis').textContent.replace(/\s/g, '')) && /IDcopies/.test((d.getElementById('famcap')||{}).textContent.replace(/\s/g, '')), 'KPI cards overwritten');
     ok(/Hide|Show/.test(d.getElementById('famtest').textContent) && /Show test records/.test(d.getElementById('famtest').textContent), 'test records not hidden by default');
     w.famMode('table'); const n = () => d.querySelectorAll('#famrows tr').length;
     w.famDD('fRole', 'Moderator'); const m = n(); w.famDD('fRole', ''); ok(m < n(), 'role filter');

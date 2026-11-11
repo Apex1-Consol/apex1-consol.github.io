@@ -64,7 +64,7 @@
   }
   const PILL = { active: ['b-ok', 'Active'], inactive: ['b-bad', 'Inactive'], expired: ['b-bad', 'Expired'], mixed: ['b-warn', 'Mixed'], due_soon: ['b-warn', 'Due soon'], needs_review: ['b-warn', 'Needs review'], unknown: ['b-n', 'No registrations'] };
   const RANK = { expired: 0, mixed: 1, due_soon: 2, needs_review: 3, inactive: 4, unknown: 5, active: 6 };
-  const GROUPS = { expired: ['Expired', 'var(--bad)', 'Renew now'], mixed: ['Mixed', 'var(--bad)', 'At least one registration needs action'], due_soon: ['Due soon', '#E0A100', 'Start the renewal'], needs_review: ['Needs review', 'var(--navy2)', 'Registration details not captured'], inactive: ['Inactive', 'var(--muted)', ''], unknown: ['No registrations', 'var(--muted)', 'Add one or mark inactive'], active: ['Active', 'var(--ok)', 'Registered; check documents'] };
+  const GROUPS = { expired: ['Expired', 'var(--bad)', 'Renew now'], mixed: ['Mixed', 'var(--bad)', 'At least one registration needs action'], due_soon: ['Due soon', '#E0A100', 'Start the renewal'], needs_review: ['Needs review', 'var(--navy2)', 'Registration not captured'], inactive: ['Inactive', 'var(--muted)', ''], unknown: ['No registrations', 'var(--muted)', 'Add one or mark inactive'], active: ['Active', 'var(--ok)', 'Registered; check documents'] };
   const pill = s => { const [c, l] = PILL[s] || PILL.unknown; return `<span class="badge ${c}">${l}</span>`; };
   /* "Mixed" says nothing on its own: name the registrations that need action instead */
   const stPill = id => {
@@ -90,13 +90,21 @@
   const scopeOf = rid => S.SC.filter(s => s.registration_id === rid);
   const qual = qid => S.Q.find(q => q.id === qid);
 
+  const asC = () => { if (S._asK !== S.BK || S._asR !== S.R || S._asD !== S.D) { S._as = assigns(); S._asK = S.BK; S._asR = S.R; S._asD = S.D; } return S._as; };
+  const nowSet = () => new Set(asC().filter(x => x.now).map(x => x.a.id));
   function nextAction(a) {
+    const bk = asC().filter(x => x.a.id === a.id && x.live && x.el[0] !== 'ok').sort((p, q) => (q.now - p.now) || String(p.start || '').localeCompare(String(q.start || '')));
+    if (bk.length) { const x = bk[0], n = bk.length, k = x.el[2], rl = x.role.toLowerCase(), on = ` (needed for ${n} booking${n === 1 ? '' : 's'})`;
+      if (k === 'exp') return x.el[1].replace(/^(.*?) ?registration expired .*$/i, (m, w) => `Renew ${w || rl} registration`) + on;
+      if (k === 'pend') return `Capture ${rl} registration details` + on;
+      if (k === 'none' || k === 'role') return `Add a ${rl} registration` + on;
+      return x.el[1] + on; }
     const regs = regsFor(a.id), miss = TYPES.length - onFile(a.id).length;
     if (!regs.length) return 'Add a SETA registration';
     const by = k => regs.filter(r => risk(r) === k);
     if (by('expired').length) return `Renew ${by('expired')[0].seta_name} (expired)`;
     if (by('due_30').length) return `Renew ${by('due_30')[0].seta_name} in ${days(by('due_30')[0])}d`;
-    if (by('pending').length) return 'Complete registration entry';
+    if (by('pending').length) return 'Capture registration details';
     if (miss) return `Upload ${miss} document${miss > 1 ? 's' : ''}`;
     if (by('due_60').length) return `Plan renewal: ${by('due_60')[0].seta_name}`;
     return '—';
@@ -104,7 +112,9 @@
 
   /* ---------- right to work, availability, quality, POPIA, rates ---------- */
   const fx = a => (a && a.fields) || {};
-  const maskId = v => !v || canWrite() ? v : '•••••••••' + String(v).slice(-4);
+  const maskId = v => !v ? v : '•••••••••' + String(v).slice(-4);
+  window.famShowId = async id => { const a = S.A.find(x => x.id === id), el = $('famidv'); if (!a || !el) return; el.textContent = a.id_number || '—';
+    try { await sb.from('audit_log').insert({ tenant_id: P.tenant, action: 'FAM_ID_VIEW', table_name: 'assessors', record_id: String(id), user_name: me(), user_role: (P.roles || []).join(',') || null, changes: { field: 'id_number' } }); } catch (_) { /* best-effort */ } };
   const saId = v => { if (!/^\d{13}$/.test(v)) return false; const m = +v.slice(2, 4), d = +v.slice(4, 6); if (m < 1 || m > 12 || d < 1 || d > 31) return false; let t = 0; for (let i = 0; i < 13; i++) { let n = +v[12 - i]; if (i % 2) { n *= 2; if (n > 9) n -= 9; } t += n; } return t % 10 === 0; };
   const idCheck = (f, self) => { const v = (f.id_number?.value || '').replace(/\s/g, ''); if (!v) return;
     const d = S.A.find(x => x.id !== self && (x.id_number || '').replace(/\s/g, '') === v);
@@ -213,14 +223,23 @@
     ['expired', 'Expired', allRisks().filter(s => s === 'expired').length, 'var(--bad)'],
     ['due_30', 'Due ≤30 days', allRisks().filter(s => s === 'due_30').length, 'var(--bad)'],
     ['due_60', 'Due 31–60 days', allRisks().filter(s => s === 'due_60').length, 'var(--warn)'],
-    ['pending', 'Not captured (regs)', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
+    ['pending', 'Not captured', allRisks().filter(s => s === 'pending').length, 'var(--muted)'],
     ['inactive', 'Inactive', allRisks().filter(s => s === 'inactive').length, 'var(--bad)'],
     ['missing', 'No ID / certificate', vis().filter(a => critMiss(a.id)).length, 'var(--bad)'],
     ['followups', 'Open follow-ups', vis().filter(a => openFU(a.id).length > 0).length, 'var(--ink)'],
     ['mine', 'Claimed by me', vis().filter(a => mineFU(a.id).length > 0).length, 'var(--navy2)'],
     ['incomplete', 'Incomplete profiles', vis().filter(a => !compl(a.id).complete).length, 'var(--warn)'],
     ['tidy', 'Data to tidy', vis().filter(a => dataFlags(a).length > 0).length, '#8A5100']];
-  const matches = (a, k) => !k ? true : k === 'missing' ? critMiss(a.id) : k === 'followups' ? openFU(a.id).length > 0 : k === 'mine' ? mineFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
+  const CAP = [['capreg', 'Registration details', a => regsFor(a.id).some(r => risk(r) === 'pending'), a => regsFor(a.id).length > 0], ['capnoreg', 'A registration', a => !regsFor(a.id).length, () => true],
+    ['capid', 'ID copies', a => !onFile(a.id).includes('ID'), () => true], ['capcert', 'Practitioner certificates', a => !onFile(a.id).includes('QUAL'), () => true], ['cappopia', 'POPIA consent', a => !fx(a).popia_consent_at, () => true]];
+  function renderCap() { const box = $('famcap'); if (!box) return; const V = vis(), ns = nowSet();
+    const rows = CAP.map(([k, l, miss, base]) => { const T = V.filter(base), M = T.filter(miss); return [k, l, T.length - M.length, T.length, M.filter(a => ns.has(a.id)).length, M.length]; }).filter(x => x[3]);
+    const live = asC().filter(x => x.live && x.bid), nod = live.filter(x => !(x.bk && x.bk.days_per_week)).length;
+    const bar = (d, t) => `<span style="display:block;height:6px;border-radius:3px;background:var(--line);overflow:hidden;margin-top:4px"><i style="display:block;height:6px;width:${t ? Math.round(d / t * 100) : 100}%;background:${d === t ? 'var(--ok)' : '#25247B'}"></i></span>`;
+    box.innerHTML = `<section class="card" style="padding:14px 18px;margin:12px 0"><div style="display:flex;align-items:baseline;gap:8px"><h2 style="font-size:15px;flex-grow:1;margin:0">To capture</h2><span class="sub">Click one to list who is missing it. People delivering now are counted in red: do those first.</span></div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px 18px;margin-top:10px">${rows.map(([k, l, d, t, nw, m]) => `<button type="button" class="famcapi${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}"><span style="display:flex;gap:6px;align-items:baseline"><b style="flex-grow:1">${l}</b><span class="sub">${d} of ${t}</span></span>${bar(d, t)}<span class="sub" style="font-size:12px">${m ? `${m} missing${nw ? ` · <span style="color:var(--bad);font-weight:600">${nw} delivering now</span>` : ''}` : '✓ all done'}</span></button>`).join('')}
+      ${live.length ? `<button type="button" class="famcapi" onclick="location.hash='fam/calendar';setTimeout(()=>famCal('tab','now'),350)"><span style="display:flex;gap:6px;align-items:baseline"><b style="flex-grow:1">Days per week on bookings</b><span class="sub">${live.length - nod} of ${live.length}</span></span>${bar(live.length - nod, live.length)}<span class="sub" style="font-size:12px">${nod ? nod + ' bookings not set · open the calendar' : '✓ all done'}</span></button>` : ''}</div></section>`; }
+  const matches = (a, k) => !k ? true : CAP.some(c => c[0] === k) ? (c => c[3](a) && c[2](a))(CAP.find(c => c[0] === k)) : k === 'missing' ? critMiss(a.id) : k === 'followups' ? openFU(a.id).length > 0 : k === 'mine' ? mineFU(a.id).length > 0 : k === 'incomplete' ? !compl(a.id).complete : k === 'tidy' ? dataFlags(a).length > 0 : regsFor(a.id).some(r => risk(r) === k);
   window.famFilter = k => { S.filter = S.filter === k ? '' : k; S.page = 0; render(); };
   window.famDD = (k, v) => { S[k] = v; S.page = 0; renderRows(); };
   window.famSearch = v => { S.q = v.toLowerCase(); S.page = 0; renderRows(); };
@@ -287,7 +306,7 @@
   const PER = 50;
   const th = (k, l) => { const on = S.view !== 'triage' && S.sort.k === k; return `<th${k ? ` aria-sort="${on ? (S.sort.dir > 0 ? 'ascending' : 'descending') : 'none'}"` : ''}>${k ? `<button class="famth" onclick="famSort('${k}')" title="Sort by this column">${l}${on ? (S.sort.dir > 0 ? ' ▲' : ' ▼') : ''}</button>` : l}</th>`; };
   const RCH = { Facilitator: 'famc-f', Assessor: 'famc-a', Moderator: 'famc-m' };
-  const roleChips = a => { const r = rolesOf(a); return r.length ? `<div class="famchips">${r.map(x => `<span class="famchip ${RCH[x] || ''}">${e(x)}</span>`).join('')}</div>` : '<div class="sub">No role yet</div>'; };
+  const roleChips = a => { const r = rolesOf(a), nw = nowSet().has(a.id) ? '<span class="famchip" style="background:rgba(37,36,123,.08);color:var(--ink);font-weight:600" title="On a booking that is running today">● Delivering now</span>' : ''; return r.length ? `<div class="famchips">${r.map(x => `<span class="famchip ${RCH[x] || ''}">${e(x)}</span>`).join('')}${nw}</div>` : `<div class="sub">No role yet</div>${nw ? `<div class="famchips">${nw}</div>` : ''}`; };
   const setaChips = list => list.length ? `<div class="famchips">${list.map(x => `<span class="famchip famc-s">${e(x)}</span>`).join('')}</div>` : '<span class="sub">—</span>';
   const RCLS = { expired: 'famc-bad', lapsed: 'famc-bad', due_30: 'famc-bad', due_60: 'famc-warn', due_90: 'famc-warn', active: 'famc-ok', inactive: 'famc-s', pending: 'famc-nc' };
   const RTXT = { expired: 'expired', lapsed: 'expired over a year ago', due_30: 'due within 30 days', due_60: 'due within 60 days', due_90: 'due within 90 days', active: 'active', inactive: 'inactive', pending: 'details not captured' };
@@ -321,7 +340,7 @@
     if (tri) {
       $('famhead').innerHTML = `<tr>${th('name', 'Practitioner')}${th('expiry', 'Registrations')}${th('docs', 'Documents')}<th class="sub" style="text-align:right;font-weight:400" title="Rows are sorted by urgency">Actions</th></tr>`;
       const cnt = WRANK.map(g => [g, all.filter(([b]) => worst(b) === g).length]).filter(([, c]) => c);
-      const sum = cnt.length ? `<tr class="famsum"><td colspan="4"><button class="famsc${S.col.size ? '' : ' on'}" onclick="famCol()" aria-pressed="${!S.col.size}" title="Open every group">All practitioners <b>${all.length}</b></button>${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]} <b title="${c} ${c === 1 ? 'person' : 'people'}">${c}</b></button>`).join('')}${[['due_30', 'due_60', 'due_90'].some(g => cnt.some(([x]) => x === g)) ? '' : 'Due soon', cnt.some(([x]) => x === 'inactive') ? '' : 'Inactive'].filter(Boolean).map(l => `<button class="famsc famsc0" disabled title="None right now">${l} <b>0</b></button>`).join('')}<div class="famkey sub"><b>SETA chips:</b>${[['famc-ok', 'Active', '90+ days left'], ['famc-warn', 'Due within 90 days', 'renew'], ['famc-bad', 'Expired', 'past expiry'], ['famc-nc', 'Details not captured', 'number or dates missing'], ['famc-s', 'Inactive', 'not in use']].map(([c, l, m]) => `<span class="famki"><span class="famchip ${c}">${l}</span>${m}</span>`).join('')}</div></td></tr>` : '';
+      const sum = cnt.length ? `<tr class="famsum"><td colspan="4"><button class="famsc${S.col.size ? '' : ' on'}" onclick="famCol()" aria-pressed="${!S.col.size}" title="Open every group">All practitioners <b>${all.length}</b></button>${cnt.map(([g, c]) => `<button class="famsc${['lapsed', 'none', 'active', 'inactive'].includes(g) ? ' q' : ''}" onclick="famJump('${g}')"><span class="famgd" style="background:${WGRP[g][1]}"></span>${WGRP[g][0]} <b title="${c} ${c === 1 ? 'person' : 'people'}">${c}</b></button>`).join('')}${[['due_30', 'due_60', 'due_90'].some(g => cnt.some(([x]) => x === g)) ? '' : 'Due soon', cnt.some(([x]) => x === 'inactive') ? '' : 'Inactive'].filter(Boolean).map(l => `<button class="famsc famsc0" disabled title="None right now">${l} <b>0</b></button>`).join('')}<div class="famkey sub"><b>SETA chips:</b>${[['famc-ok', 'Active', '90+ days left'], ['famc-warn', 'Due within 90 days', 'renew'], ['famc-bad', 'Expired', 'past expiry'], ['famc-nc', 'Not captured', 'number or dates missing'], ['famc-s', 'Inactive', 'not in use']].map(([c, l, m]) => `<span class="famki"><span class="famchip ${c}">${l}</span>${m}</span>`).join('')}</div></td></tr>` : '';
       $('famrows').innerHTML = list.length ? sum + list.map(([a, i], n) => {
         const g = worst(a), mem = n === 0 || worst(list[n - 1][0]) !== g ? all.filter(([b]) => worst(b) === g) : null, w = when(a), act = rowAction(a), shut = S.col.has(g) && !S.q && S.fSt !== g;
         const allOn = mem && mem.every(([b]) => S.sel.has(b.id));
@@ -546,7 +565,10 @@
     $('heading').textContent = a.full_name; $('crumb').textContent = 'Quality / FAM Registry';
     const c = compl(a.id), regs = regsFor(a.id), fus = S.F.filter(f => f.assessor_id === a.id), open = openFU(a.id).length;
     const kv = (k, v) => `<div><span class="sub">${k}</span><div>${v ? e(v) : '<span class="sub">—</span>'}</div></div>`;
-    const tabs = [['overview', 'Overview'], ['regs', `Registrations (${regs.length})`], ['docs', `Documents (${onFile(a.id).length}/6)`], ['fus', `Follow-ups (${open} open)`], ['comp', 'Compliance'], ['quality', `Quality (${(S.QL || []).filter(x => x.assessor_id === a.id).length})`], ['activity', 'Activity']];
+    const myB = asC().filter(x => x.a.id === a.id && x.live).sort((p, q) => String(p.start || '').localeCompare(String(q.start || '')));
+    const bkRow = x => `<div style="display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)"><span class="famchip ${RCH[x.role] || ''}">${e(x.role)}</span><div style="flex-grow:1"><a href="#" onclick="event.preventDefault();famFix(${x.bid})">${e(x.title)}</a> ${x.now ? '<span class="badge">Delivering now</span>' : ''}
+      <div class="sub" style="font-size:13px">${fmt(x.start)} – ${fmt(x.end)}${x.bk && x.bk.client_name ? ' · ' + e(x.bk.client_name) : ''} · ${x.bk && x.bk.days_per_week ? x.bk.days_per_week + ' d/wk' : '<span style="color:var(--warn,#8a5a00)">days not set</span>'} · ${e((x.bk && x.bk.status) || 'Planned')}</div>${x.el[0] !== 'ok' ? `<div style="color:var(--${x.el[0] === 'bad' ? 'bad' : 'warn'});font-size:13px">⚠ ${e(x.el[1])}</div>` : ''}</div></div>`;
+    const tabs = [['overview', 'Overview'], ['book', `Bookings (${myB.length})`], ['regs', `Registrations (${regs.length})`], ['docs', `Documents (${onFile(a.id).length}/6)`], ['fus', `Follow-ups (${open} open)`], ['comp', 'Compliance'], ['quality', `Quality (${(S.QL || []).filter(x => x.assessor_id === a.id).length})`], ['activity', 'Activity']];
     let body = '';
     if (S.tab === 'overview') {
       const up = regs.filter(r => r.registration_expiry_date).sort((x, y) => days(x) - days(y));
@@ -555,7 +577,11 @@
         <div class="card"><h2 style="font-size:15px">Completeness · ${c.score}%</h2><span class="bar" style="width:100%;margin:8px 0"><i style="width:${c.score}%;background:${c.complete ? 'var(--ok)' : c.score >= 50 ? '#E0A100' : 'var(--bad)'}"></i></span>
           ${c.complete ? '<div class="famok">✓ Profile complete</div>' : c.gaps.map(g => `<div class="sub">• ${e(g)}</div>`).join('')}</div>
         <div class="card"><h2 style="font-size:15px">Expiries</h2>${up.length ? up.map(r => `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0"><span style="flex-grow:1">${e(r.seta_name)} <span class="sub">${fmt(r.registration_expiry_date)}</span></span>${riskBadge(r)}</div>`).join('') : '<div class="sub">No expiry dates captured.</div>'}</div>
+        <div class="card" style="grid-column:1/-1"><div style="display:flex;align-items:baseline;gap:8px"><h2 style="font-size:15px;flex-grow:1">Bookings</h2>${myB.length > 3 ? `<button class="btn sm" onclick="famTab('book')">All ${myB.length}</button>` : ''}${canWrite() ? `<button class="btn sm y" onclick="famBook(null,${a.id})">+ Book</button>` : ''}</div>${myB.length ? myB.slice(0, 3).map(bkRow).join('') : '<div class="sub">No current or upcoming bookings.</div>'}</div>
+        ${c.complete ? '' : `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Still to capture</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${[!a.id_number ? ['Add ID number', `famEdit(${a.id})`] : null, TYPES.some(t => !onFile(a.id).includes(t)) ? [`Upload documents (${TYPES.filter(t => !onFile(a.id).includes(t)).length} missing)`, `famTab('docs')`] : null, !fx(a).popia_consent_at ? ['Record POPIA consent', `famConsent(${a.id})`] : null, regs.some(r => risk(r) === 'pending') ? ['Capture registration details', `famTab('regs')`] : null, !regs.length ? ['Add a registration', `famReg(${a.id})`] : null].filter(Boolean).map(([l, f]) => canWrite() ? `<button class="btn sm" onclick="${f}">${l}</button>` : `<span class="badge">${l}</span>`).join('')}</div></div>`}
         <div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Can deliver</h2><p class="sub" style="margin:2px 0 8px">Qualifications in scope on a valid SETA registration, and the open programmes for each.</p>${canBlock(a)}</div></div>`;
+    } else if (S.tab === 'book') {
+      body = `<div class="card"><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Current and upcoming bookings</h2><button class="btn sm" onclick="famFix(${a.id},'who')">Open in calendar</button>${canWrite() ? `<button class="btn sm y" onclick="famBook(null,${a.id})">+ Book</button>` : ''}</div>${myB.length ? myB.map(bkRow).join('') : '<div class="sub">No current or upcoming bookings.</div>'}</div>`;
     } else if (S.tab === 'regs') {
       body = `<div class="card"><div style="display:flex;align-items:baseline;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">SETA registrations</h2>${canWrite() ? `<button class="btn sm" onclick="famReg(${a.id})">+ Add registration</button>` : ''}</div>${regBlock(a, true)}</div>`;
     } else if (S.tab === 'docs') {
@@ -575,7 +601,7 @@
           <span class="disp" style="font-size:24px">${e(a.full_name)}</span><span style="color:#D2D1EC">${e(rolesOf(a).join(' · ') || 'No roles yet')}</span>
           <div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap;align-items:center">${stPill(a.id)}<span class="famscore">${c.score}% complete</span></div></div>
         <div style="display:flex;gap:8px;flex-wrap:wrap">${canWrite() ? `<button class="btn y sm" onclick="famEdit(${a.id})">Edit details</button>` : ''}<button class="btn sm" onclick="famCopyLink(${a.id})">Copy link</button></div></div>
-        <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}${kv('ID number', maskId(a.id_number))}${kv('Address', a.physical_address)}</div></section>
+        <div class="famkv">${kv('Email', a.email)}${kv('Phone', a.phone)}<div><span class="sub">ID number</span><div id="famidv">${a.id_number ? e(maskId(a.id_number)) + (canWrite() ? ` <button class="btn sm" style="height:24px;padding:0 8px;font-size:12px" onclick="famShowId(${a.id})" title="Shows the full number. Each view is recorded (POPIA).">Show</button>` : '') : '<span class="sub">—</span>'}</div></div>${kv('Address', a.physical_address)}</div></section>
       <div class="famtabs" role="tablist">${tabs.map(([k, l]) => `<button role="tab" aria-selected="${S.tab === k}" class="${S.tab === k ? 'on' : ''}" onclick="famTab('${k}')">${l}</button>`).join('')}</div>
       ${body}`;
   }
@@ -832,8 +858,8 @@
     const K = KPIS(), kbtn = ([k, l, v, c]) => `<button class="kpi famk${S.filter === k ? ' on' : ''}" onclick="famFilter('${k}')" aria-pressed="${S.filter === k}" title="${S.filter === k ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span></button>`;
     const kgrp = (title, ks, bar) => { const ks2 = K.filter(x => ks.includes(x[0])), tot = ks2.reduce((n, x) => n + x[2], 0);
       return `<div class="famgrp" role="group" aria-label="${title || 'Practitioners'}">${title ? `<div class="famgl">${title}</div>` : ''}${bar && tot ? `<div class="famstack" aria-hidden="true">${ks2.filter(x => x[2]).map(([, l, v, c]) => `<i style="flex:${v};background:${c}" title="${l}: ${v}"></i>`).join('')}</div>` : ''}<div class="famgk">${ks2.filter(x => x[2] || S.filter === x[0]).map(kbtn).join('')}</div>${ks2.some(x => !x[2] && S.filter !== x[0]) ? `<div class="famzero">${ks2.filter(x => !x[2] && S.filter !== x[0]).map(([k, l]) => `<button class="famz" onclick="famFilter('${k}')">${l} <b>0</b></button>`).join('')}</div>` : ''}</div>`; };
-    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['missing', 'followups', 'mine', 'incomplete', 'tidy']);
-    renderStrip(); renderCov(); renderRows(); renderPanel(); try { famBadge(); } catch (_) {}
+    $('famkpis').innerHTML = kgrp(`Registrations · ${visR().length}`, REGK, 1) + kgrp(`Practitioners · ${vis().length}`, ['followups', 'mine', 'tidy']);
+    renderStrip(); renderCap(); renderCov(); renderRows(); renderPanel(); try { famBadge(); } catch (_) {}
     if (S.mode === 'profile') renderProfile(); else if (S.mode === 'scope' && S.cat) renderScope(); else if (S.mode === 'bulk') renderBI(); else if (S.mode === 'queue') renderQueue(); else if (S.mode === 'calendar') renderCal();
   }
 
@@ -1037,7 +1063,7 @@
       const pend = mine.filter(r => /pending/i.test(r.status || '') || /pending/i.test(r.seta_name || ''));
       const ex = mine.filter(r => !pend.includes(r) && r.registration_expiry_date).sort((p, q) => q.registration_expiry_date.localeCompare(p.registration_expiry_date))[0];
       if (ex && !pend.length) return ['bad', `${ex.seta_name && !/pending/i.test(ex.seta_name) ? ex.seta_name + ' ' : ''}${role.toLowerCase()} registration expired ${fmt(ex.registration_expiry_date)}`, 'exp'];
-      if (pend.length) return ['bad', `${role} registration details not captured (Pending Entry)${ex ? `; last one expired ${fmt(ex.registration_expiry_date)}` : ''}`, 'pend'];
+      if (pend.length) return ['bad', `${role} registration not captured${ex ? `; last one expired ${fmt(ex.registration_expiry_date)}` : ''}`, 'pend'];
       if (mine.length) return ['bad', `${role} registration is ${String(mine[0].status || 'not active').toLowerCase()}`, 'pend'];
       if (all.length) return ['bad', `Registered as ${[...new Set(all.flatMap(r => r.roles?.length ? r.roles : [r.role]).filter(Boolean))].join(', ').toLowerCase()} only, not as ${role.toLowerCase()}`, 'role'];
       return ['bad', 'No registration on file', 'none']; }
@@ -1689,7 +1715,7 @@
     if (ready) return; ready = true;
     document.head.insertAdjacentHTML('beforeend', `<style>
       #famkpis{display:flex!important;flex-wrap:wrap;gap:14px 28px;flex:1 1 100%!important;order:2;align-items:flex-start}
-      #famkpis+div{margin-left:auto}
+      #famkpis+div{margin-left:auto}.famcapi{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 10px;text-align:left;font:inherit;font-size:14px;cursor:pointer}.famcapi:hover{border-color:#25247B}.famcapi.on{outline:2px solid #25247B}
       #view-fam .tw{max-height:none!important}
       .famchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
       .famchip{font-size:11px;line-height:18px;padding:0 8px;border-radius:9px;background:var(--soft);color:var(--ink);white-space:nowrap}
@@ -1816,7 +1842,7 @@
     const io = tb?.querySelector('.famio');
     if (io) { [...btns].filter(b => /^(Scope Import|Bulk Intake)$/.test(b.textContent.trim())).forEach(b => { b.classList.add('sm'); io.lastChild.appendChild(b); });
       io.lastChild.addEventListener('click', () => { io.open = false; }); document.addEventListener('click', ev => { if (io.open && !io.contains(ev.target)) io.open = false; }); }
-    $('famkpis').dataset.fam = '1'; $('famkpis').parentElement.insertAdjacentHTML('afterend', '<div id="famcov"></div>');
+    $('famkpis').dataset.fam = '1'; $('famkpis').parentElement.insertAdjacentHTML('afterend', '<div id="famcap"></div><div id="famcov"></div>');
     aside.classList.add('famdrawer'); aside.parentElement.classList.add('famrow'); aside.setAttribute('aria-label', 'Practitioner details');
     document.body.insertAdjacentHTML('beforeend', '<div id="fambk" hidden onclick="famClose()"></div>'); // outside #view-fam: route code toggles that view's children
     addEventListener('keydown', ev => { if (ev.key === 'Escape' && S.open) famClose(); });
