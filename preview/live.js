@@ -73,7 +73,8 @@
     P.user = null; P.roles = []; P.tenant = null;
     try { Object.keys(localStorage).filter(k => /^sb-.*-auth-token$/.test(k)).forEach(k => localStorage.removeItem(k)); } catch (_) {}
     sb.auth.signOut({ scope: 'local' }).catch(() => {});
-    if (location.hash !== '#login') location.hash = 'login'; else window.route();
+    // Full reload so the sign-in page always runs the latest code (captcha etc.), even in a tab left open for days.
+    location.replace(location.pathname + '#login'); setTimeout(() => location.reload(), 50);
   }
   document.querySelector('.me a[href="#login"]').onclick = e => { e.preventDefault(); hardSignOut(); };
 
