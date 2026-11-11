@@ -1036,12 +1036,14 @@
     if (end && exp < end) return ['warn', `Registration expires ${fmt(exp)}, before the programme ends ${fmt(end)}`];
     return ['ok', 'Registered until ' + fmt(exp)];
   };
+  const niceN = v => { const n = String(v || '').replace(/\s+/g, ' ').trim(); return n === n.toLowerCase() || n === n.toUpperCase() ? n.toLowerCase().replace(/(^|[\s:(\/-])([a-z])/g, (m, s, c) => s + c.toUpperCase()) : n; };
+  const grpTag = (p, progs) => p && progs.filter(x => niceN(x.programme_name).toLowerCase() === niceN(p.programme_name).toLowerCase()).length > 1 ? ' · ' + (p.group_name || '#' + p.id) : '';
   function assigns() {
     // public.fam_bookings is the only source of who is booked on what (Stavros, 10 Nov 2026). Cancelled bookings are ignored.
     const out = [], progs = (P.data && P.data.progs) || [];
     (S.BK || []).filter(b => b.status !== 'Cancelled').forEach(b => { const a = S.A.find(x => x.id === b.assessor_id); if (!a) return;
       const p = progs.find(x => x.id === b.programme_id);
-      out.push({ a, bid: b.id, bk: b, role: b.role, title: b.title || p?.programme_name || 'Booking', seta: null, start: d10(b.start_date), end: d10(b.end_date), pid: b.programme_id || null, src: 'FAM booking · ' + (b.status || 'Planned'), done: b.status === 'Done' }); });
+      out.push({ a, bid: b.id, bk: b, role: b.role, title: (t => t + (p && t.toLowerCase() === niceN(p.programme_name).toLowerCase() ? grpTag(p, progs) : ''))(niceN(b.title || p?.programme_name) || 'Booking'), seta: null, start: d10(b.start_date), end: d10(b.end_date), pid: b.programme_id || null, src: 'FAM booking · ' + (b.status || 'Planned'), done: b.status === 'Done' }); });
     out.forEach(x => { x.el = eligOf(x.a, x.role, x.seta, x.end); x.now = (!x.start || x.start <= today()) && (!x.end || x.end >= today()); x.live = !x.done && (!x.end || x.end >= today()); if (x.done) x.now = false; });
     return out;
   }
@@ -1052,7 +1054,7 @@
   /* "Can deliver": qualifications in scope on a valid SETA registration (the registration is the supporting evidence), with open programmes for each */
   const qWords = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/^(nc|fc|gc|nd) /, '').trim();
   const progsNow = () => [
-    ...((P.data && P.data.progs) || []).filter(p => !/complete|closed|cancel/i.test(p.status || '') && (!d10(p.end_date) || d10(p.end_date) >= today())).map(p => ({ pid: p.id, title: p.programme_name || p.qualification_name || 'Programme', text: [p.saqa_id, p.qualification_name, p.programme_name].join(' '), start: d10(p.start_date), end: d10(p.end_date), fac: p.facilitator_id })),
+    ...((P.data && P.data.progs) || []).filter(p => !/complete|closed|cancel/i.test(p.status || '') && (!d10(p.end_date) || d10(p.end_date) >= today())).map((p, _i, ps) => ({ pid: p.id, title: (niceN(p.programme_name || p.qualification_name) || 'Programme') + grpTag(p, ps), text: [p.saqa_id, p.qualification_name, p.programme_name].join(' '), start: d10(p.start_date), end: d10(p.end_date), fac: p.facilitator_id })),
   ];
   const canDo = a => {
     const out = new Map(), ok = regsFor(a.id).filter(r => active(r) && (!r.registration_expiry_date || r.registration_expiry_date >= today()));
@@ -1151,7 +1153,7 @@
   window.famBook = (id, aid, pid) => {
     const b = (S.BK || []).find(x => x.id === id) || {}, progs = ((P.data && P.data.progs) || []).filter(p => !/cancel/i.test(p.status || '')).sort((x, y) => String(x.programme_name).localeCompare(String(y.programme_name)));
     const o = (v, l, cur) => `<option value="${e(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${e(l)}</option>`;
-    const pn = p => { const n = String(p.programme_name || 'Programme ' + p.id).replace(/\s+/g, ' ').trim(); return n === n.toLowerCase() || n === n.toUpperCase() ? n.toLowerCase().replace(/(^|[\s:(\/-])([a-z])/g, (m, s, c) => s + c.toUpperCase()) : n; };
+    const pn = p => niceN(p.programme_name) || 'Programme ' + p.id;
     const pk = p => pn(p).toLowerCase(), pc = {}; progs.forEach(p => pc[pk(p)] = (pc[pk(p)] || 0) + 1);
     const pl = p => pn(p) + (pc[pk(p)] > 1 ? ' · ' + (p.group_name || '#' + p.id) : '');
     progs.sort((x, y) => pl(x).localeCompare(pl(y), undefined, { numeric: true }));
