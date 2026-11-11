@@ -215,7 +215,7 @@
     lLoaded = true;
     const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.filter(x => !x.t).length + ' on record';
     const head = document.querySelector('#view-learners h1')?.parentElement;
-    if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
+    if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn" id="limp" onclick="previewLearnerImport()">Import from Excel</button><button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
     head?.querySelectorAll('button:not(#ladd)').forEach(b => b.remove());
     const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Programme</th><th>Status</th><th></th>';
     renderLearners();
@@ -263,6 +263,44 @@
   window.previewLearnerAdd = () => dlg('lform', 'Add learner', learnerBody(null) + `<label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Enrol on programme (optional)<select name="prog" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)"><option value="">—</option>${progOpts()}</select></label>`,
     async el => { const row = await learnerVals(el, null); const r = await write('Learner', () => sb.from('learners').insert({ tenant_id: P.tenant, ...row }).select('id'));
       const lid = r?.[0]?.id; if (lid && el.prog.value) await enrolInsert(+el.prog.value, [lid], { Status: 'Active' }); if (lid) setTimeout(() => { location.hash = 'learner/' + lid; }, 0); });
+  /* Learner import from Excel (replaces the old app's Smart Import for learners). Step 1 reads and checks the file; step 2 saves. */
+  const IMAP = { fn: /^(first ?names?|name|given ?names?)$/, ln: /^(last ?name|surname|family ?name)$/, nid: /^(national ?id|sa ?id( ?number)?|id ?(number|no\.?)?|identity ?number)$/, dob: /^(dob|date ?of ?birth|birth ?date)$/,
+    gender: /^(gender|sex)$/, prov: /^province$/, email: /^(e-?mail( ?address)?)$/, phone: /^(phone|cell(phone)?|mobile|contact ?(number|no\.?)?|tel(ephone)?)$/, emp: /^(employment( ?status)?|employed)$/ };
+  let IMP = null;
+  window.previewImpReset = () => { IMP = null; const b = $('limpfsave'); if (b) b.textContent = 'Check file'; const m = $('limpsum'); if (m) m.textContent = ''; };
+  window.previewLearnerImport = () => { IMP = null; const progs = P.data.progs.slice().sort((a, b) => (a.programme_name || '').localeCompare(b.programme_name || ''));
+    dlg('limpf', 'Import learners from Excel', `<p class="sub">First sheet, one learner per row. Columns are matched by heading: First name, Last name, ID number, Date of birth, Gender, Province, Email, Phone, Employment. Rows with an invalid or already-used ID number are skipped.</p>
+      <input type="file" name="file" accept=".xlsx,.xls,.csv" required onchange="previewImpReset()">
+      <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Enrol everyone on (optional)<select name="prog" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:inherit"><option value="">No enrolment</option>${progs.map(p => `<option value="${p.id}">${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>
+      <div id="limpsum" class="sub"></div>`, async el => {
+      if (!IMP) { await impCheck(el); throw new Error(''); }
+      const r = await write('Learners', () => sb.from('learners').insert(IMP.ok.map(x => ({ tenant_id: P.tenant, ...x }))).select('id'));
+      const ids = (r || []).map(x => x.id); let msg = `Imported ${ids.length} learner${ids.length === 1 ? '' : 's'}`;
+      if (ids.length && el.prog.value) { await loadAll(); const e = await enrolInsert(+el.prog.value, ids, { Status: 'Active' }); msg += `, enrolled ${e.added}`; }
+      toast(msg); IMP = null; }, 'Check file'); };
+  async function impCheck(el) {
+    const f = el.file.files[0]; if (!f) throw new Error('Choose a file');
+    if (!window.XLSX) throw new Error('Excel library not loaded');
+    const wb = XLSX.read(await f.arrayBuffer(), { cellDates: true }), rows = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { defval: '', raw: false, dateNF: 'yyyy-mm-dd' });
+    if (!rows.length) throw new Error('The first sheet has no rows');
+    const heads = Object.keys(rows[0]), col = {}; Object.entries(IMAP).forEach(([k, re]) => { const h = heads.find(x => re.test(String(x).trim().toLowerCase())); if (h) col[k] = h; });
+    if (!col.fn || !col.ln) throw new Error('Need a "First name" and a "Last name" column. Found: ' + heads.join(', '));
+    const seen = new Set(P.data.learners.map(lIdn).filter(Boolean)), ok = [], skip = [];
+    for (const [i, r] of rows.entries()) {
+      const g = k => col[k] ? String(r[col[k]] ?? '').trim() : '', fn = g('fn'), ln = g('ln'), nid = g('nid').replace(/\s/g, ''), line = i + 2;
+      if (!fn && !ln) continue;
+      if (!fn || !ln) { skip.push(`Row ${line}: name missing`); continue; }
+      if (nid && !said(nid)) { skip.push(`Row ${line} ${fn} ${ln}: invalid ID number`); continue; }
+      if (nid && seen.has(nid)) { skip.push(`Row ${line} ${fn} ${ln}: ID number already on record`); continue; }
+      if (nid) { try { const { data } = await sb.rpc('check_learner_duplicate', { p_tenant_id: P.tenant, p_id_number: nid }); if ((data || []).length) { skip.push(`Row ${line} ${fn} ${ln}: ID number already on record`); continue; } } catch (e) {} seen.add(nid); }
+      const fields = { 'First Name': fn, 'Last Name': ln, 'National ID': nid, DOB: g('dob'), Gender: g('gender'), Province: g('prov'), Email: g('email'), Phone: g('phone'), Employment: g('emp') };
+      Object.keys(fields).forEach(k => { if (!fields[k]) delete fields[k]; });
+      ok.push({ first_name: fn, last_name: ln, id_number: nid || null, email: g('email') || null, phone: g('phone') || null, fields });
+    }
+    IMP = { ok };
+    $('limpsum').innerHTML = `<b>${ok.length} ready to import</b>, ${skip.length} skipped. Columns used: ${esc(Object.values(col).join(', '))}.${skip.length ? `<div style="max-height:140px;overflow:auto;margin-top:6px">${skip.map(esc).join('<br>')}</div>` : ''}`;
+    const b = $('limpfsave'); if (!ok.length) { IMP = null; return; } setTimeout(() => { b.textContent = `Import ${ok.length}`; }, 0);
+  }
   window.previewLearnerEdit = id => { const l = P.data.learners.find(x => x.id === id); if (!l) return;
     dlg('lform', 'Edit learner', learnerBody(l), async el => { const row = await learnerVals(el, l); await write('Learner', () => sb.from('learners').update(row).eq('id', id).select('id')); }); };
 
