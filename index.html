@@ -13,7 +13,7 @@ if(/[#&]view=recommendations(&|$)/.test(location.hash))recsGoNew();
 function clientsGoNew(){location.href='/preview/#clients';}
 if(/[#&]view=clients(&|$)/.test(location.hash))clientsGoNew();
 // 11 Nov: more modules moved to the new look (same live database). Old code frozen. To undo one module, delete its entry in NEW_LOOK.
-var NEW_LOOK={monitoring:'visits',learners:'learners',enrolment:'enrolments',attendance:'attendance',poe:'attendance/documents',assessors:'fam',programmes:'programmes','pm-tracker':'pmtracker',reports:'reports',audit:'audit',users:'users'};
+var NEW_LOOK={monitoring:'visits',learners:'learners',enrolment:'enrolments',attendance:'attendance',poe:'attendance/documents',assessors:'fam',programmes:'programmes','pm-tracker':'pmtracker',reports:'reports',audit:'audit',users:'users',dashboard:'dashboard',hoo:'hoo'};
 // Programmes: the sign-off queue, + Add Programme and links with ?classic=1 (from the new look's Sign-off / New programme buttons) still open the old screen.
 function keepClassic(v){return (v==='programmes'||v==='reports')&&(window.__classicOnce||/[?&]classic=1/.test(location.search));}
 function newLookGo(v){location.href='/preview/#'+NEW_LOOK[v];}
