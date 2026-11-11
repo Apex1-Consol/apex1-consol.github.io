@@ -1151,11 +1151,15 @@
   window.famBook = (id, aid, pid) => {
     const b = (S.BK || []).find(x => x.id === id) || {}, progs = ((P.data && P.data.progs) || []).filter(p => !/cancel/i.test(p.status || '')).sort((x, y) => String(x.programme_name).localeCompare(String(y.programme_name)));
     const o = (v, l, cur) => `<option value="${e(v)}"${String(cur ?? '') === String(v) ? ' selected' : ''}>${e(l)}</option>`;
+    const pn = p => { const n = String(p.programme_name || 'Programme ' + p.id).replace(/\s+/g, ' ').trim(); return n === n.toLowerCase() || n === n.toUpperCase() ? n.toLowerCase().replace(/(^|[\s:(\/-])([a-z])/g, (m, s, c) => s + c.toUpperCase()) : n; };
+    const pk = p => pn(p).toLowerCase(), pc = {}; progs.forEach(p => pc[pk(p)] = (pc[pk(p)] || 0) + 1);
+    const pl = p => pn(p) + (pc[pk(p)] > 1 ? ' · ' + (p.group_name || '#' + p.id) : '');
+    progs.sort((x, y) => pl(x).localeCompare(pl(y), undefined, { numeric: true }));
     const cur = { aid: b.assessor_id || aid || '', pid: b.programme_id || pid || '' };
     modal(id ? 'Edit booking' : 'New booking', `<div class="qagrid">
       <label>Practitioner *<select name="aid" required>${o('', 'Choose…', cur.aid)}${vis().map(a => o(a.id, shownName(a), cur.aid)).join('')}</select></label>
       <label>Role *<select name="role" required>${ROLE3.map(r => o(r, r, b.role || 'Facilitator')).join('')}</select></label>
-      <label>Programme<select name="pid">${o('', 'Not linked', cur.pid)}${progs.map(p => o(p.id, p.programme_name || 'Programme ' + p.id, cur.pid)).join('')}</select></label>
+      <label>Programme<select name="pid">${o('', 'Not linked', cur.pid)}${progs.map(p => o(p.id, pl(p), cur.pid)).join('')}</select></label>
       ${fld('title', 'What *', 'text', `required value="${e(b.title || '')}" placeholder="e.g. NC: Generic Management, cohort 2"`)}
       ${fld('client', 'Client', 'text', `value="${e(b.client_name || '')}"`)}
       ${fld('start', 'From *', 'date', `required value="${e(b.start_date || '')}"`)}${fld('end', 'To *', 'date', `required value="${e(b.end_date || '')}"`)}
@@ -1179,7 +1183,7 @@
         else await write('Booking', () => sb.from('fam_bookings').insert({ ...body, tenant_id: P.tenant, source: 'manual', created_by: P.user?.email || null }));
         say(id ? 'Booking updated' : 'Booked'); });
     const f = $('famform'); f.oninput = f.onchange = ev => { if (ev.target.name === 'pid') { const p = progs.find(x => String(x.id) === f.pid.value);
-        if (p) { if (!f.title.value) f.title.value = p.programme_name || ''; if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
+        if (p) { if (!f.title.value) f.title.value = pn(p); if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
       if (ev.target.name !== 'notes' && ev.target.name !== 'override') bkCheck(id); };
     S.bkNeed = null; bkCheck(id);
   };
