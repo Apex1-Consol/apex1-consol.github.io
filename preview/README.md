@@ -26,9 +26,9 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Learners | **Moved** (#71): list, learner page, add/edit with SA ID + duplicate check | Excel import: use the old app's Import |
 | Enrolments | **Moved** (#71): enrol one or many, edit status/statement/EISA type/funding/site | Old app's EISA table here is now PoE tracker (module results) + EISA › Exam results |
 | Attendance & PoE | **Moved** (#71): register (R = Late, as in the old app), add session, CSV, PoE tracker, Documents checklist (old "EISA & PoE Readiness" item opens #attendance/documents) | — |
-| EISA readiness | Readiness + Exam results tabs on live data; LEISA tab needs leisa tables on live | Migrations for LEISA |
-| Programmes | **Moved** (#72): stages, search, overview, Form 3 (program_modules.components added on live), edit, Activate/Close, CSV | Sign-off/hand-over, Sign-off queue, + Add Programme and PM Tracker stay in the old app (?classic=1) |
+| EISA readiness | Readiness + Exam results + LEISA tabs on live data (leisa tables on live 11 Nov) | Feedback |
+| Programmes | **Moved** (#72, sign-off #73): stages, search, overview, Form 3 (program_modules.components added on live), edit, Activate/Close, CSV | Sign-off queue, + Add Programme and PM Tracker stay in the old app (?classic=1) |
 | Dashboard | Real counts (home page) | Confirm KPI definitions |
 | Data quality | Real issues; decisions write | Merge procedure (approver not decided) |
-| QCTO Tracker, Moderation, Accreditation, Sign-off queue | Preview-only tables, not on live | Migrations to live first |
+| QCTO Tracker, Moderation, Accreditation, Sign-off queue | Tables on live since 11 Nov (migration qa_tables_live), empty; no ClickUp sync | Fill tracker from enrolments; import spreadsheets |
 | Reports, Audit, Users | Stay in the old app | — |
