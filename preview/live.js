@@ -273,7 +273,7 @@
       <input type="file" name="file" accept=".xlsx,.xls,.csv" required onchange="previewImpReset()">
       <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Enrol everyone on (optional)<select name="prog" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:inherit"><option value="">No enrolment</option>${progs.map(p => `<option value="${p.id}">${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>
       <div id="limpsum" class="sub"></div>`, async el => {
-      if (!IMP) { await impCheck(el); throw new Error(''); }
+      if (!IMP) { await impCheck(el); throw new Error(' '); }
       const r = await write('Learners', () => sb.from('learners').insert(IMP.ok.map(x => ({ tenant_id: P.tenant, ...x }))).select('id'));
       const ids = (r || []).map(x => x.id); let msg = `Imported ${ids.length} learner${ids.length === 1 ? '' : 's'}`;
       if (ids.length && el.prog.value) { await loadAll(); const e = await enrolInsert(+el.prog.value, ids, { Status: 'Active' }); msg += `, enrolled ${e.added}`; }
