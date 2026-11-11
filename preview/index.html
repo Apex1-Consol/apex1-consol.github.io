@@ -510,7 +510,7 @@ body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href=
 
     <!-- RECOMMENDATIONS -->
     <main id="view-recs" hidden>
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Recommendations</h1><button class="btn y" onclick="toast('Add recommendation')">+ Add recommendation</button></div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Recommendations</h1><button class="btn y" onclick="previewRecAdd()">+ Add recommendation</button></div>
       <div class="seg" id="recfilter" style="max-width:420px"></div>
       <div id="reclist" style="display:flex;flex-direction:column;gap:12px"></div>
     </main>
@@ -1110,7 +1110,7 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261111d"></script>
+<script src="live.js?v=20261111e"></script>
 <script src="qa.js"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261111q"></script>

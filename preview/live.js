@@ -323,26 +323,56 @@
   }
   document.addEventListener('click', e => { if (e.target.closest('#vrows a')) { const id = +e.target.textContent.replace('VIS-', ''); if (id) previewOpenVisit(id); } });
 
-  /* ---------- Recommendations (writes resolved) ---------- */
-  function applyRecs() {
-    const kmaName = k => (typeof KMAS !== 'undefined' && KMAS.find(x => x[0] === k)?.[1]) || '';
-    const fmtDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: '2-digit', month: '2-digit', year: 'numeric' }) : ''; };
-    RECS.length = 0; P.data.recs.forEach(r => {
-      const f = r.fields || {}, due = fmtDate(f.Due), bits = [r.programme_id ? esc(progName(r.programme_id)) : '', due ? 'Due ' + due : 'No due date', r.owner_email ? 'Owner ' + esc(r.owner_email) : 'No owner'].filter(Boolean);
-      RECS.push([f.KMA || 'KMA', kmaName(f.KMA) || 'Key monitoring area', f.Priority || 'Medium', r.resolved ? 1 : 0, 0, r.id,
-        { text: esc(f.Text || 'Recommendation'), sub: bits.join(' · ') + (r.resolved && r.resolved_at ? ' · Resolved ' + fmtDate(r.resolved_at) : '') }]);
-    });
-    renderRecs();
-    document.querySelectorAll('#reclist button').forEach(b => { b.onclick = null; });
+  /* ---------- Recommendations: list, add, edit, resolve ---------- */
+  // fields jsonb (same keys as the live app): Text, Owner, 'Due Date' (yyyy-mm-dd), Status (Open|Resolved), Visit (["<visit id>"])
+  const recDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
+  const recVisits = f => { let v = f.Visit; if (typeof v === 'string') { try { v = JSON.parse(v); } catch (_) { v = v ? [v] : []; } } return Array.isArray(v) ? v.map(String).filter(Boolean) : []; };
+  const recShown = () => P.data.recs.filter(r => rF === 'All' || (rF === 'Resolved') === !!r.resolved)
+    .sort((a, b) => (!!a.resolved - !!b.resolved) || String(a.fields?.['Due Date'] || '9999').localeCompare(String(b.fields?.['Due Date'] || '9999')));
+  function applyRecs() { window.renderRecs(); }
+  window.renderRecs = function () {
+    const today = new Date().toISOString().slice(0, 10);
+    $('recfilter').innerHTML = ['Open', 'Resolved', 'All'].map(s => `<button class="${s === rF ? 'on' : ''}" onclick="rF='${s}';renderRecs()">${s}</button>`).join('');
+    $('reclist').innerHTML = recShown().map(r => {
+      const f = r.fields || {}, due = f['Due Date'] || f.Due || '', late = !r.resolved && due && due < today, vis = recVisits(f);
+      const bits = [r.programme_id ? esc(progName(r.programme_id)) : '', vis.length ? vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ') : '',
+        due ? `<span style="${late ? 'color:var(--bad);font-weight:600' : ''}">${late ? 'Overdue · was due ' : 'Due '}${recDate(due)}</span>` : '<span style="color:var(--bad)">No due date</span>',
+        f.Owner ? 'Owner ' + esc(f.Owner) : '<span style="color:var(--bad)">No owner</span>', r.resolved && r.resolved_at ? 'Resolved ' + recDate(r.resolved_at) : ''].filter(Boolean);
+      return `<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
+        <div style="flex:1 1 380px;display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">${esc(f.Text || 'Recommendation')}</b><span class="sub">${bits.join(' · ')}</span></div>
+        <div style="display:flex;gap:8px"><button class="btn sm" onclick="previewRecEdit(${r.id})">Edit</button>${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`}</div></article>`;
+    }).join('') || '<p class="sub">Nothing here.</p>';
+  };
+  function recForm(r) {
+    const f = r?.fields || {}, vis = recVisits(f)[0] || '', o = (v, l, s) => `<option value="${esc(v)}" ${s ? 'selected' : ''}>${esc(l)}</option>`;
+    const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Recommendation"><form class="card" id="recform"><h2>${r ? 'Edit' : 'Add'} recommendation</h2>
+      <label>What must be put right? *<textarea name="Text" required rows="3" style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)">${esc(f.Text || '')}</textarea></label>
+      <div class="qagrid"><label>Programme<select name="programme_id">${o('', '—', !r?.programme_id)}${progs.map(p => o(p.id, p.programme_name || 'Programme ' + p.id, p.id === r?.programme_id)).join('')}</select></label>
+      <label>From visit<select name="Visit">${o('', '—', !vis)}${P.data.visits.map(v => o(v.id, 'VIS-' + v.id + ' · ' + (v.fields?.['Visit Title'] || progName(v.programme_id)), String(v.id) === vis)).join('')}</select></label>
+      <label>Owner *<input name="Owner" required value="${esc(f.Owner || '')}" placeholder="Who fixes it"></label>
+      <label>Due date *<input name="Due" type="date" required value="${esc(f['Due Date'] || '')}"></label></div>
+      <div class="sub" id="recerr" style="color:var(--bad)"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="recsave">Save</button></div></form></div>`);
+    $('recform').onchange = e => { if (e.target.name === 'Visit' && e.target.value) { const v = P.data.visits.find(x => String(x.id) === e.target.value); if (v?.programme_id) $('recform').elements.programme_id.value = v.programme_id; } };
+    $('recform').onsubmit = async ev => {
+      ev.preventDefault(); const el = $('recform').elements, btn = $('recsave'); btn.disabled = true; btn.textContent = 'Saving…';
+      const fields = { ...f, Text: el.Text.value.trim(), Owner: el.Owner.value.trim(), 'Due Date': el.Due.value, Visit: el.Visit.value ? [el.Visit.value] : [], Status: r?.resolved ? 'Resolved' : 'Open' };
+      const row = { fields, programme_id: el.programme_id.value ? +el.programme_id.value : null };
+      try {
+        if (r) await write('Recommendation', () => sb.from('recommendations').update(row).eq('id', r.id).select('id'));
+        else { if (!P.tenant) throw new Error('No tenant on your account.'); await write('Recommendation', () => sb.from('recommendations').insert({ tenant_id: P.tenant, resolved: false, ...row }).select('id')); }
+        $('famov').remove(); await loadAll();
+      } catch (err) { $('recerr').textContent = err.message || String(err); btn.disabled = false; btn.textContent = 'Save'; }
+    };
+    $('recform').elements.Text.focus();
   }
-  document.addEventListener('click', async e => {
-    const b = e.target.closest('#reclist button'); if (!b || !/Mark resolved/.test(b.textContent)) return;
-    e.stopImmediatePropagation(); e.preventDefault();
-    const card = b.closest('article'), idx = [...$('reclist').children].indexOf(card), open = RECS.filter(r => rF === 'All' || (rF === 'Resolved') === !!r[3]);
-    const rec = open[idx]; if (!rec) return;
-    await write('Recommendation', () => sb.from('recommendations').update({ resolved: true, resolved_at: new Date().toISOString() }).eq('id', rec[5]));
-    await loadAll();
-  }, true);
+  window.previewRecAdd = () => recForm(null);
+  window.previewRecEdit = id => { const r = P.data.recs.find(x => x.id === id); if (r) recForm(r); };
+  window.previewRecResolve = async (id, done) => {
+    const r = P.data.recs.find(x => x.id === id); if (!r) return;
+    try { await write('Recommendation', () => sb.from('recommendations').update({ resolved: done, resolved_at: done ? new Date().toISOString() : null, fields: { ...(r.fields || {}), Status: done ? 'Resolved' : 'Open' } }).eq('id', id).select('id')); await loadAll(); } catch (_) {}
+  };
 
   /* ---------- FAM + clients (read) ---------- */
   function applyFam() {

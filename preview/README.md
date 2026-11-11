@@ -11,4 +11,20 @@ Live ApexOne (`/index.html`, project `apex-one`) and its ClickUp lists are untou
 - `E2E-CHECKLIST.md`: setup and manual test run
 
 Open it locally (double-click `index.html`, keeping `live.js`, `qa.js`, `delivery.js` and `shell.js` in the same folder) or from any static host.
-Hosted on `main` at /preview/ (page files only) so it can be opened without a proxy. It talks only to the apexone-preview project. Migrations, adapter and tests stay on the feat/apexone-redesign-preview branch; see the go/no-go section of the gap report there before anything moves into the live app.
+Hosted on `main` at /preview/ (page files only). It talks to the LIVE apex-one project. Migrations, adapter and older tests stay on the feat/apexone-redesign-preview branch (its GAP-REPORT.md is from 21 Oct and predates the switch to live; the module list below is the current one).
+
+## Moving modules from the old app to the new look
+
+One module at a time. When a module is complete here, the old app's menu item redirects to it; after that only this copy changes.
+
+| Module | Status (11 Nov 2026) | Left to do |
+|---|---|---|
+| FAM Registry | **Moved** (apexone PR #68, 11 Nov) | Data capture; user guide kept current |
+| Recommendations | **Ready to move** (add, edit owner/due date/programme/visit, resolve, reopen; overdue in red) | Merge the apexone redirect PR |
+| Clients | Real cards | Detail panel + edit |
+| Monitoring visits | Real visits; KMA scores, type, judgement save | Evidence checklist persistence; AI report stays off |
+| Data quality | Real issues; decisions write; merge request to sign-off | Merge procedure after approval (approver not decided) |
+| Learners / Enrolments | Real lists | Add/import learner, enrol/link |
+| Dashboard | Real counts | Confirm KPI definitions |
+| Programmes, Attendance & PoE, EISA readiness | Partly mock | Wire to live tables |
+| QCTO Tracker, Moderation, Accreditation, LEISA, Sign-off queue | Preview-only tables, not on live | Migrations to live first |
