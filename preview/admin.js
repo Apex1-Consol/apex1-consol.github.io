@@ -264,7 +264,8 @@
       </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email.</p></section>`;
   }
   const run = async (fn, ok) => { try { await fn(); US = null; say(ok); renderUsers(); } catch (e) { say('Not saved: ' + e.message); } };
-  window.adUserSave = i => { const roles = [...document.querySelectorAll(`#view-users input[data-u="${i}"]:checked`)].map(x => x.value); if (!roles.length) return say('Pick at least one role, or use Delete'); const u = US[i];
+  window.adUserSave = i => { const roles = [...document.querySelectorAll(`#view-users input[data-u="${i}"]:checked`)].map(x => x.value); const u = US[i]; rl(u.role).filter(r => !ROLES.some(x => x[0] === r)).forEach(r => roles.push(r));   // keep roles this screen does not show (e.g. demo)
+    if (!roles.length) return say('Pick at least one role, or use Delete');
     run(() => ua('update', { user_id: u.id, role: roles, name: ($('un-' + i)?.value || '').trim(), tenant: u.tenant || 'apex-academy' }), 'Saved. Applies at their next sign-in.'); };
   window.adUserRemove = i => { const u = US[i]; if (!confirm(`Delete the sign-in account of ${u.email}? This cannot be undone.`)) return; run(() => ua('delete', { user_id: u.id }), 'User deleted'); };
   window.adUserAdd = () => {
