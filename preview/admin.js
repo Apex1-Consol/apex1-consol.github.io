@@ -45,12 +45,13 @@
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
 
   /* ---------- PM Tracker (live: Project Manager Tracker) ---------- */
-  const PMF = { pm: '', client: '', type: '', q: '' };
+  const PMF = { pm: '', client: '', type: '', seta: '', q: '' };
+  const pf = (p, k) => ((p.fields || {})[k] || '');
   let PMS = []; Object.defineProperty(window, 'PMS_', { get: () => PMS });
   const pmQuality = p => !(p.qualification_name || p.saqa_id) || !p.start_date || !p.end_date;
   function pmRows() {
     return (D().progs || []).filter(p => (!PMF.pm || (p.project_manager_name || 'Unassigned') === PMF.pm)
-      && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type)
+      && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type) && (!PMF.seta || (pf(p, 'SETA') || '—') === PMF.seta)
       && (!PMF.q || pmQuality(p)));
   }
   function renderPM() {
@@ -73,19 +74,20 @@
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}
         ${sel('pmf-c', 'Client', [...new Set(all.map(p => clientName(p.client_id)))].sort(), PMF.client, "adPM('client',this.value)")}
         ${sel('pmf-t', 'Programme type', [...new Set(all.map(p => p.programme_type || '—'))].sort(), PMF.type, "adPM('type',this.value)")}
+        ${sel('pmf-s', 'SETA', [...new Set(all.map(p => pf(p, 'SETA') || '—'))].sort(), PMF.seta, "adPM('seta',this.value)")}
         <label style="display:flex;gap:6px;align-items:center;font-size:13px;height:36px"><input type="checkbox" ${PMF.q ? 'checked' : ''} onchange="adPM('q',this.checked?'1':'')"> Missing qualification or dates</label>
         <button class="btn sm ghost" onclick="adPM()">Clear</button><span class="famas" style="margin-left:auto">Showing ${rows.length} of ${all.length}</span></div>
-        <div class="tw"><table class="dense">${H(['Prog ID', 'Project manager', 'Client', 'Qualification', 'Learners', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Status', ''])}<tbody>
-        ${rows.map(p => `<tr><td>${p.id}</td><td>${esc(p.project_manager_name || 'Unassigned')}</td><td>${esc(clientName(p.client_id))}</td>
-          <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ''}</td><td>${learnersIn(p.id)}</td>
-          <td>${esc(p.programme_type || '—')}</td><td>${esc(p.nqf_level || '—')}</td><td>${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">Missing</span>'}</td>
-          <td>${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">Missing</span>'}</td><td>${esc(personName(p.facilitator_id) || '—')}</td>
-          <td>${esc(p.status || '')}</td><td><button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`).join('') || none(12, 'No programmes match these filters.')}
+        <div class="tw"><table class="dense">${H(['Prog ID', 'Project manager', 'Client', 'Qualification', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status', ''])}<tbody>
+        ${rows.map(p => `<tr><td>${esc(p.display_id || p.id)}</td><td>${esc(p.project_manager_name || 'Unassigned')}</td><td>${esc(clientName(p.client_id))}</td>
+          <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ''}</td><td>${esc(pf(p, 'Cohort') || p.group_name || '—')}</td><td>${learnersIn(p.id)}</td><td>${esc(pf(p, 'Employment Status') || '—')}</td><td>${esc(pf(p, 'Mode of Delivery') || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
+          <td>${esc(p.programme_type || '—')}</td><td>${esc(p.nqf_level || pf(p, 'NQF') || '—')}</td><td>${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">Missing</span>'}</td>
+          <td>${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">Missing</span>'}</td><td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
+          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`).join('') || none(17, 'No programmes match these filters.')}
         </tbody></table></div></section>`;
   }
   window.adPM = (k, val) => { if (!k) Object.keys(PMF).forEach(x => PMF[x] = ''); else PMF[k] = PMF[k] === val && k === 'pm' ? '' : val; renderPM(); };
-  window.adPMcsv = () => csv('pm-tracker.csv', ['Prog ID', 'Project manager', 'Client', 'Qualification', 'SAQA ID', 'Learners', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Status'],
-    pmRows().map(p => [p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, learnersIn(p.id), p.programme_type, p.nqf_level, day(p.start_date), day(p.end_date), personName(p.facilitator_id), p.status]));
+  window.adPMcsv = () => csv('pm-tracker.csv', ['Prog ID', 'Project manager', 'Client', 'Qualification', 'SAQA ID', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status'],
+    pmRows().map(p => [p.display_id || p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, pf(p, 'Cohort') || p.group_name, learnersIn(p.id), pf(p, 'Employment Status'), pf(p, 'Mode of Delivery'), pf(p, 'SETA'), p.programme_type, p.nqf_level || pf(p, 'NQF'), day(p.start_date), day(p.end_date), personName(p.facilitator_id) || pf(p, 'Facilitator'), pf(p, 'Assessor'), p.status]));
   window.adPMtpl = () => {
     if (!window.XLSX) return say('Excel library not loaded');
     const ws = XLSX.utils.aoa_to_sheet([['Project manager', 'Client', 'Programme name', 'Qualification', 'SAQA ID', 'Programme type', 'NQF level', 'Start date (yyyy-mm-dd)', 'End date (yyyy-mm-dd)', 'Facilitator']]);
