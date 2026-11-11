@@ -5,7 +5,7 @@
 const sb = window.__sb, P = window.__preview, D = () => P.data;
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const say = m => window.toast(m);
+const say = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
 const has = (...r) => (P.roles || []).some(x => x === 'admin' || r.includes(x));
 const when = d => d ? new Date(d).toLocaleString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 const note = n => String(n || '').replace(/^\[\[tags:[^\]]*\]\]\n?/, '');

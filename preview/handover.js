@@ -5,7 +5,7 @@ const sb = window.__sb, P = window.__preview;
 const SUPA_URL = sb.supabaseUrl;
 async function supaHeaders() { const { data } = await sb.auth.getSession(); return { apikey: sb.supabaseKey, Authorization: 'Bearer ' + ((data.session && data.session.access_token) || sb.supabaseKey), 'Content-Type': 'application/json' }; }
 const escapeHtml = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const showToast = (t, m) => window.toast(m === undefined ? t : m);
+const showToast = (t, m) => { m = m === undefined ? t : m; window.toast(m); const e = document.getElementById('toast'); if (e) e.textContent = m; };
 const state = { get programmes() { return (P.data.progsAll || P.data.progs || []).map(p => ({ id: p.id, fields: Object.assign({ Qualification: p.programme_name, 'Prog ID': p.display_id, __stage: p.status }, p.fields || {}, { __stage: p.status }) })); },
   get currentUserEmail() { return P.user && P.user.email; }, get currentUser() { return P.user && P.user.email; } };
 const loadProgrammes = () => window.previewReload && window.previewReload();

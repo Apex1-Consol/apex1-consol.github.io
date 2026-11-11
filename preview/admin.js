@@ -14,7 +14,7 @@
   const H = h => `<thead><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead>`;
   const none = (cols, msg) => `<tr><td colspan="${cols}" style="padding:24px;text-align:center;color:var(--muted)">${msg}</td></tr>`;
   const locked = (what, who) => `<div class="empty"><b>${what}</b><span>Needs the ${who} role.</span></div>`;
-  const say = m => window.toast(m);
+  const say = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
   const daysTo = d => d ? Math.round((new Date(day(d) + 'T00:00:00') - new Date(iso() + 'T00:00:00')) / 864e5) : null;
   const progName = id => (D().progs || []).find(p => p.id === id)?.programme_name || 'Programme ' + id;
   const clientName = cid => (D().clients || []).find(c => c.id === cid)?.client_name || '—';

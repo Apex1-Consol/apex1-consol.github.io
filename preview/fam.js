@@ -30,7 +30,7 @@
   try { const j = JSON.parse(localStorage.getItem(LSK) || 'null'); if (j) { LSF.forEach(k => { if (k in j) S[k] = j[k]; }); if (Array.isArray(j.col)) S.col = new Set(j.col); } } catch (_) {}
   ['expired', 'due_30', 'due_60'].forEach(g => S.col.delete(g)); // urgent groups always open on load, so the first screen shows names
   const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
-  const say = m => window.toast(m);
+  const say = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
   const isAdm = () => has('admin', 'fam_admin');
   const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist', 'fam_admin');
