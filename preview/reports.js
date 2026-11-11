@@ -127,16 +127,16 @@ const monthsOfProg = p => { const a = p.start_date && new Date(p.start_date), b 
 function progView() {
   const admin = has(), reps = TR.reps || [], drs = Array.isArray(DR) ? DR : [], cur = TR.curI;
   const mine = new Set([...reps.map(r => r.programme_id), ...drs.map(d => d.programme_id)].map(String));
-  let progs = (D().progs || []).filter(p => mine.has(String(p.id)) || (admin && ['active', 'handed_over'].includes(p.status)));
+  let progs = (D().progsAll || D().progs || []).filter(p => mine.has(String(p.id)) || (admin && !p.deleted_at && ['active', 'handed_over'].includes(p.status)));   // programmes with reports count even if hidden elsewhere
   if (TRPM) progs = progs.filter(p => reps.some(r => r.programme_id === p.id && r.submitted_by_email === TRPM) || drs.some(d => d.programme_id === p.id && d.pm_email === TRPM));
   const cname = p => (D().clients || []).find(c => c.id === p.client_id)?.client_name || reps.find(r => r.programme_id === p.id)?.client_name_snapshot || drs.find(d => d.programme_id === p.id)?.client_name || 'No client';
   const groups = {}; progs.forEach(p => (groups[cname(p)] = groups[cname(p)] || []).push(p));
   const cell = (p, i) => {
     const m = mName(i), r = reps.find(x => x.programme_id === p.id && x.month === m), d = !r && drs.find(x => x.programme_id === p.id && x.month === m);
     const k = r ? r.status : d ? 'draft' : i > cur ? null : (day(new Date()) > dls(m).submit ? 'missing' : 'due');
-    const lab = MN[i % 12].slice(0, 3) + (i % 12 === 0 || i === cur ? ' ' + String(Math.floor(i / 12)).slice(2) : '');
+    const lab = MN[i % 12].slice(0, 3) + ' ' + String(Math.floor(i / 12)).slice(2);
     const tip = m + ' · ' + (k ? PV[k][0] : 'Upcoming'), href = r ? '/report-generator.html?report=' + r.id : '/report-generator.html';
-    return `<a href="${href}" target="_blank" rel="noopener" title="${esc(tip)}" style="flex:1;min-width:34px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;${k ? `background:${PV[k][1]};color:#fff` : 'background:var(--surface2);color:var(--muted);border:1px dashed var(--border2)'};${i === cur ? 'outline:2px solid var(--ink);outline-offset:1px;' : ''}">${lab}</a>`;
+    return `<a href="${href}" target="_blank" rel="noopener" title="${esc(tip)}" style="flex:1;min-width:46px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;${k ? `background:${PV[k][1]};color:#fff` : 'background:var(--surface2);color:var(--muted);border:1px dashed var(--border2)'};${i === cur ? 'outline:2px solid var(--ink);outline-offset:1px;' : ''}">${lab}</a>`;
   };
   const row = p => {
     const ms = monthsOfProg(p), have = [...new Set([...reps, ...drs].filter(x => x.programme_id === p.id).map(x => mIdx(x.month)).filter(i => i >= 0))].sort((a, b) => a - b);
