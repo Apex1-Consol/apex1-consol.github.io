@@ -1168,15 +1168,16 @@
       ${fld('title', 'What *', 'text', `required value="${e(b.title || '')}" placeholder="e.g. NC: Generic Management, cohort 2"`)}
       ${fld('client', 'Client', 'text', `value="${e(b.client_name || '')}"`)}
       ${fld('start', 'From *', 'date', `required value="${e(b.start_date || '')}"`)}${fld('end', 'To *', 'date', `required value="${e(b.end_date || '')}"`)}
-      ${fld('dpw', 'Days per week', 'number', `min="0.5" max="7" step="0.5" value="${e(b.days_per_week ?? '')}"`)}
+      ${fld('dpw', 'Days per week *', 'number', `required min="0.5" max="7" step="0.5" value="${e(b.days_per_week ?? ((String(b.notes || '').match(/(\d+(?:\.\d+)?) class day/) || [])[1] || 1))}" title="Used for the workload check"`)}
       <label>Status<select name="status">${BKST.map(x => o(x, x, b.status || 'Planned')).join('')}</select></label></div>
-      ${fld('notes', 'Notes', 'text', `value="${e(b.notes || '')}"`)}
+      <div class="sub" style="margin:-4px 0 6px;font-size:12px">Days per week is used for the workload check.${b.id && b.days_per_week == null ? ' It was empty, so it has been filled in for you: check it before saving.' : ''}</div>
+      <label>Notes<textarea name="notes" rows="3" maxlength="600" style="width:100%;box-sizing:border-box;border:1px solid var(--line);border-radius:10px;padding:8px 10px;font:inherit;font-size:14px;background:var(--surface);color:var(--ink);resize:vertical">${e(b.notes || '')}</textarea></label>
       <div id="fambkchk" class="sub" style="padding:8px 0">Pick a practitioner, role and dates to check availability.</div>
       <label id="fambkok" style="display:none;flex-direction:row;gap:8px;align-items:center"><input type="checkbox" name="override" style="width:auto"> Book anyway (reason is written to the notes)</label>
-      ${id && isAdm() ? `<button type="button" class="btn sm" style="color:var(--bad)" onclick="famBookDel(${id})">Delete booking</button>` : ''}`,
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px;font-size:12px">${id && isAdm() ? `<a href="#" style="color:var(--bad)" onclick="event.preventDefault();famBookDel(${id})">Delete booking</a>` : '<span></span>'}${id ? `<span class="sub">Booked by ${e(b.created_by || 'import')}${b.created_at ? ', ' + fmt(b.created_at) : ''}${b.updated_at && String(b.updated_at).slice(0, 10) !== String(b.created_at || '').slice(0, 10) ? ` · last changed ${fmt(b.updated_at)}${b.updated_by ? ' by ' + e(b.updated_by) : ''}` : ''}</span>` : ''}</div>`,
       async F => { need();
         const aidv = Number(val(F, 'aid')), role = val(F, 'role'), title = val(F, 'title'), start = val(F, 'start'), end = val(F, 'end');
-        if (!aidv || !role || !title || !start || !end) throw new Error('Practitioner, role, what, from and to are required.');
+        if (!aidv || !role || !title || !start || !end || !val(F, 'dpw')) throw new Error('Practitioner, role, what, from, to and days per week are required.');
         if (end < start) throw new Error('The end date is before the start date.');
         let notes = val(F, 'notes');
         if (S.bkNeed) { if (!F.override.checked) throw new Error('Tick "Book anyway" to save despite the warnings.');
@@ -1188,13 +1189,14 @@
         else await write('Booking', () => sb.from('fam_bookings').insert({ ...body, tenant_id: P.tenant, source: 'manual', created_by: P.user?.email || null }));
         say(id ? 'Booking updated' : 'Booked'); });
     const f = $('famform'); f.oninput = f.onchange = ev => { if (ev.target.name === 'pid') { const p = progs.find(x => String(x.id) === f.pid.value);
-        if (p) { if (!f.title.value) f.title.value = pn(p); if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
-      if (['role', 'start', 'end'].includes(ev.target.name)) bkOpts();
+        if (p) { if (!f.title.value) f.title.value = pn(p); if (!f.client.value) { const ob = (S.BK || []).find(y => y.programme_id === p.id && y.client_name); f.client.value = (ob && ob.client_name) || p.entity || ''; } if (!f.start.value && p.start_date) f.start.value = d10(p.start_date) || ''; if (!f.end.value && p.end_date) f.end.value = d10(p.end_date) || ''; } }
+      if (['role', 'start', 'end', 'dpw'].includes(ev.target.name)) bkOpts();
       if (ev.target.name !== 'notes' && ev.target.name !== 'override') bkCheck(id); };
     const bkOpts = () => { const role = f.role.value, st = f.start.value || today(), en = f.end.value || addD(st, 90), cur = f.aid.value, AS = assigns();
-      const L = vis().map(a => { const el = eligOf(a, role, null, en), pk = peak(AS.filter(x => x.a.id === a.id && x.live && x.bid !== id), st, en), k = el[0] === 'bad' ? 2 : el[0] === 'ok' && pk < dpwLim(a) ? 0 : 1; return [k, pk, a, el]; })
-        .sort((p, q) => p[0] - q[0] || p[1] - q[1] || shownName(p[2]).localeCompare(shownName(q[2])));
-      f.aid.innerHTML = o('', 'Choose…', cur) + L.map(([k, pk, a, el]) => o(a.id, `${k === 0 ? '✓ ' : ''}${shownName(a)} · ${k === 2 ? el[1] : pk + ' d/wk booked'}`, cur)).join(''); };
+      const L = vis().map(a => { const M = AS.filter(x => x.a.id === a.id && x.live && x.bid !== id && ovl(x.start, x.end, st, en)), el = eligOf(a, role, null, en), pk = peak(M, st, en), k = el[0] === 'bad' ? 2 : el[0] === 'ok' && pk < dpwLim(a) ? 0 : 1; return [k, pk, a, el, M.length]; })
+        .sort((p, q) => p[0] - q[0] || p[1] - q[1] || p[4] - q[4] || shownName(p[2]).localeCompare(shownName(q[2])));
+      const lab = (pk, n) => !n ? 'free' : pk ? `${pk} d/wk booked` : `${n} booking${n === 1 ? '' : 's'}, days not set`;
+      f.aid.innerHTML = o('', 'Choose…', cur) + L.map(([k, pk, a, el, n]) => o(a.id, `${k === 0 ? '✓ ' : ''}${shownName(a)} · ${k === 2 ? el[1] : lab(pk, n)}`, cur)).join(''); };
     bkOpts(); S.bkNeed = null; bkCheck(id);
   };
   async function bkCheck(id) {
@@ -1218,10 +1220,20 @@
       const w = awayIn(a, start, end); if (w) ex.push(`Unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + w.reason + ')' : ''}`);
       docsBefore(a, fake).slice(0, 2).forEach(d => ex.push(`${d.doc_type} ${d.expiry_date < today() ? 'expired' : 'expires'} ${fmt(d.expiry_date)}`));
       const oth = role === 'Moderator' ? 'Assessor' : role === 'Assessor' ? 'Moderator' : null; if (oth && pid && AS2.some(y => y.pid === Number(pid) && y.role === oth)) ex.push(`Also the ${oth.toLowerCase()} on this programme`); }
+    const ps = p && d10(p.start_date), pe = p && d10(p.end_date);
+    if (ps && start < ps) ex.push(`Starts before the programme (${fmt(ps)})`); if (pe && end > pe) ex.push(`Ends after the programme (${fmt(pe)})`); if (pe && end < addD(pe, -14)) ex.push(`Ends ${fmt(end)}, before the programme ends (${fmt(pe)}): who covers the rest?`);
     const need = [...(r.eligibility === 'bad' ? why : []), ...(dup ? [`Already booked as ${role.toLowerCase()} on this programme`] : []), ...ex].join('; ');
-    set(`<span class="badge ${lvl[0]}">${lvl[1]}</span> ${e(why.join(' · '))}${dup ? ' <span class="badge b-bad">Already booked on this programme</span>' : ''}
-      <div style="margin-top:6px">${cl.length ? `<span class="badge b-warn">${cl.length} other booking${cl.length === 1 ? '' : 's'} in these dates</span> ${e(cl.map(c => `${c.role || ''} · ${c.title || ''} (${fmt(c.start)} – ${fmt(c.end)})`).join('; '))}` : '<span class="badge b-ok">Free</span> No other bookings in these dates.'}</div>${ex.length ? `<div style="margin-top:6px"><span class="badge b-warn">Check</span> ${e(ex.join(' · '))}</div>` : ''}`, need);
+    const fixL = (t2) => /scope/i.test(t2) ? ` <a href="#" onclick="event.preventDefault();famBkGo(${aid},'regs')">Add to scope on profile</a>` : /registration/i.test(t2) ? ` <a href="#" onclick="event.preventDefault();famBkGo(${aid},'regs')">Open registrations</a>` : /expire|certificate|document/i.test(t2) ? ` <a href="#" onclick="event.preventDefault();famBkGo(${aid},'docs')">Open documents</a>` : /unavailable/i.test(t2) ? ` <a href="#" onclick="event.preventDefault();famBkGo(${aid})">See dates</a>` : '';
+    const items = [...why.map(t2 => [r.eligibility === 'bad' ? 'bad' : r.eligibility === 'warn' ? 'warn' : 'ok', t2]), ...(dup ? [['bad', `Already booked as ${role.toLowerCase()} on this programme`]] : []),
+      ...ex.map(t2 => [/also the (assessor|moderator)/i.test(t2) ? 'bad' : 'warn', t2]),
+      ...(cl.length ? [['info', `${cl.length} other booking${cl.length === 1 ? '' : 's'} in these dates: ${cl.map(c => `${c.role || ''} · ${niceN(c.title) || ''} (${fmt(c.start)} – ${fmt(c.end)})`).join('; ')}`]] : [])];
+    const prob = items.filter(x => x[0] === 'bad' || x[0] === 'warn'), top = items.some(x => x[0] === 'bad') ? 'bad' : prob.length ? 'warn' : 'ok';
+    const pal = { bad: ['rgba(200,40,40,.1)', 'var(--bad)', 'Check before booking'], warn: ['rgba(224,161,0,.14)', 'var(--warn,#8a5a00)', 'Check first'], ok: ['rgba(30,150,80,.1)', 'var(--ok)', 'Free and registered'] }[top];
+    set(`<div style="background:${pal[0]};border-radius:10px;padding:10px 12px;color:var(--ink);font-size:14px"><b style="color:${pal[1]}">${top === 'ok' ? '✓' : '⚠'} ${pal[2]}</b>
+      ${top === 'ok' ? `<div>${e(why.join(' · ') || 'Eligible for this role.')}</div>` : `<ul style="margin:6px 0 0;padding-left:18px">${prob.map(([l, t2]) => `<li style="color:${l === 'bad' ? 'var(--bad)' : 'inherit'}">${e(t2)}${fixL(t2)}</li>`).join('')}</ul>`}
+      ${items.filter(x => x[0] === 'info').map(x => `<div class="sub" style="margin-top:6px">${e(x[1])}</div>`).join('')}</div>`, need);
   }
+  window.famBkGo = (aid, tab) => { close(); location.hash = 'fam/' + aid; if (tab && window.famTab) setTimeout(() => { try { famTab(tab); } catch (_) {} }, 400); };
   window.famBookDel = async id => { if (!confirm('Delete this booking? It cannot be undone. To keep a record, set the status to Cancelled instead.')) return;
     try { const r = await write('Delete', () => sb.from('fam_bookings').delete().eq('id', id).select('id')); if (!r?.length) return say('Only a FAM admin can delete bookings.');
       close(); say('Booking deleted'); await load(); } catch (_) {} };
@@ -1327,7 +1339,9 @@
       if (pk > lim) out.push({ lvl: 'warn', html: `${nm2(a)}: ${pk} days a week at the busiest, over the ${lim}-day limit`, btn: `<button class="btn sm" onclick="famCal('who',${a.id})">Review</button>` });
       M.forEach(x => { const w = awayIn(a, x.start, x.end); if (w) out.push({ lvl: 'warn', html: `${nm2(a)}: unavailable ${fmt(w.from)} – ${fmt(w.to)}${w.reason ? ' (' + e(w.reason) + ')' : ''} during ${e(x.title)}`, btn: fix(x.bid) }); });
       M.filter(x => x.role === 'Moderator' && x.pid && M.some(y => y.role === 'Assessor' && y.pid === x.pid)).forEach(x => out.push({ lvl: 'bad', html: `${nm2(a)}: assessor and moderator on ${e(x.title)}`, btn: fix(x.bid) })); });
-    const ub = unbooked(AS), C = S.cal || {};
+    const ub = unbooked(AS), C = S.cal || {}, fin = (S.BK || []).filter(b => (b.status === 'Planned' || b.status === 'Confirmed') && d10(b.end_date) && d10(b.end_date) < t && V.has(b.assessor_id));
+    if (fin.length) out.push({ lvl: 'warn', html: `${fin.length} booking${fin.length === 1 ? ' has' : 's have'} ended but ${fin.length === 1 ? 'is' : 'are'} not marked Done`, btn: `<button class="btn sm" onclick="famCal('fin',${!C.fin})">${C.fin ? 'Hide' : 'Review'}</button>`,
+      more: C.fin ? fin.map(b => `<div class="fcnd" style="padding-left:22px"><span style="flex-grow:1">${e(shownName(S.A.find(a => a.id === b.assessor_id) || {}))} · ${e(niceN(b.title))} <span class="sub">ended ${fmt(b.end_date)}</span></span>${canWrite() ? `<button class="btn sm" onclick="famBkDone([${b.id}])">Mark Done</button>` : ''}</div>`).join('') + (canWrite() && fin.length > 1 ? `<div style="padding:6px 0 0 22px"><button class="btn sm" onclick="famBkDone([${fin.map(b => b.id).join(',')}])">Mark all ${fin.length} Done</button></div>` : '') : '' });
     if (ub.length) out.push({ lvl: 'warn', html: `${ub.length} programme${ub.length === 1 ? '' : 's'} running or starting within 30 days with no one booked`, btn: `<button class="btn sm" onclick="famCal('unb',${!C.unb})">${C.unb ? 'Hide' : 'View'}</button>`,
       more: C.unb ? ub.slice(0, 40).map(p => `<div class="fcnd" style="padding-left:22px"><span style="flex-grow:1">${e(p.title)} <span class="sub">${fmt(p.start)} – ${fmt(p.end)}</span></span>${canWrite() ? `<button class="btn sm" onclick="famBook(null,null,${p.pid})">Book</button>` : ''}</div>`).join('') + (ub.length > 40 ? `<div class="sub" style="padding-left:22px">and ${ub.length - 40} more</div>` : '') : '' });
     return out.sort((p, q) => (p.lvl === 'bad' ? 0 : 1) - (q.lvl === 'bad' ? 0 : 1));
@@ -1368,6 +1382,9 @@
     const tb = C.ptab === 'p' || !x ? 'p' : 'b';
     return (x ? `<div class="fcptabs" role="tablist"><button type="button" role="tab" aria-selected="${tb === 'b'}" class="${tb === 'b' ? 'on' : ''}" onclick="famCal('ptab','b')">This booking</button><button type="button" role="tab" aria-selected="${tb === 'p'}" class="${tb === 'p' ? 'on' : ''}" onclick="famCal('ptab','p')">${e(shownName(a))}</button></div>` : '') + (tb === 'p' ? pView(a) : bView(x));
   }
+  window.famBkDone = async ids => { if (!confirm(`Mark ${ids.length} booking${ids.length === 1 ? '' : 's'} as Done?`)) return;
+    try { const r = await write('Booking', () => sb.from('fam_bookings').update({ status: 'Done', updated_by: me() }).in('id', ids).select('id'));
+      say(r?.length === ids.length ? 'Marked Done' : `Marked ${r?.length || 0} of ${ids.length}. You can only change bookings you created, or ask a FAM admin.`); await load(); } catch (_) {} };
   window.famCalSwap = async (bid, aid) => { const b = (S.BK || []).find(y => y.id === bid), a0 = b && S.A.find(y => y.id === b.assessor_id), a1 = S.A.find(y => y.id === aid); if (!b || !a1) return;
     if (!confirm(`Swap ${shownName(a1)} in for ${shownName(a0 || {})} on “${b.title || 'this booking'}”?`)) return;
     const notes = ((b.notes ? b.notes + ' | ' : '') + `Swapped from ${shownName(a0 || {})} to ${shownName(a1)} (${me() || 'unknown'}, ${fmt(today())})`).slice(0, 600);
