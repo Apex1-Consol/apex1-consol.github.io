@@ -46,12 +46,17 @@
     ev.preventDefault();
     const [em, pw] = form.querySelectorAll('input');
     const btn = form.querySelector('button'); btn.disabled = true; btn.textContent = 'Signing in…';
-    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value });
+    if (!window._pvCap) { btn.disabled = false; btn.textContent = 'Sign in'; let e0 = form.querySelector('.err'); if (e0) e0.remove(); form.insertAdjacentHTML('beforeend', '<div class="err" role="alert">Please wait for the security check to finish, then try again.</div>'); return; }
+    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value, options: { captchaToken: window._pvCap } });
+    window._pvCap = null; try { window.turnstile && turnstile.reset('#pv-ts'); } catch (_) {}
     btn.disabled = false; btn.textContent = 'Sign in';
     let e = form.querySelector('.err'); if (e) e.remove();
     if (error) form.insertAdjacentHTML('beforeend', `<div class="err" role="alert">${esc(error.message)}</div>`);
   };
-  form.querySelector('.ts').textContent = 'Live ApexOne data · sign in with your ApexOne account';
+  // Live ApexOne auth has captcha protection on: same Turnstile site key as the live app.
+  const ts = form.querySelector('.ts'); ts.className = ''; ts.innerHTML = '<div id="pv-ts"></div>';
+  window._pvTsLoad = () => turnstile.render('#pv-ts', { sitekey: '0x4AAAAAAE4gMGMxYC7Zn1qJ', callback: t => { window._pvCap = t; }, 'expired-callback': () => { window._pvCap = null; } });
+  { const sc = document.createElement('script'); sc.src = 'https://challenges.cloudflare.com/turnstile/v0/api.js?onload=_pvTsLoad&render=explicit'; sc.async = true; document.head.appendChild(sc); }
   // Sign out must never wait on the auth lock: clear the local session first, then tell the server in the background.
   function hardSignOut() {
     P.user = null; P.roles = []; P.tenant = null;
