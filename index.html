@@ -1,6 +1,12 @@
 <!DOCTYPE html> 
 <html lang="en">
 <head>
+<script>
+// FAM Registry has moved to the new look (/preview/#fam), which runs on this same live database.
+// Old FAM code below is frozen; to undo, delete this script and the famGoNew() call in switchTab.
+function famGoNew(){var m=/[#&]assessor=(\d+)/.exec(location.hash);location.href='/preview/#fam'+(m?'/'+m[1]:'');}
+if(/[#&]view=fam(&|$)/.test(location.hash))famGoNew();
+</script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>APEX ONE - Central Hub System</title>
@@ -3982,6 +3988,7 @@ function openExternalApp(page) {
 }
 
 function switchTab(viewName) {
+    if (viewName === 'fam') return famGoNew();
     state.currentView = viewName;
     state.signoffOnly = false; // openSignoffQueue sets it again after switching
     const chip = document.getElementById('signoff-only-chip'); if (chip) chip.style.display = 'none';
