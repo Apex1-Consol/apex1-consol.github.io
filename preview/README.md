@@ -35,3 +35,5 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Reports, Audit, Users | **Moved** (#75): reports.js (monthly report reviews via reports.my_report_queue/transition_report, downloads CSV/Excel), audit_log, Users via user-admin Edge Function. /?classic=1#view=reports keeps old Smart Import for other tables | Dashboard, AI visit report |
 
 11 Nov evening: Dashboard + Head of Ops view moved (#76); AI visit report on the visit page (ai-generate visit_report); Reports has the monthly progress + deadline tracker (Remind PM via reports.remind_pm) and saved drafts; attendance below 80% warning on Attendance; dashboard counts leave test records out. reports.* drafts/notes/comments are PM-own only (admin all); assessor_directory view is read-only. Old app now only serves ?classic=1 screens and the Report Generator.
+
+- 11 Nov 2026: ✨ AI buttons (visit Suggest/AI report, learner Progress summary, programme AI summary) via previewAI in live.js. FAM Registry limited to role fam_admin (menu NAVR.fam in admin.js; DB restrictive policy fam_only, migration fam_access_four_only).

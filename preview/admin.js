@@ -41,6 +41,8 @@
   };
   // menu items are hidden for roles that cannot open them (index.html renderNav reads this)
   window.NAVR = Object.fromEntries(Object.entries(VIEWS).map(([k, v]) => [k, () => !v[2] || has(...v[2])]));
+  // FAM Registry: only fam_admin (Bernadine, Dolores, Ayanda, Stavros); DB policy fam_only enforces the same
+  window.NAVR.fam = () => (P.roles || []).includes('fam_admin');
   const anchor = $('view-dq');
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
 
