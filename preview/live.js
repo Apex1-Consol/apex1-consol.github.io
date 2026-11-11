@@ -116,7 +116,7 @@
   async function loadAll() {
     P.errors = {};
     const R = sb.schema('reports');
-    const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes] = await Promise.all([
+    const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows] = await Promise.all([
       q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email,phone,fields').order('last_name')),
       q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at,fields')),
       q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields')),
@@ -138,10 +138,11 @@
       q('leisa_learner', sb.from('leisa_learner').select('*')),
       q('program_modules', sb.from('program_modules').select('*').order('module_number')),
       q('attendance_sessions', sb.from('attendance_sessions').select('*').order('session_date')),
-      q('attendance', sb.from('attendance').select('id,programme_id,learner_id,session_date,status')),
-      q('eisa', sb.from('eisa').select('*'))
+      q('attendance', sb.from('attendance').select('id,programme_id,learner_id,session_date,status,fields')),
+      q('eisa', sb.from('eisa').select('*')),
+      q('poe_checklist', sb.from('poe_checklist').select('id,programme_id,learner_id,fields'))
     ]);
-    Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes });
+    Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows });
     applyAll();
     const bad = Object.keys(P.errors);
     // Tables that exist only in the old TEST project (QA/ETQA, LEISA, sign-offs): expected to be missing on live, so stay quiet about them.

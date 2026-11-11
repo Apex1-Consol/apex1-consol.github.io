@@ -19,13 +19,14 @@
   const KLAB = { KM: 'Knowledge', PM: 'Practical', WM: 'Workplace' };
   const RES = ['C', 'NYC', 'RW', 'NS'], RLAB = { C: 'Competent', NYC: 'Not yet competent', RW: 'Rework', NS: 'Not submitted' };
   const RCL = { C: 'b-ok', NYC: 'b-bad', RW: 'b-warn', NS: 'b-warn' };
-  const AT = s => ({ Present: 'P', Absent: 'A', Reason: 'R' }[s] || s || '');
+  const AT = s => ({ Present: 'P', Absent: 'A', Reason: 'R', Late: 'R' }[s] || (['P', 'A', 'R'].includes(s) ? s : ''));   // 'N/A' and blanks show as not recorded
   const NEXT = { '': 'P', P: 'R', R: 'A', A: 'P' };
 
   const progs = () => D().progs || [];
   const prog = id => progs().find(p => p.id === id);
   const learnersOf = pid => { const ids = new Set((D().enrol || []).filter(e => e.programme_id === pid).map(e => e.learner_id)); return (D().learners || []).filter(l => ids.has(l.id)); };
-  const modsOf = pid => (D().pmods || []).filter(m => m.programme_id === pid).sort((a, b) => a.module_number - b.module_number);
+  const modsOf = pid => { const pm = (D().pmods || []).filter(m => m.programme_id === pid); if (pm.length) return pm.sort((a, b) => a.module_number - b.module_number);
+    return [...new Set((D().eisaRes || []).filter(r => r.programme_id === pid).map(r => r.module_number))].sort((a, b) => a - b).map(n => ({ programme_id: pid, module_number: n, title: '' })); };   // live: few programmes have program_modules; fall back to the modules that have results
   const sessOf = pid => (D().sessions || []).filter(s => s.programme_id === pid).sort((a, b) => day(a.session_date) < day(b.session_date) ? -1 : 1);
   const attFor = (pid, lid, d) => (D().att || []).find(a => a.programme_id === pid && a.learner_id === lid && day(a.session_date) === day(d));
   const resFor = (pid, lid, n) => (D().eisaRes || []).find(r => r.programme_id === pid && r.learner_id === lid && r.module_number === n);
@@ -173,14 +174,14 @@
     if (!P.user) return _renderAtt();
     const p = ensure();
     picker('#view-attendance select', renderAtt);
-    $('atabs').innerHTML = ['Register', 'PoE tracker'].map(t => `<button class="${t === aTab ? 'on' : ''}" onclick="aTab='${t}';renderAtt()">${t}</button>`).join('');
-    $('regcard').hidden = aTab !== 'Register'; $('poecard').hidden = aTab === 'Register';
+    $('atabs').innerHTML = ['Register', 'PoE tracker', 'Documents'].map(t => `<button class="${t === aTab ? 'on' : ''}" onclick="aTab='${t}';renderAtt()">${t}</button>`).join('');
+    $('regcard').hidden = aTab !== 'Register'; $('poecard').hidden = aTab !== 'PoE tracker'; renderDocs(p);
     if (!p) { $('register').innerHTML = '<tbody><tr><td class="sub">No programmes with learners.</td></tr></tbody>'; $('poetable').innerHTML = ''; return; }
     const ls = learnersOf(p.id), ss = sessOf(p.id), ed = CAN(), lim = absenceLimit(p);
     const hint = $('regcard').querySelector('p.sub');
     if (hint) hint.innerHTML = (ed ? 'Tap a cell to cycle Present → Reason → Absent. Changes save automatically. ' : 'Read only for your role. ') + `R means absent with a valid reason (proof attached). The absence limit for this programme is ${lim} days.`;
     const head = $('regcard').firstElementChild;
-    if (head && !$('dvadd')) head.insertAdjacentHTML('beforeend', '<button class="btn sm" id="dvadd" onclick="dvAddToggle()">+ Add session</button>');
+    if (head && !$('dvadd')) head.insertAdjacentHTML('beforeend', '<button class="btn sm" onclick="dvAttCsv()">Export CSV</button><button class="btn sm" id="dvadd" onclick="dvAddToggle()">+ Add session</button>');
     if ($('dvadd')) $('dvadd').hidden = !ed;
     const form = !ed || !addOpen ? '' : `<tr><td colspan="${ss.length + 3}" style="white-space:normal"><div class="qagrid" id="dvsess"><label>Date<input type="date" data-k="session_date"></label>
       <label>Module<select data-k="module">${modsOf(p.id).map(m => `<option value="${m.module_number}">Module ${m.module_number}: ${esc(m.title || '')}</option>`).join('') || '<option value="">No modules</option>'}</select></label>
@@ -189,7 +190,7 @@
     $('register').innerHTML = `<thead><tr><th>Learner</th>${ss.map((s, i) => `<th style="text-align:center" title="${esc(s.topic || '')}">S${i + 1}<div class="sub" style="font-weight:400">${fmtD(day(s.session_date)).slice(0, 5)}${modOfSession(s) ? ' · M' + modOfSession(s) : ''}</div></th>`).join('')}<th>Rate</th><th>Absent</th></tr></thead><tbody>${form}${ls.map(l => {
       let rec = 0, here = 0, ab = 0;
       const cells = ss.map(s => { const v = AT(attFor(p.id, l.id, s.session_date)?.status); if (v) { rec++; if (v !== 'A') here++; if (v === 'A') ab++; }
-        const [bg, fg] = v ? SC[v] : ['var(--soft)', 'var(--muted)'];
+        const [bg, fg] = v && SC[v] ? SC[v] : ['var(--soft)', 'var(--muted)'];
         return `<td style="text-align:center;padding:8px 4px">${ed ? `<button aria-label="${name(l)} ${fmtD(day(s.session_date))}: ${v || 'not recorded'}" onclick="dvMark(${l.id},'${day(s.session_date)}')" style="width:36px;height:36px;border:0;border-radius:8px;font-weight:700;background:${bg};color:${fg}">${v || '·'}</button>` : `<span class="dot" style="width:32px;height:32px;background:${bg};color:${fg}">${v || '·'}</span>`}</td>`; }).join('');
       return `<tr><td style="font-weight:600">${lnk(l)}</td>${cells}<td style="font-weight:600">${rec ? pct(here, rec) + '%' : '—'}</td><td>${ab > lim ? `<span class="badge b-bad">${ab} · over ${lim}</span>` : ab}</td></tr>`; }).join('')}</tbody>`;
     if (!ss.length) $('register').insertAdjacentHTML('beforeend', `<tbody><tr><td colspan="3" class="sub">No sessions yet.${ed ? ' Use “+ Add session”.' : ''}</td></tr></tbody>`);
@@ -212,16 +213,16 @@
     if (!v.session_date) return say('Pick the session date');
     if (sessOf(p.id).some(s => day(s.session_date) === v.session_date)) return say('There is already a session on that date');
     const row = { tenant_id: P.tenant, programme_id: p.id, session_date: v.session_date, topic: v.topic || null, facilitator: v.facilitator || null, venue: v.venue || null,
-      fields: { Date: v.session_date, Topic: v.topic, Facilitator: v.facilitator, Venue: v.venue, Programme: p.id, Module: v.module ? +v.module : null } };
+      fields: { Date: v.session_date, Topic: v.topic, Facilitator: v.facilitator, Venue: v.venue, Programme: [String(p.id)], Module: v.module ? +v.module : null } };
     const r = await write('Session', () => sb.from('attendance_sessions').insert(row).select());
     (D().sessions = D().sessions || []).push((r && r[0]) || row); addOpen = false; say('Session added'); renderAtt();
   };
   window.dvMark = async (lid, d) => {
     const p = prog(dProg); if (!p) return;
-    const cur = attFor(p.id, lid, d), nv = NEXT[AT(cur?.status)];
-    const row = { tenant_id: P.tenant, programme_id: p.id, learner_id: lid, session_date: d, status: nv };
+    const cur = attFor(p.id, lid, d), nv = NEXT[AT(cur?.status)] || 'P';
+    const row = { tenant_id: P.tenant, programme_id: p.id, learner_id: lid, session_date: d, status: nv, fields: { ...(cur?.fields || {}), Programme: [String(p.id)], Learner: [String(lid)], Date: d, Status: nv } };
     await write('Attendance', () => sb.from('attendance').upsert(row, { onConflict: 'tenant_id,learner_id,programme_id,session_date' }));
-    if (cur) cur.status = nv; else (D().att = D().att || []).push(row);
+    if (cur) { cur.status = nv; cur.fields = row.fields; } else (D().att = D().att || []).push(row);
     renderAtt();
   };
   async function saveRes(lid, n, patch) {
@@ -235,10 +236,79 @@
   window.dvRes2 = (lid, n, k, v) => saveRes(lid, n, () => ({ [COL[k]]: v || null })).then(() => say('Result saved'));
   window.dvMod = (lid, n, on) => saveRes(lid, n, c => ({ fields: { ...(c?.fields || {}), 'Internal moderation': on ? 'Yes' : 'No' } })).then(() => say(on ? 'Marked as internally moderated' : 'Moderation tick removed'));
 
+
+  /* ---------- Documents checklist (the old app's "PoE" screen): per programme document list, per learner Received / Missing / N/A + note ----------
+     poe_checklist rows: fields RecordType 'poe' {Programme:[id],Learner:[id],Marks: JSON {docId: received|missing|na, note_<docId>: text}}
+     and RecordType 'poeconfig' {Programme:[id], Docs: JSON [{id,label,required}]}; typed programme_id / learner_id kept in step. */
+  const POE_DOCS = [{ id: 'id_copy', label: 'ID Copy / Certified ID', required: true }, { id: 'enrolment_frm', label: 'Signed Enrolment Form', required: true }, { id: 'consent', label: 'Consent Form (POPIA)', required: true },
+    { id: 'logbook', label: 'Logbook (signed)', required: true }, { id: 'poe', label: 'Portfolio of Evidence (PoE)', required: true }, { id: 'mou', label: 'MOU (employer-signed)', required: false },
+    { id: 'medical', label: 'Medical Certificate (if applicable)', required: false }, { id: 'bank_confirm', label: 'Banking Confirmation Letter', required: false }];
+  const pcProg = r => +((r.fields?.Programme || [])[0] ?? r.programme_id), pcLearner = r => +((r.fields?.Learner || [])[0] ?? r.learner_id);
+  const pcRows = () => D().poeRows || [];
+  const pcCfgRec = pid => pcRows().find(r => r.fields?.RecordType === 'poeconfig' && pcProg(r) === pid);
+  const pcDocs = pid => { const r = pcCfgRec(pid); try { if (r?.fields?.Docs) return JSON.parse(r.fields.Docs); } catch (_) {} return POE_DOCS.map(d => ({ ...d })); };
+  const pcRec = (pid, lid) => pcRows().find(r => (r.fields?.RecordType || 'poe') === 'poe' && pcProg(r) === pid && pcLearner(r) === lid);
+  const pcMarks = (pid, lid) => { try { return JSON.parse(pcRec(pid, lid)?.fields?.Marks || '{}'); } catch (_) { return {}; } };
+  async function pcSave(pid, lid, marks) {
+    const cur = pcRec(pid, lid), fields = { ...(cur?.fields || {}), RecordType: 'poe', Programme: [String(pid)], Learner: [String(lid)], Marks: JSON.stringify(marks) };
+    if (cur) { await write('Documents', () => sb.from('poe_checklist').update({ fields, programme_id: pid, learner_id: lid }).eq('id', cur.id)); cur.fields = fields; }
+    else { const r = await write('Documents', () => sb.from('poe_checklist').insert({ tenant_id: P.tenant, programme_id: pid, learner_id: lid, fields }).select()); pcRows().push((r && r[0]) || { fields, programme_id: pid, learner_id: lid }); }
+  }
+  window.dvDoc = async (lid, doc, st) => { const p = prog(dProg); if (!p) return; const m = pcMarks(p.id, lid); m[doc] = m[doc] === st ? '' : st; await pcSave(p.id, lid, m); renderAtt(); };
+  window.dvDocNote = async (lid, doc, v) => { const p = prog(dProg); if (!p) return; const m = pcMarks(p.id, lid); if (v.trim()) m['note_' + doc] = v.trim(); else delete m['note_' + doc]; await pcSave(p.id, lid, m); say('Note saved'); };
+  window.dvDocCfg = () => {
+    const p = prog(dProg); if (!p) return; const docs = pcDocs(p.id);
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Document list"><form class="card" id="dcform"><h2>Documents for ${esc(p.programme_name)}</h2>
+      <div id="dclist" style="display:flex;flex-direction:column;gap:6px">${docs.map(d => `<div style="display:flex;gap:8px;align-items:center"><input data-id="${esc(d.id)}" value="${esc(d.label)}" style="flex-grow:1;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)"><label style="flex-direction:row;gap:6px;align-items:center;font-size:12px"><input type="checkbox" ${d.required ? 'checked' : ''} style="height:auto"> Required</label><button type="button" class="btn sm" onclick="this.parentElement.remove()">Remove</button></div>`).join('')}</div>
+      <button type="button" class="btn sm" onclick="document.getElementById('dclist').insertAdjacentHTML('beforeend','<div style=&quot;display:flex;gap:8px;align-items:center&quot;><input data-id=&quot;doc_'+Date.now()+'&quot; placeholder=&quot;Document name&quot; style=&quot;flex-grow:1;height:34px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)&quot;><label style=&quot;flex-direction:row;gap:6px;align-items:center;font-size:12px&quot;><input type=&quot;checkbox&quot; checked style=&quot;height:auto&quot;> Required</label><button type=&quot;button&quot; class=&quot;btn sm&quot; onclick=&quot;this.parentElement.remove()&quot;>Remove</button></div>')">+ Add document</button>
+      <div class="sub" id="dcerr" style="color:var(--bad)"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y">Save list</button></div></form></div>`);
+    $('dcform').onsubmit = async ev => { ev.preventDefault();
+      const list = [...$('dclist').children].map(r => { const [t, c] = r.querySelectorAll('input'); return { id: t.dataset.id, label: t.value.trim(), required: c.checked }; }).filter(d => d.label);
+      const cur = pcCfgRec(p.id), fields = { ...(cur?.fields || {}), RecordType: 'poeconfig', Programme: [String(p.id)], Docs: JSON.stringify(list) };
+      try { if (cur) { await write('Document list', () => sb.from('poe_checklist').update({ fields, programme_id: p.id }).eq('id', cur.id)); cur.fields = fields; }
+        else { const r = await write('Document list', () => sb.from('poe_checklist').insert({ tenant_id: P.tenant, programme_id: p.id, fields }).select()); pcRows().push((r && r[0]) || { fields, programme_id: p.id }); }
+        $('famov').remove(); say('Document list saved'); renderAtt(); } catch (err) { $('dcerr').textContent = err.message || String(err); } };
+  };
+  function renderDocs(p) {
+    let box = $('doccard'); if (!box) { $('poecard').insertAdjacentHTML('afterend', '<section class="card" id="doccard" hidden></section>'); box = $('doccard'); }
+    box.hidden = aTab !== 'Documents'; if (aTab !== 'Documents' || !p) return;
+    const ls = learnersOf(p.id), docs = pcDocs(p.id), req = docs.filter(d => d.required), ed = CAN();
+    const done = l => { const m = pcMarks(p.id, l.id); return req.filter(d => m[d.id] === 'received' || m[d.id] === 'na').length; };
+    const complete = ls.filter(l => done(l) === req.length).length;
+    const btn = (l, d, st, lab, cls) => { const on = pcMarks(p.id, l.id)[d.id] === st; return ed ? `<button class="btn sm${on ? ' ' + cls : ''}" style="${on ? '' : 'opacity:.55'}" onclick="dvDoc(${l.id},'${esc(d.id)}','${st}')">${lab}</button>` : (on ? `<span class="badge ${cls === 'y' ? 'b-ok' : cls === 'n' ? 'b-bad' : 'b-n'}">${lab}</span>` : ''); };
+    box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h2 style="flex-grow:1">Learner documents</h2><span class="sub">${complete} of ${ls.length} learners complete · ${req.length} required documents</span>${ed ? '<button class="btn sm" onclick="dvDocCfg()">Edit document list</button>' : ''}<button class="btn sm" onclick="dvDocCsv()">Export CSV</button></div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">${ls.map(l => { const m = pcMarks(p.id, l.id), d0 = done(l), pc = req.length ? Math.round(d0 / req.length * 100) : 100;
+        return `<details class="card" style="padding:10px 14px"><summary style="display:flex;gap:10px;align-items:center;cursor:pointer"><b style="flex-grow:1">${name(l)}</b><span style="width:140px;height:8px;border-radius:4px;background:var(--soft);overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:${pc === 100 ? 'var(--ok)' : pc >= 60 ? '#E0A100' : 'var(--bad)'}"></i></span><span class="sub" style="min-width:90px">${d0}/${req.length} required</span></summary>
+          <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${docs.map(d => `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="flex:1 1 220px">${esc(d.label)}${d.required ? '' : ' <span class="sub">(optional)</span>'}</span>${btn(l, d, 'received', 'Received', 'y')}${btn(l, d, 'missing', 'Missing', 'n')}${btn(l, d, 'na', 'N/A', '')}
+            ${ed ? `<input placeholder="Note" value="${esc(m['note_' + d.id] || '')}" onchange="dvDocNote(${l.id},'${esc(d.id)}',this.value)" style="flex:1 1 160px;height:30px;border:1px solid var(--line);border-radius:6px;padding:0 6px;font:inherit;background:transparent;color:var(--ink)">` : `<span class="sub">${esc(m['note_' + d.id] || '')}</span>`}</div>`).join('')}</div></details>`; }).join('') || '<p class="sub">No learners enrolled on this programme.</p>'}</div>`;
+  }
+  const csv = (nm, rows) => { const t = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n'); try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = nm; document.body.appendChild(a); a.click(); a.remove(); } catch (_) {} say('Exported ' + nm); };
+  window.dvDocCsv = () => { const p = prog(dProg); if (!p) return; const docs = pcDocs(p.id);
+    csv(`Documents-${String(p.programme_name).replace(/[^\w]+/g, '-')}.csv`, [['Learner', ...docs.map(d => d.label)], ...learnersOf(p.id).map(l => { const m = pcMarks(p.id, l.id); return [l.first_name + ' ' + l.last_name, ...docs.map(d => m[d.id] || '')]; })]); };
+  window.dvAttCsv = () => { const p = prog(dProg); if (!p) return; const ss = sessOf(p.id);
+    csv(`Attendance-${String(p.programme_name).replace(/[^\w]+/g, '-')}.csv`, [['Learner', ...ss.map(s => day(s.session_date) + (s.topic ? ' ' + s.topic : ''))], ...learnersOf(p.id).map(l => [l.first_name + ' ' + l.last_name, ...ss.map(s => AT(attFor(p.id, l.id, s.session_date)?.status))])]); };
+
+  /* ---------- Exam results (old app EISA screen: exam v1/v2 result and % per learner per module) ---------- */
+  function renderExams(p) {
+    let box = $('examcard'); if (!box) { $('eisaready').insertAdjacentHTML('afterend', '<section class="card" style="padding:0" id="examcard" hidden></section>'); box = $('examcard'); }
+    box.hidden = eTab !== 'Exam results'; if (eTab !== 'Exam results') return;
+    if (!p) { box.innerHTML = '<p class="sub" style="padding:16px">No programme.</p>'; return; }
+    const ls = learnersOf(p.id), ms = modsOf(p.id), ed = CAN(), EX = ['C', 'NYC', 'NS', 'N/A'];
+    const sel = (l, m, k) => { const v = resFor(p.id, l.id, m.module_number)?.[k] || ''; return ed ? `<select class="cellin" onchange="dvExam(${l.id},${m.module_number},'${k}',this.value)"><option value="">—</option>${EX.map(x => `<option ${x === v ? 'selected' : ''}>${x}</option>`).join('')}</select>` : esc(v || '—'); };
+    const pctIn = (l, m, k) => { const v = resFor(p.id, l.id, m.module_number)?.[k] || ''; return ed ? `<input class="cellin" style="width:64px" inputmode="decimal" value="${esc(v)}" onchange="dvExam(${l.id},${m.module_number},'${k}',this.value.trim())">` : esc(v || '—'); };
+    box.innerHTML = `<div style="padding:16px 20px;display:flex;gap:10px;align-items:center"><h2 style="flex-grow:1">Exam results</h2><span class="sub">First and second attempt per module · saves as you change a cell</span></div>
+      <div class="tw"><table style="min-width:760px"><thead><tr><th rowspan="2">Learner</th>${ms.map(m => `<th colspan="4" style="text-align:center;border-left:1px solid var(--line)">Module ${m.module_number}</th>`).join('')}</tr><tr>${ms.map(() => '<th style="border-left:1px solid var(--line)">Exam 1</th><th>%</th><th>Exam 2</th><th>%</th>').join('')}</tr></thead>
+      <tbody>${ls.map(l => `<tr><td style="font-weight:600">${lnk(l)}</td>${ms.map(m => `<td style="border-left:1px solid var(--line)">${sel(l, m, 'exam_v1_result')}</td><td>${pctIn(l, m, 'exam_v1_pct')}</td><td>${sel(l, m, 'exam_v2_result')}</td><td>${pctIn(l, m, 'exam_v2_pct')}</td>`).join('')}</tr>`).join('') || '<tr><td class="sub">No learners enrolled on this programme.</td></tr>'}</tbody></table></div>`;
+  }
+  window.dvExam = (lid, n, k, v) => saveRes(lid, n, () => ({ [k]: v || null })).then(() => say('Exam result saved'));
+
   /* ---------- EISA readiness ---------- */
   const _renderE = renderE;
   renderE = function () {
     _renderE();                                   // qa.js handles the LEISA file tab
+    if (P.user && $('etabs') && !$('etabs').textContent.includes('Exam results')) { $('etabs').insertAdjacentHTML('beforeend', `<button role="tab" class="${eTab === 'Exam results' ? 'on' : ''}" onclick="eTab='Exam results';renderE()">Exam results</button>`); }
+    if (P.user && eTab === 'Exam results') { $('eisaready').hidden = true; if ($('leisa')) $('leisa').hidden = true; [...$('etabs').children].forEach(b => b.classList.toggle('on', b.textContent === 'Exam results')); picker('#view-eisa select', renderE); renderExams(ensure()); return; }
+    if ($('examcard')) $('examcard').hidden = true;
     if (!P.user || eTab !== 'Readiness') return;
     const p = ensure();
     picker('#view-eisa select', renderE);

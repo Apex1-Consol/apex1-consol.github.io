@@ -152,6 +152,21 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
     const u = log.find(x => x.table === 'monitoring_visits'); ok(u && u.val.fields.KMA1 === '4' && u.val.fields['Overall Judgment'] === '3' && u.eq[1] === 80, JSON.stringify(u && u.val));
   });
+  await t('Learner: add rejects an invalid SA ID, then saves with old-app field keys', async () => {
+    const { w, d, log } = await boot(sess('admin')); w.location.hash = 'learners'; await tick();
+    w.previewLearnerAdd(); const f = d.getElementById('lform'); f.elements.fn.value = 'Ann'; f.elements.ln.value = 'New'; f.elements.nid.value = '1234567890123';
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    ok(/not valid/.test(d.getElementById('lformerr').textContent) && !log.some(x => x.table === 'learners' && x.op === 'insert'), 'invalid ID saved');
+    f.elements.nid.value = ''; d.getElementById('lformsave').disabled = false; f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    const u = log.find(x => x.table === 'learners' && x.op === 'insert'); ok(u && JSON.stringify(u.val).includes('"First Name":"Ann"'), JSON.stringify(u));
+  });
+  await t('Enrolment: enrol skips learners already on the programme', async () => {
+    const { w, d, log } = await boot(sess('admin')); w.location.hash = 'enrolments'; await tick();
+    w.previewEnrolAdd(100); const f = d.getElementById('enform'); f.elements.prog.value = '100';
+    [...f.querySelectorAll('input[name=lid]')].filter(x => ['1', '2'].includes(x.value)).forEach(x => { x.checked = true; });
+    f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
+    const u = log.find(x => x.table === 'enrolments' && x.op === 'insert'); ok(u && JSON.stringify(u.val).includes('"learner_id":2') && !JSON.stringify(u.val).includes('"learner_id":1'), JSON.stringify(u));
+  });
   await t('Recommendation: Mark resolved writes resolved=true', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'recs'; await tick();
     const b = [...d.querySelectorAll('#reclist button')].find(x => /Mark resolved/.test(x.textContent)); b.click(); await tick();
