@@ -386,7 +386,7 @@
   // Same storage as the old app: typed columns + fields jsonb ('Company Name', 'Contact Person', Email, Phone, Address, Sector, 'BEE Level', 'MOU Status', 'MOU Date Signed', 'MOU Expiry Date').
   const CL_SECTORS = ['Agriculture', 'Construction', 'Education & Training', 'Energy', 'Financial Services', 'Government/Public Sector', 'Healthcare', 'Hospitality & Tourism', 'ICT', 'Insurance', 'Manufacturing', 'Mining', 'Retail & Wholesale', 'Transport & Logistics', 'Other'];
   const CL_BEE = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6', 'Level 7', 'Level 8', 'Non-Compliant'];
-  const CL_MOU = ['Signed', 'Pending', 'Expired', 'Not Required'];
+  const CL_MOU = ['Signed', 'Draft', 'Pending', 'Expired', 'Not Required'];
   let clPick = null, clQ = '';
   const clF = c => c.fields || {};
   const clName = c => c.client_name || clF(c)['Company Name'] || 'Client ' + c.id;
@@ -395,7 +395,7 @@
     const f = clF(c), exp = f['MOU Expiry Date'] || f['MOU Expiry'] || '', today = new Date().toISOString().slice(0, 10), soon = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
     let s = f['MOU Status'] || '';
     if (exp && exp < today && s !== 'Not Required') s = 'Expired';
-    const cls = s === 'Signed' ? (exp && exp <= soon ? 'b-warn' : 'b-ok') : s === 'Expired' ? 'b-bad' : s === 'Pending' ? 'b-warn' : 'b-n';
+    const cls = s === 'Signed' ? (exp && exp <= soon ? 'b-warn' : 'b-ok') : s === 'Expired' ? 'b-bad' : s === 'Pending' || s === 'Draft' ? 'b-warn' : 'b-n';
     return { s: s || 'No MOU recorded', exp, cls, note: s === 'Signed' && exp && exp <= soon ? 'expires ' + clDate(exp) : '' };
   }
   function applyClients() {
@@ -422,7 +422,7 @@
   window.previewClPick = id => { clPick = id; applyClients(); };
   window.previewClSearch = v => { clQ = v || ''; applyClients(); };
   function clForm(c) {
-    const f = c ? clF(c) : {}, o = (list, v) => `<option value="">—</option>` + list.map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+    const f = c ? clF(c) : {}, o = (list, v) => `<option value="">—</option>` + (v && !list.includes(v) ? [v, ...list] : list).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
     const inp = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${esc(v || '')}" ${ex}></label>`;
     document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Client"><form class="card" id="clform"><h2>${c ? 'Edit' : 'Add'} client</h2><div class="qagrid">
       ${inp('name', 'Company name *', c ? clName(c) : '', 'text', 'required')}${inp('contact', 'Contact person', c?.contact_person || f['Contact Person'])}${inp('email', 'Email', c?.contact_email || f.Email, 'email')}${inp('phone', 'Phone', c?.contact_number || f.Phone, 'tel')}
