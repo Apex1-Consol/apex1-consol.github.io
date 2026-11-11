@@ -25,9 +25,9 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Monitoring visits | **Moved** (#71): list, full edit form (old field keys), add, print, recommendations per visit | AI visit report not carried over (AI off) |
 | Learners | **Moved** (#71): list, learner page, add/edit with SA ID + duplicate check | Excel import: use the old app's Import |
 | Enrolments | **Moved** (#71): enrol one or many, edit status/statement/EISA type/funding/site | Old app's EISA table here is now PoE tracker (module results) + EISA › Exam results |
-| Attendance & PoE | **Moved** (#71): register, add session, CSV, PoE tracker, Documents checklist (old "EISA & PoE Readiness" item opens #attendance/documents) | R code: old app called it "Late", new look "Reason given" (both count as attended); confirm the label |
+| Attendance & PoE | **Moved** (#71): register (R = Late, as in the old app), add session, CSV, PoE tracker, Documents checklist (old "EISA & PoE Readiness" item opens #attendance/documents) | — |
 | EISA readiness | Readiness + Exam results tabs on live data; LEISA tab needs leisa tables on live | Migrations for LEISA |
-| Programmes | **Not moved**: PI to PM hand-over sign-off engine only in the old app; Form 3 save needs program_modules.components on live | Hand-over flow, Form 3 column, edit form |
+| Programmes | **Moved** (#72): stages, search, overview, Form 3 (program_modules.components added on live), edit, Activate/Close, CSV | Sign-off/hand-over, Sign-off queue, + Add Programme and PM Tracker stay in the old app (?classic=1) |
 | Dashboard | Real counts (home page) | Confirm KPI definitions |
 | Data quality | Real issues; decisions write | Merge procedure (approver not decided) |
 | QCTO Tracker, Moderation, Accreditation, Sign-off queue | Preview-only tables, not on live | Migrations to live first |
