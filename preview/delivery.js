@@ -115,7 +115,7 @@
 
 
   /* ---------- Programmes: search, edit (typed columns + the old app's field keys), lifecycle, CSV ----------
-     Lifecycle: initiated -> (PI/Compliance/Head of Ops sign-off, old app only) -> handed_over -> activate_programme -> active -> close_programme -> closed. */
+     Lifecycle: initiated -> (PI/Compliance/Head of Ops sign-off, handover.js) -> handed_over -> activate_programme -> active -> close_programme -> closed. */
   const CLASSIC = '/?classic=1#view=programmes';
   let pQ = '';
   const pf = p => p.fields || {};
@@ -134,7 +134,7 @@
     const box = hd.lastElementChild, st = p.status || 'initiated', pm = has('project_manager'), lead = has('pi_specialist', 'compliance_officer', 'head_of_ops');
     const btns = [];
     if (CAN() || pm) btns.push(`<button class="btn ghost" onclick="dvProgEdit(${p.id})">Edit</button>`);
-    if (st === 'initiated' && lead) btns.push(`<a class="btn y" href="${CLASSIC}">Sign-off (old app)</a>`);
+    if (st === 'initiated' && lead) btns.push(`<a class="btn y" href="#handover/${p.id}">Sign-off &amp; hand-over</a>`);
     if (st === 'handed_over' && pm) btns.push(`<button class="btn y" onclick="dvStage(${p.id},'activate_programme','Mark this programme as Active? This confirms you are taking it on.')">Activate</button>`);
     if (st === 'active' && pm) btns.push(`<button class="btn ghost" onclick="dvStage(${p.id},'close_programme','Mark this programme as Closed? This is the final stage.')">Close</button>`);
     box.innerHTML = btns.join('');
