@@ -216,7 +216,7 @@
     const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.filter(x => !x.t).length + ' on record';
     const head = document.querySelector('#view-learners h1')?.parentElement;
     if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn" id="limp" onclick="previewLearnerImport()">Import from Excel</button><button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
-    head?.querySelectorAll('button:not(#ladd)').forEach(b => b.remove());
+    head?.querySelectorAll('button:not(#ladd):not(#limp)').forEach(b => b.remove());
     const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Programme</th><th>Status</th><th></th>';
     renderLearners();
     if (location.hash.startsWith('#learner/')) renderLearner(+location.hash.split('/')[1]);
