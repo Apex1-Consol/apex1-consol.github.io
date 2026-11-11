@@ -20,7 +20,7 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Module | Status (11 Nov 2026) | Left to do |
 |---|---|---|
 | FAM Registry | **Moved** (apexone PR #68, 11 Nov) | Data capture; user guide kept current |
-| Recommendations | **Ready to move** (add, edit owner/due date/programme/visit, resolve, reopen; overdue in red) | Merge the apexone redirect PR |
+| Recommendations | **Moved** (apexone PR #69, 11 Nov): add, edit owner/due date/programme/visit, resolve, reopen; overdue in red | Nothing |
 | Clients | Real cards | Detail panel + edit |
 | Monitoring visits | Real visits; KMA scores, type, judgement save | Evidence checklist persistence; AI report stays off |
 | Data quality | Real issues; decisions write; merge request to sign-off | Merge procedure after approval (approver not decided) |
