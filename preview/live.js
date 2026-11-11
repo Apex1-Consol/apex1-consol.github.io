@@ -46,8 +46,8 @@
     ev.preventDefault();
     const [em, pw] = form.querySelectorAll('input');
     const btn = form.querySelector('button'); btn.disabled = true; btn.textContent = 'Signing in…';
-    if (!window._pvCap) { btn.disabled = false; btn.textContent = 'Sign in'; let e0 = form.querySelector('.err'); if (e0) e0.remove(); form.insertAdjacentHTML('beforeend', '<div class="err" role="alert">Please wait for the security check to finish, then try again.</div>'); return; }
-    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value, options: { captchaToken: window._pvCap } });
+    if (!window._pvCap && window.turnstile) { btn.disabled = false; btn.textContent = 'Sign in'; let e0 = form.querySelector('.err'); if (e0) e0.remove(); form.insertAdjacentHTML('beforeend', '<div class="err" role="alert">Please wait for the security check to finish, then try again.</div>'); return; }
+    const { error } = await sb.auth.signInWithPassword({ email: em.value.trim(), password: pw.value, ...(window._pvCap ? { options: { captchaToken: window._pvCap } } : {}) });
     window._pvCap = null; try { window.turnstile && turnstile.reset('#pv-ts'); } catch (_) {}
     btn.disabled = false; btn.textContent = 'Sign in';
     let e = form.querySelector('.err'); if (e) e.remove();
