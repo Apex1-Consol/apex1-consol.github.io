@@ -471,7 +471,7 @@
     const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
     const recs = P.data.recs.filter(r => (r.fields?.Visit || []).map(String).includes(String(v.id)));
     box.innerHTML = `<a class="back" href="#visits">← All visits</a>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="font-size:26px;flex-grow:1">${esc(vLabel(v))} · ${esc(vProg(v) ? progName(vProg(v)) : 'No programme')}</h1><button class="btn" onclick="previewVisitPrint(${v.id})">Print report</button><button class="btn y" form="vform">Save visit</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="font-size:26px;flex-grow:1">${esc(vLabel(v))} · ${esc(vProg(v) ? progName(vProg(v)) : 'No programme')}</h1><button class="btn" onclick="previewVisitAI(${v.id})">✨ AI report</button><button class="btn" onclick="previewVisitPrint(${v.id})">Print report</button><button class="btn y" form="vform">Save visit</button></div>
       <form id="vform" class="card vform" style="display:flex;flex-direction:column;gap:14px">
         <h2 style="font-size:15px">Visit</h2><div class="qagrid">${inp('date', 'Date of visit', f['Date of Visit'], 'date')}<label>Programme<select name="prog"><option value="">—</option>${progs.map(p => `<option value="${p.id}" ${p.id === vProg(v) ? 'selected' : ''}>${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>${inp('venue', 'Venue', f.Venue)}${inp('pers', 'QCTO personnel', f['QCTO Personnel'])}</div>
         <h2 style="font-size:15px">Key monitoring areas (1 = Not yet adequate … 4 = Exceeds)</h2><div class="qagrid">${VKMA.map((l, i) => `<label>KMA${i + 1} · ${l}<select name="KMA${i + 1}">${o(i === 5 ? ['1', '2', '3', '4', 'N/A'] : ['1', '2', '3', '4'], f['KMA' + (i + 1)])}</select></label>`).join('')}
@@ -511,6 +511,23 @@
       try { if (!P.tenant) throw new Error('No tenant on your account.'); const r = await write('Visit', () => sb.from('monitoring_visits').insert({ tenant_id: P.tenant, programme_id: +prog, fields }).select('id')); $('famov').remove(); await loadAll(); if (r?.[0]?.id) previewOpenVisit(r[0].id); }
       catch (err) { $('vaerr').textContent = err.message || String(err); }
     };
+  };
+  /* AI visit report: same Edge Function and request as the old app (ai-generate, type visit_report); the server builds the text from the saved visit. */
+  window.previewVisitAI = async id => {
+    lCss(); document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="AI visit report"><div class="card" style="max-width:760px;width:100%;max-height:85vh;display:flex;flex-direction:column;gap:10px"><h2>AI visit report</h2>
+      <div id="aivr" class="sub" style="white-space:pre-wrap;overflow:auto;flex:1;color:var(--ink)">Generating report… (up to 45 seconds)</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button class="btn" id="aivrcopy" disabled>Copy</button><button class="btn y" onclick="document.getElementById('famov').remove()">Close</button></div></div></div>`);
+    const out = $('aivr'), ctrl = new AbortController(), tm = setTimeout(() => ctrl.abort(), 45000);
+    try {
+      const { data } = await sb.auth.getSession(); const tok = data.session && data.session.access_token; if (!tok) throw new Error('Not signed in. Please sign in again.');
+      const res = await fetch(sb.supabaseUrl + '/functions/v1/ai-generate', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ type: 'visit_report', visit_id: Number(id) }), signal: ctrl.signal });
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j || j.ok === false) throw new Error(res.status === 401 ? 'Not authorised to use AI features. Please sign in again.' : (j && j.error) || res.statusText || 'AI request failed');
+      const txt = j.report || ''; if (!out.isConnected) return;
+      out.textContent = txt || '(No report text returned)';
+      const c = $('aivrcopy'); if (txt) { c.disabled = false; c.onclick = () => navigator.clipboard.writeText(txt).then(() => toast('Report copied'), () => toast('Copy failed')); }
+    } catch (e) { if (out.isConnected) out.textContent = 'Could not generate the report: ' + (e.name === 'AbortError' ? 'it took too long, please try again.' : e.message); }
+    finally { clearTimeout(tm); }
   };
   window.previewVisitPrint = id => {
     const v = P.data.visits.find(x => x.id === id); if (!v) return; const f = vF(v), w = window.open('', '_blank'); if (!w) return;
