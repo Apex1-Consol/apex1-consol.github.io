@@ -23,7 +23,7 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Recommendations | **Moved** (#69) | Nothing |
 | Clients | **Moved** (#70) | Nothing |
 | Monitoring visits | **Moved** (#71): list, full edit form (old field keys), add, print, recommendations per visit | AI visit report not carried over (AI off) |
-| Learners | **Moved** (#71): list, learner page, add/edit with SA ID + duplicate check | Excel import: use the old app's Import |
+| Learners | **Moved** (#71): list, learner page, add/edit with SA ID + duplicate check, Import from Excel (check step, optional enrolment) | — |
 | Enrolments | **Moved** (#71): enrol one or many, edit status/statement/EISA type/funding/site | Old app's EISA table here is now PoE tracker (module results) + EISA › Exam results |
 | Attendance & PoE | **Moved** (#71): register (R = Late, as in the old app), add session, CSV, PoE tracker, Documents checklist (old "EISA & PoE Readiness" item opens #attendance/documents) | — |
 | EISA readiness | Readiness + Exam results + LEISA tabs on live data (leisa tables on live 11 Nov) | Feedback |
@@ -31,4 +31,5 @@ One module at a time. When a module is complete here, the old app's menu item re
 | Dashboard | Real counts (home page) | Confirm KPI definitions |
 | Data quality | Real issues; decisions write | Merge procedure (approver not decided) |
 | QCTO Tracker, Moderation, Accreditation, Sign-off queue | On live since 11 Nov (qa_tables_live). Tracker has one row per real enrolment (257) + trigger qcto_tracker_add on new enrolments. Moderation/Accreditation empty (no spreadsheets); no ClickUp sync | Staff capture |
-| Reports, Audit, Users | Stay in the old app | — |
+| PM Tracker | **Moved** (#74): PM cards, PM/client/type/SETA/data filters, old-app columns, CSV, Edit | — |
+| Reports, Audit, Users | **Moved** (#75): reports.js (monthly report reviews via reports.my_report_queue/transition_report, downloads CSV/Excel), audit_log, Users via user-admin Edge Function. /?classic=1#view=reports keeps old Smart Import for other tables | Dashboard, AI visit report |
