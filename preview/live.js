@@ -117,8 +117,8 @@
     P.errors = {};
     const R = sb.schema('reports');
     const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes] = await Promise.all([
-      q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email').order('last_name')),
-      q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at')),
+      q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email,phone,fields').order('last_name')),
+      q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at,fields')),
       q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields')),
       q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager,sales_person,fields,deleted_at')),
       q('qcto_tracker', sb.from('qcto_tracker').select('*').order('id')),
@@ -185,35 +185,127 @@
     $('aisum').textContent = 'AI summary is off in the preview (no AI calls are made against test data).';
   }
 
-  /* ---------- learners ---------- */
+  /* ---------- Learners + Enrolments (same fields as the old app) ---------- */
+  // learners: columns first_name,last_name,id_number,email,phone + fields 'First Name','Last Name','National ID',DOB,Gender,Province,Email,Phone,Employment,Programme,'Programme Name'
+  // enrolments: columns learner_id, programme_id, status ('active') + fields Status (Active|Completed|Withdrawn|Enrolled|Pending|In Progress),'Statement Status','EISA Type','Funding Type',Site,'Learner Name','Programme Name','Enrolment ID'
+  const LG = ['Male', 'Female', 'Other'], LPROV = ['Eastern Cape', 'Free State', 'Gauteng', 'KwaZulu-Natal', 'Limpopo', 'Mpumalanga', 'North West', 'Northern Cape', 'Western Cape'], LEMP = ['Employed', 'Unemployed'];
+  const ENST = ['Active', 'Completed', 'Withdrawn', 'Enrolled', 'Pending'], ENSS = ['Issued', 'Pending', 'Not Issued', 'Not Applicable', 'Training In Progress'], ENET = ['Internal', 'External'];
+  const ENFUND = ['Self-Funded', 'SETA Funded', 'Discretionary Grant', 'Mandatory Grant', 'Learnership Grant', 'Company Funded', 'NSFAS', 'Bursary', 'Other'];
+  const lf = l => l.fields || {}, ef = e => e.fields || {};
+  const lName = l => `${l.first_name || lf(l)['First Name'] || ''} ${l.last_name || lf(l)['Last Name'] || ''}`.trim() || 'Learner ' + l.id;
+  const lIdn = l => l.id_number || lf(l)['National ID'] || '';
+  const enSt = e => { const s = ef(e).Status || e.status || ''; return s ? s[0].toUpperCase() + s.slice(1) : 'Active'; };
+  const enLive = e => ['Active', 'Enrolled', 'In progress', 'In Progress', 'Pending'].includes(enSt(e));
+  const lTest = l => String(lf(l).is_test_data) === 'true';
+  const said = id => { if (!/^\d{13}$/.test(id)) return false; let s = 0; for (let i = 0; i < 13; i++) { let d = +id[i]; if (i % 2) { d *= 2; if (d > 9) d -= 9; } s += d; } return s % 10 === 0; };
+  const opt = (list, v, blank = '—') => `<option value="">${blank}</option>` + (v && !list.includes(v) ? [v, ...list] : list).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  const progOpts = sel => P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || ''))).map(p => `<option value="${p.id}" ${String(p.id) === String(sel) ? 'selected' : ''}>${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('');
+  const lCss = () => { if (!$('lformcss')) document.head.insertAdjacentHTML('beforeend', '<style id="lformcss">#famov textarea,#famov .lpick{border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)}#famov .lpick{max-height:260px;overflow:auto;display:flex;flex-direction:column;gap:2px}#famov .lpick label{flex-direction:row;align-items:center;gap:8px;font-size:13px;color:var(--ink)}#famov .lpick input{height:auto}</style>'); };
+  function dlg(id, title, body, onSave, saveLabel = 'Save') {
+    lCss(); document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="${esc(title)}"><form class="card" id="${id}"><h2>${esc(title)}</h2>${body}<div class="sub" id="${id}err" style="color:var(--bad)"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="${id}save">${saveLabel}</button></div></form></div>`);
+    $(id).onsubmit = async ev => { ev.preventDefault(); const b = $(id + 'save'); b.disabled = true; const t = b.textContent; b.textContent = 'Saving…';
+      try { if (!P.tenant) throw new Error('No tenant on your account.'); await onSave($(id).elements); $('famov')?.remove(); await loadAll(); } catch (err) { $(id + 'err').textContent = err.message || String(err); b.disabled = false; b.textContent = t; } };
+    $(id).querySelector('input,select')?.focus();
+  }
   function applyLearners() {
-    const d = P.data; LEARNERS.length = 0;
-    d.learners.forEach(l => { const e = d.enrol.find(x => x.learner_id === l.id && x.status === 'active');
-      LEARNERS.push({ id: l.id, n: (l.first_name + ' ' + l.last_name).trim(), idn: l.id ? '••••••••' + String(l.id_number || '').slice(-4) : '', p: e ? progName(e.programme_id) : '', a: null, s: e ? 'Active' : 'Unlinked' }); });
-    LEARNERS.forEach(l => l.id = l.idn);
+    LEARNERS.length = 0;
+    P.data.learners.forEach(l => { const e = P.data.enrol.filter(x => x.learner_id === l.id), live = e.find(enLive);
+      LEARNERS.push({ lid: l.id, n: lName(l), id: lIdn(l) ? '••••••••' + lIdn(l).slice(-4) : '', p: live ? progName(live.programme_id) : (e[0] ? progName(e[0].programme_id) + ' (' + enSt(e[0]).toLowerCase() + ')' : ''), s: live ? 'Active' : 'Unlinked', t: lTest(l) }); });
     lLoaded = true;
-    const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.length + ' on record';
+    const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.filter(x => !x.t).length + ' on record';
+    const head = document.querySelector('#view-learners h1')?.parentElement;
+    if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
+    head?.querySelectorAll('button:not(#ladd)').forEach(b => b.remove());
+    const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Programme</th><th>Status</th><th></th>';
+    renderLearners();
+    if (location.hash.startsWith('#learner/')) renderLearner(+location.hash.split('/')[1]);
   }
   renderLearners = function () {
-    const q = ($('lq').value || '').trim().toLowerCase(), all = LEARNERS.length, act = LEARNERS.filter(l => l.s === 'Active').length;
+    const q = ($('lq').value || '').trim().toLowerCase(), base = LEARNERS.filter(l => !l.t), all = base.length, act = base.filter(l => l.s === 'Active').length;
     $('lfilter').innerHTML = [['All', all], ['Active', act], ['Unlinked', all - act]].map(([f, c]) => `<button class="${f === lF ? 'on' : ''}" onclick="lF='${f}';lPage=0;renderLearners()">${f} · ${c}</button>`).join('');
-    const rows = LEARNERS.filter(l => (lF === 'All' || l.s === lF) && (!q || l.n.toLowerCase().includes(q)));
+    const rows = base.filter(l => (lF === 'All' || l.s === lF) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q)));
     const pages = Math.max(1, Math.ceil(rows.length / PER)); if (lPage >= pages) lPage = pages - 1; const pg = rows.slice(lPage * PER, lPage * PER + PER);
-    $('lrows').innerHTML = pg.map(l => `<tr><td><b>${esc(l.n)}</b></td><td class="sub">${l.id || '<span class="badge b-warn">No ID</span>'}</td><td>${l.p ? esc(l.p) : '<span class="sub">Not enrolled</span>'}</td><td><span class="sub">—</span></td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-warn">Unlinked</span>'}</td></tr>`).join('') || '<tr><td colspan="5"><div class="empty"><b>No learners match</b></div></td></tr>';
-    $('lpager').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${rows.length ? lPage * PER + 1 : 0}–${lPage * PER + pg.length} of ${rows.length}</span>`;
+    $('lrows').innerHTML = pg.map(l => `<tr style="cursor:pointer" onclick="location.hash='learner/${l.lid}'"><td><b>${esc(l.n)}</b></td><td class="sub">${l.id || '<span class="badge b-warn">No ID</span>'}</td><td>${l.p ? esc(l.p) : '<span class="sub">Not enrolled</span>'}</td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-warn">Unlinked</span>'}</td><td><button class="btn sm" onclick="event.stopPropagation();previewLearnerEdit(${l.lid})">Edit</button></td></tr>`).join('') || '<tr><td colspan="5" class="sub">No learners match.</td></tr>';
+    $('lpager').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${rows.length ? lPage * PER + 1 : 0}–${lPage * PER + pg.length} of ${rows.length}</span>${pages > 1 ? `<button class="btn sm" ${lPage ? '' : 'disabled'} onclick="lPage--;renderLearners()">Previous</button><button class="btn sm" ${lPage < pages - 1 ? '' : 'disabled'} onclick="lPage++;renderLearners()">Next</button>` : ''}`;
   };
   loadLearners = renderLearners;
-
-  /* ---------- enrolments ---------- */
-  function applyEnrolments() {
-    const d = P.data, lname = id => { const l = d.learners.find(x => x.id === id); return l ? l.first_name + ' ' + l.last_name : 'Learner ' + id; };
-    const linked = new Set(d.enrol.filter(e => e.status === 'active').map(e => e.learner_id));
-    document.querySelector('#view-enrolments .count').textContent = d.learners.filter(l => !linked.has(l.id)).length;
-    renderEn = function () {
-      $('enfilter').innerHTML = ['All', 'active', 'completed', 'withdrawn'].map(s => `<button class="${s === enF ? 'on' : ''}" onclick="enF='${s}';renderEn()">${s[0].toUpperCase() + s.slice(1)}</button>`).join('');
-      $('enrows').innerHTML = d.enrol.filter(e => enF === 'All' || e.status === enF).map(e => `<tr><td><b>${esc(lname(e.learner_id))}</b></td><td>${esc(progName(e.programme_id))}</td><td>${fmt(e.created_at)}</td><td><span class="badge ${e.status === 'active' ? 'b-ok' : 'b-n'}">${e.status}</span></td><td></td></tr>`).join('');
-    }; renderEn();
+  addEventListener('hashchange', () => { if (location.hash.startsWith('#learner/')) renderLearner(+location.hash.split('/')[1]); });
+  function renderLearner(id) {
+    const l = P.data.learners.find(x => x.id === id), box = $('view-learner'); if (!box) return;
+    if (!l) { box.innerHTML = '<a class="back" href="#learners">← All learners</a><p class="sub">Learner not found.</p>'; return; }
+    try { ROUTES.learner[0] = lName(l); } catch (_) {}
+    const f = lf(l), en = P.data.enrol.filter(e => e.learner_id === id), kv = (k, v) => v ? `<div style="display:flex;gap:8px"><span class="sub" style="min-width:120px">${k}</span><span>${esc(String(v))}</span></div>` : '';
+    const ini = lName(l).split(/\s+/).map(s => s[0] || '').join('').slice(0, 2).toUpperCase();
+    box.innerHTML = `<a class="back" href="#learners">← All learners</a>
+      <div class="card" style="display:flex;flex-wrap:wrap;gap:18px;align-items:center"><span style="width:64px;height:64px;border-radius:50%;background:var(--navy);color:var(--yellow);font-family:Poppins;font-weight:600;font-size:22px;display:flex;align-items:center;justify-content:center">${esc(ini)}</span>
+        <div style="flex-grow:1"><h1 style="font-size:24px">${esc(lName(l))}</h1><span class="sub" style="font-size:14px">${lIdn(l) ? 'ID ••••••••' + esc(lIdn(l).slice(-4)) : 'No ID number'}${f.Employment ? ' · ' + esc(f.Employment) : ''}</span></div>
+        <button class="btn" onclick="previewLearnerEdit(${l.id})">Edit details</button><button class="btn y" onclick="previewEnrolAdd(null,${l.id})">+ Enrol</button></div>
+      <div class="row"><section class="card" style="flex:1 1 320px;display:flex;flex-direction:column;gap:6px"><h2 style="font-size:15px">Details</h2>${kv('Email', l.email || f.Email)}${kv('Phone', l.phone || f.Phone)}${kv('Date of birth', f.DOB)}${kv('Gender', f.Gender)}${kv('Province', f.Province)}${kv('Employment', f.Employment)}</section>
+      <section class="card" style="flex:2 1 420px;display:flex;flex-direction:column;gap:8px"><h2 style="font-size:15px">Enrolments (${en.length})</h2>
+        ${en.map(e => `<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="badge ${enLive(e) ? 'b-ok' : 'b-n'}">${esc(enSt(e))}</span><b style="flex-grow:1">${esc(progName(e.programme_id))}</b><span class="sub">${esc([ef(e)['Statement Status'] && 'Statement ' + ef(e)['Statement Status'], ef(e)['Funding Type'], ef(e).Site].filter(Boolean).join(' · '))}</span><button class="btn sm" onclick="previewEnrolEdit(${e.id})">Edit</button></div>`).join('') || '<p class="sub">Not enrolled yet.</p>'}</section></div>`;
   }
+  function learnerBody(l) {
+    const f = l ? lf(l) : {}, i = (n, lab, v, t = 'text', ex = '') => `<label>${lab}<input name="${n}" type="${t}" value="${esc(v || '')}" ${ex}></label>`;
+    return `<div class="qagrid">${i('fn', 'First name *', l ? (l.first_name || f['First Name']) : '', 'text', 'required')}${i('ln', 'Last name *', l ? (l.last_name || f['Last Name']) : '', 'text', 'required')}${i('nid', 'SA ID number', l ? lIdn(l) : '', 'text', 'inputmode="numeric" maxlength="13"')}${i('dob', 'Date of birth', f.DOB, 'date')}
+      <label>Gender<select name="gender">${opt(LG, f.Gender)}</select></label><label>Province<select name="prov">${opt(LPROV, f.Province)}</select></label>${i('email', 'Email', l ? (l.email || f.Email) : '', 'email')}${i('phone', 'Phone', l ? (l.phone || f.Phone) : '', 'tel')}
+      <label>Employment<select name="emp">${opt(LEMP, f.Employment)}</select></label></div>`;
+  }
+  async function learnerVals(el, l) {
+    const v = n => el[n].value.trim(), nid = v('nid');
+    if (nid) { if (!said(nid)) throw new Error('That SA ID number is not valid (13 digits, check digit).');
+      const dup = P.data.learners.find(x => x.id !== l?.id && lIdn(x) === nid); if (dup) throw new Error(`${lName(dup)} already has this ID number.`);
+      try { const { data } = await sb.rpc('check_learner_duplicate', { p_tenant_id: P.tenant, p_id_number: nid }); const d = (data || []).find(x => x.learner_id !== l?.id); if (d) throw new Error(`${d.first_name} ${d.last_name} already has this ID number.`); } catch (e) { if (/already has/.test(e.message)) throw e; } }
+    const fields = { ...(l ? lf(l) : {}), 'First Name': v('fn'), 'Last Name': v('ln'), 'National ID': nid, DOB: v('dob'), Gender: v('gender'), Province: v('prov'), Email: v('email'), Phone: v('phone'), Employment: v('emp') };
+    Object.keys(fields).forEach(k => { if (fields[k] === '' && !(l && k in lf(l))) delete fields[k]; });
+    return { first_name: v('fn'), last_name: v('ln'), id_number: nid || null, email: v('email') || null, phone: v('phone') || null, fields };
+  }
+  window.previewLearnerAdd = () => dlg('lform', 'Add learner', learnerBody(null) + `<label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Enrol on programme (optional)<select name="prog" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:var(--ink)"><option value="">—</option>${progOpts()}</select></label>`,
+    async el => { const row = await learnerVals(el, null); const r = await write('Learner', () => sb.from('learners').insert({ tenant_id: P.tenant, ...row }).select('id'));
+      const lid = r?.[0]?.id; if (lid && el.prog.value) await enrolInsert(+el.prog.value, [lid], { Status: 'Active' }); if (lid) setTimeout(() => { location.hash = 'learner/' + lid; }, 0); });
+  window.previewLearnerEdit = id => { const l = P.data.learners.find(x => x.id === id); if (!l) return;
+    dlg('lform', 'Edit learner', learnerBody(l), async el => { const row = await learnerVals(el, l); await write('Learner', () => sb.from('learners').update(row).eq('id', id).select('id')); }); };
+
+  async function enrolInsert(pid, lids, extra) {
+    const p = P.data.progs.find(x => x.id === pid), existing = new Set(P.data.enrol.filter(e => e.programme_id === pid).map(e => e.learner_id)), todo = lids.filter(id => !existing.has(id));
+    if (!todo.length) throw new Error('Already enrolled on this programme.');
+    const rows = todo.map(id => { const l = P.data.learners.find(x => x.id === id); const fields = { Status: 'Active', ...extra, Learner: [String(id)], 'Learner Name': [l ? lName(l) : ''], Programme: [String(pid)], 'Programme Name': [p?.programme_name || ''] };
+      Object.keys(fields).forEach(k => { if (fields[k] === '') delete fields[k]; }); return { tenant_id: P.tenant, learner_id: id, programme_id: pid, status: 'active', fields }; });
+    await write('Enrolment', () => sb.from('enrolments').insert(rows).select('id')); return { added: todo.length, skipped: lids.length - todo.length };
+  }
+  const enExtra = el => ({ Status: el.st.value || 'Active', 'Funding Type': el.fund.value, Site: el.site.value.trim() });
+  window.previewEnrolAdd = (pid, lid) => {
+    const learners = P.data.learners.filter(l => !lTest(l)).sort((a, b) => lName(a).localeCompare(lName(b)));
+    dlg('enform', lid ? 'Enrol learner' : 'Enrol learners', `<div class="qagrid"><label>Programme *<select name="prog" required><option value="">—</option>${progOpts(pid)}</select></label><label>Status<select name="st">${opt(ENST, 'Active', 'Active')}</select></label><label>Funding type<select name="fund">${opt(ENFUND, '')}</select></label><label>Site<input name="site"></label></div>
+      ${lid ? `<input type="hidden" name="one" value="${lid}"><p>${esc(lName(P.data.learners.find(x => x.id === lid) || {}))}</p>` : `<label>Learners * <input name="lq" type="search" placeholder="Filter by name" oninput="[...document.querySelectorAll('#famov .lpick label')].forEach(x=>x.hidden=!x.textContent.toLowerCase().includes(this.value.toLowerCase()))"></label>
+      <label style="flex-direction:row;gap:8px;align-items:center"><input type="checkbox" name="unl" style="height:auto" onchange="[...document.querySelectorAll('#famov .lpick label')].forEach(x=>{if(this.checked&&x.dataset.l==='1')x.hidden=true;else if(!this.checked)x.hidden=false})"> Only show learners without an active enrolment</label>
+      <div class="lpick">${learners.map(l => `<label data-l="${P.data.enrol.some(e => e.learner_id === l.id && enLive(e)) ? 1 : 0}"><input type="checkbox" name="lid" value="${l.id}"> ${esc(lName(l))} <span class="sub">${lIdn(l) ? '··' + esc(lIdn(l).slice(-4)) : ''}</span></label>`).join('')}</div>`}`,
+      async el => { const ids = el.one ? [+el.one.value] : [...$('enform').querySelectorAll('input[name=lid]:checked')].map(x => +x.value); if (!ids.length) throw new Error('Pick at least one learner.');
+        const r = await enrolInsert(+el.prog.value, ids, enExtra(el)); toast2(`${r.added} enrolled${r.skipped ? `, ${r.skipped} already on this programme` : ''}`); }, 'Enrol');
+  };
+  window.previewEnrolEdit = id => { const e = P.data.enrol.find(x => x.id === id); if (!e) return; const f = ef(e), l = P.data.learners.find(x => x.id === e.learner_id);
+    dlg('eeform', 'Edit enrolment', `<p><b>${esc(l ? lName(l) : 'Learner')}</b> · ${esc(progName(e.programme_id))}</p><div class="qagrid"><label>Status<select name="st">${opt(ENST, enSt(e), 'Active')}</select></label><label>Statement status<select name="ss">${opt(ENSS, f['Statement Status'])}</select></label>
+      <label>EISA type<select name="et">${opt(ENET, f['EISA Type'])}</select></label><label>Funding type<select name="fund">${opt(ENFUND, f['Funding Type'])}</select></label><label>Site<input name="site" value="${esc(f.Site || '')}"></label></div>`,
+      async el => { const nf = { ...f, Status: el.st.value || 'Active', 'Statement Status': el.ss.value, 'EISA Type': el.et.value, 'Funding Type': el.fund.value, Site: el.site.value.trim() };
+        Object.keys(nf).forEach(k => { if (nf[k] === '' && !(k in f)) delete nf[k]; }); await write('Enrolment', () => sb.from('enrolments').update({ fields: nf }).eq('id', id).select('id')); }); };
+  let enProg = '', enQ = '';
+  function applyEnrolments() {
+    const d = P.data, lname = id => { const l = d.learners.find(x => x.id === id); return l ? lName(l) : 'Learner ' + id; };
+    const linked = new Set(d.enrol.filter(enLive).map(e => e.learner_id));
+    document.querySelector('#view-enrolments .count').textContent = d.learners.filter(l => !lTest(l) && !linked.has(l.id)).length;
+    const head = document.querySelector('#view-enrolments h1')?.parentElement; if (head && !$('enadd')) { head.querySelectorAll('button').forEach(b => b.remove()); head.insertAdjacentHTML('beforeend', '<button class="btn y" id="enadd" onclick="previewEnrolAdd()">+ Enrol learners</button>'); }
+    const sel = document.querySelector('#view-enrolments label.f select'); if (sel && !sel.dataset.live) { sel.dataset.live = 1; sel.innerHTML = '<option value="">All programmes</option>' + progOpts(); sel.onchange = () => { enProg = sel.value; renderEn(); }; sel.insertAdjacentHTML('afterend', '<input type="search" id="enq" placeholder="Learner name" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:var(--ink)" oninput="previewEnQ(this.value)">'); }
+    renderEn = function () {
+      const st = ['All', 'Active', 'Completed', 'Withdrawn'];
+      $('enfilter').innerHTML = st.map(s => `<button class="${s === enF ? 'on' : ''}" onclick="enF='${s}';renderEn()">${s}</button>`).join('');
+      const q = enQ.toLowerCase(), rows = d.enrol.filter(e => (enF === 'All' || enF.toLowerCase() === 'all' || enSt(e) === enF || (enF === 'Active' && enLive(e))) && (!enProg || String(e.programme_id) === enProg) && (!q || lname(e.learner_id).toLowerCase().includes(q)))
+        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+      $('enrows').innerHTML = rows.slice(0, 300).map(e => `<tr><td><a href="#learner/${e.learner_id}"><b>${esc(lname(e.learner_id))}</b></a></td><td>${esc(progName(e.programme_id))}<div class="sub">${esc([ef(e)['Statement Status'] && 'Statement ' + ef(e)['Statement Status'], ef(e)['Funding Type'], ef(e).Site].filter(Boolean).join(' · '))}</div></td><td>${fmt(e.created_at)}</td><td><span class="badge ${enLive(e) ? 'b-ok' : 'b-n'}">${esc(enSt(e))}</span></td><td><button class="btn sm" onclick="previewEnrolEdit(${e.id})">Edit</button></td></tr>`).join('') + (rows.length > 300 ? `<tr><td colspan="5" class="sub">Showing 300 of ${rows.length}. Filter by programme to see the rest.</td></tr>` : '') || '<tr><td colspan="5" class="sub">No enrolments match.</td></tr>';
+    };
+    if (!['All', 'Active', 'Completed', 'Withdrawn'].includes(enF)) enF = 'All';
+    renderEn();
+  }
+  window.previewEnQ = v => { enQ = v || ''; renderEn(); };
 
   /* ---------- QCTO tracker (writes) ---------- */
   function applyTracker() {
