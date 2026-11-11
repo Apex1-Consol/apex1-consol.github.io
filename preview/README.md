@@ -19,12 +19,16 @@ One module at a time. When a module is complete here, the old app's menu item re
 
 | Module | Status (11 Nov 2026) | Left to do |
 |---|---|---|
-| FAM Registry | **Moved** (apexone PR #68, 11 Nov) | Data capture; user guide kept current |
-| Recommendations | **Moved** (apexone PR #69, 11 Nov): add, edit owner/due date/programme/visit, resolve, reopen; overdue in red | Nothing |
-| Clients | **Moved** (apexone PR #70, 11 Nov): search, MOU badge, detail with programmes, add, edit; same fields as the old app | Nothing |
-| Monitoring visits | Real visits; KMA scores, type, judgement save | Evidence checklist persistence; AI report stays off |
-| Data quality | Real issues; decisions write; merge request to sign-off | Merge procedure after approval (approver not decided) |
-| Learners / Enrolments | Real lists | Add/import learner, enrol/link |
-| Dashboard | Real counts | Confirm KPI definitions |
-| Programmes, Attendance & PoE, EISA readiness | Partly mock | Wire to live tables |
-| QCTO Tracker, Moderation, Accreditation, LEISA, Sign-off queue | Preview-only tables, not on live | Migrations to live first |
+| FAM Registry (+ old Assessors, SETA Assessments, QCTO Modules items) | **Moved** (ApexOne #68, #71) | Data capture; user guide kept current |
+| Recommendations | **Moved** (#69) | Nothing |
+| Clients | **Moved** (#70) | Nothing |
+| Monitoring visits | **Moved** (#71): list, full edit form (old field keys), add, print, recommendations per visit | AI visit report not carried over (AI off) |
+| Learners | **Moved** (#71): list, learner page, add/edit with SA ID + duplicate check | Excel import: use the old app's Import |
+| Enrolments | **Moved** (#71): enrol one or many, edit status/statement/EISA type/funding/site | Old app's EISA table here is now PoE tracker (module results) + EISA › Exam results |
+| Attendance & PoE | **Moved** (#71): register, add session, CSV, PoE tracker, Documents checklist (old "EISA & PoE Readiness" item opens #attendance/documents) | R code: old app called it "Late", new look "Reason given" (both count as attended); confirm the label |
+| EISA readiness | Readiness + Exam results tabs on live data; LEISA tab needs leisa tables on live | Migrations for LEISA |
+| Programmes | **Not moved**: PI to PM hand-over sign-off engine only in the old app; Form 3 save needs program_modules.components on live | Hand-over flow, Form 3 column, edit form |
+| Dashboard | Real counts (home page) | Confirm KPI definitions |
+| Data quality | Real issues; decisions write | Merge procedure (approver not decided) |
+| QCTO Tracker, Moderation, Accreditation, Sign-off queue | Preview-only tables, not on live | Migrations to live first |
+| Reports, Audit, Users | Stay in the old app | — |
