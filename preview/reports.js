@@ -23,7 +23,7 @@ function queue() {
   if (!rows.length) return `<div class="empty"><b>${QF === 'open' ? 'Nothing needs your action right now' : 'No monthly reports yet'}</b></div>`;
   return `<div class="tw"><table class="dense"><thead><tr><th>Client / programme</th><th>Month</th><th>Status</th><th>Reviewer note</th><th>Next action</th></tr></thead><tbody>${rows.map(r => {
     const st = ST[r.status] || [r.status, ''], acts = r.next_actions || [];
-    return `<tr><td><b>${esc(r.client_name || 'Report ' + r.id)}</b><div class="famas">${esc(r.programme_name || '')}${r.submitted_by_email ? ' · ' + esc(r.submitted_by_email) : ''}</div><a href="#" class="famas" onclick="rpHist(${+r.id});return false">History</a></td>
+    return `<tr><td><a href="/report-generator.html?report=${+r.id}" target="_blank" rel="noopener"><b>${esc(r.client_name || 'Report ' + r.id)}</b> ↗</a><div class="famas">${esc(r.programme_name || '')}${r.submitted_by_email ? ' · ' + esc(r.submitted_by_email) : ''}</div><a href="#" class="famas" onclick="rpHist(${+r.id});return false">History</a></td>
       <td>${esc(r.month || '')}</td><td><span class="badge ${st[1]}">${esc(st[0])}</span><div class="famas">${esc(r.reviewed_by ? 'Reviewed by ' + r.reviewed_by + ' · ' + when(r.reviewed_at) : r.printed_at ? 'Submitted ' + when(r.printed_at) : '')}</div></td>
       <td style="max-width:320px;white-space:pre-wrap">${esc(note(r.reviewer_note)) || '—'}</td>
       <td>${acts.length ? `${acts.includes('needs_changes') ? `<textarea id="rpn-${r.id}" class="cellin" rows="2" placeholder="Note for the PM (needed to request changes)" style="width:100%;min-width:200px;margin-bottom:6px"></textarea>` : ''}
