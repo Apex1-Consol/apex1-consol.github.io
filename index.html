@@ -13,9 +13,11 @@ if(/[#&]view=recommendations(&|$)/.test(location.hash))recsGoNew();
 function clientsGoNew(){location.href='/preview/#clients';}
 if(/[#&]view=clients(&|$)/.test(location.hash))clientsGoNew();
 // 11 Nov: more modules moved to the new look (same live database). Old code frozen. To undo one module, delete its entry in NEW_LOOK.
-var NEW_LOOK={monitoring:'visits',learners:'learners',enrolment:'enrolments',attendance:'attendance',poe:'attendance/documents',assessors:'fam'};
+var NEW_LOOK={monitoring:'visits',learners:'learners',enrolment:'enrolments',attendance:'attendance',poe:'attendance/documents',assessors:'fam',programmes:'programmes'};
+// Programmes: the sign-off queue, + Add Programme and links with ?classic=1 (from the new look's Sign-off / New programme buttons) still open the old screen.
+function keepClassic(v){return v==='programmes'&&(window.__classicOnce||/[?&]classic=1/.test(location.search));}
 function newLookGo(v){location.href='/preview/#'+NEW_LOOK[v];}
-(function(){var m=/[#&]view=([a-z]+)(&|$)/.exec(location.hash);if(m&&NEW_LOOK[m[1]])newLookGo(m[1]);})();
+(function(){var m=/[#&]view=([a-z]+)(&|$)/.exec(location.hash);if(m&&NEW_LOOK[m[1]]&&!keepClassic(m[1]))newLookGo(m[1]);})();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -4001,7 +4003,8 @@ function switchTab(viewName) {
     if (viewName === 'fam') return famGoNew();
     if (viewName === 'recommendations') return recsGoNew();
     if (viewName === 'clients') return clientsGoNew();
-    if (NEW_LOOK[viewName]) return newLookGo(viewName);
+    if (NEW_LOOK[viewName] && !keepClassic(viewName)) return newLookGo(viewName);
+    window.__classicOnce = false;
     state.currentView = viewName;
     state.signoffOnly = false; // openSignoffQueue sets it again after switching
     const chip = document.getElementById('signoff-only-chip'); if (chip) chip.style.display = 'none';
@@ -4399,7 +4402,7 @@ async function callProgrammeStageRpc(fn, body, successMsg) {
 function handOverProgramme(recordId) { HO.open(recordId, 'signoff'); }
 // Sign-off queue (sidebar, under Programme Initiation): the ledger limited to programmes awaiting sign-off.
 async function openSignoffQueue() {
-    switchTab('programmes');
+    window.__classicOnce = true; switchTab('programmes');
     state.signoffOnly = true;
     document.getElementById('signoff-only-chip').style.display = '';
     document.querySelectorAll('.nav-item').forEach(i => i.classList.toggle('active', i.dataset.view === 'signoff-queue'));
@@ -7939,7 +7942,7 @@ function renderProgrammeHealthCards() {
             <div style="font-size:12px;margin-bottom:16px;">Import your data or add a programme to get started.</div>
             <button class="btn btn-gold btn-sm" onclick="openModal('import-modal')">&#128229; Import Excel</button>
             &nbsp;
-            <button class="btn btn-secondary btn-sm" onclick="switchTab('programmes')">+ Add Programme</button>
+            <button class="btn btn-secondary btn-sm" onclick="window.__classicOnce=true;switchTab('programmes')">+ Add Programme</button>
         </div>`;
         return;
     }
