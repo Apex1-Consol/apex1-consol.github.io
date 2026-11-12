@@ -174,7 +174,7 @@ function pmView() {
   const admin = has(), m = TR.cur, all = (TR.byM[m] || []).filter(x => !TRPM || x.pm === TRPM), rows = all.filter(x => !TRS || x.stage === TRS);
   const tiles = `<div class="famtiles" style="padding:14px 20px">${UI.tiles([{ t: esc(m) + ' · ' + all.length + ' report' + (all.length === 1 ? '' : 's'), k: Object.keys(STAGE).map(k => [STAGE[k], all.filter(x => x.stage === k).length, STC[k], TRS === k, `rpTS('${k}')`]) }])}</div>`;
   const pms = [...new Set(rows.map(x => x.pm || ''))].sort((a, b) => (!a - !b) || pmName(a).localeCompare(pmName(b))), solo = pms.length === 1;
-  const TB = { dan: 'b-bad', warn: 'b-warn' }, drs = Array.isArray(DR) ? DR : [];
+  const TB = { dan: 'b-bad', warn: 'b-warn', hold: 'b-n' }, drs = Array.isArray(DR) ? DR : [];
   const repRow = x => {
     const k = x.r ? 'r' + x.r.id : 'p' + x.pid, o = !!RPO[k], id = x.r ? +x.r.id : 0, p = (D().progsAll || D().progs || []).find(q => q.id === x.pid), dr = !x.r && drs.find(d => d.programme_id === x.pid && d.month === m);
     return `<button class="ddrow sub2" aria-expanded="${o}" onclick="rpRO('${k}')"><span class="chev">${o ? '▾' : '▸'}</span><span style="flex:1;min-width:0"><b>${esc(x.prog || '')}</b><span class="sub"> · ${esc(x.client || '')}</span></span>
