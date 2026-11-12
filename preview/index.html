@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>(function(){var em=/[?&]embed=1/.test(location.search);window.APX_EMBED=em;
+<script>(function(){var em=/[?&]embed=1/.test(location.search)||window.top!==window;window.APX_EMBED=em;
 window.apxMail=function(u){if(em){window.open(u,'_blank')}else{location.href=u}};
 if(!em)return;document.documentElement.classList.add('embed');
 document.addEventListener('click',function(ev){var a=ev.target.closest&&ev.target.closest('a[href^="mailto:"]');if(a){ev.preventDefault();window.open(a.href,'_blank')}},true);
