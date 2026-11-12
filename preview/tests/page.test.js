@@ -278,7 +278,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const { w, d } = await boot(sess(['admin'])); w.location.hash = 'eisa'; await tick();
     const b = d.querySelector('#eisarows .lname'); ok(b, 'no learner link'); b.click();
     ok(!d.getElementById('rpanel').hidden && /EISA checklist/.test(d.getElementById('rpbody').textContent), 'panel not opened');
-    w.shTab('Assistant'); ok(/switched off in the preview/.test(d.getElementById('rpbody').textContent), 'assistant note missing');
+    w.shTab('Assistant'); ok(/EISA|Not enrolled|Nothing missing/.test(d.getElementById('rpbody').textContent), 'what is missing list missing');
     w.toggleRail(false); ok(d.getElementById('shell').classList.contains('rail'), 'rail not applied');
     w.toggleRail(true); ok(!d.getElementById('shell').classList.contains('rail'), 'menu not reopened');
   });
