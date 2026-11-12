@@ -55,7 +55,11 @@
   window.apxPMonly = () => (P.roles || []).includes(PM) && !(P.roles || []).some(r => r === 'admin' || r === 'demo');
   window.apxMineName = s => { const t = String(s || '').toLowerCase().split(/[^a-z]+/); return myNames().some(x => t.includes(x)); };
   window.apxMineProg = p => !apxPMonly() || apxMineName(p.project_manager_name);
-  const guard = () => { const r = location.hash.slice(1).split('/')[0]; if (P.user && NAVR[r] && !NAVR[r]()) location.hash = 'mywork'; };
+  const guard = () => { const r = location.hash.slice(1).split('/')[0], no = P.user && NAVR[r] && !NAVR[r]();
+    if (!window.APX_EMBED) { if (no) location.hash = 'mywork'; return; }
+    let d = document.getElementById('apxNoAccess');
+    if (no && !d) { d = document.createElement('div'); d.id = 'apxNoAccess'; d.setAttribute('role', 'alert'); d.style.cssText = 'position:fixed;inset:0;z-index:90;background:var(--ground,#fff);color:var(--ink,#111);display:flex;align-items:center;justify-content:center;padding:24px;text-align:center;font:16px/1.5 inherit'; d.innerHTML = '<div><b style="font-size:20px;display:block;margin-bottom:6px">You don\'t have access to this screen</b>Your ApexOne role doesn\'t include it. Ask an admin if you need it.</div>'; document.body.appendChild(d); }
+    else if (!no && d) d.remove(); };
   addEventListener('hashchange', guard); setTimeout(guard, 0);
   const anchor = $('view-dq');
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
