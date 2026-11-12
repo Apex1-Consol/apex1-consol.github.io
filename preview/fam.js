@@ -419,7 +419,7 @@
     $('famsave').textContent = 'Open in mail app';
     $('famform').onsubmit = ev => { ev.preventDefault(); const f = $('famform').elements;
       const url = 'mailto:?bcc=' + encodeURIComponent(ok.map(a => a.email).join(',')) + '&subject=' + encodeURIComponent(f.subj.value) + '&body=' + encodeURIComponent(f.body.value);
-      close(); location.href = url; }; };
+      close(); apxMail(url); }; };
   window.famClearSel = () => { S.sel.clear(); renderRows(); };
   window.famBulk = async act => {
     const list = S.F.filter(f => S.sel.has(f.assessor_id) && !CLOSED.includes(f.status));

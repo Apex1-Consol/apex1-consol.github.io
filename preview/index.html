@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="en">
 <head>
+<script>(function(){var em=/[?&]embed=1/.test(location.search);window.APX_EMBED=em;
+window.apxMail=function(u){if(em){window.open(u,'_blank')}else{location.href=u}};
+if(!em)return;document.documentElement.classList.add('embed');
+document.addEventListener('click',function(ev){var a=ev.target.closest&&ev.target.closest('a[href^="mailto:"]');if(a){ev.preventDefault();window.open(a.href,'_blank')}},true);
+var c=navigator.clipboard,o=c&&c.writeText&&c.writeText.bind(c);
+var fb=function(t){var x=document.createElement('textarea');x.value=t;x.style.cssText='position:fixed;opacity:0';document.body.appendChild(x);x.select();var k=false;try{k=document.execCommand('copy')}catch(e){}x.remove();return k?Promise.resolve():Promise.reject(new Error('copy blocked'))};
+try{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:function(t){return o?o(t).catch(function(){return fb(t)}):fb(t)},readText:c&&c.readText&&c.readText.bind(c)}})}catch(e){}
+})();</script>
+<style>html.embed .side{display:none!important}</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ApexOne Preview</title>
@@ -762,7 +771,7 @@ function renderNav(cur){curNav=cur;if(!PINS){try{PINS=JSON.parse(localStorage.ge
 function famOnly(){const r=(window.__preview&&window.__preview.roles)||[];return r.length>0&&r.every(x=>x==='fam_admin'||x==='ohs')}
 function route(){
   if(location.hash.slice(1).split('/')[0]==='assessors'){location.replace('#fam');return;}
-  if(location.hash==='#pi'){window.open('../programme-initiation.html','_blank');history.back();return;}
+  if(location.hash==='#pi'){if(window.APX_EMBED){location.href='../programme-initiation.html?embed=1';return;}window.open('../programme-initiation.html','_blank');history.back();return;}
   const r=location.hash.slice(1).split('/')[0]||'login';
   const isLogin=r==='login'||!ROUTES[r];
   document.body.classList.toggle('famonly',famOnly());
@@ -1232,11 +1241,11 @@ function learnerRules(){return `<div class="row">
 <script src="live.js?v=20261112u"></script>
 <script src="qa.js?v=20261112k"></script>
 <script src="famcu.js?v=d2727e3"></script>
-<script src="fam.js?v=20261112sy"></script>
+<script src="fam.js?v=20261112em"></script>
 <script src="delivery.js?v=20261112h"></script>
 <script src="handover.js?v=20261112d"></script>
 <script src="shell.js?v=20261112x"></script>
-<script src="today.js?v=20261112e"></script>
+<script src="today.js?v=20261112em"></script>
 <script src="admin.js?v=20261112mx"></script>
 <script src="reports.js?v=20261112p"></script>
 </body>

@@ -153,7 +153,7 @@
   function mail(w, xs) { const n = xs.length, list = xs.slice(0, 25).map(x => `- ${x.h}: ${plain(x.t)} (${plain(x.s)})\n  ${SITE}#${x.link}`).join('\n');
     const body = `Hi ${w.n.split(/\s/)[0]},\n\nPlease update ApexOne for the following${n > 1 ? ' ' + n + ' items' : ''}:\n\n${list}${n > 25 ? `\n\n...and ${n - 25} more: open ApexOne, press the Today button (top right) and choose "Mine".` : ''}\n\nEach line clears by itself once the information is in ApexOne.\n\nThank you`;
     const subj = n > 1 ? `ApexOne: ${n} items to update` : `ApexOne: please update ${plain(xs[0].t).slice(0, 60)}`;
-    location.href = `mailto:${encodeURIComponent(w.e || '')}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`; }
+    apxMail(`mailto:${encodeURIComponent(w.e || '')}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`); }
   let LAST = [];
   window.tdyReq = i => { const x = LAST[i]; if (!x || !isAdm()) return; mail(x.w, [x]); record([x]); };
   window.tdyReqAll = who => { if (!isAdm()) return; const xs = LAST.filter(x => x.w.n === who && !x.z && !x.r); if (!xs.length) return; mail(xs[0].w, xs); record(xs); };
