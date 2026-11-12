@@ -300,6 +300,21 @@
     const exp = A.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
     $('akpis').innerHTML = ASTAT.slice().reverse().map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
       + `<div class="kpi"><span class="l">Expiring within 12 months</span><span class="v" style="color:${exp ? 'var(--bad)' : 'var(--ink)'}">${exp}</span><span class="n" style="color:var(--muted)">plan re-accreditation</span></div>`;
+    { // Programme checks: expiring / not accredited (client-side from programmes + accreditation_items)
+      const td = new Date().toISOString().slice(0, 10), t90 = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
+      const kc = x => String(x || '').trim(), gr = {};
+      A.filter(a => a.status === 'Accreditation granted' && kc(a.saqa_id)).forEach(a => { const k = kc(a.saqa_id); if (!gr[k] || String(a.accreditation_to || '9') > String(gr[k].accreditation_to || '9')) gr[k] = a; });
+      const act = (P.data.progs || []).filter(p => kc(p.saqa_id || p.qualification_code) && !/complet|cancel|closed/i.test((p.status || '') + ' ' + (p.programme_status || '')) && (!p.end_date || p.end_date >= td));
+      const exp = [], na = [];
+      act.forEach(p => { const a = gr[kc(p.saqa_id || p.qualification_code)];
+        if (!a) na.push([p, 'No granted accreditation on record']);
+        else if (a.accreditation_to && (a.accreditation_to < t90 || (p.end_date && a.accreditation_to < p.end_date))) exp.push([p, 'Accredited to ' + a.accreditation_to + (p.end_date && a.accreditation_to < p.end_date ? ' (before programme end ' + p.end_date + ')' : '')]); });
+      if (!$('apchk')) $('akpis').insertAdjacentHTML('beforebegin', '<div id="apchk" style="margin-bottom:14px"></div>');
+      const sel = window.aPC === 'exp' ? exp : window.aPC === 'na' ? na : null;
+      const cl = p => { const c = (P.data.clients || []).find(x => x.id === p.client_id); return c ? c.client_name || (c.fields || {})['Company Name'] || '' : ''; };
+      $('apchk').innerHTML = UI.tiles([{ t: 'Programme checks', k: [['Accreditation expiring', exp.length, 'var(--bad)', window.aPC === 'exp', "aPC=aPC==='exp'?null:'exp';renderA()"], ['Not accredited', na.length, 'var(--bad)', window.aPC === 'na', "aPC=aPC==='na'?null:'na';renderA()"]] }])
+        + (sel ? `<div class="tw" style="margin-top:10px"><table class="dense">${H(['ID', 'Programme', 'Client', 'Qualification ID', 'Start', 'End', 'PM', 'Issue'])}<tbody>${sel.sort((x, y) => kc(x[0].saqa_id).localeCompare(kc(y[0].saqa_id))).map(([p, r]) => `<tr><td>${esc(p.display_id || p.id)}</td><td style="white-space:normal;font-weight:600">${esc(p.programme_name || '')}</td><td>${esc(cl(p))}</td><td>${esc(kc(p.saqa_id || p.qualification_code))}</td><td>${p.start_date || ''}</td><td>${p.end_date || ''}</td><td>${esc(p.project_manager_name || '')}</td><td style="white-space:normal">${esc(r)}</td></tr>`).join('') || '<tr><td colspan="8"><div class="empty"><b>None</b></div></td></tr>'}</tbody></table></div>` : '');
+    }
     $('afilter').innerHTML = ['All', 'Granted', 'In progress', 'To submit', 'Expiring'].map(f => `<button class="${f === aF ? 'on' : ''}" onclick="aF='${f}';renderA()">${f}</button>`).join('');
     const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? a.status === 'Desktop application to be submitted' : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted'].includes(a.status));
     const sel = a => QA() ? `<select class="cellsel" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
