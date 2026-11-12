@@ -71,7 +71,7 @@
         ${gaps ? `<span class="badge b-warn">${gaps} missing qualification or dates</span>` : '<span class="badge b-ok">Data complete</span>'}</button>`;
     }).join('');
     v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager, from the programmes in ApexOne',
-      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button><button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
+      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button>${has('pi_specialist', 'project_manager') ? '<button class="btn" onclick="adIntake()">+ From signed proposal</button>' : ''}<button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
       + (pms.length ? `<div class="famtiles">${UI.tiles([{ t: `Project managers · ${pms.length}`, k: pms.map((n, i) => [esc(n), all.filter(p => (p.project_manager_name || 'Unassigned') === n).length, n === 'Unassigned' ? 'var(--warn)' : '', PMF.pm === n, `adPM('pm',PMS_[${i}])`]) },
         { t: 'Data gaps', k: [['Missing qualification or dates', all.filter(pmQuality).length, 'var(--warn)', !!PMF.q, `adPM('q','${PMF.q ? '' : '1'}')`]] },
         { t: 'Imported', k: [['To confirm', all.filter(toConf).length, 'var(--warn)', !!PMF.tc, `adPM('tc','${PMF.tc ? '' : '1'}')`]] }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
@@ -101,6 +101,47 @@
       await write('Confirm programme', () => sb.from('programmes').update({ fields: f }).eq('id', id));
       p.fields = f; say('Programme confirmed'); renderPM();
     } catch (e) {}
+  };
+  // Signed proposal intake: client (new or existing) + initiated programme (lands in "To confirm") + pasted learner list
+  window.adIntake = () => {
+    const cls = (D().clients || []).filter(c => !c.deleted_at), cn = c => c.client_name || (c.fields || {})['Company Name'] || '';
+    const st = 'border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)';
+    const L = (l, h) => `<label style="display:flex;flex-direction:column;gap:4px;font-size:13px">${l}${h}</label>`;
+    document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="New programme from signed proposal"><form class="card" id="adin" style="max-width:640px;max-height:90vh;overflow:auto;display:flex;flex-direction:column;gap:10px"><h2>New programme from signed proposal</h2>
+      ${L('Client * (pick or type a new one)', `<input name="client" list="adincl" required style="${st}"><datalist id="adincl">${cls.map(c => `<option value="${esc(cn(c))}">`).join('')}</datalist>`)}
+      ${L('Qualification / programme name *', `<input name="qual" required style="${st}">`)}
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px">${L('Qualification code', `<input name="code" style="${st}">`)}${L('NQF', `<input name="nqf" style="${st}">`)}${L('Type', `<select name="ptype" style="${st}"><option value="occupational">Occupational</option><option value="legacy">Legacy</option></select>`)}
+      ${L('Start date', `<input type="date" name="start" style="${st}">`)}${L('Proposal date', `<input type="date" name="pdate" style="${st}">`)}${L('Project manager', `<select name="pm" style="${st}"><option value="">To assign</option>${(PMS || []).filter(n => n !== 'Unassigned').map(n => `<option>${esc(n)}</option>`).join('')}</select>`)}</div>
+      ${L('Notes (facilitator, moderator, group size…)', `<textarea name="note" rows="2" style="${st}"></textarea>`)}
+      ${L('Learners (optional): paste rows from Excel — first name, surname, ID number, phone, email', `<textarea name="lrn" rows="5" style="${st}" placeholder="Thandi	Hadebe	9711260991081	0676902353	thandi@mail.com"></textarea>`)}
+      <div class="sub" id="adinerr" style="color:var(--bad)"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y" id="adinsave">Create programme</button></div></form></div>`);
+    $('adin').onsubmit = async ev => {
+      ev.preventDefault(); const f = $('adin').elements, b = $('adinsave'); b.disabled = true; b.textContent = 'Saving…';
+      try {
+        const norm = x => String(x || '').toLowerCase().replace(/[^a-z0-9]/g, ''), name = f.client.value.trim();
+        let cl = cls.find(c => norm(cn(c)) === norm(name)), src = 'Proposal intake ' + new Date().toISOString().slice(0, 10) + ' by ' + P.user.email;
+        if (!cl) { const r = await sb.from('clients').insert({ tenant_id: P.tenant, client_name: name, fields: { source: src } }).select('id').single(); if (r.error) throw r.error; cl = r.data; }
+        const pm = f.pm.value, own = pm ? ((D().progs || []).find(p => p.project_manager_name === pm && p.owner_email) || {}).owner_email : null;
+        const code = f.code.value.trim(), qual = f.qual.value.trim();
+        const pr = await sb.from('programmes').insert({ tenant_id: P.tenant, client_id: cl.id, programme_name: code ? code + ': ' + qual : qual, qualification_name: qual, saqa_id: code || null, nqf_level: f.nqf.value.trim() || null,
+          start_date: f.start.value || null, status: 'initiated', programme_type: f.ptype.value, project_manager_name: pm || null, owner_email: own || null,
+          fields: { imported: true, source: src, proposal_date: f.pdate.value || null, note: f.note.value.trim() || null } }).select('id').single();
+        if (pr.error) throw pr.error;
+        const rows = f.lrn.value.split(/\r?\n/).map(l => l.split(/\t|;|,/).map(x => x.trim())).filter(r => r[0] && r[1]);
+        let added = 0;
+        if (rows.length) {
+          const ids = rows.map(r => (r[2] || '').replace(/\D/g, '')).filter(Boolean), ex = ids.length ? await sb.from('learners').select('id,id_number').in('id_number', ids) : { data: [] };
+          const have = new Map((ex.data || []).map(x => [String(x.id_number).replace(/\D/g, ''), x.id])), lids = [];
+          for (const r of rows) { const idn = (r[2] || '').replace(/\D/g, '');
+            if (idn && have.has(idn)) { lids.push(have.get(idn)); continue; }
+            const l = await sb.from('learners').insert({ tenant_id: P.tenant, first_name: r[0], last_name: r[1], id_number: idn || null, phone: r[3] || null, email: r[4] || null, fields: { source: src } }).select('id').single();
+            if (l.error) throw l.error; lids.push(l.data.id); added++; }
+          if (lids.length) { const e = await sb.from('enrolments').insert(lids.map(id => ({ tenant_id: P.tenant, learner_id: id, programme_id: pr.data.id, status: 'active', fields: { source: src } }))); if (e.error) throw e.error; }
+        }
+        $('famov').remove(); say(`Programme created${rows.length ? ` · ${rows.length} learners enrolled (${added} new)` : ''} · now in "To confirm"`); if (window.previewReload) await window.previewReload(); renderPM();
+      } catch (e) { $('adinerr').textContent = e.message || String(e); b.disabled = false; b.textContent = 'Create programme'; }
+    };
   };
   window.adPMcsv = () => csv('pm-tracker.csv', ['Prog ID', 'Project manager', 'Client', 'Qualification', 'SAQA ID', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status'],
     pmRows().map(p => [p.display_id || p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, pf(p, 'Cohort') || p.group_name, learnersIn(p.id), pf(p, 'Employment Status'), pf(p, 'Mode of Delivery'), pf(p, 'SETA'), p.programme_type, p.nqf_level || pf(p, 'NQF'), day(p.start_date), day(p.end_date), personName(p.facilitator_id) || pf(p, 'Facilitator'), pf(p, 'Assessor'), p.status]));
