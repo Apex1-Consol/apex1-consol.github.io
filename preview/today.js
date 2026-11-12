@@ -39,7 +39,7 @@
     if (o === 'pm') { const c = p ? (D().clients || []).find(k => String(k.id) === String(p.client_id)) : null, nm = p?.project_manager_name || c?.project_manager;
       if (nm) { const u = byName(nm); return u ? { n: disp(u), e: u.email } : { n: String(nm).split(/\s+/)[0], e: '' }; }
       o = 'hoo'; why = ' (no PM)'; }
-    if (ROLE[o]) { const u = byRole(ROLE[o][0]); return u ? { n: disp(u) + why, e: u.email } : { n: ROLE[o][1] + why, e: '' }; }
+    if (ROLE[o]) { const u = byRole(ROLE[o][0]); return u ? { n: disp(u), e: u.email, why } : { n: ROLE[o][1], e: '', why }; }
     if (o === 'admin') return { n: 'Admin', e: '' };
     const u = byName(o); return u ? { n: disp(u), e: u.email } : { n: String(o).split(/[\s@]+/)[0], e: '' };
   }
@@ -177,7 +177,7 @@
       <div class="tdycs">${chip('all', open.length, 'All', '')}${chip('need', need.length, 'Needs action', 'b-warn')}${mine.length ? chip('mine', mine.length, 'Mine', 'b-ok') : ''}${wait.length ? chip('wait', wait.length, 'Requested', '') : ''}${adm ? chip('who', new Set(open.map(x => x.w.n)).size, 'By person', '') : ''}${zz ? chip('snz', zz, 'Snoozed', '') : ''}</div>`;
     const q = s => esc(s).replace(/'/g, '');
     const row = x => { const i = LAST.indexOf(x), rq = x.r ? `Requested ${fmt(x.r.requested_at)} by ${esc(String(x.r.requested_by || '').split('@')[0])}` : '';
-      return `<div class="tdyr"><button type="button" class="tdyi${x.warn && !x.r ? ' w' : ''}${x.r ? ' q' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span><span class="tdyo">→ ${esc(x.w.n)}${rq ? ' · ' + rq : ''}</span></button>
+      return `<div class="tdyr"><button type="button" class="tdyi${x.warn && !x.r ? ' w' : ''}${x.r ? ' q' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span><span class="tdyo">→ ${esc(x.w.n + (x.w.why || ''))}${rq ? ' · ' + rq : ''}</span></button>
         <span class="tdyb">${adm && x.w.e && !x.r ? `<button type="button" class="tdyz" title="Email ${esc(x.w.n)} to fix this" aria-label="Request fix from ${esc(x.w.n)}" onclick="tdyReq(${i})">✉</button>` : ''}${adm && x.r ? `<button type="button" class="tdyz" title="Clear the request mark" aria-label="Clear request" onclick="tdyUnreq(${i})">✓</button>` : ''}<button type="button" class="tdyz" title="${x.z ? 'Bring back' : 'Snooze 7 days'}" aria-label="${x.z ? 'Bring back' : 'Snooze 7 days'}" onclick="tdySnooze('${x.k}',${!x.z})">${x.z ? '↺' : 'z'}</button></span></div>`; };
     if (byP && !TF.who) { const g = new Map(); open.forEach(x => { const k = x.w.n; if (!g.has(k)) g.set(k, { w: x.w, n: 0, need: 0, req: 0 }); const o = g.get(k); o.n++; if (x.warn && !x.r) o.need++; if (x.r) o.req++; });
       const rows = [...g.values()].sort((a, b) => b.need - a.need || b.n - a.n);
