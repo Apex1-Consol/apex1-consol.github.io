@@ -1,5 +1,5 @@
 /* ApexOne redesign preview — app shell (2026-10-22).
-   Menu open/close (icon rail), right side panel (Details / Activity / Assistant),
+   Menu open/close (icon rail), right side panel (Today; with a learner selected also Learner / History / What's missing),
    "My work" home per role, Ctrl K search. Reads the data live.js loaded; the only
    extra reads are the Activity tab's audit_log and outbox look-ups. No writes. */
 (function () {
@@ -49,8 +49,10 @@
   const scr = () => location.hash.slice(1).split('/')[0] || 'mywork';
 
   function renderRP() {
-    $('rptabs').innerHTML = ['Today', 'Details', 'Activity', 'Assistant'].map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')">${t}</button>`).join('');
     const l = learner(S.lid), p = A() && S.pid ? A().prog(S.pid) : null, body = $('rpbody');
+    if (!l) S.tab = 'Today'; // learner tabs only show once a learner is selected
+    const TL = { Today: 'Today', Details: 'Learner', Activity: 'History', Assistant: "What's missing" };
+    $('rptabs').innerHTML = (l ? ['Today', 'Details', 'Activity', 'Assistant'] : ['Today']).map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')"${t === 'Details' ? ` title="${nm(l).replace(/[<>"&]/g, '')}"` : ''}>${TL[t]}</button>`).join('');
     if (S.tab === 'Today') { if (onFam() && window.famToday) { body.innerHTML = '<div id="famtoday"></div>'; famToday(true); return; } body.innerHTML = window.apxToday ? apxToday(scr()) : ''; if (!D().progs) setTimeout(() => { if (S.open && S.tab === 'Today') renderRP(); }, 1500); return; }
     if (!l) { const fam = location.hash.slice(1).split('/')[0] === 'fam'; body.innerHTML = `<div class="empty"><b>Nothing selected</b><span>${fam ? 'This panel shows learner details. To see a practitioner, click their name in the FAM Registry list.' : "Select a learner's name in Attendance &amp; PoE, EISA readiness or search (Ctrl K) to see their details here."}</span></div>`; return; }
     if (S.tab === 'Details') body.innerHTML = details(l, p);
