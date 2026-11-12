@@ -105,20 +105,16 @@
       return `${esc(TBL[r.table_name] || r.table_name)} ${esc((r.action || '').toLowerCase())}${f.length ? ': ' + esc(f.join(', ')) : ''}`; };
     $('rpbody').innerHTML = head(x.l, x.p, facts(x.l, x.p)) + x.sync + `<div><h3>History</h3>${x.rows.length ? `<div class="tl">${x.rows.map(r => `<div>${what(r)}<div class="sub">${esc(r.user_name || 'system')} · ${fmt(r.created_at)} ${String(r.created_at || '').slice(11, 16)}</div></div>`).join('')}</div>` : `<div class="sub">${esc(x.note || 'No changes recorded yet.')}</div>`}</div>`;
   }
-  function assistant(l, p) {
-    const f = facts(l, p), a = A(); let ans = 'Not enrolled on a programme in the preview.';
-    if (f) {
-      const gaps = [];
-      f.ms.forEach(m => { const r = a.resFor(p.id, l.id, m.module_number); a.kindsOf(m).forEach(k => { const v = r?.[a.COL[k]]; if (v !== 'C') gaps.push(`module ${m.module_number} ${k} is ${v ? a.RLAB[v].toLowerCase() : 'not recorded'}`); });
-        if (r?.fields?.['Internal moderation'] !== 'Yes') gaps.push(`module ${m.module_number} is not moderated`); });
-      if (!f.r.c[5]) gaps.push('the SoR is not issued on the QCTO tracker');
-      ans = f.ready ? `${nm(l)} meets all six EISA criteria.` : `${nm(l)} is not EISA ready: ${gaps.slice(0, 6).join('; ')}.`;
-      if (f.abs) ans += ` Attendance ${f.rate} with ${f.abs} absence${f.abs > 1 ? 's' : ''} (limit ${f.lim}).`;
-    }
-    return head(l, p, f) + `<div class="note" style="margin:0">The AI assistant is switched off in the preview. In the live app it answers questions about this screen's data. The answer below comes straight from the data.</div>
-      <div style="align-self:flex-end;max-width:85%;background:var(--soft);color:var(--navy);border-radius:10px 10px 2px 10px;padding:8px 12px;font-size:13px">Why isn't ${esc(nm(l))} EISA ready?</div>
-      <div style="max-width:92%;background:var(--ground);border:1px solid var(--line2);border-radius:10px 10px 10px 2px;padding:10px 12px;font-size:13px;line-height:1.5">${esc(ans)}</div>
-      <label style="display:flex;gap:8px;align-items:center;border:1px solid var(--line);border-radius:8px;padding:6px 6px 6px 12px"><span class="sr">Ask the assistant</span><input disabled placeholder="Ask about this programme… (live app only)" style="flex-grow:1;min-width:0;border:0;background:transparent;font:inherit;font-size:13px"><button class="btn sm" type="button" disabled>Send</button></label>`;
+  function assistant(l, p) { // "What's missing": what stands between this learner and EISA, straight from the data
+    const f = facts(l, p), a = A(), gaps = [];
+    if (!f) return head(l, p, f) + '<div class="empty"><b>Not enrolled</b><span>This learner is not enrolled on a programme yet.</span></div>';
+    f.ms.forEach(m => { const r = a.resFor(p.id, l.id, m.module_number); a.kindsOf(m).forEach(k => { const v = r?.[a.COL[k]]; if (v !== 'C') gaps.push(`Module ${m.module_number} ${k}: ${v ? a.RLAB[v].toLowerCase() : 'not recorded'}`); });
+      if (r?.fields?.['Internal moderation'] !== 'Yes') gaps.push(`Module ${m.module_number}: not moderated`); });
+    if (!f.r.c[5]) gaps.push('SoR not issued on the QCTO tracker');
+    if (f.abs) gaps.push(`Attendance ${f.rate}: ${f.abs} absence${f.abs > 1 ? 's' : ''} (limit ${f.lim})`);
+    return head(l, p, f) + (f.ready && !f.abs ? `<div class="empty"><b>Nothing missing ✓</b><span>${esc(nm(l))} meets all six EISA criteria.</span></div>`
+      : `<div><h3>${f.ready ? 'EISA ready, but note' : 'Not EISA ready yet'} <span class="sub" style="font-weight:400">${gaps.length}</span></h3><ul style="margin:0;padding-left:18px;font-size:13px;line-height:1.6">${gaps.map(g => `<li>${esc(g)}</li>`).join('')}</ul></div>
+        <div class="sub">Fix these in Attendance &amp; PoE and the QCTO tracker. This list updates as the data changes.</div>`);
   }
 
   /* ---------- My work ---------- */
