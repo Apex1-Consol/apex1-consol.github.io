@@ -42,8 +42,8 @@
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
   };
   window.shTab = t => { S.tab = t; renderRP(); };
-  window.addEventListener('hashchange', () => { if (S.open) applyRP(); else badge(); });
-  window.shRefresh = () => { if (S.open) renderRP(); else badge(); };
+  window.addEventListener('hashchange', () => { if (S.open) applyRP(); else badge(); }); setInterval(() => badge(), 60000);
+  window.shRefresh = () => { if (S.open) renderRP(); badge(); };
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.open && !document.querySelector('dialog[open]')) toggleRP(false); });
   function badge() { const b = $('rpbtn'); if (!b || !window.apxTodayCount) return; const n = onFam() ? 0 : apxTodayCount(scr()); let d = b.querySelector('.rpdot'); if (!d) { b.style.position = 'relative'; b.insertAdjacentHTML('beforeend', '<span class="rpdot" style="position:absolute;top:-3px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--warn,#c80);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;box-sizing:border-box"></span>'); d = b.querySelector('.rpdot'); } d.textContent = n > 99 ? '99+' : n; d.hidden = !n; d.title = n + ' to act on'; }
   const scr = () => location.hash.slice(1).split('/')[0] || 'mywork';
