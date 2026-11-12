@@ -47,14 +47,15 @@
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
 
   /* ---------- PM Tracker (live: Project Manager Tracker) ---------- */
-  const PMF = { pm: '', client: '', type: '', seta: '', q: '' };
+  const PMF = { pm: '', client: '', type: '', seta: '', q: '', tc: '' };
+  const toConf = p => String((p.fields || {}).imported) === 'true' && !(p.fields || {}).confirmed_at;
   const pf = (p, k) => ((p.fields || {})[k] || '');
   let PMS = []; Object.defineProperty(window, 'PMS_', { get: () => PMS });
   const pmQuality = p => !(p.qualification_name || p.saqa_id) || !p.start_date || !p.end_date;
   function pmRows() {
     return (D().progs || []).filter(p => (!PMF.pm || (p.project_manager_name || 'Unassigned') === PMF.pm)
       && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type) && (!PMF.seta || (pf(p, 'SETA') || '—') === PMF.seta)
-      && (!PMF.q || pmQuality(p)));
+      && (!PMF.q || pmQuality(p)) && (!PMF.tc || toConf(p)));
   }
   function renderPM() {
     const v = $('view-pmtracker');
@@ -72,7 +73,8 @@
     v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager, from the programmes in ApexOne',
       `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button><button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
       + (pms.length ? `<div class="famtiles">${UI.tiles([{ t: `Project managers · ${pms.length}`, k: pms.map((n, i) => [esc(n), all.filter(p => (p.project_manager_name || 'Unassigned') === n).length, n === 'Unassigned' ? 'var(--warn)' : '', PMF.pm === n, `adPM('pm',PMS_[${i}])`]) },
-        { t: 'Data gaps', k: [['Missing qualification or dates', all.filter(pmQuality).length, 'var(--warn)', !!PMF.q, `adPM('q','${PMF.q ? '' : '1'}')`]] }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
+        { t: 'Data gaps', k: [['Missing qualification or dates', all.filter(pmQuality).length, 'var(--warn)', !!PMF.q, `adPM('q','${PMF.q ? '' : '1'}')`]] },
+        { t: 'Imported', k: [['To confirm', all.filter(toConf).length, 'var(--warn)', !!PMF.tc, `adPM('tc','${PMF.tc ? '' : '1'}')`]] }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
       + `
       <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}
@@ -87,10 +89,19 @@
           <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ''}</td><td>${esc(pf(p, 'Cohort') || p.group_name || '—')}</td><td>${learnersIn(p.id)}</td><td>${esc(pf(p, 'Employment Status') || '—')}</td><td>${esc(pf(p, 'Mode of Delivery') || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
           <td>${esc(p.programme_type || '—')}</td><td>${esc(p.nqf_level || pf(p, 'NQF') || '—')}</td><td>${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">Missing</span>'}</td>
           <td>${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">Missing</span>'}</td><td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
-          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(17, 'No programmes match these filters.')}
+          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${toConf(p) && has('project_manager') ? `<button class="btn sm y" onclick="adPMconf(${p.id})">Confirm</button> ` : ''}${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(17, 'No programmes match these filters.')}
         </tbody></table></div></section>`;
   }
   window.adPM = (k, val) => { if (!k) Object.keys(PMF).forEach(x => PMF[x] = ''); else PMF[k] = PMF[k] === val && k === 'pm' ? '' : val; renderPM(); };
+  window.adPMconf = async id => {
+    const p = (D().progs || []).find(x => x.id === id); if (!p) return;
+    try {
+      const cur = await sb.from('programmes').select('fields').eq('id', id).single(); if (cur.error) throw cur.error;
+      const f = Object.assign({}, cur.data.fields || {}, { confirmed_at: new Date().toISOString(), confirmed_by: P.user.email });
+      await write('Confirm programme', () => sb.from('programmes').update({ fields: f }).eq('id', id));
+      p.fields = f; say('Programme confirmed'); renderPM();
+    } catch (e) {}
+  };
   window.adPMcsv = () => csv('pm-tracker.csv', ['Prog ID', 'Project manager', 'Client', 'Qualification', 'SAQA ID', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status'],
     pmRows().map(p => [p.display_id || p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, pf(p, 'Cohort') || p.group_name, learnersIn(p.id), pf(p, 'Employment Status'), pf(p, 'Mode of Delivery'), pf(p, 'SETA'), p.programme_type, p.nqf_level || pf(p, 'NQF'), day(p.start_date), day(p.end_date), personName(p.facilitator_id) || pf(p, 'Facilitator'), pf(p, 'Assessor'), p.status]));
   window.adPMtpl = () => {
