@@ -69,7 +69,7 @@ function tone(x, month) {
 }
 let TR = null, TRM = null, TRS = '', TRPM = '', TRV = (() => { try { return localStorage.getItem('rp.view') || 'pm'; } catch (_) { return 'pm'; } })();
 async function loadTR() {
-  const r = await R.from('reports').select('id,programme_id,client_name_snapshot,programme_name_snapshot,month,status,submitted_by_email,hold_until,remind_pm_at').neq('status', 'archived');
+  const r = await R.from('reports').select('id,programme_id,client_name_snapshot,programme_name_snapshot,month,status,submitted_by_email,hold_until,hold_reason,hold_note,remind_pm_at').neq('status', 'archived');
   if (r.error) { TR = { err: r.error.message }; return; }
   const reps = r.data || [], drs = Array.isArray(DR) ? DR : [], cur = (() => { const n = new Date(); return n.getFullYear() * 12 + n.getMonth() - 1; })();
   const months = new Set([...reps.map(x => x.month), ...drs.map(x => x.month), mName(cur)].filter(m => mIdx(m) >= 0));
@@ -116,7 +116,7 @@ function trackerM() {
     ${rows.map(x => `<tr><td><b>${esc(x.client || '')}</b><div style="font-size:12.5px;color:var(--muted);margin-top:2px">${esc(x.prog || '')}${x.r ? ` · <a href="#" onclick="rpHist(${+x.r.id});return false" style="color:inherit">History</a>` : ''}</div></td><td>${esc(pmName(x.pm))}</td>
       <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${STC[x.stage]};margin-right:6px"></span>${STAGE[x.stage]}</td>
       <td><span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>${x.r && x.r.remind_pm_at ? `<div style="font-size:12.5px;color:var(--muted);margin-top:2px">Reminded ${esc(fmtD(new Date(x.r.remind_pm_at)))}</div>` : ''}</td>
-      <td style="text-align:right;line-height:2.4">${x.r ? `<a class="btn sm" href="/report-generator.html?report=${+x.r.id}" target="_blank" rel="noopener">Open ↗</a>` : `<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Generator ↗</a>`}
+      <td style="text-align:right;line-height:2.4">${x.r ? `<button class="btn sm" onclick="rpPdf(${+x.r.id},this)">PDF</button> <a class="btn sm" href="/report-generator.html?report=${+x.r.id}" target="_blank" rel="noopener">Open ↗</a>` : `<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Generator ↗</a>`}
         ${acts(x).map(a => a === 'needs_changes' ? ` <button class="btn sm" onclick="rpNote(${+x.r.id})">Request changes</button>` : ` <button class="btn sm y" onclick="rpAct(${+x.r.id},'${a}',this)">${esc(ACT[a] || a)}</button>`).join('')}
         ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? ` <button class="btn sm" onclick="rpRemind(${+x.r.id},this)">Remind PM</button>` : ''}</td></tr>
       ${x.r ? `<tr id="rpn-row-${+x.r.id}" hidden><td colspan="5"><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><textarea id="rpn-${+x.r.id}" class="cellin" rows="2" placeholder="Note for the PM: what needs to change" style="flex:1 1 320px"></textarea><button class="btn sm y" onclick="rpAct(${+x.r.id},'needs_changes',this)">Send to PM</button><button class="btn sm" onclick="rpNote(${+x.r.id})">Cancel</button></div></td></tr>
@@ -143,6 +143,32 @@ function stripOf(p) {
 let PMO = (() => { try { return JSON.parse(localStorage.getItem('rp.pmOpen') || '{}') || {}; } catch (_) { return {}; } })(), RPO = {};
 window.rpPMO = k => { PMO[k] = !PMO[k]; try { localStorage.setItem('rp.pmOpen', JSON.stringify(PMO)); } catch (_) {} render(); };
 window.rpRO = k => { RPO[k] = !RPO[k]; render(); };
+/* Report tools (same database functions as the Report Generator): saved PDF, hold, archive/restore. */
+window.rpPdf = async (id, btn) => { btn.disabled = true;
+  const f = await R.from('report_files').select('pdf_path,created_at').eq('report_id', id).not('pdf_path', 'is', null).order('created_at', { ascending: false }).limit(1);
+  const p = f.data && f.data[0] && f.data[0].pdf_path; if (!p) { btn.disabled = false; return say(f.error ? 'Could not look up the PDF: ' + f.error.message : 'No PDF saved for this report yet. It is saved when the report is printed or submitted in the Report Generator.'); }
+  const u = await sb.storage.from('client-reports').createSignedUrl(p, 300, { download: true }); btn.disabled = false;
+  if (u.error) return say('Could not open the PDF: ' + u.error.message); const a = document.createElement('a'); a.href = u.data.signedUrl; a.rel = 'noopener'; a.click(); };
+const HOLDR = ['Client asked to wait', 'Waiting for client sign-off', 'Corrections requested by client', 'Other'];
+window.rpHoldForm = id => { const t = $('rphold-' + id); if (t) t.hidden = !t.hidden; };
+window.rpHold = async (id, btn, off) => {
+  const until = off ? null : $('rphd-' + id).value, why = off ? null : $('rphr-' + id).value, note = off ? null : $('rphn-' + id).value.trim();
+  if (!off && (!until || !why)) return say('Choose a reason and a date');
+  btn.disabled = true; const r = await R.rpc('set_report_hold', off ? { p_report_id: id, p_until: null } : { p_report_id: id, p_until: until, p_reason: why, p_note: note || null });
+  if (r.error) { btn.disabled = false; return say('Not saved: ' + r.error.message); } say(off ? 'Hold removed' : 'On hold until ' + until); await rpTR(); };
+window.rpArchive = (id, btn) => { if (confirm('Archive this report? It leaves the lists. You can restore it from Archived reports at the bottom.')) rpAct(id, 'archived', btn); };
+let ARC = null, ARCOPEN = false;
+window.rpArc = async () => { ARCOPEN = !ARCOPEN; if (ARCOPEN) { ARC = null; render(); const r = await R.from('reports').select('id,client_name_snapshot,programme_name_snapshot,month,submitted_by_email,archived_at').eq('status', 'archived').order('archived_at', { ascending: false }); ARC = r.error ? { err: r.error.message } : r.data || []; } render(); };
+window.rpRestore = async (id, btn) => { btn.disabled = true; const a = await R.rpc('report_next_actions', { p_report_id: id }), to = (a.data || []).find(x => x !== 'archived');
+  if (!to) { btn.disabled = false; return say(a.error ? a.error.message : 'This report cannot be restored by you'); }
+  const r = await R.rpc('transition_report', { p_report_id: id, p_to_status: to, p_note: null }); if (r.error) { btn.disabled = false; return say('Not restored: ' + r.error.message); }
+  say('Restored as ' + ((ST[to] || [to])[0]).toLowerCase()); ARCOPEN = false; Q = null; await loadQ(); await rpTR(); };
+function archived() {
+  if (!has() || TR === null || TR.err) return '';
+  const body = !ARCOPEN ? '' : ARC === null ? '<div class="famas" style="padding:12px 20px">Loading…</div>' : ARC.err ? `<div class="famas" style="padding:12px 20px">${esc(ARC.err)}</div>` : !ARC.length ? '<div class="famas" style="padding:12px 20px">No archived reports.</div>'
+    : `<div class="tw"><table class="dense"><thead><tr><th>Client / programme</th><th>Month</th><th>PM</th><th>Archived</th><th></th></tr></thead><tbody>${ARC.map(r => `<tr><td><b>${esc(r.client_name_snapshot || '')}</b><div class="sub">${esc(r.programme_name_snapshot || '')}</div></td><td>${esc(r.month || '')}</td><td>${esc(pmName(r.submitted_by_email))}</td><td>${esc(when(r.archived_at))}</td><td style="text-align:right;white-space:nowrap"><button class="btn sm" onclick="rpPdf(${+r.id},this)">PDF</button> <button class="btn sm" onclick="rpRestore(${+r.id},this)">Restore</button></td></tr>`).join('')}</tbody></table></div>`;
+  return `<section class="card" style="padding:0"><div style="display:flex;align-items:center;padding:14px 20px"><h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpArc()">${ARCOPEN ? '▾' : '▸'} Archived reports</h2></div>${body}</section>`;
+}
 const needsAct = x => ['notstarted', 'changes'].includes(x.stage) || x.t[0] === 'dan';
 function pmView() {
   const admin = has(), m = TR.cur, all = (TR.byM[m] || []).filter(x => !TRPM || x.pm === TRPM), rows = all.filter(x => !TRS || x.stage === TRS);
@@ -160,7 +186,12 @@ function pmView() {
         <div style="display:flex;gap:8px;flex-wrap:wrap">${x.r ? `<a class="btn sm y" href="/report-generator.html?report=${id}" target="_blank" rel="noopener">Open report ↗</a>` : `<a class="btn sm y" href="/report-generator.html" target="_blank" rel="noopener">${x.stage === 'notstarted' ? 'Start in Report Generator ↗' : 'Open Report Generator ↗'}</a>`}
           ${acts(x).map(a => a === 'needs_changes' ? `<button class="btn sm" onclick="rpNote(${id})">Request changes</button>` : `<button class="btn sm n" onclick="rpAct(${id},'${a}',this)">${esc(ACT[a] || a)}</button>`).join('')}
           ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? `<button class="btn sm" onclick="rpRemind(${id},this)">Remind PM</button>` : ''}
+          ${x.r ? `<button class="btn sm" onclick="rpPdf(${id},this)">Download PDF</button>` : ''}
+          ${x.r && !['sent'].includes(x.stage) ? (x.r.hold_until ? `<button class="btn sm" onclick="rpHold(${id},this,true)">Remove hold</button>` : `<button class="btn sm" onclick="rpHoldForm(${id})">Put on hold</button>`) : ''}
+          ${admin && x.r && ['changes', 'approved', 'sent'].includes(x.stage) ? `<button class="btn sm" onclick="rpArchive(${id},this)">Archive</button>` : ''}
           ${x.r ? `<button class="btn sm" onclick="rpHist(${id})">History</button>` : ''}</div>
+        ${x.r && x.r.hold_until ? `<div class="kv"><span>On hold</span><span>until ${esc(fmtD(new Date(x.r.hold_until + 'T00:00')))} · ${esc(x.r.hold_reason || '')}${x.r.hold_note ? ' · ' + esc(x.r.hold_note) : ''}</span></div>` : ''}
+        ${x.r && !x.r.hold_until ? `<div id="rphold-${id}" hidden><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end"><label class="sub" style="display:flex;flex-direction:column;gap:4px">Reason<select id="rphr-${id}" class="cellin" style="height:36px"><option value="">Choose…</option>${HOLDR.map(o => `<option>${o}</option>`).join('')}</select></label><label class="sub" style="display:flex;flex-direction:column;gap:4px">Hold until<input id="rphd-${id}" type="date" class="cellin" style="height:36px" min="${new Date().toISOString().slice(0, 10)}"></label><label class="sub" style="display:flex;flex-direction:column;gap:4px;flex:1 1 200px">Note (optional)<input id="rphn-${id}" class="cellin" style="height:36px" placeholder="e.g. Client's year-end, resend on the 20th"></label><button class="btn sm y" onclick="rpHold(${id},this)">Save hold</button><button class="btn sm" onclick="rpHoldForm(${id})">Cancel</button></div></div>` : ''}
         ${x.r ? `<div id="rpn-row-${id}" hidden><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><textarea id="rpn-${id}" class="cellin" rows="2" placeholder="Note for the PM: what needs to change" style="flex:1 1 320px"></textarea><button class="btn sm y" onclick="rpAct(${id},'needs_changes',this)">Send to PM</button><button class="btn sm" onclick="rpNote(${id})">Cancel</button></div></div><div id="rph-${id}" hidden><div></div></div>` : ''}</div>`}`;
   };
   return tiles + (pms.map(pm => {
@@ -274,6 +305,7 @@ function render() {
   v.innerHTML = `<div style="display:flex;flex-direction:column;gap:20px">
     <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
     ${tracker()}
+    ${archived()}
     ${drafts()}
 
   </div>`;
