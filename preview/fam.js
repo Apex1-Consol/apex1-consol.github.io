@@ -32,8 +32,8 @@
   const saveF = () => { try { localStorage.setItem(LSK, JSON.stringify({ ...Object.fromEntries(LSF.map(k => [k, S[k]])), col: [...S.col] })); } catch (_) {} };
   const say = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
   const has = (...r) => (P.roles || []).some(x => r.includes(x));
-  const isAdm = () => has('admin', 'fam_admin');
-  const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist', 'fam_admin');
+  const isAdm = () => has('admin', 'ohs', 'fam_admin');
+  const canWrite = () => has('admin', 'qa_specialist', 'etqa', 'project_manager', 'pi_specialist', 'ohs', 'fam_admin');
   const me = () => P.user?.email || null;
   const MONS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmt = s => { if (!s) return '—'; const x = String(s).slice(0, 10); if (!/^\d{4}-\d\d-\d\d$/.test(x)) return String(s); const [y, m, d] = x.split('-'); return `${+d} ${MONS[+m - 1]} ${y}`; };

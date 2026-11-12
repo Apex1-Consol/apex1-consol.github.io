@@ -46,7 +46,7 @@
     clients: [PM, PI], pmtracker: [PM, PI], programmes: [PM, PI, QA], pi: [PI],
     learners: [PM, QA, ET], dq: [QA, ET], enrolments: [QA, ET], eisa: [QA, ET], qcto: [QA, ET, PI, PM],
     attendance: [PM, QA], visits: [PM, QA], recs: [PM, QA], modver: [QA, ET, PM], accred: [QA],
-    signoff: [PI, 'compliance_officer', 'head_of_ops'], fam: [PI, 'fam_admin'], assessors: [QA, ET],
+    signoff: [PI, 'compliance_officer', 'head_of_ops'], fam: [PI, 'ohs', 'fam_admin'], assessors: [QA, ET],
     synchealth: [], audit: [], users: [] };
   window.NAVR = Object.fromEntries(Object.entries(GATE).map(([k, r]) => [k, () => !r || has(...r)]));
   // A project manager (not admin/demo) sees only their own programmes and clients in My work, Clients and PM Tracker.
@@ -310,7 +310,7 @@
   window.adAuCsv = () => csv('audit-log.csv', ['When', 'User', 'Role', 'Action', 'Table', 'Record', 'Changes'], (AL || []).map(r => [r.created_at, r.user_name, r.user_role, r.action, r.table_name, r.record_id, JSON.stringify(r.changes)]));
 
   /* ---------- User management ---------- */
-  const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer'], ['fam_admin', 'FAM Registry only']];
+  const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer'], ['ohs', 'OHS (FAM Registry)']];
   let US = null;
   // Live: the user-admin Edge Function (service key stays server-side; it re-checks the caller is admin). Same calls as the old app.
   async function ua(action, payload) {
