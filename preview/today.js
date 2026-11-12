@@ -72,8 +72,8 @@
       return { h: 'Attendance', link: 'attendance', items: quiet.concat(hi) }; },
     learners(m) { const E = new Set((D().enrol || []).map(e => e.learner_id)), L = (D().learners || []).filter(l => !/\[TEST\]|^test/i.test(l.first_name || ''));
       const enrolled = window.apxMineProg ? new Set((D().enrol || []).filter(e => m.has(String(e.programme_id))).map(e => e.learner_id)) : null;
-      const r = L.filter(l => enrolled ? enrolled.has(l.id) : true).map(l => ({ l, miss: [!l.id_number && 'ID number', !l.email && 'email', !l.phone && 'phone', !enrolled && !E.has(l.id) && 'enrolment'].filter(Boolean) })).filter(o => o.miss.length);
-      return { h: 'Learners missing details', link: 'learners', items: r.sort((a, b) => b.miss.length - a.miss.length).map(o => it(esc((o.l.first_name + ' ' + o.l.last_name).trim()), 'Missing ' + o.miss.join(', '), `window.shOpen&&shOpen(null,${o.l.id})`, o.miss.includes('ID number'))) }; },
+      const r = L.filter(l => enrolled ? enrolled.has(l.id) : true).map(l => ({ l, miss: [!l.id_number && 'ID number', !l.email && 'email', !l.phone && 'phone', !enrolled && !E.has(l.id) && 'enrolment'].filter(Boolean) })).filter(o => o.miss.includes('ID number') || o.miss.includes('enrolment'));
+      return { h: 'Learners missing ID or enrolment', link: 'learners', items: r.sort((a, b) => b.miss.length - a.miss.length).map(o => it(esc((o.l.first_name + ' ' + o.l.last_name).trim()), 'Missing ' + o.miss.join(', '), `window.shOpen&&shOpen(null,${o.l.id})`, o.miss.includes('ID number'))) }; },
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false)) }; },
