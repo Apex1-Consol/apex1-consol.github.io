@@ -1,14 +1,17 @@
 /* ApexOne preview — "Today" side panel per screen (2026-11-12).
-   Same idea as FAM's Today panel: what to act on now on this screen, each line one click away.
-   Reads only the data live.js already loaded (P.data). No writes, no extra queries. FAM keeps its own panel. */
+   What to act on now on this screen, who must action it, and (admins) a one-click request to that person.
+   Reads the data live.js already loaded (P.data), plus the staff directory (rpc apx_staff) and open fix requests (fix_requests).
+   The only write is fix_requests (admins). Requests open in the admin's own mail app: nothing is sent by ApexOne. FAM keeps its own Today (fam.js). */
 (function () {
-  const P = window.__preview, D = () => (P && P.data) || {};
+  const P = window.__preview, D = () => (P && P.data) || {}, sb = () => window.__sb;
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const T0 = new Date(new Date().toISOString().slice(0, 10)).getTime();
   const dd = s => { if (!s) return null; const t = Date.parse(String(s).slice(0, 10)); return isNaN(t) ? null : Math.round((t - T0) / 864e5); };
   const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '';
   const when = n => n == null ? '' : n === 0 ? 'today' : n < 0 ? `${-n} d overdue` : `in ${n} d`;
   const ok = h => !window.NAVR || !NAVR[h] || NAVR[h]();
+  const roles = () => (P && P.roles) || [], isAdm = () => roles().includes('admin');
+  const meE = () => String(P?.user?.email || '').toLowerCase();
   const progs = () => (D().progs || []).filter(p => !String(p.programme_name || '').startsWith('[TEST]') && (!window.apxMineProg || apxMineProg(p)));
   const pmap = () => { const m = new Map(); progs().forEach(p => m.set(String(p.id), p)); return m; };
   const live = p => p.status === 'active';
@@ -17,76 +20,109 @@
   const goH = h => `location.hash='${h}'`;
   const lname = id => { const l = (D().learners || []).find(x => x.id === id); return l ? esc((l.first_name + ' ' + l.last_name).trim()) : 'Learner'; };
   const F = (o, ...k) => { const f = o.fields || {}; for (const x of k) if (f[x]) return f[x]; return ''; };
-  const it = (t, s, go, warn) => ({ t, s, go, warn });
+  /* item: title, sub, go (onclick), warn, owner spec ('pm' | 'qa' | 'hoo' | 'pi' | 'comp' | 'admin' | a person's name/email), programme id */
+  const it = (t, s, go, warn, o, pid) => ({ t, s, go, warn, o, pid });
   const byN = (a, k = 'n') => a.sort((x, y) => (x[k] ?? 9e9) - (y[k] ?? 9e9));
+
+  /* ---------- who must action it ---------- */
+  const ST = { list: null, req: null, busy: false };
+  const ALIAS = { hansie: 'johannes', tia: 'thia' };
+  const first = s => { const v = String(s || '').toLowerCase().trim(); if (v.includes('@')) return v; const w = v.split(/[^a-z]+/).filter(Boolean)[0] || ''; return ALIAS[w] || w; };
+  const staff = () => ST.list || [];
+  const disp = u => { const p = u.email.split('@')[0]; return /apex/i.test(u.name || '') || !u.name ? p[0].toUpperCase() + p.slice(1) : u.name; };
+  const byName = s => { const f = first(s); if (!f) return null; if (f.includes('@')) return staff().find(u => u.email.toLowerCase() === f) || null; return staff().find(u => first(u.email.split('@')[0]) === f || first(u.name) === f) || null; };
+  const byRole = r => staff().find(u => (u.roles || []).includes(r)) || null;
+  const ROLE = { qa: ['qa_specialist', 'QA'], hoo: ['head_of_ops', 'Head of Ops'], pi: ['pi_specialist', 'PI'], comp: ['compliance_officer', 'Compliance'] };
+  function owner(x) {
+    const p = x.pid != null ? (D().progs || []).find(q => String(q.id) === String(x.pid)) : null;
+    let o = x.o || 'admin', why = '';
+    if (o === 'pm') { const c = p ? (D().clients || []).find(k => String(k.id) === String(p.client_id)) : null, nm = p?.project_manager_name || c?.project_manager;
+      if (nm) { const u = byName(nm); return u ? { n: disp(u), e: u.email } : { n: String(nm).split(/\s+/)[0], e: '' }; }
+      o = 'hoo'; why = ' (no PM)'; }
+    if (ROLE[o]) { const u = byRole(ROLE[o][0]); return u ? { n: disp(u) + why, e: u.email } : { n: ROLE[o][1] + why, e: '' }; }
+    if (o === 'admin') return { n: 'Admin', e: '' };
+    const u = byName(o); return u ? { n: disp(u), e: u.email } : { n: String(o).split(/[\s@]+/)[0], e: '' };
+  }
+  async function loadSide(force) {
+    if (ST.busy || (!force && ST.list && ST.req)) return; if (!sb() || !P?.user) return; ST.busy = true;
+    try { const [a, b] = await Promise.all([ST.list && !force ? { data: ST.list } : sb().rpc('apx_staff'), sb().from('fix_requests').select('id,item_key,owner_name,requested_by,requested_at').is('cleared_at', null)]);
+      ST.list = (a && a.data) || []; ST.req = new Map(); ((b && b.data) || []).forEach(r => { if (!ST.req.has(r.item_key)) ST.req.set(r.item_key, r); }); }
+    catch (_) { ST.list = ST.list || []; ST.req = ST.req || new Map(); }
+    ST.busy = false; clearGone(); window.shRefresh && shRefresh();
+  }
 
   /* ---------- building blocks, each returns { h, items, link } ---------- */
   const B = {
     recs(m) { const r = byN((D().recs || []).filter(x => !x.resolved && m.has(String(x.programme_id))).map(x => ({ x, n: dd(F(x, 'Due Date')) })));
-      return { h: 'Open recommendations', link: 'recs', items: r.filter(o => o.n == null || o.n <= 14).map(o => it(esc(String(F(o.x, 'Text')).slice(0, 80) || 'Recommendation'), `${pname(m.get(String(o.x.programme_id)))} · ${F(o.x, 'Owner') ? esc(F(o.x, 'Owner')) + ' · ' : ''}${o.n == null ? 'no due date' : 'due ' + when(o.n)}`, goH('recs'), o.n == null || o.n < 0)) }; },
+      return { h: 'Open recommendations', link: 'recs', items: r.filter(o => o.n == null || o.n <= 14).map(o => it(esc(String(F(o.x, 'Text')).slice(0, 80) || 'Recommendation'), `${pname(m.get(String(o.x.programme_id)))} · ${o.n == null ? 'no due date' : 'due ' + when(o.n)}`, goH('recs'), o.n == null || o.n < 0, F(o.x, 'Owner') || 'pm', o.x.programme_id)) }; },
     visits(m) { const v = D().visits || [], last = new Map(), next = [];
       v.forEach(x => { const k = String(x.programme_id), d = F(x, 'Date of Visit', 'Date'), n = F(x, 'Next Visit Date'); if (d && (!last.get(k) || d > last.get(k))) last.set(k, d); if (n && m.has(k)) next.push({ x, n: dd(n), d: n }); });
-      const due = byN(next.filter(o => o.n != null && o.n <= 14)).map(o => it(pname(m.get(String(o.x.programme_id))), `Next visit ${fmt(o.d)} · ${when(o.n)}`, goH('visits'), o.n < 0));
+      const due = byN(next.filter(o => o.n != null && o.n <= 14)).map(o => it(pname(m.get(String(o.x.programme_id))), `Next visit ${fmt(o.d)} · ${when(o.n)}`, goH('visits'), o.n < 0, 'pm', o.x.programme_id));
       const none = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -30 && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -90))
-        .map(p => it(pname(p), last.get(String(p.id)) ? `Last visit ${fmt(last.get(String(p.id)))}` : 'No visit recorded', goP(p.id), true));
+        .map(p => it(pname(p), last.get(String(p.id)) ? `Last visit ${fmt(last.get(String(p.id)))}: book a visit` : 'No visit recorded: book or capture a visit', goP(p.id), true, 'pm', p.id));
       return { h: 'Visits due', link: 'visits', items: due.concat(none) }; },
-    eisa(m) { const t = byN((D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.eisa_date && !x.eisa_outcome).map(x => ({ x, n: dd(x.eisa_date) })).filter(o => o.n >= -7 && o.n <= 30));
-      const g = new Map(); t.forEach(o => { const k = o.x.programme_id + '|' + String(o.x.eisa_date).slice(0, 10); g.set(k, (g.get(k) || { o, c: 0 })); g.get(k).c++; });
+    eisa(m) { const t = (D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.eisa_date && !x.eisa_outcome).map(x => ({ x, n: dd(x.eisa_date) })).filter(o => o.n >= -7 && o.n <= 30);
+      const g = new Map(); t.forEach(o => { const k = o.x.programme_id + '|' + String(o.x.eisa_date).slice(0, 10); if (!g.has(k)) g.set(k, { o, c: 0, n: o.n }); g.get(k).c++; });
       const w = byN((D().windows || []).map(x => ({ x, n: dd(x.registration_closing) })).filter(o => o.n != null && o.n >= 0 && o.n <= 21));
-      return { h: 'EISA coming up', link: 'eisa', items: [...g.values()].map(({ o, c }) => it(pname(m.get(String(o.x.programme_id))), `${c} learner${c > 1 ? 's' : ''} · EISA ${fmt(o.x.eisa_date)} · ${when(o.n)}`, `window.dvGo?dvGo('eisa','Readiness'):${goH('eisa')}`, o.n <= 7))
-        .concat(w.map(o => it(esc(o.x.label || o.x.qualification || 'EISA window'), `Registration closes ${fmt(o.x.registration_closing)} · ${when(o.n)}`, goH('eisa'), o.n <= 7))) }; },
-    qcto(m) { const t = (D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.current_status === 'Not Started'), g = new Map();
-      t.forEach(x => { const p = m.get(String(x.programme_id)); if (p && (dd(p.start_date) ?? 1) <= -30) g.set(p.id, (g.get(p.id) || 0) + 1); });
-      return { h: 'Not started, programme running 30+ days', link: 'qcto', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} learner${c > 1 ? 's' : ''} still Not Started`, goH('qcto'), true)) }; },
+      return { h: 'EISA coming up', link: 'eisa', items: byN([...g.values()]).map(({ o, c }) => it(pname(m.get(String(o.x.programme_id))), `${c} learner${c > 1 ? 's' : ''} · EISA ${fmt(o.x.eisa_date)} · ${when(o.n)}`, `window.dvGo?dvGo('eisa','Readiness'):${goH('eisa')}`, o.n <= 7, 'qa', o.x.programme_id))
+        .concat(w.map(o => it(esc(o.x.label || o.x.qualification || 'EISA window'), `Registration closes ${fmt(o.x.registration_closing)} · ${when(o.n)}`, goH('eisa'), o.n <= 7, 'qa'))) }; },
+    qcto(m) { const g = new Map();
+      (D().tracker || []).forEach(x => { const p = m.get(String(x.programme_id)); if (p && x.current_status === 'Not Started' && (dd(p.start_date) ?? 1) <= -30) g.set(p.id, (g.get(p.id) || 0) + 1); });
+      return { h: 'Not started, programme running 30+ days', link: 'qcto', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} learner${c > 1 ? 's' : ''} still Not Started on the QCTO tracker`, goH('qcto'), true, 'pm', id)) }; },
     mods(m) { const r = (D().mods || []).filter(x => m.has(String(x.programme_id)) && x.stage !== 'Submitted to PM').map(x => ({ x, n: dd(x.stage_date), e: dd(x.exit_verification_date) }));
-      const it2 = r.filter(o => o.x.stage === 'On hold' || (o.n != null && o.n <= -30) || (o.e != null && o.e >= 0 && o.e <= 30))
-        .map(o => it(pname(m.get(String(o.x.programme_id))), `${esc(o.x.stage || 'No stage')}${o.e != null && o.e >= 0 && o.e <= 30 ? ' · exit verification ' + fmt(o.x.exit_verification_date) : o.n != null ? ' · ' + (-o.n) + ' d at this stage' : ''}`, goH('modver'), o.x.stage === 'On hold' || o.n <= -30));
-      return { h: 'Moderation needing a push', link: 'modver', items: it2 }; },
+      return { h: 'Moderation needing a push', link: 'modver', items: r.filter(o => o.x.stage === 'On hold' || (o.n != null && o.n <= -30) || (o.e != null && o.e >= 0 && o.e <= 30))
+        .map(o => it(pname(m.get(String(o.x.programme_id))), `${esc(o.x.stage || 'No stage')}${o.e != null && o.e >= 0 && o.e <= 30 ? ' · exit verification ' + fmt(o.x.exit_verification_date) : o.n != null ? ' · ' + (-o.n) + ' d at this stage' : ''}`, goH('modver'), o.x.stage === 'On hold' || o.n <= -30, 'qa', o.x.programme_id)) }; },
     accs() { const a = byN((D().accs || []).map(x => ({ x, n: dd(x.accreditation_to) })));
       return { h: 'Accreditation', link: 'accred', items: a.filter(o => (o.n != null && o.n <= 120) || (o.x.status && o.x.status !== 'Accreditation granted'))
-        .map(o => it(esc(`${o.x.saqa_id || ''} ${o.x.title || ''}`.trim()), o.n != null && o.n <= 120 ? `Expires ${fmt(o.x.accreditation_to)} · ${when(o.n)}` : esc(o.x.status) + (o.x.site_visit_date ? ' · site visit ' + fmt(o.x.site_visit_date) : ''), goH('accred'), o.n != null && o.n <= 60)) }; },
-    signoffs() { const s = (D().signoffs || []).filter(x => !x.status || /pend|submit|open/i.test(x.status));
-      return { h: 'Waiting for sign-off', link: 'signoff', items: s.map(x => it(esc(x.title || x.kind || 'Item'), `${esc(x.submitted_by || '')}${x.created_at ? ' · ' + fmt(x.created_at) : ''}`, goH('signoff'), (dd(x.created_at) ?? 0) <= -3)) }; },
-    reports(m) { const r = (D().reports || []).filter(x => !x.archived_at && (!x.programme_id || m.has(String(x.programme_id))));
-      const items = [];
-      r.forEach(x => { const nm = esc(x.programme_name_snapshot || x.client_name_snapshot || 'Report') + (x.month ? ' · ' + esc(String(x.month).slice(0, 7)) : '');
-        if (x.status === 'needs_changes') items.push(it(nm, 'Needs changes' + (x.reviewer_note ? ': ' + esc(String(x.reviewer_note).slice(0, 60)) : ''), goH('reports'), true));
-        else if (x.status === 'approved' && !x.sent_at) items.push(it(nm, 'Approved, not sent to client', goH('reports'), (dd(x.reviewed_at) ?? 0) <= -3));
-        else if (x.remind_pm_at && dd(x.remind_pm_at) <= 0) items.push(it(nm, 'PM reminder due ' + fmt(x.remind_pm_at), goH('reports'), true));
-        else if (x.hold_until && dd(x.hold_until) <= 3) items.push(it(nm, 'Hold ends ' + fmt(x.hold_until) + (x.hold_reason ? ' · ' + esc(x.hold_reason) : ''), goH('reports'), dd(x.hold_until) < 0)); });
+        .map(o => it(esc(`${o.x.saqa_id || ''} ${o.x.title || ''}`.trim()), o.n != null && o.n <= 120 ? `Expires ${fmt(o.x.accreditation_to)} · ${when(o.n)}` : esc(o.x.status) + (o.x.site_visit_date ? ' · site visit ' + fmt(o.x.site_visit_date) : ''), goH('accred'), o.n != null && o.n <= 60, 'qa')) }; },
+    signoffs() { const s = (D().signoffs || []).filter(x => !x.status || /wait|pend|submit|open/i.test(x.status));
+      return { h: 'Waiting for sign-off', link: 'signoff', items: s.map(x => it(esc(x.title || x.kind || 'Item'), `From ${esc(x.submitted_by || 'unknown')}${x.created_at ? ' · ' + fmt(x.created_at) : ''}`, goH('signoff'), (dd(x.created_at) ?? 0) <= -3, 'comp')) }; },
+    reports(m) { const items = [];
+      (D().reports || []).filter(x => !x.archived_at && (!x.programme_id || m.has(String(x.programme_id)))).forEach(x => { const nm = esc(x.programme_name_snapshot || x.client_name_snapshot || 'Report') + (x.month ? ' · ' + esc(String(x.month).slice(0, 7)) : ''), o = x.submitted_by_email || 'pm';
+        if (x.status === 'needs_changes') items.push(it(nm, 'Needs changes' + (x.reviewer_note ? ': ' + esc(String(x.reviewer_note).slice(0, 60)) : ''), goH('reports'), true, o, x.programme_id));
+        else if (x.status === 'approved' && !x.sent_at) items.push(it(nm, 'Approved, not sent to client', goH('reports'), (dd(x.reviewed_at) ?? 0) <= -3, o, x.programme_id));
+        else if (x.remind_pm_at && dd(x.remind_pm_at) <= 0) items.push(it(nm, 'PM reminder due ' + fmt(x.remind_pm_at), goH('reports'), true, o, x.programme_id));
+        else if (x.hold_until && dd(x.hold_until) <= 3) items.push(it(nm, 'Hold ends ' + fmt(x.hold_until) + (x.hold_reason ? ' · ' + esc(x.hold_reason) : ''), goH('reports'), dd(x.hold_until) < 0, o, x.programme_id)); });
       return { h: 'Reports to move', link: 'reports', items }; },
     dates(m) { const r = byN([...m.values()].filter(live).flatMap(p => [['Starts', p.start_date], ['Ends', p.end_date]].map(([k, d]) => ({ p, k, d, n: dd(d) }))).filter(o => o.n != null && o.n >= -3 && o.n <= 21));
-      return { h: 'Starting or ending soon', link: 'pmtracker', items: r.map(o => it(pname(o.p), `${o.k} ${fmt(o.d)} · ${when(o.n)}`, goP(o.p.id), o.k === 'Ends' && o.n <= 7)) }; },
-    gaps(m) { const L = new Set((D().enrol || []).map(e => String(e.programme_id)));
-      const r = [...m.values()].filter(p => p.status !== 'closed').map(p => ({ p, miss: [!p.saqa_id && 'SAQA', !p.project_manager_name && 'PM', !(p.start_date && p.end_date) && 'dates', live(p) && !L.has(String(p.id)) && 'learners'].filter(Boolean) })).filter(o => o.miss.length);
-      return { h: 'Programmes missing details', link: 'programmes', items: r.sort((a, b) => b.miss.length - a.miss.length).map(o => it(pname(o.p), 'Missing ' + o.miss.join(', '), goP(o.p.id), o.miss.length > 1)) }; },
+      return { h: 'Starting or ending soon', link: 'pmtracker', items: r.map(o => it(pname(o.p), `${o.k} ${fmt(o.d)} · ${when(o.n)}`, goP(o.p.id), o.k === 'Ends' && o.n <= 7, 'pm', o.p.id)) }; },
+    gaps(m) { const L = new Set((D().enrol || []).map(e => String(e.programme_id))), items = [];
+      [...m.values()].filter(p => p.status !== 'closed').forEach(p => {
+        if (!p.project_manager_name) items.push(it(pname(p), 'Missing PM: assign a project manager', goP(p.id), true, 'hoo', p.id));
+        if (!p.saqa_id) items.push(it(pname(p), 'Missing SAQA ID', goP(p.id), false, 'qa', p.id));
+        const mm = [!(p.start_date && p.end_date) && 'dates', live(p) && !L.has(String(p.id)) && 'learners'].filter(Boolean);
+        if (mm.length) items.push(it(pname(p), 'Missing ' + mm.join(' and '), goP(p.id), mm.length > 1, 'pm', p.id)); });
+      return { h: 'Programmes missing details', link: 'programmes', items }; },
     clients(m) { const used = new Set([...m.values()].filter(live).map(p => String(p.client_id)));
-      const c = (D().clients || []).filter(x => !x.deleted_at && (!window.apxMineProg || used.has(String(x.id))));
-      return { h: 'Clients missing details', link: 'clients', items: c.map(x => ({ x, miss: [!x.project_manager && 'PM', !x.contact_email && 'contact email', !x.contact_number && 'contact number'].filter(Boolean) })).filter(o => o.miss.length)
-        .map(o => it(esc(o.x.client_name), 'Missing ' + o.miss.join(', ') + (used.has(String(o.x.id)) ? ' · has live programmes' : ''), goH('clients'), !o.x.project_manager && used.has(String(o.x.id)))) }; },
+      const c = (D().clients || []).filter(x => !x.deleted_at && (!window.apxMineProg || used.has(String(x.id)))), items = [];
+      c.forEach(x => { const lv = used.has(String(x.id)) ? ' · has live programmes' : '';
+        if (!x.project_manager) items.push(it(esc(x.client_name), 'Missing PM' + lv, goH('clients'), !!lv, 'hoo'));
+        const mm = [!x.contact_email && 'contact email', !x.contact_number && 'contact number'].filter(Boolean);
+        if (mm.length) items.push(it(esc(x.client_name), 'Missing ' + mm.join(', ') + lv, goH('clients'), false, x.project_manager || 'hoo')); });
+      return { h: 'Clients missing details', link: 'clients', items }; },
     att(m) { const last = new Map(); (D().sessions || []).forEach(s => { const k = String(s.programme_id); if (dd(s.session_date) <= 0 && (!last.get(k) || s.session_date > last.get(k))) last.set(k, s.session_date); });
       const A = window.dvApi, quiet = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -14 && A && A.learnersOf(p.id).length && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -14))
-        .map(p => it(pname(p), last.get(String(p.id)) ? `Last register ${fmt(last.get(String(p.id)))}` : 'No register captured', `window.dvProg&&dvProg(${p.id});window.dvGo?dvGo('attendance','Register'):${goH('attendance')}`, true));
+        .map(p => it(pname(p), last.get(String(p.id)) ? `Last register ${fmt(last.get(String(p.id)))}: capture registers` : 'No register captured', `window.dvProg&&dvProg(${p.id});window.dvGo?dvGo('attendance','Register'):${goH('attendance')}`, true, 'pm', p.id));
       const ab = new Map(); (D().att || []).forEach(a => { if (m.has(String(a.programme_id)) && /^a/i.test(a.status || '') && dd(a.session_date) >= -30) { const k = a.programme_id + '|' + a.learner_id; ab.set(k, (ab.get(k) || 0) + 1); } });
-      const hi = [...ab].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).map(([k, c]) => { const [pid, lid] = k.split('|'); return it(lname(+lid), `${c} absences in 30 days · ${pname(m.get(pid))}`, `window.shOpen&&shOpen(${+pid},${+lid})`, c >= 5); });
+      const hi = [...ab].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).map(([k, c]) => { const [pid, lid] = k.split('|'); return it(lname(+lid), `${c} absences in 30 days · ${pname(m.get(pid))}`, `window.shOpen&&shOpen(${+pid},${+lid})`, c >= 5, 'pm', pid); });
       return { h: 'Attendance', link: 'attendance', items: quiet.concat(hi) }; },
-    learners(m) { const E = new Set((D().enrol || []).map(e => e.learner_id)), L = (D().learners || []).filter(l => !/\[TEST\]|^test/i.test(l.first_name || ''));
-      const enrolled = window.apxMineProg ? new Set((D().enrol || []).filter(e => m.has(String(e.programme_id))).map(e => e.learner_id)) : null;
-      const r = L.filter(l => enrolled ? enrolled.has(l.id) : true).map(l => ({ l, miss: [!l.id_number && 'ID number', !l.email && 'email', !l.phone && 'phone', !enrolled && !E.has(l.id) && 'enrolment'].filter(Boolean) })).filter(o => o.miss.includes('ID number') || o.miss.includes('enrolment'));
-      return { h: 'Learners missing ID or enrolment', link: 'learners', items: r.sort((a, b) => b.miss.length - a.miss.length).map(o => it(esc((o.l.first_name + ' ' + o.l.last_name).trim()), 'Missing ' + o.miss.join(', '), `window.shOpen&&shOpen(null,${o.l.id})`, o.miss.includes('ID number'))) }; },
+    learners(m) { const EP = new Map(); (D().enrol || []).forEach(e => { if (!EP.has(e.learner_id)) EP.set(e.learner_id, e.programme_id); });
+      const L = (D().learners || []).filter(l => !/\[TEST\]|^test/i.test(l.first_name || '')), mine = !!(window.apxPMonly && apxPMonly());
+      const r = L.filter(l => !mine || m.has(String(EP.get(l.id)))).map(l => ({ l, pid: EP.get(l.id), miss: [!l.id_number && 'ID number', !EP.has(l.id) && 'enrolment'].filter(Boolean) })).filter(o => o.miss.length);
+      return { h: 'Learners missing ID or enrolment', link: 'learners', items: r.map(o => it(esc((o.l.first_name + ' ' + o.l.last_name).trim()), 'Missing ' + o.miss.join(', ') + (o.pid ? ' · ' + pname(m.get(String(o.pid))) : ''), `window.shOpen&&shOpen(${o.pid ? +o.pid : 'null'},${o.l.id})`, o.miss.includes('ID number'), o.pid ? 'pm' : 'hoo', o.pid)) }; },
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
-      return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false)) }; },
+      return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
     sync() { const o = D().outbox || [], f = o.filter(x => /fail|error/i.test(x.status || '')), p = o.filter(x => /pend|queue/i.test(x.status || ''));
       const g = new Map(); f.forEach(x => g.set(x.source_table, (g.get(x.source_table) || 0) + 1));
-      return { h: 'ClickUp sync', link: 'synchealth', items: [...g].map(([t, c]) => it(esc(t), `${c} failed · ${esc((f.find(x => x.source_table === t).last_error || '').slice(0, 70))}`, goH('synchealth'), true)).concat(p.length ? [it('Waiting to send', `${p.length} change${p.length > 1 ? 's' : ''} queued`, goH('synchealth'), p.length > 50)] : []) }; }
+      return { h: 'ClickUp sync', link: 'synchealth', items: [...g].map(([t, c]) => it(esc(t), `${c} failed · ${esc((f.find(x => x.source_table === t).last_error || '').slice(0, 70))}`, goH('synchealth'), true, 'admin')).concat(p.length ? [it('Waiting to send', `${p.length} change${p.length > 1 ? 's' : ''} queued`, goH('synchealth'), p.length > 50, 'admin')] : []) }; }
   };
 
   /* ---------- which blocks each screen shows (first = most relevant) ---------- */
   const SCREENS = {
     mywork: ['signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
     dashboard: ['dates', 'recs', 'visits', 'eisa', 'mods', 'reports'],
-    hoo: ['signoffs', 'gaps', 'clients', 'recs', 'mods', 'reports', 'accs', 'sync'],
+    hoo: ['signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'enrol', 'sync'],
     reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['dates', 'recs', 'visits', 'reports'],
     programmes: ['dates', 'gaps', 'recs'], pi: ['gaps', 'dates'], learners: ['learners', 'att'], dq: ['learners', 'enrol'],
     enrolments: ['enrol', 'learners'], eisa: ['eisa', 'qcto'], qcto: ['eisa', 'qcto', 'enrol'], attendance: ['att'],
@@ -94,41 +130,76 @@
     synchealth: ['sync'], assessors: ['mods', 'accs']
   };
   const LBL = { recs: 'Recommendations', visits: 'Visits', eisa: 'EISA', qcto: 'QCTO tracker', modver: 'Moderation', accred: 'Accreditation', signoff: 'Sign-off', reports: 'Reports', pmtracker: 'PM Tracker', programmes: 'Programmes', clients: 'Clients', attendance: 'Attendance', learners: 'Learners', enrolments: 'Enrolments', synchealth: 'Sync health' };
-  const MAX = 6;
+  const MAX = 6, ALLB = Object.keys(B);
 
-  /* snooze (7 days, this browser only) and filter, like FAM's Today */
-  const SK = 'ao.tdySnooze', TF = { f: 'all' };
+  /* snooze (7 days, this browser only), filters and the admin "By person" view */
+  const SK = 'ao.tdySnooze', TF = { f: 'all', who: null };
   const snz = () => { try { const o = JSON.parse(localStorage.getItem(SK) || '{}'), now = Date.now(); Object.keys(o).forEach(k => { if (o[k] < now) delete o[k]; }); return o; } catch (_) { return {}; } };
-  const key = x => (x.go + '|' + x.t).replace(/<[^>]+>/g, '').slice(0, 200);
+  const plain = s => String(s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
   const hsh = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return 'k' + (h >>> 0).toString(36); };
   window.tdySnooze = (k, on) => { const o = snz(); if (on) o[k] = Date.now() + 7 * 864e5; else delete o[k]; try { localStorage.setItem(SK, JSON.stringify(o)); } catch (_) {} window.shRefresh && shRefresh(); };
-  window.tdyF = f => { TF.f = f; window.shRefresh && shRefresh(); };
-  const build = scr => { const keys = (SCREENS[scr] || SCREENS.mywork), m = pmap(), out = [], S0 = snz();
-    keys.forEach(k => { let b; try { b = B[k](m); } catch (e) { return; } if (!b || (b.link && !ok(b.link))) return; b.items.forEach(x => { x.k = hsh(key(x)); x.z = !!S0[x.k]; }); out.push(b); });
+  window.tdyF = (f, who) => { TF.f = f; TF.who = who || null; window.shRefresh && shRefresh(); };
+  const build = (scr, keys) => { const m = pmap(), out = [], S0 = snz(), R = ST.req || new Map();
+    (keys || SCREENS[scr] || SCREENS.mywork).forEach(k => { let b; try { b = B[k](m); } catch (e) { return; } if (!b || (b.link && !ok(b.link))) return;
+      b.items.forEach(x => { x.k = hsh(plain(x.go + '|' + x.t + '|' + x.o + '|' + String(x.s).split(' · ')[0].replace(/\d+ d (overdue|at this stage)|in \d+ d|today/g, ''))); x.z = !!S0[x.k]; x.w = owner(x); x.r = R.get(x.k) || null; x.h = b.h; x.link = b.link; }); out.push(b); });
     return out; };
-  window.apxTodayCount = scr => { if (!D().progs) return 0; let n = 0; build(scr).forEach(b => b.items.forEach(x => { if (x.warn && !x.z) n++; })); return n; };
+  const mineX = x => !!x.w.e && x.w.e.toLowerCase() === meE();
+  window.apxTodayCount = scr => { if (!D().progs) return 0; let n = 0; build(scr).forEach(b => b.items.forEach(x => { if (x.warn && !x.z && !x.r) n++; })); return n; };
+
+  /* fix requests: open a ready email in the admin's own mail app and record who asked whom, when */
+  const SITE = 'https://apex1-consol.github.io/preview/';
+  async function record(xs) { const seen = new Set(), rows = xs.filter(x => !x.r && !seen.has(x.k) && seen.add(x.k)).map(x => ({ item_key: x.k, screen: x.link, title: plain(x.t).slice(0, 200), detail: plain(x.s).slice(0, 300), owner_name: x.w.n, owner_email: x.w.e || null }));
+    if (!rows.length) return; try { const r = await sb().from('fix_requests').insert(rows); if (r.error) throw r.error; } catch (e) { alert('Could not record the request: ' + (e.message || e)); } await loadSide(true); }
+  function mail(w, xs) { const n = xs.length, list = xs.slice(0, 25).map(x => `- ${x.h}: ${plain(x.t)} (${plain(x.s)})\n  ${SITE}#${x.link}`).join('\n');
+    const body = `Hi ${w.n.split(/\s/)[0]},\n\nPlease update ApexOne for the following${n > 1 ? ' ' + n + ' items' : ''}:\n\n${list}${n > 25 ? `\n\n...and ${n - 25} more: open ApexOne, press the Today button (top right) and choose "Mine".` : ''}\n\nEach line clears by itself once the information is in ApexOne.\n\nThank you`;
+    const subj = n > 1 ? `ApexOne: ${n} items to update` : `ApexOne: please update ${plain(xs[0].t).slice(0, 60)}`;
+    location.href = `mailto:${encodeURIComponent(w.e || '')}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(body)}`; }
+  let LAST = [];
+  window.tdyReq = i => { const x = LAST[i]; if (!x || !isAdm()) return; mail(x.w, [x]); record([x]); };
+  window.tdyReqAll = who => { if (!isAdm()) return; const xs = LAST.filter(x => x.w.n === who && !x.z && !x.r); if (!xs.length) return; mail(xs[0].w, xs); record(xs); };
+  window.tdyUnreq = async i => { const x = LAST[i]; if (!x?.r || !isAdm()) return; try { await sb().from('fix_requests').update({ cleared_at: new Date().toISOString() }).eq('item_key', x.k).is('cleared_at', null); } catch (_) {} loadSide(true); };
+  let cleared = false;
+  function clearGone() { // a request is done once its line no longer appears anywhere: close it (admins, once per page load, after the data has loaded)
+    if (cleared || !isAdm() || !ST.req || !ST.req.size || !D().progs || !(D().tracker || []).length) return; cleared = true;
+    const all = new Set(); build('hoo', ALLB).forEach(b => b.items.forEach(x => all.add(x.k)));
+    const gone = [...ST.req.keys()].filter(k => !all.has(k)); if (!gone.length) return;
+    sb().from('fix_requests').update({ cleared_at: new Date().toISOString() }).in('item_key', gone).is('cleared_at', null).then(() => { gone.forEach(k => ST.req.delete(k)); window.shRefresh && shRefresh(); }, () => {}); }
 
   window.apxToday = scr => {
     if (!D().progs) return '<div class="empty"><b>Loading…</b></div>';
-    const out = build(scr), all = out.flatMap(b => b.items), live = all.filter(x => !x.z), need = live.filter(x => x.warn), zz = all.length - live.length;
-    const pick = TF.f === 'need' ? (x => x.warn && !x.z) : TF.f === 'snz' ? (x => x.z) : (x => !x.z);
-    const chip = (f, n, l, c) => `<button type="button" class="tdyc${TF.f === f ? ' on' : ''}" aria-pressed="${TF.f === f}" onclick="tdyF('${f}')"><span class="badge ${c}">${n}</span> ${l}</button>`;
-    const head = `<div class="sub">${scr in SCREENS ? 'What to act on now on this screen.' : 'Your day across ApexOne.'} ${fmt(new Date().toISOString())} · ${live.length} open</div>
-      <div class="tdycs">${chip('all', live.length, 'All', '')}${chip('need', need.length, 'Needs action', 'b-warn')}${zz ? chip('snz', zz, 'Snoozed', '') : ''}</div>`;
+    if (!ST.list || !ST.req) loadSide(); else clearGone();
+    const adm = isAdm(), byP = TF.f === 'who', out = build(scr, byP && scr === 'hoo' ? ALLB : null), all = out.flatMap(b => b.items);
+    const open = all.filter(x => !x.z), need = open.filter(x => x.warn && !x.r), wait = open.filter(x => x.r), mine = open.filter(mineX), zz = all.length - open.length;
+    LAST = all;
+    const pick = { all: x => !x.z, need: x => x.warn && !x.z && !x.r, mine: x => mineX(x) && !x.z, wait: x => x.r && !x.z, snz: x => x.z, who: x => !x.z && (!TF.who || x.w.n === TF.who) }[TF.f] || (x => !x.z);
+    const chip = (f, n, l, c) => `<button type="button" class="tdyc${TF.f === f && !TF.who ? ' on' : ''}" aria-pressed="${TF.f === f}" onclick="tdyF('${f}')"><span class="badge ${c}">${n}</span> ${l}</button>`;
+    const head = `<div class="sub">${scr in SCREENS ? 'What to act on now on this screen, and who must action it.' : 'Your day across ApexOne.'} ${fmt(new Date().toISOString())} · ${open.length} open</div>
+      <div class="tdycs">${chip('all', open.length, 'All', '')}${chip('need', need.length, 'Needs action', 'b-warn')}${mine.length ? chip('mine', mine.length, 'Mine', 'b-ok') : ''}${wait.length ? chip('wait', wait.length, 'Requested', '') : ''}${adm ? chip('who', new Set(open.map(x => x.w.n)).size, 'By person', '') : ''}${zz ? chip('snz', zz, 'Snoozed', '') : ''}</div>`;
+    const q = s => esc(s).replace(/'/g, '');
+    const row = x => { const i = LAST.indexOf(x), rq = x.r ? `Requested ${fmt(x.r.requested_at)} by ${esc(String(x.r.requested_by || '').split('@')[0])}` : '';
+      return `<div class="tdyr"><button type="button" class="tdyi${x.warn && !x.r ? ' w' : ''}${x.r ? ' q' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span><span class="tdyo">→ ${esc(x.w.n)}${rq ? ' · ' + rq : ''}</span></button>
+        <span class="tdyb">${adm && x.w.e && !x.r ? `<button type="button" class="tdyz" title="Email ${esc(x.w.n)} to fix this" aria-label="Request fix from ${esc(x.w.n)}" onclick="tdyReq(${i})">✉</button>` : ''}${adm && x.r ? `<button type="button" class="tdyz" title="Clear the request mark" aria-label="Clear request" onclick="tdyUnreq(${i})">✓</button>` : ''}<button type="button" class="tdyz" title="${x.z ? 'Bring back' : 'Snooze 7 days'}" aria-label="${x.z ? 'Bring back' : 'Snooze 7 days'}" onclick="tdySnooze('${x.k}',${!x.z})">${x.z ? '↺' : 'z'}</button></span></div>`; };
+    if (byP && !TF.who) { const g = new Map(); open.forEach(x => { const k = x.w.n; if (!g.has(k)) g.set(k, { w: x.w, n: 0, need: 0, req: 0 }); const o = g.get(k); o.n++; if (x.warn && !x.r) o.need++; if (x.r) o.req++; });
+      const rows = [...g.values()].sort((a, b) => b.need - a.need || b.n - a.n);
+      return head + `<div class="sub">${scr === 'hoo' ? 'Everything in ApexOne' : 'This screen'}, grouped by who must action it.${scr === 'hoo' ? '' : ' Head of Ops shows all screens.'}</div>` + rows.map(o => `<div class="tdyr"><button type="button" class="tdyi${o.need ? ' w' : ''}" onclick="tdyF('who','${q(o.w.n)}')"><b>${esc(o.w.n)}</b><span>${o.n} open · ${o.need} need action${o.req ? ' · ' + o.req + ' requested' : ''}</span></button>
+        <span class="tdyb">${adm && o.w.e && o.n > o.req ? `<button type="button" class="tdyz" style="width:auto;padding:0 8px" title="One email to ${esc(o.w.n)} listing all ${o.n - o.req} unrequested items" onclick="tdyReqAll('${q(o.w.n)}')">✉ all</button>` : ''}</span></div>`).join(''); }
     const shown = out.map(b => ({ b, items: b.items.filter(pick) })).filter(o => o.items.length);
-    if (!shown.length) return head + `<div class="empty"><b>${TF.f === 'snz' ? 'Nothing snoozed' : 'All clear ✓'}</b><span>${TF.f === 'all' ? 'Nothing due or overdue here.' : ''}</span></div>`;
-    return head + shown.map(({ b, items }) => { const n = items.length, w = items.filter(x => x.warn).length;
-      const rows = items.slice().sort((a, c) => (c.warn ? 1 : 0) - (a.warn ? 1 : 0)).slice(0, MAX);
+    const back = TF.who ? `<div class="tdycs"><button type="button" class="tdyc" onclick="tdyF('who')">‹ Everyone</button>${adm && open.some(x => x.w.n === TF.who && x.w.e && !x.r) ? `<button type="button" class="tdyc" onclick="tdyReqAll('${q(TF.who)}')">✉ Request all from ${esc(TF.who)}</button>` : ''}</div>` : '';
+    if (!shown.length) return head + back + `<div class="empty"><b>${TF.f === 'snz' ? 'Nothing snoozed' : 'All clear ✓'}</b><span>${TF.f === 'all' ? 'Nothing due or overdue here.' : ''}</span></div>`;
+    const lim = TF.who || TF.f === 'mine' ? 50 : MAX;
+    return head + back + shown.map(({ b, items }) => { const n = items.length, w = items.filter(x => x.warn && !x.r).length;
+      const rows = items.slice().sort((a, c) => ((c.warn && !c.r) ? 1 : 0) - ((a.warn && !a.r) ? 1 : 0)).slice(0, lim);
       return `<section class="tdy"><h3>${esc(b.h)} <span class="sub" style="font-weight:400">${n}${w && TF.f !== 'need' ? ` · <span style="color:var(--warn)">${w} need action</span>` : ''}</span></h3>
-        ${rows.map(x => `<div class="tdyr"><button type="button" class="tdyi${x.warn ? ' w' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span></button><button type="button" class="tdyz" title="${x.z ? 'Bring back' : 'Snooze 7 days'}" aria-label="${x.z ? 'Bring back' : 'Snooze 7 days'}" onclick="tdySnooze('${x.k}',${!x.z})">${x.z ? '↺' : 'z'}</button></div>`).join('')}
-        ${n > MAX && LBL[b.link] ? `<a class="sub" href="#${b.link}">All ${n} in ${LBL[b.link]} ›</a>` : ''}</section>`; }).join('');
+        ${rows.map(row).join('')}
+        ${n > lim && LBL[b.link] ? `<a class="sub" href="#${b.link}">All ${n} in ${LBL[b.link]} ›</a>` : ''}</section>`; }).join('');
   };
   if (!document.getElementById('tdycss')) document.head.insertAdjacentHTML('beforeend', `<style id="tdycss">
     .tdy{display:flex;flex-direction:column;gap:4px}.tdy h3{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
     .tdyi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:7px 10px;border:1px solid var(--line,#e5e5ef);border-left:3px solid var(--line,#e5e5ef);border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
-    .tdyi:hover{background:var(--hover,rgba(0,0,0,.03))}.tdyi.w{border-left-color:var(--warn,#c80)}.tdyi span{color:var(--muted);font-size:12px}
-    .tdyi b{font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}
-    .tdyr{display:flex;gap:4px;align-items:stretch}.tdyr .tdyi{flex:1;min-width:0}.tdyz{flex:0 0 28px;border:1px solid var(--line,#e5e5ef);border-radius:8px;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:12px}.tdyz:hover{color:var(--ink)}
+    .tdyi:hover{background:var(--hover,rgba(0,0,0,.03))}.tdyi.w{border-left-color:var(--warn,#c80)}.tdyi.q{border-left-color:var(--ok,#2a8)}.tdyi span{color:var(--muted);font-size:12px}
+    .tdyi b{font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}.tdyi .tdyo{color:var(--ink);opacity:.75}
+    .tdyr{display:flex;gap:4px;align-items:stretch}.tdyr .tdyi{flex:1;min-width:0}.tdyb{display:flex;flex-direction:column;gap:4px}.tdyb:empty{display:none}
+    .tdyz{flex:1 0 auto;width:28px;min-height:26px;border:1px solid var(--line,#e5e5ef);border-radius:8px;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:12px}.tdyz:hover{color:var(--ink)}
     .tdycs{display:flex;gap:6px;flex-wrap:wrap}.tdyc{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px 3px 4px;font:inherit;font-size:13px;cursor:pointer;display:flex;gap:6px;align-items:center}.tdyc.on{border-color:var(--ink)}
     #view-fam .famdrawer{z-index:61!important}</style>`);
 })();
