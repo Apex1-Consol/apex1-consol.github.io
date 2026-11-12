@@ -84,8 +84,12 @@
     let p = prog(dProg);
     const list = progs().filter(x => PST[pStatus](x.status));
     if (!p || !PST[pStatus](p.status)) { dProg = list[0]?.id ?? dProg; p = prog(dProg); }
-    $('pstatus').innerHTML = Object.keys(PST).map(s => `<button class="${s === pStatus ? 'on' : ''}" onclick="pStatus='${s}';renderProg()">${s}</button>`).join('');
-    $('plist').innerHTML = list.map(x => `<button class="pick${x.id === dProg ? ' on' : ''}" onclick="dvProg(${x.id})"><b>${esc(x.programme_name)}</b><span class="sub">${esc(client(x)?.client_name || 'No client')} · ${learnersOf(x.id).length} learners</span></button>`).join('') || `<div class="empty"><b>No ${pStatus.toLowerCase()} programmes</b></div>`;
+    $('pstatus').className = 'famseg'; $('pstatus').style.flexWrap = 'wrap';
+    $('pstatus').innerHTML = Object.keys(PST).map(s => `<button class="${s === pStatus ? 'on' : ''}" aria-pressed="${s === pStatus}" onclick="pStatus='${s}';renderProg()">${s} · ${progs().filter(x => PST[s](x.status)).length}</button>`).join('');
+    const cn = x => client(x)?.client_name || 'No client', sorted = list.slice().sort((a, b) => (cn(a) === 'No client') - (cn(b) === 'No client') || cn(a).localeCompare(cn(b)) || String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
+    let pLast = null;
+    $('plist').innerHTML = sorted.map(x => { const gh = cn(x) !== pLast ? `<div class="pickgh"><span class="famgd" style="background:${cn(x) === 'No client' ? 'var(--warn)' : 'var(--navy)'}"></span>${esc(cn(x))}<span class="famgn">${sorted.filter(y => cn(y) === cn(x)).length}</span></div>` : ''; pLast = cn(x);
+      return gh + `<button class="pick${x.id === dProg ? ' on' : ''}" onclick="dvProg(${x.id})"><b>${esc(x.programme_name)}</b><span class="sub">${x.programme_type === 'legacy' ? '<span class="famtag">LEG</span>' : '<span class="famtag">OCC</span>'}${learnersOf(x.id).length} learners${x.start_date ? '' : '<span class="famflag">No dates</span>'}</span></button>`; }).join('') || `<div class="empty"><b>No ${pStatus.toLowerCase()} programmes</b></div>`;
     const v = $('view-programmes'), hd = v.querySelector('.dark');
     if (!p || !PST[pStatus](p.status)) { if ($('psuit')) $('psuit').hidden = true; hd.hidden = true; $('ptabs').innerHTML = ''; $('pstats').hidden = $('pmodcard').hidden = $('form3').hidden = true; return; }
     hd.hidden = false;
@@ -126,7 +130,8 @@
     if (!P.user) return;
     const side = $('pstatus')?.parentElement; if (!side) return;
     if (!$('pq')) $('pstatus').insertAdjacentHTML('afterend', '<input id="pq" type="search" placeholder="Search programmes" oninput="dvPQ(this.value)" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink)">');
-    const q = pQ.toLowerCase(); if (q) [...$('plist').children].forEach(b => { b.hidden = !b.textContent.toLowerCase().includes(q); });
+    const q = pQ.toLowerCase(); if (q) { let gh = null, any = false; const close = () => { if (gh) gh.hidden = !any; };
+      [...$('plist').children].forEach(b => { if (b.classList.contains('pickgh')) { close(); gh = b; any = b.textContent.toLowerCase().includes(q); return; } b.hidden = !(b.textContent.toLowerCase().includes(q) || (gh && gh.textContent.toLowerCase().includes(q))); any = any || !b.hidden; }); close(); }
     const nb = [...side.querySelectorAll('button')].find(b => /New programme/.test(b.textContent));
     if (nb) { nb.textContent = '+ New programme'; nb.onclick = () => (CAN() || has('pi_specialist')) ? dvProgEdit(null) : say('Ask a project manager or PI specialist to add programmes'); }
     if (!$('pcsv')) side.insertAdjacentHTML('beforeend', '<button class="btn" id="pcsv" onclick="dvProgCsv()">Export CSV</button>');

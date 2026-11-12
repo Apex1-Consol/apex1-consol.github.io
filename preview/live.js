@@ -15,6 +15,14 @@
   window.__sb = sb;
   const P = { user: null, roles: [], tenant: null, data: {} };
   window.__preview = P;
+  /* Shared look (FAM Registry style) for every screen: KPI filter tiles, segmented switch, grouped table rows */
+  window.UI = {
+    tiles: gs => gs.map(g => `<div class="famgrp" role="group" aria-label="${g.t}"><div class="famgl">${g.t}</div><div class="famgk">${g.k.map(([l, v, c, on, click]) => click
+      ? `<button type="button" class="kpi famk${on ? ' on' : ''}" onclick="${click}" aria-pressed="${!!on}" title="${on ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v && c ? c : v ? 'var(--ink)' : 'var(--muted)'}">${v}</span></button>`
+      : `<div class="kpi famk" style="cursor:default"><span class="l">${l}</span><span class="v" style="color:${c || 'var(--ink)'}">${v}</span></div>`).join('')}</div></div>`).join(''),
+    seg: (opts, cur, fn) => `<div class="famseg" role="group">${opts.map(o => `<button type="button" class="${o === cur ? 'on' : ''}" aria-pressed="${o === cur}" onclick="${fn(o)}">${o}</button>`).join('')}</div>`,
+    gh: (label, n, color, cols, note) => `<tr class="famgh"><td colspan="${cols}"><span class="famgd" style="background:${color}"></span>${label}<span class="famgn">${n}</span>${note ? `<span class="sub">${note}</span>` : ''}</td></tr>`
+  };
   const isAdmin = () => P.roles.includes('admin');
   const can = (...r) => isAdmin() || r.some(x => P.roles.includes(x));
   const fmt = s => s ? String(s).slice(0, 10).split('-').reverse().join('/') : '';
@@ -219,15 +227,27 @@
     if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn" id="limp" onclick="previewLearnerImport()">Import from Excel</button><button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
     head?.querySelectorAll('button:not(#ladd):not(#limp)').forEach(b => b.remove());
     const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Programme</th><th>Status</th><th></th>';
+    const lcard = $('lrows')?.closest('.card'); if (lcard && !$('ltiles')) { lcard.insertAdjacentHTML('beforebegin', '<div id="ltiles" class="famtiles"></div>'); const tb = $('lfilter').parentElement; tb.className = 'famtool'; tb.removeAttribute('style'); $('lfilter').removeAttribute('style'); $('lfilter').className = ''; }
     renderLearners();
     if (location.hash.startsWith('#learner/')) renderLearner(+location.hash.split('/')[1]);
   }
+  let lView = 'By programme';
+  window.lSetView = v => { lView = v; lPage = 0; renderLearners(); };
   renderLearners = function () {
-    const q = ($('lq').value || '').trim().toLowerCase(), base = LEARNERS.filter(l => !l.t), all = base.length, act = base.filter(l => l.s === 'Active').length;
-    $('lfilter').innerHTML = [['All', all], ['Active', act], ['Unlinked', all - act]].map(([f, c]) => `<button class="${f === lF ? 'on' : ''}" onclick="lF='${f}';lPage=0;renderLearners()">${f} · ${c}</button>`).join('');
-    const rows = base.filter(l => (lF === 'All' || l.s === lF) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q)));
+    const q = ($('lq').value || '').trim().toLowerCase(), base = LEARNERS.filter(l => !l.t), all = base.length, act = base.filter(l => l.s === 'Active').length, noid = base.filter(l => !l.id).length;
+    if (!['All', 'Active', 'Unlinked', 'No ID'].includes(lF)) lF = 'All';
+    const tile = (k, v, c) => [k === 'All' ? 'All learners' : k, v, c, lF === k && k !== 'All', `lF='${lF === k ? 'All' : k}';lPage=0;renderLearners()`];
+    if ($('ltiles')) $('ltiles').innerHTML = UI.tiles([{ t: 'Enrolment', k: [tile('All', all), tile('Active', act, 'var(--ok)'), tile('Unlinked', all - act, 'var(--warn)')] }, { t: 'Needs attention', k: [tile('No ID', noid, 'var(--bad)')] }]);
+    $('lfilter').innerHTML = UI.seg(['By programme', 'List'], lView, o => `lSetView('${o}')`);
+    let rows = base.filter(l => (lF === 'All' || (lF === 'No ID' ? !l.id : l.s === lF)) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q)));
+    const grp = l => l.p || 'Not enrolled', byP = lView === 'By programme';
+    if (byP) rows = rows.slice().sort((a, b) => (!a.p - !b.p) || grp(a).localeCompare(grp(b)) || a.n.localeCompare(b.n));
+    const cnt = {}; rows.forEach(l => { cnt[grp(l)] = (cnt[grp(l)] || 0) + 1; });
     const pages = Math.max(1, Math.ceil(rows.length / PER)); if (lPage >= pages) lPage = pages - 1; const pg = rows.slice(lPage * PER, lPage * PER + PER);
-    $('lrows').innerHTML = pg.map(l => `<tr style="cursor:pointer" onclick="location.hash='learner/${l.lid}'"><td><b>${esc(l.n)}</b></td><td class="sub">${l.id || '<span class="badge b-warn">No ID</span>'}</td><td>${l.p ? esc(l.p) : '<span class="sub">Not enrolled</span>'}</td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-warn">Unlinked</span>'}</td><td><button class="btn sm" onclick="event.stopPropagation();previewLearnerEdit(${l.lid})">Edit</button></td></tr>`).join('') || '<tr><td colspan="5" class="sub">No learners match.</td></tr>';
+    let last = null;
+    $('lrows').innerHTML = pg.map(l => {
+      const gh = byP && grp(l) !== last ? UI.gh(esc(grp(l)), cnt[grp(l)], l.p ? 'var(--navy)' : 'var(--warn)', 5) : ''; last = grp(l);
+      return gh + `<tr class="famtr" onclick="location.hash='learner/${l.lid}'"><td><b>${esc(l.n)}</b>${l.id ? '' : '<span class="famflag">No ID</span>'}</td><td class="sub">${l.id || '—'}</td><td>${l.p ? esc(l.p) : '<span class="sub">Not enrolled</span>'}</td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-warn">Unlinked</span>'}</td><td style="text-align:right"><button class="famact" onclick="event.stopPropagation();previewLearnerEdit(${l.lid})">Edit</button></td></tr>`; }).join('') || '<tr><td colspan="5" class="sub">No learners match.</td></tr>';
     $('lpager').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${rows.length ? lPage * PER + 1 : 0}–${lPage * PER + pg.length} of ${rows.length}</span>${pages > 1 ? `<button class="btn sm" ${lPage ? '' : 'disabled'} onclick="lPage--;renderLearners()">Previous</button><button class="btn sm" ${lPage < pages - 1 ? '' : 'disabled'} onclick="lPage++;renderLearners()">Next</button>` : ''}`;
   };
   loadLearners = renderLearners;
@@ -437,7 +457,8 @@
   // Dropouts,'Dropout Reasons','Special Needs Count','Knowledge Facilitator','Practical Facilitator','Workplace Mentor','MOU Signed','Visit Notes'
   const VKMA = ['Programme Implementation', 'Human Resources', 'Assessment Strategy', 'Progress on Implementation', 'General Responsiveness', 'E-learning'];
   const VDROP = ['Employment Secured', 'Relocated', 'Financial Constraints', 'Health/Medical', 'Family/Personal', 'Academic Performance', 'Disciplinary', 'Lost Interest', 'Transport Issues', 'Other'];
-  let vFilt = 'All', vCur = null;
+  let vFilt = 'All', vCur = null, vView = 'By status';
+  window.previewVisitView = o => { vView = o; applyVisits(); };
   const vF = v => v.fields || {};
   const vDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
   const vProg = v => v.programme_id || +((vF(v).Programme || [])[0]) || null;
@@ -448,13 +469,22 @@
     const today = new Date().toISOString().slice(0, 10), all = P.data.visits.slice().sort((a, b) => String(vF(b)['Date of Visit'] || '').localeCompare(String(vF(a)['Date of Visit'] || '')));
     const head = document.querySelector('#view-visits h1')?.parentElement; const btn = head?.querySelector('button'); if (btn) { btn.textContent = '+ Add visit'; btn.onclick = () => previewVisitAdd(); btn.removeAttribute('onclick'); }
     const due = all.filter(v => vNext(v) && vNext(v) <= today), openRecs = id => P.data.recs.filter(r => !r.resolved && (r.fields?.Visit || []).map(String).includes(String(id))).length;
-    $('vkpis').innerHTML = [['Visits', all.length, ''], ['Next visit due or overdue', due.length, due.length ? 'var(--bad)' : ''], ['Open recommendations', P.data.recs.filter(r => !r.resolved).length, ''], ['Average judgement', (() => { const j = all.map(v => +vF(v)['Overall Judgment']).filter(Boolean); return j.length ? (j.reduce((a, b) => a + b, 0) / j.length).toFixed(1) + ' / 4' : '—'; })(), '']]
-      .map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="${c ? 'color:' + c : ''}">${v}</span></div>`).join('');
+    const low = v => +vF(v)['Overall Judgment'] && +vF(v)['Overall Judgment'] <= 2, withRecs = all.filter(v => openRecs(v.id) > 0);
+    const vt = (k, v, c) => [k === 'All' ? 'All visits' : k, v, c, vFilt === k && k !== 'All', `previewVisitFilter('${vFilt === k ? 'All' : k}')`];
+    $('vkpis').className = 'famtiles';
+    $('vkpis').innerHTML = UI.tiles([{ t: 'Visits', k: [vt('All', all.length), vt('Next visit due', due.length, 'var(--bad)'), vt('Low score', all.filter(low).length, 'var(--bad)')] },
+      { t: 'Follow-up', k: [vt('Has open recommendations', withRecs.length, 'var(--warn)'), ['Average judgement', (() => { const j = all.map(v => +vF(v)['Overall Judgment']).filter(Boolean); return j.length ? (j.reduce((a, b) => a + b, 0) / j.length).toFixed(1) + ' / 4' : '—'; })()]] }]);
     const th = $('vrows').closest('table').querySelector('thead tr'); if (th) th.innerHTML = '<th>Visit</th><th>Programme · Venue</th><th>Date</th><th>QCTO personnel</th><th>Judgement</th><th>Next visit</th>';
-    $('vfilter').innerHTML = ['All', 'Next visit due', 'Has open recommendations'].map(s => `<button class="${s === vFilt ? 'on' : ''}" onclick="previewVisitFilter('${s}')">${s}</button>`).join('');
-    const rows = all.filter(v => vFilt === 'All' || (vFilt === 'Next visit due' ? due.includes(v) : openRecs(v.id) > 0));
-    $('vrows').innerHTML = rows.map(v => { const f = vF(v), nx = vNext(v), late = nx && nx <= today;
-      return `<tr style="cursor:pointer" onclick="previewOpenVisit(${v.id})"><td><b>${esc(vLabel(v))}</b></td><td>${esc(vProg(v) ? progName(vProg(v)) : (f['Programme Name'] || [])[0] || '—')}<div class="sub">${esc(f.Venue || '')}</div></td><td>${vDate(f['Date of Visit'])}</td><td>${esc(f['QCTO Personnel'] || '—')}</td>
+    const tb = $('vfilter').parentElement; if (tb.className !== 'famtool') { tb.className = 'famtool'; tb.removeAttribute('style'); $('vfilter').removeAttribute('style'); $('vfilter').className = ''; }
+    $('vfilter').innerHTML = UI.seg(['By status', 'List'], vView, o => `previewVisitView('${o}')`) + `<span style="flex-grow:1"></span><span class="sub">Newest first</span>`;
+    let rows = all.filter(v => vFilt === 'All' || (vFilt === 'Next visit due' ? due.includes(v) : vFilt === 'Low score' ? low(v) : openRecs(v.id) > 0));
+    const VG = [['Next visit due', 'var(--bad)', v => due.includes(v)], ['Low score (1 or 2)', 'var(--bad)', low], ['Open recommendations', 'var(--warn)', v => openRecs(v.id) > 0], ['On track', 'var(--ok)', () => true]];
+    const gOf = v => VG.findIndex(g => g[2](v));
+    if (vView === 'By status') rows = rows.map(v => [gOf(v), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
+    let vLast = -1;
+    $('vrows').innerHTML = rows.map(v => { const f = vF(v), nx = vNext(v), late = nx && nx <= today, gi = gOf(v);
+      const gh = vView === 'By status' && gi !== vLast ? UI.gh(VG[gi][0], rows.filter(x => gOf(x) === gi).length, VG[gi][1], 6) : ''; vLast = gi;
+      return gh + `<tr class="famtr" onclick="previewOpenVisit(${v.id})"><td><b>${esc(vLabel(v))}</b></td><td>${esc(vProg(v) ? progName(vProg(v)) : (f['Programme Name'] || [])[0] || '—')}<div class="sub">${esc(f.Venue || '')}</div></td><td>${vDate(f['Date of Visit'])}</td><td>${esc(f['QCTO Personnel'] || '—')}</td>
         <td>${f['Overall Judgment'] ? `<span class="badge ${vJudge(f['Overall Judgment'])}">${esc(f['Overall Judgment'])} / 4</span>` : '<span class="sub">Not scored</span>'}</td>
         <td>${nx ? `<span style="${late ? 'color:var(--bad);font-weight:600' : ''}">Next ${vDate(nx)}</span>` : '<span class="sub">No next date</span>'}${openRecs(v.id) ? `<div class="sub">${openRecs(v.id)} open recommendation${openRecs(v.id) > 1 ? 's' : ''}</div>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="sub">No visits</td></tr>';
     if (location.hash.startsWith('#visit/')) renderVisit(+location.hash.split('/')[1]);
@@ -571,16 +601,19 @@
   function applyRecs() { window.renderRecs(); }
   window.renderRecs = function () {
     const today = new Date().toISOString().slice(0, 10);
-    $('recfilter').innerHTML = ['Open', 'Resolved', 'All'].map(s => `<button class="${s === rF ? 'on' : ''}" onclick="rF='${s}';renderRecs()">${s}</button>`).join('');
-    $('reclist').innerHTML = recShown().map(r => {
-      const f = r.fields || {}, due = f['Due Date'] || f.Due || '', late = !r.resolved && due && due < today, vis = recVisits(f);
-      const bits = [r.programme_id ? esc(progName(r.programme_id)) : '', vis.length ? vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ') : '',
-        due ? `<span style="${late ? 'color:var(--bad);font-weight:600' : ''}">${late ? 'Overdue · was due ' : 'Due '}${recDate(due)}</span>` : '<span style="color:var(--bad)">No due date</span>',
-        f.Owner ? 'Owner ' + esc(f.Owner) : '<span style="color:var(--bad)">No owner</span>', r.resolved && r.resolved_at ? 'Resolved ' + recDate(r.resolved_at) : ''].filter(Boolean);
-      return `<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
-        <div style="flex:1 1 380px;display:flex;flex-direction:column;gap:6px"><b style="font-size:15px">${esc(f.Text || 'Recommendation')}</b><span class="sub">${bits.join(' · ')}</span></div>
-        <div style="display:flex;gap:8px"><button class="btn sm" onclick="previewRecEdit(${r.id})">Edit</button>${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`}</div></article>`;
-    }).join('') || '<p class="sub">Nothing here.</p>';
+    const rc = k => P.data.recs.filter(r => k === 'All' || (k === 'Resolved') === !!r.resolved).length;
+    $('recfilter').innerHTML = ['Open', 'Resolved', 'All'].map(s => `<button class="${s === rF ? 'on' : ''}" onclick="rF='${s}';renderRecs()">${s} · ${rc(s)}</button>`).join('');
+    const shown = recShown(), RG = [['Overdue', 'var(--bad)', r => !r.resolved && (r.fields?.['Due Date'] || r.fields?.Due || '') && (r.fields['Due Date'] || r.fields.Due) < today], ['Open', 'var(--warn)', r => !r.resolved], ['Resolved', 'var(--ok)', () => true]];
+    const rg = r => RG.findIndex(g => g[2](r)), ordered = shown.map(r => [rg(r), r]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+    let rLast = -1;
+    $('reclist').innerHTML = !ordered.length ? '<section class="card"><div class="empty"><b>Nothing here</b></div></section>' : `<section class="card reccard" style="padding:0;overflow:hidden"><div class="tw"><table><thead><tr><th>Recommendation</th><th>Programme · visit</th><th>Owner</th><th>Due</th><th></th></tr></thead><tbody>${ordered.map(r => {
+      const f = r.fields || {}, due = f['Due Date'] || f.Due || '', late = !r.resolved && due && due < today, vis = recVisits(f), gi = rg(r);
+      const gh = gi !== rLast ? UI.gh(RG[gi][0], ordered.filter(x => rg(x) === gi).length, RG[gi][1], 5) : ''; rLast = gi;
+      return gh + `<tr class="famtr"><td style="white-space:normal;min-width:260px"><b>${esc(f.Text || 'Recommendation')}</b>${r.resolved && r.resolved_at ? `<div class="sub">Resolved ${recDate(r.resolved_at)}</div>` : ''}</td>
+        <td>${r.programme_id ? esc(progName(r.programme_id)) : '<span class="sub">—</span>'}${vis.length ? `<div class="sub">${vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ')}</div>` : ''}</td>
+        <td>${f.Owner ? esc(f.Owner) : '<span class="badge b-bad">No owner</span>'}</td>
+        <td>${due ? `<span style="${late ? 'color:var(--bad);font-weight:700' : ''}">${recDate(due)}</span>` : '<span class="badge b-bad">No date</span>'}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="famact" onclick="previewRecEdit(${r.id})">Edit</button> &nbsp; ${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`;
   };
   function recForm(r) {
     const f = r?.fields || {}, vis = recVisits(f)[0] || '', o = (v, l, s) => `<option value="${esc(v)}" ${s ? 'selected' : ''}>${esc(l)}</option>`;

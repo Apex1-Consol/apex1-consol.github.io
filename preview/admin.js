@@ -71,7 +71,9 @@
     }).join('');
     v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager, from the programmes in ApexOne',
       `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button><button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
-      + `<div class="grid">${cards || '<div class="empty"><b>No programmes yet</b></div>'}</div>
+      + (pms.length ? `<div class="famtiles">${UI.tiles([{ t: `Project managers · ${pms.length}`, k: pms.map((n, i) => [esc(n), all.filter(p => (p.project_manager_name || 'Unassigned') === n).length, n === 'Unassigned' ? 'var(--warn)' : '', PMF.pm === n, `adPM('pm',PMS_[${i}])`]) },
+        { t: 'Data gaps', k: [['Missing qualification or dates', all.filter(pmQuality).length, 'var(--warn)', !!PMF.q, `adPM('q','${PMF.q ? '' : '1'}')`]] }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
+      + `
       <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}
         ${sel('pmf-c', 'Client', [...new Set(all.map(p => clientName(p.client_id)))].sort(), PMF.client, "adPM('client',this.value)")}
@@ -80,11 +82,12 @@
         <label style="display:flex;gap:6px;align-items:center;font-size:13px;height:36px"><input type="checkbox" ${PMF.q ? 'checked' : ''} onchange="adPM('q',this.checked?'1':'')"> Missing qualification or dates</label>
         <button class="btn sm ghost" onclick="adPM()">Clear</button><span class="famas" style="margin-left:auto">Showing ${rows.length} of ${all.length}</span></div>
         <div class="tw"><table class="dense">${H(['Prog ID', 'Project manager', 'Client', 'Qualification', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status', ''])}<tbody>
-        ${rows.map(p => `<tr><td>${esc(p.display_id || p.id)}</td><td>${esc(p.project_manager_name || 'Unassigned')}</td><td>${esc(clientName(p.client_id))}</td>
+        ${(() => { const pmOf = p => p.project_manager_name || 'Unassigned'; return rows.slice().sort((a, b) => pmOf(a).localeCompare(pmOf(b))); })().map((p, i, arr) => { const pm = p.project_manager_name || 'Unassigned', prev = i ? (arr[i - 1].project_manager_name || 'Unassigned') : null;
+          return (pm !== prev ? UI.gh(esc(pm), arr.filter(x => (x.project_manager_name || 'Unassigned') === pm).length, pm === 'Unassigned' ? 'var(--warn)' : 'var(--navy)', 17) : '') + `<tr class="famtr"><td>${esc(p.display_id || p.id)}</td><td>${esc(p.project_manager_name || 'Unassigned')}</td><td>${esc(clientName(p.client_id))}</td>
           <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ''}</td><td>${esc(pf(p, 'Cohort') || p.group_name || '—')}</td><td>${learnersIn(p.id)}</td><td>${esc(pf(p, 'Employment Status') || '—')}</td><td>${esc(pf(p, 'Mode of Delivery') || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
           <td>${esc(p.programme_type || '—')}</td><td>${esc(p.nqf_level || pf(p, 'NQF') || '—')}</td><td>${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">Missing</span>'}</td>
           <td>${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">Missing</span>'}</td><td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
-          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`).join('') || none(17, 'No programmes match these filters.')}
+          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(17, 'No programmes match these filters.')}
         </tbody></table></div></section>`;
   }
   window.adPM = (k, val) => { if (!k) Object.keys(PMF).forEach(x => PMF[x] = ''); else PMF[k] = PMF[k] === val && k === 'pm' ? '' : val; renderPM(); };

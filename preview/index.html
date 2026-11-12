@@ -235,6 +235,117 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
 @media (max-width:1499px){.rpanel{position:fixed;right:0;top:0;bottom:0;width:380px;max-width:100vw;z-index:60;box-shadow:-8px 0 24px rgba(23,22,70,.18)}}
 @media (max-width:900px){.app.rail .side{flex:1 1 100%;flex-direction:row;flex-wrap:wrap}}
 body.famonly .sw.s,body.famonly #bellbtn,body.famonly .navgroup:not(:has(a[href="#fam"])){display:none!important}
+
+/* ===== Shared look (from FAM Registry): KPI filter tiles .famgrp/.famk, toolbar .famtool + .famseg, grouped rows tr.famgh, selected row .famtr.sel, .famtag/.famflag/.famact/.famchip. Use window.UI helpers in shell.js. ===== */
+.famchips{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px}
+.famchip{font-size:11px;line-height:18px;padding:0 8px;border-radius:9px;background:var(--soft);color:var(--ink);white-space:nowrap}
+.famc-f{background:#E3F1E6;color:#1E6B34}.famc-a{background:#E4ECFA;color:#2A4E9B}.famc-m{background:#FBF0D9;color:#8A5100}
+.famc-s{background:transparent;border:1px solid var(--line);color:var(--muted)}
+.famc-bad{background:transparent;border:1px solid var(--bad);color:var(--bad)}.famc-warn{background:transparent;border:1px solid #E0A100;color:#8A5100}.famc-ok{background:transparent;border:1px solid var(--ok);color:var(--ok)}
+.famrtw{padding:8px 10px;border-radius:10px;margin:4px 0 8px;font-size:13px}.famrtw.bad{background:#FDECEA;color:var(--bad)}.famrtw.warn{background:#FBF0D9;color:#8A5100}
+.famcomp{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}.famkv2{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px 16px;margin:6px 0 10px}
+.famc-nc{background:transparent;border:1px dashed var(--muted);color:var(--muted);font-style:italic}
+.famnoid{margin-left:8px;font-size:11px;color:#8A5100;white-space:nowrap}.famck{margin:0 8px 0 0;vertical-align:middle}
+.famsum td{padding:4px 0 10px!important;border:0!important}.famsc{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px;margin:0 6px 6px 0;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--soft);font-size:13px}.famsc.q{opacity:.75}.famsc:hover{border-color:var(--navy2)}.famsc:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
+.famsc.on{background:var(--navy);color:#fff;border-color:var(--navy)}.famfum{position:relative;display:inline-block}.famfum>summary{list-style:none;cursor:pointer}.famfum>summary::-webkit-details-marker{display:none}.famfum>div{position:absolute;right:0;top:calc(100% + 4px);z-index:5;display:flex;flex-direction:column;gap:4px;padding:6px;background:var(--card,#fff);border:1px solid var(--line);border-radius:8px;box-shadow:0 4px 14px rgba(0,0,0,.12)}.famleg{display:flex;flex-wrap:wrap;gap:6px;align-items:center;font-size:12px;margin-top:2px}.famleg .famchip{font-size:11px}.famgt{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.famgt:focus-visible{outline:2px solid var(--navy2);outline-offset:2px}
+.famgsel{float:right;letter-spacing:0;text-transform:none;font-weight:400;cursor:pointer}@media (hover:hover){.famgsel{opacity:0;transition:opacity .15s}.famgh:hover .famgsel,.famgsel:focus-within,.famgsel:has(:checked){opacity:1}}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:#1E3A26;color:#9FD8AE}:root:not([data-theme=light]) .famc-a{background:#1F2D4D;color:#A9C1F2}:root:not([data-theme=light]) .famc-m{background:#3D2F12;color:#F0CF8A}}
+:root[data-theme=dark] .famc-f{background:#1E3A26;color:#9FD8AE}:root[data-theme=dark] .famc-a{background:#1F2D4D;color:#A9C1F2}:root[data-theme=dark] .famc-m{background:#3D2F12;color:#F0CF8A}
+.famtool select.faminput{flex:0 0 auto;max-width:170px}
+.famgrp{display:flex;flex-direction:column;gap:6px;min-width:0}
+.famgl{font-size:12px;font-weight:700;color:var(--muted)}
+.famgk{display:flex;flex-wrap:wrap;gap:8px}
+.famk{min-width:112px;padding:10px 14px;gap:2px;text-align:left;cursor:pointer;font:inherit;border:1px solid var(--line);outline:none}
+.famk .v{font-size:22px}.famk .l{font-size:12px;white-space:nowrap}
+.famk:focus{outline:none}.famk:focus-visible{outline:3px solid var(--yellow);outline-offset:2px}
+.famk.on{border:2px solid var(--navy);padding:9px 13px;box-shadow:inset 0 -3px 0 var(--yellow)}
+tr.famgh td{background:var(--ground);padding:14px 12px 6px!important;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);border-top:1px solid var(--line)}
+.famgd{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:1px}
+.famgn{margin:0 8px;padding:1px 8px;border-radius:999px;background:var(--line2);letter-spacing:0;text-transform:none}
+tr.famgh .sub{letter-spacing:0;text-transform:none;font-weight:400}
+.famtool{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)}
+.famseg{display:flex;background:var(--ground);border-radius:10px;padding:3px}
+.famseg button{border:0;background:transparent;font:inherit;font-size:13px;font-weight:700;color:var(--muted);padding:6px 12px;border-radius:8px;cursor:pointer}
+.famseg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.famsub{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 16px;border-bottom:1px solid var(--line2);font-size:12px}
+.fampage{display:flex;gap:8px;align-items:center;padding:8px 16px;border-top:1px solid var(--line)}
+.famtr{cursor:pointer}.famtr:hover td{background:var(--ground)}
+.famtr.sel td{background:var(--soft)}.famtr.sel td:first-child{box-shadow:inset 4px 0 0 var(--yellow)}
+.famtag{display:inline-block;font-size:10px;font-weight:700;letter-spacing:.06em;color:var(--muted);background:var(--line2);border-radius:4px;padding:1px 5px;margin-right:6px;vertical-align:2px}
+.famflag{display:inline-block;margin-left:6px;font-size:11px;font-weight:700;color:#8A5100;background:#FFF3D6;border-radius:4px;padding:1px 5px;vertical-align:1px}
+.famact{border:0;background:none;font:inherit;font-size:13px;font-weight:700;color:var(--navy2);cursor:pointer;padding:6px 0;white-space:nowrap}
+.famact:hover{text-decoration:underline}
+.famclip{max-width:240px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.famnav{display:flex;gap:6px;align-items:center;padding:10px 20px}.famnav .sub{flex-grow:1;font-size:12px}
+.famstep{margin:16px 20px 0;border-radius:12px;padding:14px;border:1px solid var(--line);border-left:4px solid var(--yellow);display:flex;flex-direction:column;gap:6px;font-size:14px}
+.famnl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.famtidy{margin-top:6px;padding:10px 12px;border-radius:8px;background:#FFF9EB;color:#3A2600;font-size:13px;display:flex;flex-direction:column;gap:2px}
+.famcan{display:inline-block;font-size:11px;font-weight:700;white-space:nowrap;color:var(--ok);background:var(--okbg);border-radius:6px;padding:2px 6px;margin:4px 0 0 42px;cursor:help}.famcan-q{padding:8px 0;border-top:1px solid var(--line2,#eee)}.famcan-q:first-child{border-top:0;padding-top:0}.famcan-p{margin:4px 0 0 12px;font-size:13px}
+.famwho{display:inline-flex;gap:10px;align-items:flex-start;vertical-align:top}.famav{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;color:#0C2F52;background:var(--accent-gold,#D4A537);margin-top:2px}.famidl{font-size:12px;margin:-2px 0 2px}.famname{border:0;background:none;font:inherit;font-weight:600;color:var(--ink);padding:4px 0;text-align:left;cursor:pointer}
+.famth{border:0;background:none;font:inherit;font-weight:inherit;color:inherit;padding:0;cursor:pointer;text-align:left}
+.famok{font-size:12px;color:var(--ok);font-weight:700;margin-top:4px}.famgap{font-size:12px;margin-top:4px}
+.famhead{background:var(--navy);color:#fff;padding:20px;display:flex;flex-direction:column;gap:4px}
+.famreg{border-top:1px solid var(--line2);padding:10px 0;display:flex;flex-direction:column;gap:4px}
+.famfu{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:4px}.famfu .sub{flex-grow:1}
+.famacts{display:flex;gap:12px;font-weight:600;font-size:13px}.famh{padding:2px 0 2px 32px}
+.famscope{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.famtrack{position:relative;height:26px;margin:4px 8px 0;border-radius:13px;background:linear-gradient(90deg,var(--badbg) 0 33.3%,var(--warnbg) 33.3% 66.6%,var(--soft) 66.6%)}
+.famdot{position:absolute;top:5px;width:16px;height:16px;margin-left:-8px;border-radius:50%;border:2px solid var(--surface);cursor:pointer;padding:0}
+.famdot:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
+.famticks{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin:0 2px}
+.famnext{font-size:13px;display:flex;flex-wrap:wrap;gap:4px;align-items:baseline}
+.famback{font-weight:600;font-size:14px;align-self:flex-start}
+.famphead{background:var(--navy);color:#fff;display:flex;flex-direction:column;gap:14px}
+.famphead .sub{color:#D2D1EC}.famscore{font-size:13px;color:#D2D1EC}
+.famkv{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;border-top:1px solid rgba(255,255,255,.18);padding-top:12px;font-size:14px;overflow-wrap:anywhere}
+.famtabs{display:flex;gap:4px;border-bottom:1px solid var(--line);overflow-x:auto}
+.famtabs button{border:0;background:none;font:inherit;padding:10px 12px;color:var(--muted);cursor:pointer;white-space:nowrap;border-bottom:3px solid transparent}
+.famtabs button.on{color:var(--ink);font-weight:700;border-bottom-color:var(--yellow)}
+.famgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.famev{display:grid;grid-template-columns:96px 1fr;gap:10px;padding:8px 0;border-top:1px solid var(--line2)}
+.faminput{height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink);min-width:0}
+/* ApexU skin (28 Oct mock) */
+.famgrp{flex:1 1 380px;background:var(--surface,#fff);border-radius:16px;padding:16px 18px;box-shadow:0 1px 2px rgba(22,21,74,.06),0 0 0 1px var(--line2);gap:10px}
+.famgl{font-size:14px;color:var(--ink)}
+.famstack{display:flex;gap:2px;height:12px;border-radius:9px;overflow:hidden}.famstack i{display:block;height:100%}
+.famk{flex:1 1 0;min-width:96px;border:0;background:var(--ground);border-radius:12px;box-shadow:none}
+.famk .v{font-size:24px;font-weight:800}.famk .l{white-space:normal}
+.famk.on{box-shadow:inset 0 0 0 2px var(--navy),inset 0 -4px 0 var(--yellow);padding:10px 14px}
+.famzero{display:flex;flex-wrap:wrap;gap:6px}.famz{border:0;font:inherit;font-size:12px;color:var(--muted);background:var(--ground);border-radius:8px;padding:4px 10px;cursor:pointer}.famz b{margin-left:4px;color:var(--ink)}
+.famsc{border:0!important;border-radius:0!important;background:transparent!important;color:var(--muted)!important;font-weight:600;padding:8px 2px!important;margin:0 18px 6px 0!important;box-shadow:inset 0 -3px 0 transparent;opacity:1!important}
+.famsc b{order:2;font-size:12px;background:var(--line2);color:var(--ink);border-radius:999px;padding:1px 8px}.famsc:hover{color:var(--navy)!important}
+.famsc.on{color:var(--navy)!important;box-shadow:inset 0 -3px 0 var(--yellow)}.famsc.on b{background:var(--navy);color:#fff}
+.famc-f{background:#E6E6F4!important;color:#25247B!important}.famc-a{background:#DDF1EC!important;color:#0F5E4E!important}.famc-m{background:#EEE6F8!important;color:#5B2C8F!important}.famc-f,.famc-a,.famc-m{font-weight:700}
+:root[data-theme=dark] .famc-f{background:rgba(185,184,227,.18)!important;color:#D2D1EC!important}:root[data-theme=dark] .famc-a{background:#12352D!important;color:#8FD9C4!important}:root[data-theme=dark] .famc-m{background:#33234A!important;color:#D5BDF2!important}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .famc-f{background:rgba(185,184,227,.18)!important;color:#D2D1EC!important}:root:not([data-theme=light]) .famc-a{background:#12352D!important;color:#8FD9C4!important}:root:not([data-theme=light]) .famc-m{background:#33234A!important;color:#D5BDF2!important}}
+.famc-bad,.famc-warn,.famc-ok,.famc-nc{border:0!important;font-weight:600;line-height:22px;padding:0 10px;border-radius:8px}
+.famc-bad::before,.famc-warn::before,.famc-ok::before,.famc-nc::before{content:"";display:inline-block;width:7px;height:7px;border-radius:50%;background:currentColor;margin-right:6px;vertical-align:1px}
+.famc-bad{background:rgba(214,69,69,.12)!important}.famc-warn{background:rgba(224,161,0,.16)!important}.famc-ok{background:rgba(46,158,106,.13)!important}.famc-nc{background:var(--line2)!important;font-style:normal!important}
+.famav{background:var(--navy)!important;color:var(--yellow)!important;width:36px!important;height:36px!important}
+.famname{font-weight:700!important}
+tr.famgh td{background:var(--ground);color:var(--navy);text-transform:none;letter-spacing:0;font-size:13px;box-shadow:inset 4px 0 0 var(--g,var(--line))}
+.tw thead th,#view-fam thead th{font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.famact{border:1px solid var(--line)!important;border-radius:8px;padding:6px 12px!important;background:var(--surface,#fff)!important;color:var(--navy)!important}
+.famact:hover{text-decoration:none!important;border-color:var(--navy2)!important}
+.famact.y{background:var(--yellow)!important;border-color:var(--yellow)!important;color:var(--navy)!important}
+.famb{display:inline-block;margin-left:8px;font-size:11px;font-weight:700;padding:1px 8px;border-radius:999px;background:rgba(224,161,0,.18);color:#8A5100;vertical-align:1px}.famb-m{background:var(--navy);color:var(--yellow)}
+.famsc0{opacity:.5!important;cursor:default}
+.famdots{list-style:none;display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;margin-left:6px;border:1px solid var(--line);border-radius:8px;color:var(--muted);cursor:pointer;vertical-align:middle;font-size:16px}.famdots::-webkit-details-marker{display:none}.famrm{text-align:left}.famrm>div{min-width:160px}
+.famtr .famck{float:left;margin:12px 8px 0 0}.famtr .famwho{display:flex;overflow:hidden}
+/* Shared look applied to the older building blocks, so every screen matches the FAM Registry */
+.famtiles{display:flex;flex-wrap:wrap;gap:14px;align-items:stretch}
+.grid:has(>.kpi){background:var(--surface);border-radius:16px;padding:16px 18px;gap:10px;box-shadow:0 1px 2px rgba(22,21,74,.06),0 0 0 1px var(--line2);grid-template-columns:repeat(auto-fit,minmax(130px,1fr))}
+.grid>.kpi{background:var(--ground);border:0;border-radius:12px;padding:12px 14px;gap:4px}
+.grid>a.kpi:hover{box-shadow:inset 0 0 0 2px var(--navy2)}
+.grid>.kpi .v{font-size:24px;font-weight:800}.grid>.kpi .l{font-size:12px}
+.seg{background:var(--ground)}.seg button{font-weight:700}.seg button.on{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tabs button.on{color:var(--ink);font-weight:700}
+tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var(--ground)}
+.pick.on{border-color:var(--navy);background:var(--soft);box-shadow:inset 4px 0 0 var(--yellow)}
+.pickgh{display:flex;align-items:center;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 2px 0}
+.pickgh .famgn{margin-left:auto}
+.famtool .search{height:36px;background:var(--surface);border-color:var(--border2)}
+.reccard td .btn{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1110,14 +1221,14 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261111s"></script>
+<script src="live.js?v=20261112t"></script>
 <script src="qa.js"></script>
 <script src="famcu.js?v=d2727e3"></script>
-<script src="fam.js?v=20261111r"></script>
-<script src="delivery.js?v=20261112f"></script>
-<script src="handover.js?v=20261112c"></script>
+<script src="fam.js?v=20261112s"></script>
+<script src="delivery.js?v=20261112g"></script>
+<script src="handover.js?v=20261112d"></script>
 <script src="shell.js?v=20261028f"></script>
-<script src="admin.js?v=20261111g"></script>
+<script src="admin.js?v=20261112h"></script>
 <script src="reports.js?v=20261111j"></script>
 </body>
 </html>
