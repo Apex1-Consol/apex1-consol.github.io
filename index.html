@@ -18,6 +18,9 @@ var NEW_LOOK={monitoring:'visits',learners:'learners',enrolment:'enrolments',att
 function keepClassic(v){return (v==='programmes'||v==='reports')&&(window.__classicOnce||/[?&]classic=1/.test(location.search));}
 function newLookGo(v){location.href='/preview/#'+NEW_LOOK[v];}
 (function(){var m=/[#&]view=([a-z-]+)(&|$)/.exec(location.hash);if(m&&NEW_LOOK[m[1]]&&!keepClassic(m[1]))newLookGo(m[1]);})();
+// 12 Nov cutover: the new look (/preview/) is now ApexOne. Every other visit to the old hub goes there.
+// The old screens stay reachable with ?classic=1 (Add Programme, classic sign-off). To undo, delete the line below.
+(function(){if(/[?&]classic=1/.test(location.search))return;var h=location.hash,s=/[#&]signoff=(\d+)/.exec(h),v=/[#&]view=([a-z-]+)/.exec(h);location.replace('/preview/#'+(s?'handover/'+s[1]:(v&&NEW_LOOK[v[1]])||'mywork'));})();
 </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
