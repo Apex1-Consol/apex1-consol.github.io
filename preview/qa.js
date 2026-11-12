@@ -307,7 +307,9 @@
       const act = (P.data.progs || []).filter(p => kc(p.saqa_id || p.qualification_code) && !/complet|cancel|closed/i.test((p.status || '') + ' ' + (p.programme_status || '')) && (!p.end_date || p.end_date >= td));
       const exp = [], na = [];
       act.forEach(p => { const a = gr[kc(p.saqa_id || p.qualification_code)];
-        if (!a) na.push([p, 'No granted accreditation on record']);
+        const lg = typeof LEG === 'object' && LEG ? LEG[kc(p.saqa_id || p.qualification_code)] : null;
+        if (!a && lg && lg[2] === 'Yes') return;
+        if (!a) na.push([p, lg ? 'Legacy (' + lg[0] + '), not extended' : 'No granted accreditation on record']);
         else if (a.accreditation_to && (a.accreditation_to < t90 || (p.end_date && a.accreditation_to < p.end_date))) exp.push([p, 'Accredited to ' + a.accreditation_to + (p.end_date && a.accreditation_to < p.end_date ? ' (before programme end ' + p.end_date + ')' : '')]); });
       if (!$('apchk')) $('akpis').insertAdjacentHTML('beforebegin', '<div id="apchk" style="margin-bottom:14px"></div>');
       const sel = window.aPC === 'exp' ? exp : window.aPC === 'na' ? na : null;
