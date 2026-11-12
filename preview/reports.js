@@ -67,7 +67,7 @@ function tone(x, month) {
   if (t >= warn) return ['warn', 'Due ' + fmtD(due)];
   return ['', 'Due ' + fmtD(due)];
 }
-let TR = null, TRM = null, TRS = '', TRPM = '', TRV = 'prog';
+let TR = null, TRM = null, TRS = '', TRPM = '', TRV = (() => { try { return localStorage.getItem('rp.view') || 'pm'; } catch (_) { return 'pm'; } })();
 async function loadTR() {
   const r = await R.from('reports').select('id,programme_id,client_name_snapshot,programme_name_snapshot,month,status,submitted_by_email,hold_until,remind_pm_at').neq('status', 'archived');
   if (r.error) { TR = { err: r.error.message }; return; }
@@ -92,7 +92,7 @@ async function loadTR() {
 const acts = x => { if (!x.r) return []; const q = (Q || []).find(r => r.id === x.r.id); return ((q && q.next_actions) || []).filter(a => a !== 'archived' && a !== 'pending'); };
 window.rpNote = id => { const t = $('rpn-row-' + id); if (t) { t.hidden = !t.hidden; if (!t.hidden) $('rpn-' + id).focus(); } };
 const pmName = e => String(e || 'Unassigned').split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-function tracker() { const h = trackerM(); if (TRV !== 'prog' || !h.includes('<!--TRBODY-->')) return h; return h.slice(0, h.indexOf('<!--TRBODY-->')) + progView() + '</section>'; }
+function tracker() { const h = trackerM(); if (TRV === 'month' || !h.includes('<!--TRBODY-->')) return h; return h.slice(0, h.indexOf('<!--TRBODY-->')) + (TRV === 'pm' ? pmView() : progView()) + '</section>'; }
 function trackerM() {
   if (TR === null) return '';
   if (TR.err) return `<section class="card"><b>Monthly reports</b><div class="famas">Could not load: ${esc(TR.err)}</div></section>`;
@@ -108,7 +108,7 @@ function trackerM() {
   const chips = Object.keys(STAGE).map(k => { const c = all.filter(x => x.stage === k).length; return c ? `<button class="btn sm ${TRS === k ? 'y' : ''}" onclick="rpTS('${k}')"><span style="width:8px;height:8px;border-radius:50%;background:${STC[k]};display:inline-block;margin-right:6px"></span>${STAGE[k]} ${c}</button>` : ''; }).join('');
   const TB = { dan: 'b-bad', warn: 'b-warn', hold: '', '': 'b-ok' };
   return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
-    <h2 style="flex-grow:1;font-size:18px">Monthly reports</h2><span class="seg" style="display:inline-flex;gap:4px"><button class="btn sm ${TRV === 'prog' ? 'y' : ''}" onclick="rpTV('prog')">By programme</button><button class="btn sm ${TRV === 'month' ? 'y' : ''}" onclick="rpTV('month')">By month</button></span>${admin && pms.length > 1 ? `<select class="cellin" style="height:36px" onchange="rpTP(this.value)"><option value="">All PMs</option>${pms.map(p => `<option value="${esc(p)}"${p === TRPM ? ' selected' : ''}>${esc(pmName(p))}</option>`).join('')}</select>` : ''}<button class="btn sm" onclick="rpTR()">Refresh</button></div>
+    <h2 style="flex-grow:1;font-size:18px">Monthly reports</h2><span class="famseg" role="group">${[['pm', 'By PM'], ['prog', 'By programme'], ['month', 'By month']].map(([k, l]) => `<button class="${TRV === k ? 'on' : ''}" aria-pressed="${TRV === k}" onclick="rpTV('${k}')">${l}</button>`).join('')}</span>${admin && pms.length > 1 ? `<select class="cellin" style="height:36px" onchange="rpTP(this.value)"><option value="">All PMs</option>${pms.map(p => `<option value="${esc(p)}"${p === TRPM ? ' selected' : ''}>${esc(pmName(p))}</option>`).join('')}</select>` : ''}<button class="btn sm" onclick="rpTR()">Refresh</button></div>
 <!--TRBODY-->
     <div style="display:flex;flex-wrap:wrap;gap:10px;padding:14px 20px">${months.slice(-4).map(bar).join('')}</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;padding:0 20px 12px">${chips}${TRS ? '<button class="btn sm ghost" style="color:var(--ink)" onclick="rpTS(\'\')">Show all</button>' : ''}</div>
@@ -126,6 +126,49 @@ function trackerM() {
 /* By programme: one block per month of the programme's run, coloured by that month's report; click opens it. */
 const PV = { sent_to_client: ['Sent', '#25247B'], archived: ['Archived', '#5F5E5A'], approved: ['Approved', '#0F6E56'], pending: ['Waiting for review', '#534AB7'], needs_changes: ['Changes requested', '#D85A30'], draft: ['Draft', '#BA7517'], missing: ['Missing, overdue', '#A32D2D'], due: ['Due, not started', '#EF9F27'] };
 const monthsOfProg = p => { const a = p.start_date && new Date(p.start_date), b = p.end_date && new Date(p.end_date); if (!a || !b || b < a) return null; const out = []; for (let i = a.getFullYear() * 12 + a.getMonth(); i <= b.getFullYear() * 12 + b.getMonth() && out.length < 60; i++) out.push(i); return out; };
+function cellOf(p, i) {
+  const reps = TR.reps || [], drs = Array.isArray(DR) ? DR : [], cur = TR.curI;
+    const m = mName(i), r = reps.find(x => x.programme_id === p.id && x.month === m), d = !r && drs.find(x => x.programme_id === p.id && x.month === m);
+    const k = r ? r.status : d ? 'draft' : i > cur ? null : (day(new Date()) > dls(m).submit ? 'missing' : 'due');
+    const lab = MN[i % 12].slice(0, 3) + ' ' + String(Math.floor(i / 12)).slice(2);
+    const tip = m + ' · ' + (k ? PV[k][0] : 'Upcoming'), href = r ? '/report-generator.html?report=' + r.id : '/report-generator.html';
+    return `<a href="${href}" target="_blank" rel="noopener" title="${esc(tip)}" style="flex:1;min-width:46px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;${k ? `background:${PV[k][1]};color:#fff` : 'background:var(--surface2);color:var(--muted);border:1px dashed var(--border2)'};${i === cur ? 'outline:2px solid var(--ink);outline-offset:1px;' : ''}">${lab}</a>`;
+}
+function stripOf(p) {
+  const ms = monthsOfProg(p), have = [...new Set([...(TR.reps || []), ...(Array.isArray(DR) ? DR : [])].filter(x => x.programme_id === p.id).map(x => mIdx(x.month)).filter(i => i >= 0))].sort((a, b) => a - b), list = ms || have;
+  return (list.length ? `<div style="display:flex;gap:3px;flex-wrap:wrap">${list.map(i => cellOf(p, i)).join('')}</div>` : '') + (ms ? '' : `<div style="font-size:12.5px;color:var(--warn)">Add the programme's start and end dates to see all its months.</div>`);
+}
+/* By PM: one drop-down per project manager (closed until clicked, remembered per browser) for the current reporting month.
+   Open a PM to list their reports; open a report for its months, deadline and actions. Keeps the page calm: colour only where opened. */
+let PMO = (() => { try { return JSON.parse(localStorage.getItem('rp.pmOpen') || '{}') || {}; } catch (_) { return {}; } })(), RPO = {};
+window.rpPMO = k => { PMO[k] = !PMO[k]; try { localStorage.setItem('rp.pmOpen', JSON.stringify(PMO)); } catch (_) {} render(); };
+window.rpRO = k => { RPO[k] = !RPO[k]; render(); };
+const needsAct = x => ['notstarted', 'changes'].includes(x.stage) || x.t[0] === 'dan';
+function pmView() {
+  const admin = has(), m = TR.cur, all = (TR.byM[m] || []).filter(x => !TRPM || x.pm === TRPM), rows = all.filter(x => !TRS || x.stage === TRS);
+  const tiles = `<div class="famtiles" style="padding:14px 20px">${UI.tiles([{ t: esc(m) + ' · ' + all.length + ' report' + (all.length === 1 ? '' : 's'), k: Object.keys(STAGE).map(k => [STAGE[k], all.filter(x => x.stage === k).length, STC[k], TRS === k, `rpTS('${k}')`]) }])}</div>`;
+  const pms = [...new Set(rows.map(x => x.pm || ''))].sort((a, b) => (!a - !b) || pmName(a).localeCompare(pmName(b))), solo = pms.length === 1;
+  const TB = { dan: 'b-bad', warn: 'b-warn' }, drs = Array.isArray(DR) ? DR : [];
+  const repRow = x => {
+    const k = x.r ? 'r' + x.r.id : 'p' + x.pid, o = !!RPO[k], id = x.r ? +x.r.id : 0, p = (D().progsAll || D().progs || []).find(q => q.id === x.pid), dr = !x.r && drs.find(d => d.programme_id === x.pid && d.month === m);
+    return `<button class="ddrow sub2" aria-expanded="${o}" onclick="rpRO('${k}')"><span class="chev">${o ? '▾' : '▸'}</span><span style="flex:1;min-width:0"><b>${esc(x.prog || '')}</b><span class="sub"> · ${esc(x.client || '')}</span></span>
+      <span style="font-size:13px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${STC[x.stage]};margin-right:6px"></span>${STAGE[x.stage]}</span>${TB[x.t[0]] ? `<span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>` : ''}</button>
+      ${!o ? '' : `<div class="ddbody">${p ? stripOf(p) : ''}
+        <div class="kv"><span>Deadline</span><span>${esc(x.t[1])}</span></div>
+        ${dr ? `<div class="kv"><span>Last saved</span><span>${esc(when(dr.updated_at || dr.saved_at))}</span></div>` : ''}
+        ${x.r && x.r.remind_pm_at ? `<div class="kv"><span>PM reminded</span><span>${esc(fmtD(new Date(x.r.remind_pm_at)))}</span></div>` : ''}
+        <div style="display:flex;gap:8px;flex-wrap:wrap">${x.r ? `<a class="btn sm y" href="/report-generator.html?report=${id}" target="_blank" rel="noopener">Open report ↗</a>` : `<a class="btn sm y" href="/report-generator.html" target="_blank" rel="noopener">${x.stage === 'notstarted' ? 'Start in Report Generator ↗' : 'Open Report Generator ↗'}</a>`}
+          ${acts(x).map(a => a === 'needs_changes' ? `<button class="btn sm" onclick="rpNote(${id})">Request changes</button>` : `<button class="btn sm n" onclick="rpAct(${id},'${a}',this)">${esc(ACT[a] || a)}</button>`).join('')}
+          ${admin && x.r && ['changes', 'approved'].includes(x.stage) && !x.r.remind_pm_at ? `<button class="btn sm" onclick="rpRemind(${id},this)">Remind PM</button>` : ''}
+          ${x.r ? `<button class="btn sm" onclick="rpHist(${id})">History</button>` : ''}</div>
+        ${x.r ? `<div id="rpn-row-${id}" hidden><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><textarea id="rpn-${id}" class="cellin" rows="2" placeholder="Note for the PM: what needs to change" style="flex:1 1 320px"></textarea><button class="btn sm y" onclick="rpAct(${id},'needs_changes',this)">Send to PM</button><button class="btn sm" onclick="rpNote(${id})">Cancel</button></div></div><div id="rph-${id}" hidden><div></div></div>` : ''}</div>`}`;
+  };
+  return tiles + (pms.map(pm => {
+    const list = rows.filter(x => (x.pm || '') === pm).sort((a, b) => needsAct(b) - needsAct(a) || String(a.client).localeCompare(String(b.client))), bad = list.filter(needsAct).length, key = pm || '_', o = solo || !!PMO[key];
+    return `<button class="ddrow" aria-expanded="${o}" onclick="rpPMO('${esc(key).replace(/'/g, '&#39;')}')"><span class="chev">${o ? '▾' : '▸'}</span><b style="flex:1;min-width:0">${esc(pm ? pmName(pm) : 'Unassigned')}</b><span class="sub">${list.length} report${list.length === 1 ? '' : 's'}</span>${bad ? `<span class="ddact">${bad} need${bad === 1 ? 's' : ''} action</span>` : ''}</button>${o ? list.map(repRow).join('') : ''}`;
+  }).join('') || `<div class="empty"><b>No reports for ${esc(m)}${TRS ? ' at this stage' : ''}</b></div>`)
+    + `<p class="note" style="margin:12px 20px">${esc(m)} reports by project manager. "Needs action" = not started, changes requested or past its deadline. Click a PM to see their reports, and a report for its months and actions.</p>`;
+}
 function progView() {
   const admin = has(), reps = TR.reps || [], drs = Array.isArray(DR) ? DR : [], cur = TR.curI;
   const mine = new Set([...reps.map(r => r.programme_id), ...drs.map(d => d.programme_id)].map(String));
@@ -133,13 +176,7 @@ function progView() {
   if (TRPM) progs = progs.filter(p => reps.some(r => r.programme_id === p.id && r.submitted_by_email === TRPM) || drs.some(d => d.programme_id === p.id && d.pm_email === TRPM));
   const cname = p => (D().clients || []).find(c => c.id === p.client_id)?.client_name || reps.find(r => r.programme_id === p.id)?.client_name_snapshot || drs.find(d => d.programme_id === p.id)?.client_name || 'No client';
   const groups = {}; progs.forEach(p => (groups[cname(p)] = groups[cname(p)] || []).push(p));
-  const cell = (p, i) => {
-    const m = mName(i), r = reps.find(x => x.programme_id === p.id && x.month === m), d = !r && drs.find(x => x.programme_id === p.id && x.month === m);
-    const k = r ? r.status : d ? 'draft' : i > cur ? null : (day(new Date()) > dls(m).submit ? 'missing' : 'due');
-    const lab = MN[i % 12].slice(0, 3) + ' ' + String(Math.floor(i / 12)).slice(2);
-    const tip = m + ' · ' + (k ? PV[k][0] : 'Upcoming'), href = r ? '/report-generator.html?report=' + r.id : '/report-generator.html';
-    return `<a href="${href}" target="_blank" rel="noopener" title="${esc(tip)}" style="flex:1;min-width:46px;height:30px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:11px;text-decoration:none;${k ? `background:${PV[k][1]};color:#fff` : 'background:var(--surface2);color:var(--muted);border:1px dashed var(--border2)'};${i === cur ? 'outline:2px solid var(--ink);outline-offset:1px;' : ''}">${lab}</a>`;
-  };
+  const cell = cellOf;
   const row = p => {
     const ms = monthsOfProg(p), have = [...new Set([...reps, ...drs].filter(x => x.programme_id === p.id).map(x => mIdx(x.month)).filter(i => i >= 0))].sort((a, b) => a - b);
     const list = ms || have, pos = ms ? ms.indexOf(cur) : -1, pm = reps.find(r => r.programme_id === p.id)?.submitted_by_email || drs.find(d => d.programme_id === p.id)?.pm_email || p.project_manager_name;
@@ -155,7 +192,7 @@ function progView() {
     ${names.map(c => `<details open style="border-top:1px solid var(--line)"><summary style="padding:12px 20px;cursor:pointer;font-weight:600;display:flex;justify-content:space-between;gap:8px"><span>${esc(c)}</span><span style="font-weight:400;color:var(--muted);font-size:12.5px">${groups[c].length} programme${groups[c].length === 1 ? '' : 's'}</span></summary>${groups[c].sort((a, b) => (a.programme_name || '').localeCompare(b.programme_name || '')).map(row).join('')}</details>`).join('') || '<div class="empty"><b>No programmes with reports yet</b></div>'}
     <p class="note" style="margin:12px 20px">Each block is one month of the programme, from its start to its end date. The outlined block is the current reporting month. Click a month to open its report in the Report Generator.</p>`;
 }
-window.rpTV = v => { TRV = v; render(); };
+window.rpTV = v => { TRV = v; try { localStorage.setItem('rp.view', v); } catch (_) {} render(); };
 window.rpTM = m => { TRM = m; TRS = ''; render(); };
 window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };

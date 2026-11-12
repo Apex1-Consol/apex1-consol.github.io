@@ -346,6 +346,13 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
 .pickgh .famgn{margin-left:auto}
 .famtool .search{height:36px;background:var(--surface);border-color:var(--border2)}
 .reccard td .btn{white-space:nowrap}
+.ddrow{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:14px 20px;border-top:1px solid var(--line);cursor:pointer;flex-wrap:wrap}
+.ddrow:hover,.ddrow[aria-expanded=true]{background:var(--ground)}.ddrow:focus-visible{outline:3px solid var(--yellow);outline-offset:-3px}
+.ddrow .chev{width:14px;color:var(--muted);font-size:12px}.ddact{font-size:12px;font-weight:700;color:var(--bad)}
+.ddrow.sub2{padding:12px 20px 12px 44px;border-top-color:var(--line2);background:transparent}.ddrow.sub2:hover{background:var(--ground)}
+.ddrow.sub2[aria-expanded=true]{background:var(--soft);box-shadow:inset 4px 0 0 var(--yellow)}
+.ddbody{padding:6px 20px 16px 68px;display:flex;flex-direction:column;gap:10px;background:var(--surface2)}
+@media(max-width:700px){.ddrow.sub2{padding-left:28px}.ddbody{padding-left:28px}}
 </style>
 </head>
 <body>
@@ -1229,6 +1236,6 @@ function learnerRules(){return `<div class="row">
 <script src="handover.js?v=20261112d"></script>
 <script src="shell.js?v=20261028f"></script>
 <script src="admin.js?v=20261112h"></script>
-<script src="reports.js?v=20261111j"></script>
+<script src="reports.js?v=20261112k"></script>
 </body>
 </html>
