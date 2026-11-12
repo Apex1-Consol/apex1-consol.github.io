@@ -196,7 +196,7 @@ window.rpTV = v => { TRV = v; try { localStorage.setItem('rp.view', v); } catch 
 window.rpTM = m => { TRM = m; TRS = ''; render(); };
 window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };
-window.rpTR = async () => { TR = null; render(); await loadDr(); await loadTR(); render(); };
+window.rpTR = async () => { TR = null; render(); await Promise.all([loadQ(), loadDr()]); await loadTR(); render(); };   // also reloads the allowed actions (my_report_queue)
 window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };
 window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => x.stage === 'sent' || (x.stage === 'approved' && x.t[1] === 'Approved')).length, od: rows.filter(x => x.t[0] === 'dan').length }; };
 window.rpLoadTR = async () => { if (TR === null) { await loadDr(); await loadTR(); } return window.rpSummary(); };
