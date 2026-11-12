@@ -253,7 +253,10 @@ window.rpXlsx = i => { if (!window.XLSX) return say('Excel library not loaded');
   XLSX.writeFile(wb, `${i == null ? 'ApexOne_all_data' : SETS[i][0].replace(/ /g, '_')}${tag()}_${stamp()}.xlsx`); say('Excel file downloaded'); };
 window.rpF = (k, v) => { F[k] = v; if (k === 'client') F.prog = ''; render(); };
 
+let DLOPEN = false;
+window.rpDl = () => { DLOPEN = !DLOPEN; if (!DLOPEN && location.hash === '#reports/downloads') history.replaceState(null, '', '#reports'); render(); };
 function render() {
+  const dlOpen = DLOPEN || location.hash === '#reports/downloads';
   const v = $('view-reports'); if (!v || v.hidden) return;
   const clients = (D().clients || []).map(c => [String(c.id), c.client_name || (c.fields || {})['Company Name'] || 'Client ' + c.id]).sort((a, b) => a[1].localeCompare(b[1]));
   const progs = (D().progs || []).filter(p => !F.client || String(p.client_id) === F.client).map(p => [String(p.id), (p.display_id ? p.display_id + ' · ' : '') + (p.programme_name || '')]);
@@ -263,18 +266,18 @@ function render() {
     <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
     ${tracker()}
     ${drafts()}
-    <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
-      <h2 style="flex-grow:1;font-size:18px;align-self:center">Downloads</h2>
+    <section class="card" style="padding:0" id="rpdl">${!dlOpen ? `<div style="display:flex;align-items:center;padding:14px 20px"><h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpDl()">▸ Downloads <span style="font-weight:400;color:var(--muted)">(CSV / Excel)</span></h2></div></section>` : `<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
+      <h2 style="flex-grow:1;font-size:18px;align-self:center;cursor:pointer" onclick="rpDl()">▾ Downloads <span style="font-weight:400;color:var(--muted)">(CSV / Excel)</span></h2>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Client<select class="cellin" style="height:36px;max-width:260px" onchange="rpF('client',this.value)">${opt(clients, F.client, 'All clients')}</select></label>
       <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Programme<select class="cellin" style="height:36px;max-width:300px" onchange="rpF('prog',this.value)">${opt(progs, F.prog, 'All programmes')}</select></label>
       ${has() ? '<button class="btn y" onclick="rpXlsx()">Everything (.xlsx)</button>' : ''}</div>
       <div class="tw"><table class="dense"><thead><tr><th>Data set</th><th>Rows</th><th></th></tr></thead><tbody>
       ${SETS.map((s, i) => `<tr><td><b>${esc(s[0])}</b></td><td>${rowsOf(s).length}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm" onclick="rpCsv(${i})">CSV</button> <button class="btn sm" onclick="rpXlsx(${i})">Excel</button></td></tr>`).join('')}
-      </tbody></table></div><p class="note" style="margin:12px 20px">Test records are left out. Each file holds the database columns plus the captured fields, as on screen.</p></section>
+      </tbody></table></div><p class="note" style="margin:12px 20px">Test records are left out. Each file holds the database columns plus the captured fields, as on screen.</p></section>`}
   </div>`;
 }
 ROUTES.reports = ['Reports', 'Outputs'];
-async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await Promise.all([loadQ(), loadDr().then(loadTR)]); render(); } }
+async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (location.hash === '#reports/downloads') setTimeout(() => $('rpdl')?.scrollIntoView({ behavior: 'smooth' }), 50); if (Q === null) { await Promise.all([loadQ(), loadDr().then(loadTR)]); render(); } }
 /* Dashboard and My work: a one-line card for the current reporting month */
 async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
