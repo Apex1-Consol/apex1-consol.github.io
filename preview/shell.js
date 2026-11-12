@@ -29,14 +29,14 @@
   document.addEventListener('keydown', e => { if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); window.jumpTo(); } });
 
   /* ---------- right side panel ---------- */
-  const S = { open: ls.get('rp', false), tab: 'Details', pid: null, lid: null, act: null };
+  const S = { open: ls.get('rp', false), tab: 'Today', pid: null, lid: null, act: null };
   function applyRP() {
     $('rpanel').hidden = !S.open || onFam(); // FAM uses its own docked practitioner panel
-    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'FAM calendar: who is on what, cover and renewals' : S.open ? 'Close side panel' : 'Open side panel'); b.title = b.getAttribute('aria-label');
+    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'FAM calendar: who is on what, cover and renewals' : S.open ? 'Close side panel' : 'Today: what to act on, on this screen'); b.title = b.getAttribute('aria-label');
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';
-  window.toggleRP = f => { if (onFam() && window.famToday) { famToday(f); return; } S.open = f === undefined ? !S.open : !!f; ls.set('rp', S.open); applyRP(); };
+  window.toggleRP = f => { if (onFam() && window.famToday) { famToday(f); return; } S.open = f === undefined ? !S.open : !!f; if (S.open) S.tab = 'Today'; ls.set('rp', S.open); applyRP(); };
   window.shOpen = (pid, lid) => {
     if (!pid) { const e = (D().enrol || []).find(x => x.learner_id === lid); pid = e ? e.programme_id : null; }
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
@@ -45,8 +45,9 @@
   window.addEventListener('hashchange', () => { if (S.open) applyRP(); });
 
   function renderRP() {
-    $('rptabs').innerHTML = ['Details', 'Activity', 'Assistant'].map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')">${t}</button>`).join('');
+    $('rptabs').innerHTML = ['Today', 'Details', 'Activity', 'Assistant'].map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')">${t}</button>`).join('');
     const l = learner(S.lid), p = A() && S.pid ? A().prog(S.pid) : null, body = $('rpbody');
+    if (S.tab === 'Today') { body.innerHTML = window.apxToday ? apxToday(location.hash.slice(1).split('/')[0] || 'mywork') : ''; if (!D().progs) setTimeout(() => { if (S.open && S.tab === 'Today') renderRP(); }, 1500); return; }
     if (!l) { const fam = location.hash.slice(1).split('/')[0] === 'fam'; body.innerHTML = `<div class="empty"><b>Nothing selected</b><span>${fam ? 'This panel shows learner details. To see a practitioner, click their name in the FAM Registry list.' : "Select a learner's name in Attendance &amp; PoE, EISA readiness or search (Ctrl K) to see their details here."}</span></div>`; return; }
     if (S.tab === 'Details') body.innerHTML = details(l, p);
     if (S.tab === 'Activity') activity(l, p);
