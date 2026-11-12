@@ -1585,7 +1585,7 @@
 
   /* ---------- Today panel (side-panel button on #fam): things to act on now, with actions in place ---------- */
   let TD = null;
-  window.famToday = f => { const open = f === undefined ? !TD : !!f; if (!open) { TD = null; $('famtoday')?.remove(); $('famtodaybk')?.remove(); return; } TD = TD || { add: false }; renderToday(); };
+  window.famToday = f => { if (f === false) return; TD = TD || { add: false }; renderToday(); }; // Today now lives in the shared side panel (shell.js); links keep it open beside the page
   window.famTodayGo = h => { famToday(false); location.hash = h; };
   window.famTodayCover = (k, tab) => { S.cal = S.cal || {}; S.cal.tab = tab; S.cal.cf = k === '' ? '' : TD.rk[k]; famTodayGo('fam/calendar'); setTimeout(() => window.famCal && famCal('tab', tab), 0); };
   window.famTodayAdd = async ev => { ev.preventDefault(); const f = ev.target, aid = +f.elements.aid.value, notes = f.elements.note.value.trim(), due = f.elements.due.value || null;
@@ -1594,8 +1594,8 @@
       TD.add = false; say('Follow-up added'); await load(); } catch (_) { /* write() already showed it */ } };
   function renderToday() {
     if (!TD) return;
-    let el = $('famtoday');
-    if (!el) { document.body.insertAdjacentHTML('beforeend', `<div id="famtodaybk" onclick="famToday(false)"></div><aside id="famtoday" role="dialog" aria-label="Today"></aside><style id="famtodaycss">
+    const el = $('famtoday'); if (!el) return;
+    if (!$('famtodaycss')) { document.head.insertAdjacentHTML('beforeend', `<style id="famtodaycss">
       #famtodaybk{position:fixed;inset:0;background:rgba(20,20,60,.25);z-index:59}
       #famtoday{position:fixed;top:0;right:0;bottom:0;width:min(460px,100vw);z-index:60;overflow:auto;overscroll-behavior:contain;background:var(--card,#fff);box-shadow:-8px 0 32px rgba(20,20,60,.18);padding:16px 18px 28px;display:flex;flex-direction:column;gap:14px}
       #famtoday h2{font-size:18px;margin:0;flex-grow:1}#famtoday h3{font-size:14px;margin:0 0 6px;display:flex;gap:6px;align-items:center}
@@ -1603,7 +1603,8 @@
       #famtoday>*{flex-shrink:0}#famtoday .tdi{padding:8px 0;border-top:1px solid var(--line)}#famtoday .tdi:first-of-type{border-top:0}
       #famtoday .tdi a{font-weight:600}#famtoday .tdb{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}#famtoday .tdb:empty{display:none}#famtoday .tdb .btn{height:30px;font-size:13px;padding:0 10px}
       #famtoday form{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:12px}#famtoday form select,#famtoday form input{height:38px;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit;font-size:14px;width:100%;box-sizing:border-box}
-      </style>`); el = $('famtoday'); }
+      #rpbody #famtoday{position:static;width:auto;box-shadow:none;padding:0;z-index:auto;overflow:visible;background:none}#rpbody #famtoday>div:first-child h2{display:none}
+      </style>`); }
     const vids = new Set(vis().map(a => a.id)), A = id => S.A.find(x => x.id === id), t = today(), in30 = addD(t, 30);
     const pl = a => a ? `<a href="#fam/${a.id}" onclick="famToday(false)">${e(shownName(a))}</a>` : 'Unknown';
     const dleft = d => Math.round((new Date(d + 'T00:00:00') - new Date(t + 'T00:00:00')) / 864e5), when = d => { const n = dleft(d); return n < 0 ? `expired ${-n} day${n === -1 ? '' : 's'} ago` : n === 0 ? 'expires today' : `in ${n} day${n === 1 ? '' : 's'}`; };
@@ -1667,7 +1668,7 @@
     const form = TD.add ? `<form onsubmit="famTodayAdd(event)"><b>New follow-up</b><select name="aid" aria-label="Practitioner" required><option value="">Choose practitioner…</option>${people.map(a => `<option value="${a.id}">${e(shownName(a))}</option>`).join('')}</select>
       <input name="note" placeholder="What needs doing?" aria-label="Note" required maxlength="500"><label class="sub" style="display:grid;gap:4px">Due date (optional)<input type="date" name="due" min="${t}"></label>
       <div style="display:flex;gap:6px;justify-content:flex-end"><button type="button" class="btn sm" onclick="TDcancel()">Cancel</button><button class="btn sm y">Save</button></div></form>` : '';
-    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="famToday(false)" aria-label="Close">✕</button></div>
+    el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="toggleRP(false)" aria-label="Close">✕</button></div>
       <div class="sub" style="margin-top:-8px">${fmt(t)} · ${live.length} to act on</div><div class="tdchips">${chips}</div>${form}
       ${body || `<div class="card" style="padding:18px;text-align:center">${cf || TD.snz ? 'Nothing here.' : 'Nothing due. ✓'}</div>`}
       ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${demToday()}${done}`;

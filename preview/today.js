@@ -96,22 +96,39 @@
   const LBL = { recs: 'Recommendations', visits: 'Visits', eisa: 'EISA', qcto: 'QCTO tracker', modver: 'Moderation', accred: 'Accreditation', signoff: 'Sign-off', reports: 'Reports', pmtracker: 'PM Tracker', programmes: 'Programmes', clients: 'Clients', attendance: 'Attendance', learners: 'Learners', enrolments: 'Enrolments', synchealth: 'Sync health' };
   const MAX = 6;
 
+  /* snooze (7 days, this browser only) and filter, like FAM's Today */
+  const SK = 'ao.tdySnooze', TF = { f: 'all' };
+  const snz = () => { try { const o = JSON.parse(localStorage.getItem(SK) || '{}'), now = Date.now(); Object.keys(o).forEach(k => { if (o[k] < now) delete o[k]; }); return o; } catch (_) { return {}; } };
+  const key = x => (x.go + '|' + x.t).replace(/<[^>]+>/g, '').slice(0, 200);
+  const hsh = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return 'k' + (h >>> 0).toString(36); };
+  window.tdySnooze = (k, on) => { const o = snz(); if (on) o[k] = Date.now() + 7 * 864e5; else delete o[k]; try { localStorage.setItem(SK, JSON.stringify(o)); } catch (_) {} window.shRefresh && shRefresh(); };
+  window.tdyF = f => { TF.f = f; window.shRefresh && shRefresh(); };
+  const build = scr => { const keys = (SCREENS[scr] || SCREENS.mywork), m = pmap(), out = [], S0 = snz();
+    keys.forEach(k => { let b; try { b = B[k](m); } catch (e) { return; } if (!b || (b.link && !ok(b.link))) return; b.items.forEach(x => { x.k = hsh(key(x)); x.z = !!S0[x.k]; }); out.push(b); });
+    return out; };
+  window.apxTodayCount = scr => { if (!D().progs) return 0; let n = 0; build(scr).forEach(b => b.items.forEach(x => { if (x.warn && !x.z) n++; })); return n; };
+
   window.apxToday = scr => {
-    const keys = (SCREENS[scr] || SCREENS.mywork), m = pmap(), out = [];
-    keys.forEach(k => { let b; try { b = B[k](m); } catch (e) { return; } if (!b || (b.link && !ok(b.link))) return; out.push(b); });
-    const shown = out.filter(b => b.items.length);
-    const head = `<div class="sub">${scr in SCREENS ? 'What to act on now on this screen.' : 'Nothing specific for this screen; here is your day.'} Click a line to open it.</div>`;
-    if (!D().progs) return head + '<div class="empty"><b>Loading…</b></div>';
-    if (!shown.length) return head + '<div class="empty"><b>All clear</b><span>Nothing due or overdue here.</span></div>';
-    return head + shown.map(b => { const n = b.items.length, w = b.items.filter(x => x.warn).length;
-      const rows = b.items.slice().sort((a, c) => (c.warn ? 1 : 0) - (a.warn ? 1 : 0)).slice(0, MAX);
-      return `<div class="tdy"><h3>${esc(b.h)} <span class="sub" style="font-weight:400">${n}${w ? ` · <span style="color:var(--warn)">${w} need action</span>` : ''}</span></h3>
-        ${rows.map(x => `<button type="button" class="tdyi${x.warn ? ' w' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span></button>`).join('')}
-        ${n > MAX && LBL[b.link] ? `<a class="sub" href="#${b.link}">All ${n} in ${LBL[b.link]} ›</a>` : ''}</div>`; }).join('');
+    if (!D().progs) return '<div class="empty"><b>Loading…</b></div>';
+    const out = build(scr), all = out.flatMap(b => b.items), live = all.filter(x => !x.z), need = live.filter(x => x.warn), zz = all.length - live.length;
+    const pick = TF.f === 'need' ? (x => x.warn && !x.z) : TF.f === 'snz' ? (x => x.z) : (x => !x.z);
+    const chip = (f, n, l, c) => `<button type="button" class="tdyc${TF.f === f ? ' on' : ''}" aria-pressed="${TF.f === f}" onclick="tdyF('${f}')"><span class="badge ${c}">${n}</span> ${l}</button>`;
+    const head = `<div class="sub">${scr in SCREENS ? 'What to act on now on this screen.' : 'Your day across ApexOne.'} ${fmt(new Date().toISOString())} · ${live.length} open</div>
+      <div class="tdycs">${chip('all', live.length, 'All', '')}${chip('need', need.length, 'Needs action', 'b-warn')}${zz ? chip('snz', zz, 'Snoozed', '') : ''}</div>`;
+    const shown = out.map(b => ({ b, items: b.items.filter(pick) })).filter(o => o.items.length);
+    if (!shown.length) return head + `<div class="empty"><b>${TF.f === 'snz' ? 'Nothing snoozed' : 'All clear ✓'}</b><span>${TF.f === 'all' ? 'Nothing due or overdue here.' : ''}</span></div>`;
+    return head + shown.map(({ b, items }) => { const n = items.length, w = items.filter(x => x.warn).length;
+      const rows = items.slice().sort((a, c) => (c.warn ? 1 : 0) - (a.warn ? 1 : 0)).slice(0, MAX);
+      return `<section class="tdy"><h3>${esc(b.h)} <span class="sub" style="font-weight:400">${n}${w && TF.f !== 'need' ? ` · <span style="color:var(--warn)">${w} need action</span>` : ''}</span></h3>
+        ${rows.map(x => `<div class="tdyr"><button type="button" class="tdyi${x.warn ? ' w' : ''}" onclick="${esc(x.go)}"><b>${x.t}</b><span>${x.s}</span></button><button type="button" class="tdyz" title="${x.z ? 'Bring back' : 'Snooze 7 days'}" aria-label="${x.z ? 'Bring back' : 'Snooze 7 days'}" onclick="tdySnooze('${x.k}',${!x.z})">${x.z ? '↺' : 'z'}</button></div>`).join('')}
+        ${n > MAX && LBL[b.link] ? `<a class="sub" href="#${b.link}">All ${n} in ${LBL[b.link]} ›</a>` : ''}</section>`; }).join('');
   };
   if (!document.getElementById('tdycss')) document.head.insertAdjacentHTML('beforeend', `<style id="tdycss">
     .tdy{display:flex;flex-direction:column;gap:4px}.tdy h3{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
     .tdyi{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;width:100%;padding:7px 10px;border:1px solid var(--line,#e5e5ef);border-left:3px solid var(--line,#e5e5ef);border-radius:8px;background:none;font:inherit;font-size:13px;color:var(--ink);cursor:pointer}
     .tdyi:hover{background:var(--hover,rgba(0,0,0,.03))}.tdyi.w{border-left-color:var(--warn,#c80)}.tdyi span{color:var(--muted);font-size:12px}
-    .tdyi b{font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}</style>`);
+    .tdyi b{font-weight:600;overflow:hidden;text-overflow:ellipsis;max-width:100%;white-space:nowrap}
+    .tdyr{display:flex;gap:4px;align-items:stretch}.tdyr .tdyi{flex:1;min-width:0}.tdyz{flex:0 0 28px;border:1px solid var(--line,#e5e5ef);border-radius:8px;background:none;color:var(--muted);cursor:pointer;font:inherit;font-size:12px}.tdyz:hover{color:var(--ink)}
+    .tdycs{display:flex;gap:6px;flex-wrap:wrap}.tdyc{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:3px 10px 3px 4px;font:inherit;font-size:13px;cursor:pointer;display:flex;gap:6px;align-items:center}.tdyc.on{border-color:var(--ink)}
+    #view-fam .famdrawer{z-index:61!important}</style>`);
 })();

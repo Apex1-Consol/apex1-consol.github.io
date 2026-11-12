@@ -31,23 +31,27 @@
   /* ---------- right side panel ---------- */
   const S = { open: ls.get('rp', false), tab: 'Today', pid: null, lid: null, act: null };
   function applyRP() {
-    $('rpanel').hidden = !S.open || onFam(); // FAM uses its own docked practitioner panel
-    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', onFam() ? 'FAM calendar: who is on what, cover and renewals' : S.open ? 'Close side panel' : 'Today: what to act on, on this screen'); b.title = b.getAttribute('aria-label');
+    $('rpanel').hidden = !S.open; badge();
+    const b = $('rpbtn'); b.setAttribute('aria-expanded', String(S.open)); b.setAttribute('aria-label', S.open ? 'Close side panel' : 'Today: what to act on, on this screen'); b.title = b.getAttribute('aria-label');
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';
-  window.toggleRP = f => { if (onFam() && window.famToday) { famToday(f); return; } S.open = f === undefined ? !S.open : !!f; if (S.open) S.tab = 'Today'; ls.set('rp', S.open); applyRP(); };
+  window.toggleRP = f => { S.open = f === undefined ? !S.open : !!f; if (S.open) S.tab = 'Today'; ls.set('rp', S.open); applyRP(); };
   window.shOpen = (pid, lid) => {
     if (!pid) { const e = (D().enrol || []).find(x => x.learner_id === lid); pid = e ? e.programme_id : null; }
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
   };
   window.shTab = t => { S.tab = t; renderRP(); };
-  window.addEventListener('hashchange', () => { if (S.open) applyRP(); });
+  window.addEventListener('hashchange', () => { if (S.open) applyRP(); else badge(); });
+  window.shRefresh = () => { if (S.open) renderRP(); else badge(); };
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && S.open && !document.querySelector('dialog[open]')) toggleRP(false); });
+  function badge() { const b = $('rpbtn'); if (!b || !window.apxTodayCount) return; const n = onFam() ? 0 : apxTodayCount(scr()); let d = b.querySelector('.rpdot'); if (!d) { b.style.position = 'relative'; b.insertAdjacentHTML('beforeend', '<span class="rpdot" style="position:absolute;top:-3px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--warn,#c80);color:#fff;font-size:10px;font-weight:700;line-height:16px;text-align:center;box-sizing:border-box"></span>'); d = b.querySelector('.rpdot'); } d.textContent = n > 99 ? '99+' : n; d.hidden = !n; d.title = n + ' to act on'; }
+  const scr = () => location.hash.slice(1).split('/')[0] || 'mywork';
 
   function renderRP() {
     $('rptabs').innerHTML = ['Today', 'Details', 'Activity', 'Assistant'].map(t => `<button role="tab" type="button" aria-selected="${t === S.tab}" class="${t === S.tab ? 'on' : ''}" onclick="shTab('${t}')">${t}</button>`).join('');
     const l = learner(S.lid), p = A() && S.pid ? A().prog(S.pid) : null, body = $('rpbody');
-    if (S.tab === 'Today') { body.innerHTML = window.apxToday ? apxToday(location.hash.slice(1).split('/')[0] || 'mywork') : ''; if (!D().progs) setTimeout(() => { if (S.open && S.tab === 'Today') renderRP(); }, 1500); return; }
+    if (S.tab === 'Today') { if (onFam() && window.famToday) { body.innerHTML = '<div id="famtoday"></div>'; famToday(true); return; } body.innerHTML = window.apxToday ? apxToday(scr()) : ''; if (!D().progs) setTimeout(() => { if (S.open && S.tab === 'Today') renderRP(); }, 1500); return; }
     if (!l) { const fam = location.hash.slice(1).split('/')[0] === 'fam'; body.innerHTML = `<div class="empty"><b>Nothing selected</b><span>${fam ? 'This panel shows learner details. To see a practitioner, click their name in the FAM Registry list.' : "Select a learner's name in Attendance &amp; PoE, EISA readiness or search (Ctrl K) to see their details here."}</span></div>`; return; }
     if (S.tab === 'Details') body.innerHTML = details(l, p);
     if (S.tab === 'Activity') activity(l, p);
@@ -205,5 +209,5 @@
   const _route = window.route;
   window.route = function () { _route(); if (location.hash === '#mywork') renderMW(); };
   addEventListener('resize', () => { if (ls.get('rail', null) === null) applyRail(); });
-  applyRail(); applyRP();
+  applyRail(); applyRP(); [2500, 6000, 12000].forEach(t => setTimeout(() => window.shRefresh(), t));
 })();
