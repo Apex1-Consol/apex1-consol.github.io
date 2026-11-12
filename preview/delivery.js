@@ -101,6 +101,10 @@
     const tabs = [['Overview', `pTab='Overview';renderProg()`], ['Form 3', `pTab='Form 3';renderProg()`], ['Learners ›', `location.hash='learners'`],
       ['Attendance ›', `dvGo('attendance','Register')`], ['PoE ›', `dvGo('attendance','PoE tracker')`], ['EISA readiness ›', `dvGo('eisa','Readiness')`], ['Visits ›', `location.hash='visits'`]];
     $('ptabs').innerHTML = tabs.map(([t, f]) => `<button role="tab" aria-selected="${t === pTab}" class="${t === pTab ? 'on' : ''}" onclick="${f}">${t}</button>`).join('');
+    { const sid = String(p.id), cnt = k => (D()[k] || []).filter(x => String(x.programme_id) === sid), ok = h => !window.NAVR || !NAVR[h] || NAVR[h]();
+      const rel = [['qcto', 'QCTO tracker', cnt('tracker').length], ['modver', 'Moderation', cnt('mods').length], ['visits', 'Visits', cnt('visits').length], ['recs', 'Open recommendations', cnt('recs').filter(r => !r.resolved).length], ['reports', 'Reports', cnt('reports').length], ['enrolments', 'Enrolments', cnt('enrol').length]].filter(r => ok(r[0]));
+      let rs = $('prelated'); if (!rs) { $('ptabs').insertAdjacentHTML('afterend', '<div id="prelated" class="sub" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 4px"></div>'); rs = $('prelated'); }
+      rs.innerHTML = rel.length ? '<span>Related:</span>' + rel.map(([h, l, n]) => `<a href="#${h}" style="${n ? '' : 'color:var(--warn)'}">${l} · ${n}</a>`).join('') : ''; }
     const f3 = pTab === 'Form 3';
     $('pstats').hidden = f3; $('pmodcard').hidden = f3; $('form3').hidden = !f3;
     let su = $('psuit'); if (!su) { $('pmodcard').insertAdjacentHTML('afterend', '<section class="card" id="psuit" style="padding:0;margin-top:16px"></section>'); su = $('psuit'); }
