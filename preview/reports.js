@@ -1,6 +1,6 @@
 /* Reports in the new look (live data). Replaces the old app's "Reports" screen:
    1. Monthly report reviews: reports.my_report_queue / reports.transition_report (the database decides who may do what).
-   2. Downloads: CSV or Excel of each data set, filtered by client and programme, plus one workbook with everything. */
+   2. Exports live on each screen (Export ▾ via rpExp); the admin backup is in Admin › Data & Sync health. */
 (() => {
 const sb = window.__sb, P = window.__preview, D = () => P.data;
 const $ = id => document.getElementById(id);
@@ -251,12 +251,21 @@ window.rpCsv = i => { const s = SETS[i], a = flat(rowsOf(s));
 window.rpXlsx = i => { if (!window.XLSX) return say('Excel library not loaded'); const wb = XLSX.utils.book_new();
   (i == null ? SETS : [SETS[i]]).forEach(s => XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(flat(rowsOf(s))), s[0].slice(0, 31)));
   XLSX.writeFile(wb, `${i == null ? 'ApexOne_all_data' : SETS[i][0].replace(/ /g, '_')}${tag()}_${stamp()}.xlsx`); say('Excel file downloaded'); };
+/* Export button on the screens that have no export of their own (same columns as the old Downloads list; test records left out).
+   Links, not buttons, so screen code that clears header buttons leaves it alone. */
+window.rpExp = (name, fmt) => { const i = SETS.findIndex(x => x[0] === name); if (i < 0) return; F.client = F.prog = ''; fmt === 'csv' ? rpCsv(i) : rpXlsx(i); };
+const EXP = { learners: 'Learners', enrolments: 'Enrolments', visits: 'Monitoring visits', recs: 'Recommendations', eisa: 'EISA results', clients: 'Clients' };
+function addExport() {
+  const k = location.hash.slice(1).split('/')[0], name = EXP[k], v = $('view-' + k); if (!name || !v || v.querySelector('.rpexp')) return;
+  const hd = v.querySelector('h1')?.closest('main > div'); if (!hd) return;
+  const go = f => `<a href="#" class="btn sm" onclick="rpExp('${name}','${f}');this.closest('details').open=false;return false">${f === 'csv' ? 'CSV' : 'Excel'}</a>`;
+  const html = `<details class="famfum rpexp"><summary class="btn" aria-label="Export ${name}">Export ▾</summary><div>${go('csv')}${go('xlsx')}</div></details>`;
+  const y = [...hd.querySelectorAll('.btn.y')].pop(); y ? y.insertAdjacentHTML('beforebegin', html) : hd.insertAdjacentHTML('beforeend', html);
+}
+addEventListener('hashchange', () => setTimeout(addExport, 400)); setInterval(addExport, 2000);
 window.rpF = (k, v) => { F[k] = v; if (k === 'client') F.prog = ''; render(); };
 
-let DLOPEN = false;
-window.rpDl = () => { DLOPEN = !DLOPEN; if (!DLOPEN && location.hash === '#reports/downloads') history.replaceState(null, '', '#reports'); render(); };
 function render() {
-  const dlOpen = DLOPEN || location.hash === '#reports/downloads';
   const v = $('view-reports'); if (!v || v.hidden) return;
   const clients = (D().clients || []).map(c => [String(c.id), c.client_name || (c.fields || {})['Company Name'] || 'Client ' + c.id]).sort((a, b) => a[1].localeCompare(b[1]));
   const progs = (D().progs || []).filter(p => !F.client || String(p.client_id) === F.client).map(p => [String(p.id), (p.display_id ? p.display_id + ' · ' : '') + (p.programme_name || '')]);
@@ -266,18 +275,11 @@ function render() {
     <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex:1 1 300px"><h2 style="font-size:18px">Report Generator</h2><span class="sub">Write, print and submit monthly client reports. Same screen and steps as before.</span></div><a class="btn y" href="/report-generator.html" target="_blank" rel="noopener">Open Report Generator ↗</a></section>
     ${tracker()}
     ${drafts()}
-    <section class="card" style="padding:0" id="rpdl">${!dlOpen ? `<div style="display:flex;align-items:center;padding:14px 20px"><h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpDl()">▸ Downloads <span style="font-weight:400;color:var(--muted)">(CSV / Excel)</span></h2></div></section>` : `<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
-      <h2 style="flex-grow:1;font-size:18px;align-self:center;cursor:pointer" onclick="rpDl()">▾ Downloads <span style="font-weight:400;color:var(--muted)">(CSV / Excel)</span></h2>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Client<select class="cellin" style="height:36px;max-width:260px" onchange="rpF('client',this.value)">${opt(clients, F.client, 'All clients')}</select></label>
-      <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Programme<select class="cellin" style="height:36px;max-width:300px" onchange="rpF('prog',this.value)">${opt(progs, F.prog, 'All programmes')}</select></label>
-      ${has() ? '<button class="btn y" onclick="rpXlsx()">Everything (.xlsx)</button>' : ''}</div>
-      <div class="tw"><table class="dense"><thead><tr><th>Data set</th><th>Rows</th><th></th></tr></thead><tbody>
-      ${SETS.map((s, i) => `<tr><td><b>${esc(s[0])}</b></td><td>${rowsOf(s).length}</td><td style="white-space:nowrap;text-align:right"><button class="btn sm" onclick="rpCsv(${i})">CSV</button> <button class="btn sm" onclick="rpXlsx(${i})">Excel</button></td></tr>`).join('')}
-      </tbody></table></div><p class="note" style="margin:12px 20px">Test records are left out. Each file holds the database columns plus the captured fields, as on screen.</p></section>`}
+
   </div>`;
 }
 ROUTES.reports = ['Reports', 'Outputs'];
-async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (location.hash === '#reports/downloads') setTimeout(() => $('rpdl')?.scrollIntoView({ behavior: 'smooth' }), 50); if (Q === null) { await Promise.all([loadQ(), loadDr().then(loadTR)]); render(); } }
+async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports' || !P.user) return; render(); if (Q === null) { await Promise.all([loadQ(), loadDr().then(loadTR)]); render(); } }
 /* Dashboard and My work: a one-line card for the current reporting month */
 async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;

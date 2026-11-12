@@ -194,7 +194,7 @@
     if (!OQ) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>'; const r = await sb.from('v_clickup_operator_queue').select('*').order('updated_at', { ascending: false }).limit(500); OQ = r.error ? (say('Could not load the sync queue: ' + r.error.message), []) : r.data || []; }
     const rows = OQ.filter(OQT[OQF][1]), dq = D().dq || [];
     const ob = D().outbox || [], okN = ob.filter(o => o.status === 'succeeded').length;
-    v.innerHTML = head('Data & Sync Health', 'ApexOne is the system of record; ClickUp mirrors it. Records are identified only by source table and record id.', '<button class="btn" onclick="adOpsReload()">Refresh</button>')
+    v.innerHTML = head('Data & Sync Health', 'ApexOne is the system of record; ClickUp mirrors it. Records are identified only by source table and record id.', (has() ? '<button class="btn" onclick="rpXlsx()" title="Every data set in one Excel file, test records left out">Backup: everything (.xlsx)</button>' : '') + '<button class="btn" onclick="adOpsReload()">Refresh</button>')
       + `<div class="grid">${Object.entries(OQT).map(([k, [l, f]]) => kpi(l, OQ.filter(f).length)).join('')}${kpi('Synced (latest 500)', okN)}</div>
       <section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><h2 style="font-size:17px;margin-bottom:10px">ClickUp sync queue</h2>${seg(Object.entries(OQT).map(([k, [l, f]]) => [k, l, OQ.filter(f).length]), OQF, 'adOpsF')}</div>
       <div class="tw"><table class="dense">${H(['Record', 'Status', 'Attempts', 'Last error', 'Next try', 'Updated', ''])}<tbody>
