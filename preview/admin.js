@@ -8,7 +8,7 @@
   if (!sb || !P || !write) return;
 
   const D = () => P.data || {};
-  const has = (...r) => (P.roles || []).some(x => x === 'admin' || r.includes(x));
+  const has = (...r) => (P.roles || []).some(x => x === 'admin' || x === 'demo' || r.includes(x));
   const day = s => s ? String(s).slice(0, 10) : '';
   const iso = () => new Date().toISOString().slice(0, 10);
   const H = h => `<thead><tr>${h.map(x => `<th>${x}</th>`).join('')}</tr></thead>`;
@@ -40,10 +40,23 @@
     users: ['User management', 'Admin', []]
   };
   // menu items are hidden for roles that cannot open them (index.html renderNav reads this)
-  window.NAVR = Object.fromEntries(Object.entries(VIEWS).map(([k, v]) => [k, () => !v[2] || has(...v[2])]));
-  // FAM Registry: only fam_admin (Bernadine, Dolores, Ayanda, Stavros); DB policy fam_only enforces the same
-  window.NAVR.fam = () => (P.roles || []).includes('fam_admin');
-  window.NAVR.pi = () => has('pi_specialist');
+  // Page access per role, agreed with Stavros 12 Nov 2026. Admin and demo see everything; null = everyone.
+  const PM = 'project_manager', PI = 'pi_specialist', QA = 'qa_specialist', ET = 'etqa';
+  const GATE = { mywork: null, dashboard: null, reports: null, hoo: ['head_of_ops'],
+    clients: [PM, PI], pmtracker: [PM, PI], programmes: [PM, PI, QA], pi: [PI],
+    learners: [PM, QA, ET], dq: [QA, ET], enrolments: [QA, ET], eisa: [QA, ET], qcto: [QA, ET, PI, PM],
+    attendance: [PM, QA], visits: [PM, QA], recs: [PM, QA], modver: [QA, ET, PM], accred: [QA],
+    signoff: [PI, 'compliance_officer', 'head_of_ops'], fam: [PI, 'fam_admin'], assessors: [QA, ET],
+    synchealth: [], audit: [], users: [] };
+  window.NAVR = Object.fromEntries(Object.entries(GATE).map(([k, r]) => [k, () => !r || has(...r)]));
+  // A project manager (not admin/demo) sees only their own programmes and clients in My work, Clients and PM Tracker.
+  const ALIAS = { thia: 'tia', johannes: 'hansie', hansie: 'johannes' };
+  const myNames = () => { const u = P.user || {}, e = (u.email || '').split(/[@+.]/)[0].toLowerCase(), n = String(u.user_metadata?.name || '').toLowerCase().split(/\s+/)[0]; return [e, n, ALIAS[e], ALIAS[n]].filter(Boolean); };
+  window.apxPMonly = () => (P.roles || []).includes(PM) && !(P.roles || []).some(r => r === 'admin' || r === 'demo');
+  window.apxMineName = s => { const t = String(s || '').toLowerCase().split(/[^a-z]+/); return myNames().some(x => t.includes(x)); };
+  window.apxMineProg = p => !apxPMonly() || apxMineName(p.project_manager_name);
+  const guard = () => { const r = location.hash.slice(1).split('/')[0]; if (P.user && NAVR[r] && !NAVR[r]()) location.hash = 'mywork'; };
+  addEventListener('hashchange', guard); setTimeout(guard, 0);
   const anchor = $('view-dq');
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
 
@@ -61,7 +74,7 @@
   function renderPM() {
     const v = $('view-pmtracker');
     if (!has('qa_specialist', 'project_manager', 'pi_specialist')) { v.innerHTML = locked('PM Tracker', 'admin, QA, project manager or PI specialist'); return; }
-    const all = D().progs || [], rows = pmRows();
+    const all = (D().progs || []).filter(apxMineProg), rows = pmRows().filter(apxMineProg);
     const pms = [...new Set(all.map(p => p.project_manager_name || 'Unassigned'))].sort();
     PMS = pms;
     const cards = pms.map((n, i) => {
@@ -145,7 +158,7 @@
     };
   };
   window.adPMcsv = () => csv('pm-tracker.csv', ['Prog ID', 'Project manager', 'Client', 'Qualification', 'SAQA ID', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status'],
-    pmRows().map(p => [p.display_id || p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, pf(p, 'Cohort') || p.group_name, learnersIn(p.id), pf(p, 'Employment Status'), pf(p, 'Mode of Delivery'), pf(p, 'SETA'), p.programme_type, p.nqf_level || pf(p, 'NQF'), day(p.start_date), day(p.end_date), personName(p.facilitator_id) || pf(p, 'Facilitator'), pf(p, 'Assessor'), p.status]));
+    pmRows().filter(apxMineProg).map(p => [p.display_id || p.id, p.project_manager_name || 'Unassigned', clientName(p.client_id), p.qualification_name || p.programme_name, p.saqa_id, pf(p, 'Cohort') || p.group_name, learnersIn(p.id), pf(p, 'Employment Status'), pf(p, 'Mode of Delivery'), pf(p, 'SETA'), p.programme_type, p.nqf_level || pf(p, 'NQF'), day(p.start_date), day(p.end_date), personName(p.facilitator_id) || pf(p, 'Facilitator'), pf(p, 'Assessor'), p.status]));
   window.adPMtpl = () => {
     if (!window.XLSX) return say('Excel library not loaded');
     const ws = XLSX.utils.aoa_to_sheet([['Project manager', 'Client', 'Programme name', 'Qualification', 'SAQA ID', 'Programme type', 'NQF level', 'Start date (yyyy-mm-dd)', 'End date (yyyy-mm-dd)', 'Facilitator']]);

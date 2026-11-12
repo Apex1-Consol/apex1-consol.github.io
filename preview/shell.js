@@ -15,7 +15,7 @@
   const nm = l => l ? (l.first_name + ' ' + l.last_name).trim() : '';
   const short = p => (p?.programme_name || '').replace('[TEST] ', '');
   const learner = id => (D().learners || []).find(l => l.id === id);
-  const active = () => (D().progs || []).filter(p => p.status === 'active' && A() && A().learnersOf(p.id).length);
+  const active = () => (D().progs || []).filter(p => p.status === 'active' && A() && A().learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p)));
 
   /* ---------- menu open / closed ---------- */
   const app = () => document.getElementById('shell');
@@ -117,7 +117,7 @@
   /* ---------- My work ---------- */
   let mwRole = null, mwPick = {}, mwShowHidden = false;
   const hid = () => { const h = ls.get('hide', {}); return h.d === iso() ? h.ids || [] : []; };
-  const roleOf = () => roles().includes('admin') ? 'admin' : (roles().some(r => ['qa_specialist', 'etqa'].includes(r)) ? 'qa' : 'pm');
+  const roleOf = () => roles().includes('admin') ? 'admin' : roles().includes('pi_specialist') ? 'pi' : (roles().some(r => ['qa_specialist', 'etqa'].includes(r)) ? 'qa' : 'pm');
   function tasks(role) {
     const a = A(), out = [], d = D(); if (!a) return out;
     const go = (pid, h, t) => `dvApi.setProg(${pid});dvGo('${h}','${t}')`;
@@ -142,6 +142,11 @@
       }));
       const open = (d.recs || []).filter(r => !r.resolved).length;
       if (open) out.push({ id: 'recs', t: `Close ${open} open recommendation${open > 1 ? 's' : ''}`, s: 'From monitoring visits', k: 'Recommendation', c: 'Review', on: `location.hash='recs'`, bad: 1 });
+    }
+    if (role === 'pi') {
+      const w = typeof soWaiting === 'function' ? soWaiting() : 0, ret = (d.signoffs || []).filter(s => s.status === 'returned').length;
+      if (ret) out.push({ id: 'pir', t: `${ret} hand-over${ret > 1 ? 's' : ''} returned to fix`, s: 'Sign-off queue', k: 'Sign-off', c: 'Open', on: `location.hash='signoff'`, bad: 1 });
+      if (w) out.push({ id: 'piw', t: `${w} hand-over${w > 1 ? 's' : ''} waiting for sign-off`, s: 'Sign-off queue', k: 'Sign-off', c: 'View', on: `location.hash='signoff'` });
     }
     if (role === 'admin') {
       const w = typeof soWaiting === 'function' ? soWaiting() : 0, ret = (d.signoffs || []).filter(s => s.status === 'returned').length;
@@ -189,6 +194,7 @@
       return `<a class="mwprog" href="#programmes" onclick="setTimeout(()=>dvProg(${p.id}))"><b style="display:block;font-size:13px">${esc(short(p))}</b><span class="sub">${lsn.length} learner${lsn.length === 1 ? '' : 's'} · ${at.rate === null ? '—' : at.rate + '%'} attendance · ${rd} of ${lsn.length} EISA ready</span><span class="mwbar"><i style="width:${lsn.length ? Math.max(2, Math.round(rd / lsn.length * 100)) : 0}%"></i></span></a>`; }).join('') || '<div class="empty" style="padding:20px"><span>No active programmes</span></div>' : '';
     const L = { pm: [['Attendance register', "dvGo('attendance','Register')"], ['PoE tracker', "dvGo('attendance','PoE tracker')"], ['EISA readiness', "dvGo('eisa','Readiness')"]],
       qa: [['Moderation & Verification', "location.hash='modver'"], ['QCTO Tracker', "location.hash='qcto'"], ['LEISA file', "dvGo('eisa','LEISA file')"]],
+      pi: [['Programme Initiation', "location.hash='pi'"], ['Sign-off queue', "location.hash='signoff'"], ['Clients', "location.hash='clients'"]],
       admin: [['Sign-off queue', "location.hash='signoff'"], ['Data quality', "location.hash='dq'"], ['Accreditation', "location.hash='accred'"]] }[mwRole];
     $('mwlinks').innerHTML = L.map(([t, f]) => `<a href="#" onclick="${f};return false">${t}</a>`).join('');
   }

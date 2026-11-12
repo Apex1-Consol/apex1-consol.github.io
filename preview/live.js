@@ -671,7 +671,7 @@
     return { s: s || 'No MOU recorded', exp, cls, note: s === 'Signed' && exp && exp <= soon ? 'expires ' + clDate(exp) : '' };
   }
   function applyClients() {
-    const list = P.data.clients.filter(c => !c.deleted_at).sort((a, b) => clName(a).localeCompare(clName(b)));
+    const list = P.data.clients.filter(c => !c.deleted_at && (!window.apxPMonly || !apxPMonly() || apxMineName(c.project_manager) || P.data.progs.some(p => p.client_id === c.id && apxMineProg(p)))).sort((a, b) => clName(a).localeCompare(clName(b)));
     if (!list.find(c => c.id === clPick)) clPick = list[0]?.id ?? null;
     const head = document.querySelector('#view-clients h1')?.parentElement;
     if (head && !$('clq')) head.insertAdjacentHTML('beforeend', '<input id="clq" type="search" placeholder="Search clients, contacts, PM" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--surface);color:var(--ink);min-width:220px" oninput="previewClSearch(this.value)">');
