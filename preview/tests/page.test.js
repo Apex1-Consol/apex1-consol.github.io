@@ -269,6 +269,22 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const { w, d } = await boot(sess('operations')); w.location.hash = 'attendance'; await tick();
     ok(!d.querySelector('#register button:not(.lname)') && d.getElementById('dvadd').hidden, 'operations can edit');
   });
+  await t('Attendance & PoE: imported registers and legacy document marks count; legacy running programme is Active', async () => {
+    const keep = JSON.stringify({ a: DATA.attendance, p: DATA.programmes, e: DATA.enrolments, c: DATA.poe_checklist });
+    DATA.attendance = DATA.attendance.concat([{ id: 401, programme_id: 100, learner_id: 1, session_date: '2026-06-17', status: 'A' }, { id: 402, programme_id: 101, learner_id: 1, session_date: '2026-06-12', status: 'P' }]);
+    DATA.programmes = DATA.programmes.concat([{ id: 101, programme_name: 'Legacy no dates', status: 'initiated', client_id: 7 }]);
+    DATA.enrolments = DATA.enrolments.concat([{ id: 11, learner_id: 1, programme_id: 101, status: 'active' }]);
+    DATA.poe_checklist = [{ id: 1, programme_id: 100, learner_id: 1, created_at: '2026-08-01', fields: { RecordType: 'poe', Programme: ['100'], Learner: ['1'], Marks: '{"id_copy":"received"}' } },
+      { id: 5, programme_id: 100, learner_id: 1, created_at: '2026-09-01', fields: { RecordType: 'poe', Programme: ['100'], Learner: ['1'], Marks: '{"id_copy":"received","learner_agreement":"received","qualification_cert":"missing","workplace_evidence":"received"}' } }];
+    try {
+      const { w, d } = await boot(sess('qa_specialist')); w.location.hash = 'attendance'; await tick();
+      ok(d.querySelector('#register button[aria-label*="17/06/2026"]')?.textContent === 'A', 'imported register date not shown');
+      ok(w.dvApi.regDates(100).join() === '2026-06-10,2026-06-17', 'regDates ' + w.dvApi.regDates(100));
+      ok(w.dvApi.runState(w.dvApi.prog(101)) === 'Active', 'legacy programme with a register and no start date should be Active');
+      const g = w.dvApi.docGaps(100); ok(g.captured && g.missing === 1 && g.open === 0, 'docGaps ' + JSON.stringify(g));
+      w.eval("aTab='Documents'"); w.renderAtt(); await tick(); ok(/Learner Agreement/.test(d.getElementById('doccard').textContent) && /3\/4 required/.test(d.getElementById('doccard').textContent), 'legacy list / newest row');
+    } finally { const k = JSON.parse(keep); DATA.attendance = k.a; DATA.programmes = k.p; DATA.enrolments = k.e; if (k.c) DATA.poe_checklist = k.c; else delete DATA.poe_checklist; }
+  });
   await t('My work: role tasks, admin can view as PM, hide for today', async () => {
     const { w, d } = await boot(sess(['admin'])); w.location.hash = 'mywork'; await tick();
     ok(!d.getElementById('view-mywork').hidden, 'My work not shown');

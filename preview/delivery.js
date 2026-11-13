@@ -27,7 +27,18 @@
   const learnersOf = pid => { const ids = new Set((D().enrol || []).filter(e => e.programme_id === pid).map(e => e.learner_id)); return (D().learners || []).filter(l => ids.has(l.id)); };
   const modsOf = pid => { const pm = (D().pmods || []).filter(m => m.programme_id === pid); if (pm.length) return pm.sort((a, b) => a.module_number - b.module_number);
     return [...new Set((D().eisaRes || []).filter(r => r.programme_id === pid).map(r => r.module_number))].sort((a, b) => a - b).map(n => ({ programme_id: pid, module_number: n, title: '' })); };   // live: few programmes have program_modules; fall back to the modules that have results
-  const sessOf = pid => (D().sessions || []).filter(s => s.programme_id === pid).sort((a, b) => day(a.session_date) < day(b.session_date) ? -1 : 1);
+  // Register dates = dates with at least one P / R / A mark. Imported registers often have marks but no attendance_sessions row:
+  // those dates still show as register columns (marked "imported") so the register, rates and Today checks see them.
+  const regDates = pid => [...new Set((D().att || []).filter(a => a.programme_id === pid && AT(a.status)).map(a => day(a.session_date)))].sort();
+  const sessOf = pid => { const ss = (D().sessions || []).filter(s => s.programme_id === pid), have = new Set(ss.map(s => day(s.session_date)));
+    const extra = regDates(pid).filter(d => !have.has(d)).map(d => ({ programme_id: pid, session_date: d, topic: '', fields: {}, imported: true }));
+    return ss.concat(extra).sort((a, b) => day(a.session_date) < day(b.session_date) ? -1 : day(a.session_date) > day(b.session_date) ? 1 : 0); };
+  /* Run state from status + dates. Legacy programmes stay 'initiated' while running, so 'initiated' with a start date (or, with no start
+     date, a captured register) on or before today and no past end date is Active; past its end date it is Completed; otherwise Planned. */
+  const today = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+  const runState = p => { if (!p) return 'Planned'; if (['closed', 'completed'].includes(p.status)) return 'Completed'; if (p.status === 'active') return 'Active';
+    const t = today(), st = day(p.start_date) || regDates(p.id)[0] || '';
+    if (!st || st > t) return 'Planned'; return p.end_date && day(p.end_date) < t ? 'Completed' : 'Active'; };
   const attFor = (pid, lid, d) => (D().att || []).find(a => a.programme_id === pid && a.learner_id === lid && day(a.session_date) === day(d));
   const resFor = (pid, lid, n) => (D().eisaRes || []).find(r => r.programme_id === pid && r.learner_id === lid && r.module_number === n);
   const kindsOf = m => { const k = KINDS.filter(x => (m.components || []).some(c => c.kind === x)); return k.length ? k : KINDS; };
@@ -42,7 +53,7 @@
   let dProg = null;
   const ensure = () => {
     const ok = progs().filter(p => learnersOf(p.id).length);
-    if (!ok.some(p => p.id === dProg)) dProg = (ok.find(p => p.status === 'active') || ok[0] || progs()[0])?.id ?? null;
+    if (!ok.some(p => p.id === dProg)) dProg = (ok.find(p => runState(p) === 'Active') || ok[0] || progs()[0])?.id ?? null;
     return prog(dProg);
   };
   const picker = (sel, after) => {
@@ -73,25 +84,25 @@
     'Every module assessed: a final result (C or NYC) for each part, no rework or missing submissions', 'Every module ticked as internally moderated in the PoE tracker', 'SoR status is Issued in the QCTO tracker'];
 
   /* ---------- Programmes ---------- */
-  const PST = { Active: s => s === 'active', Planned: s => ['initiated', 'handed_over', 'planned', 'draft'].includes(s), Completed: s => ['closed', 'completed'].includes(s) };
+  const PST = { Active: p => runState(p) === 'Active', Planned: p => runState(p) === 'Planned', Completed: p => runState(p) === 'Completed' };
   // shared with shell.js (My work, side panel)
-  window.dvApi = { readiness, why, learnersOf, modsOf, sessOf, attFor, resFor, kindsOf, attendance, absenceLimit, prog, progs, AT, COL, KINDS, KLAB, RLAB, setProg: id => { dProg = id; } };
+  window.dvApi = { readiness, why, learnersOf, modsOf, sessOf, attFor, resFor, kindsOf, attendance, absenceLimit, prog, progs, regDates, runState, docGaps: (...a) => docGaps(...a), AT, COL, KINDS, KLAB, RLAB, setProg: id => { dProg = id; } };
   window.dvProg = id => { dProg = id; pTab = 'Overview'; renderProg(); };
   window.dvGo = (hash, tab) => { if (hash === 'attendance') aTab = tab; if (hash === 'eisa') eTab = tab; location.hash = hash; setTimeout(() => { if (hash === 'attendance') renderAtt(); if (hash === 'eisa') renderE(); }, 0); };
   const _renderProg = renderProg;
   renderProg = function () {
     if (!P.user) return _renderProg();
     let p = prog(dProg);
-    const list = progs().filter(x => PST[pStatus](x.status));
-    if (!p || !PST[pStatus](p.status)) { dProg = list[0]?.id ?? dProg; p = prog(dProg); }
+    const list = progs().filter(x => PST[pStatus](x));
+    if (!p || !PST[pStatus](p)) { dProg = list[0]?.id ?? dProg; p = prog(dProg); }
     $('pstatus').className = 'famseg'; $('pstatus').style.flexWrap = 'wrap';
-    $('pstatus').innerHTML = Object.keys(PST).map(s => `<button class="${s === pStatus ? 'on' : ''}" aria-pressed="${s === pStatus}" onclick="pStatus='${s}';renderProg()">${s} · ${progs().filter(x => PST[s](x.status)).length}</button>`).join('');
+    $('pstatus').innerHTML = Object.keys(PST).map(s => `<button class="${s === pStatus ? 'on' : ''}" aria-pressed="${s === pStatus}" onclick="pStatus='${s}';renderProg()">${s} · ${progs().filter(x => PST[s](x)).length}</button>`).join('');
     const cn = x => client(x)?.client_name || 'No client', sorted = list.slice().sort((a, b) => (cn(a) === 'No client') - (cn(b) === 'No client') || cn(a).localeCompare(cn(b)) || String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
     let pLast = null;
     $('plist').innerHTML = sorted.map(x => { const gh = cn(x) !== pLast ? `<div class="pickgh"><span class="famgd" style="background:${cn(x) === 'No client' ? 'var(--warn)' : 'var(--navy)'}"></span>${esc(cn(x))}<span class="famgn">${sorted.filter(y => cn(y) === cn(x)).length}</span></div>` : ''; pLast = cn(x);
       return gh + `<button class="pick${x.id === dProg ? ' on' : ''}" onclick="dvProg(${x.id})"><b>${esc(x.programme_name)}</b><span class="sub">${x.programme_type === 'legacy' ? '<span class="famtag">LEG</span>' : '<span class="famtag">OCC</span>'}${learnersOf(x.id).length} learners${x.start_date ? '' : '<span class="famflag">No dates</span>'}</span></button>`; }).join('') || `<div class="empty"><b>No ${pStatus.toLowerCase()} programmes</b></div>`;
     const v = $('view-programmes'), hd = v.querySelector('.dark');
-    if (!p || !PST[pStatus](p.status)) { if ($('psuit')) $('psuit').hidden = true; hd.hidden = true; $('ptabs').innerHTML = ''; $('pstats').hidden = $('pmodcard').hidden = $('form3').hidden = true; return; }
+    if (!p || !PST[pStatus](p)) { if ($('psuit')) $('psuit').hidden = true; hd.hidden = true; $('ptabs').innerHTML = ''; $('pstats').hidden = $('pmodcard').hidden = $('form3').hidden = true; return; }
     hd.hidden = false;
     const sp = hd.querySelectorAll('span');
     sp[0].textContent = `${p.status === 'active' ? 'Active' : p.status} · ${p.programme_type || p.qualification_type || 'Programme'}`;
@@ -189,7 +200,7 @@
     };
   };
   window.dvProgCsv = () => {
-    const rows = progs().filter(p => PST[pStatus](p.status)), cols = [['Prog ID', p => p.display_id], ['Programme', p => p.programme_name], ['Client', p => client(p)?.client_name], ['Stage', p => p.status], ['Type', p => p.programme_type], ['SAQA ID', p => p.saqa_id], ['NQF', p => p.nqf_level], ['Project manager', p => p.project_manager_name], ['Start', p => day(p.start_date)], ['End', p => day(p.end_date)], ['Learners enrolled', p => learnersOf(p.id).length]];
+    const rows = progs().filter(p => PST[pStatus](p)), cols = [['Prog ID', p => p.display_id], ['Programme', p => p.programme_name], ['Client', p => client(p)?.client_name], ['Stage', p => p.status], ['Type', p => p.programme_type], ['SAQA ID', p => p.saqa_id], ['NQF', p => p.nqf_level], ['Project manager', p => p.project_manager_name], ['Start', p => day(p.start_date)], ['End', p => day(p.end_date)], ['Learners enrolled', p => learnersOf(p.id).length]];
     const t = [cols.map(c => c[0]), ...rows.map(p => cols.map(c => c[1](p) ?? ''))].map(r => r.map(x => `"${String(x).replace(/"/g, '""')}"`).join(',')).join('\r\n');
     try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = `Programmes-${pStatus}.csv`; document.body.appendChild(a); a.click(); a.remove(); } catch (_) {}
     say(`Exported ${rows.length} programmes`);
@@ -279,7 +290,7 @@
       <label>Module<select data-k="module">${modsOf(p.id).map(m => `<option value="${m.module_number}">Module ${m.module_number}: ${esc(m.title || '')}</option>`).join('') || '<option value="">No modules</option>'}</select></label>
       <label>Topic<input data-k="topic"></label><label>Facilitator<input data-k="facilitator" value="${esc((D().assessors || []).find(a => a.id === p.facilitator_id)?.full_name || '')}"></label><label>Venue<input data-k="venue" value="Online"></label></div>
       <div style="display:flex;gap:8px;margin-top:8px"><button class="btn y sm" onclick="dvAddSession()">Save session</button><button class="btn sm" onclick="dvAddToggle()">Cancel</button></div></td></tr>`;
-    $('register').innerHTML = `<thead><tr><th>Learner</th>${ss.map((s, i) => `<th style="text-align:center" title="${esc(s.topic || '')}">S${i + 1}<div class="sub" style="font-weight:400">${fmtD(day(s.session_date)).slice(0, 5)}${modOfSession(s) ? ' · M' + modOfSession(s) : ''}</div></th>`).join('')}<th>Rate</th><th>Absent</th></tr></thead><tbody>${form}${ls.map(l => {
+    $('register').innerHTML = `<thead><tr><th>Learner</th>${ss.map((s, i) => `<th style="text-align:center" title="${s.imported ? 'Imported register: marks captured without a session record' : esc(s.topic || '')}">S${i + 1}<div class="sub" style="font-weight:400">${fmtD(day(s.session_date)).slice(0, 5)}${modOfSession(s) ? ' · M' + modOfSession(s) : ''}</div></th>`).join('')}<th>Rate</th><th>Absent</th></tr></thead><tbody>${form}${ls.map(l => {
       let rec = 0, here = 0, ab = 0;
       const cells = ss.map(s => { const v = AT(attFor(p.id, l.id, s.session_date)?.status); if (v) { rec++; if (v !== 'A') here++; if (v === 'A') ab++; }
         const [bg, fg] = v && SC[v] ? SC[v] : ['var(--soft)', 'var(--muted)'];
@@ -303,7 +314,7 @@
     const p = prog(dProg), box = $('dvsess'); if (!p || !box) return;
     const v = {}; box.querySelectorAll('[data-k]').forEach(i => { v[i.dataset.k] = i.value.trim(); });
     if (!v.session_date) return say('Pick the session date');
-    if (sessOf(p.id).some(s => day(s.session_date) === v.session_date)) return say('There is already a session on that date');
+    if (sessOf(p.id).some(s => !s.imported && day(s.session_date) === v.session_date)) return say('There is already a session on that date');
     const row = { tenant_id: P.tenant, programme_id: p.id, session_date: v.session_date, topic: v.topic || null, facilitator: v.facilitator || null, venue: v.venue || null,
       fields: { Date: v.session_date, Topic: v.topic, Facilitator: v.facilitator, Venue: v.venue, Programme: [String(p.id)], Module: v.module ? +v.module : null } };
     const r = await write('Session', () => sb.from('attendance_sessions').insert(row).select());
@@ -335,17 +346,31 @@
   const POE_DOCS = [{ id: 'id_copy', label: 'ID Copy / Certified ID', required: true }, { id: 'enrolment_frm', label: 'Signed Enrolment Form', required: true }, { id: 'consent', label: 'Consent Form (POPIA)', required: true },
     { id: 'logbook', label: 'Logbook (signed)', required: true }, { id: 'poe', label: 'Portfolio of Evidence (PoE)', required: true }, { id: 'mou', label: 'MOU (employer-signed)', required: false },
     { id: 'medical', label: 'Medical Certificate (if applicable)', required: false }, { id: 'bank_confirm', label: 'Banking Confirmation Letter', required: false }];
+  // Registers imported from the old app used this list (no 'poeconfig' row): show those programmes against it so their marks count.
+  const POE_LEGACY = [{ id: 'id_copy', label: 'ID Copy / Certified ID', required: true }, { id: 'learner_agreement', label: 'Learner Agreement', required: true },
+    { id: 'qualification_cert', label: 'Qualification Certificate', required: true }, { id: 'workplace_evidence', label: 'Workplace Evidence', required: true }];
   const pcProg = r => +((r.fields?.Programme || [])[0] ?? r.programme_id), pcLearner = r => +((r.fields?.Learner || [])[0] ?? r.learner_id);
   const pcRows = () => D().poeRows || [];
   const pcCfgRec = pid => pcRows().find(r => r.fields?.RecordType === 'poeconfig' && pcProg(r) === pid);
-  const pcDocs = pid => { const r = pcCfgRec(pid); try { if (r?.fields?.Docs) return JSON.parse(r.fields.Docs); } catch (_) {} return POE_DOCS.map(d => ({ ...d })); };
-  const pcRec = (pid, lid) => pcRows().find(r => (r.fields?.RecordType || 'poe') === 'poe' && pcProg(r) === pid && pcLearner(r) === lid);
+  const pcLearnerRows = pid => pcRows().filter(r => (r.fields?.RecordType || 'poe') === 'poe' && pcProg(r) === pid);
+  const pcDocs = pid => { const r = pcCfgRec(pid); try { if (r?.fields?.Docs) return JSON.parse(r.fields.Docs); } catch (_) {}
+    const legacy = new Set(POE_LEGACY.map(d => d.id).filter(k => !POE_DOCS.some(d => d.id === k)));
+    const used = pcLearnerRows(pid).some(r => { try { return Object.keys(JSON.parse(r.fields?.Marks || '{}')).some(k => legacy.has(k)); } catch (_) { return false; } });
+    return (used ? POE_LEGACY : POE_DOCS).map(d => ({ ...d })); };
+  // Newest row wins if a learner has more than one
+  const pcRec = (pid, lid) => pcLearnerRows(pid).filter(r => pcLearner(r) === lid).sort((a, b) => String(b.updated_at || b.created_at || '').localeCompare(String(a.updated_at || a.created_at || '')) || (b.id || 0) - (a.id || 0))[0];
   const pcMarks = (pid, lid) => { try { return JSON.parse(pcRec(pid, lid)?.fields?.Marks || '{}'); } catch (_) { return {}; } };
   async function pcSave(pid, lid, marks) {
     const cur = pcRec(pid, lid), fields = { ...(cur?.fields || {}), RecordType: 'poe', Programme: [String(pid)], Learner: [String(lid)], Marks: JSON.stringify(marks) };
     if (cur) { await write('Documents', () => sb.from('poe_checklist').update({ fields, programme_id: pid, learner_id: lid }).eq('id', cur.id)); cur.fields = fields; }
     else { const r = await write('Documents', () => sb.from('poe_checklist').insert({ tenant_id: P.tenant, programme_id: pid, learner_id: lid, fields }).select()); pcRows().push((r && r[0]) || { fields, programme_id: pid, learner_id: lid }); }
   }
+  /* Learner documents per programme for Today: learners, any marks captured, learners with a required document marked Missing,
+     learners with a required document not yet marked. */
+  function docGaps(pid) { const ls = learnersOf(pid), req = pcDocs(pid).filter(d => d.required); let captured = false, missing = 0, open = 0;
+    ls.forEach(l => { const m = pcMarks(pid, l.id); if (Object.keys(m).some(k => !k.startsWith('note_') && m[k])) captured = true;
+      if (req.some(d => m[d.id] === 'missing')) missing++; else if (req.some(d => !m[d.id])) open++; });
+    return { learners: ls.length, captured, missing, open }; }
   window.dvDoc = async (lid, doc, st) => { const p = prog(dProg); if (!p) return; const m = pcMarks(p.id, lid); m[doc] = m[doc] === st ? '' : st; await pcSave(p.id, lid, m); renderAtt(); };
   window.dvDocNote = async (lid, doc, v) => { const p = prog(dProg); if (!p) return; const m = pcMarks(p.id, lid); if (v.trim()) m['note_' + doc] = v.trim(); else delete m['note_' + doc]; await pcSave(p.id, lid, m); say('Note saved'); };
   window.dvDocCfg = () => {

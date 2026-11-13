@@ -148,7 +148,7 @@
       q('attendance_sessions', sb.from('attendance_sessions').select('*').order('session_date')),
       q('attendance', sb.from('attendance').select('id,programme_id,learner_id,session_date,status,fields')),
       q('eisa', sb.from('eisa').select('*')),
-      q('poe_checklist', sb.from('poe_checklist').select('id,programme_id,learner_id,fields'))
+      q('poe_checklist', sb.from('poe_checklist').select('id,programme_id,learner_id,fields,created_at,updated_at'))
     ]);
     Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows });
     P.data.progsAll = progs; P.data.progs = progs.filter(p => !p.deleted_at);   // 233 of 260 programmes are soft-deleted on live

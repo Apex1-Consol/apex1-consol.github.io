@@ -14,10 +14,13 @@
   const meE = () => String(P?.user?.email || '').toLowerCase();
   const progs = () => (D().progs || []).filter(p => !String(p.programme_name || '').startsWith('[TEST]') && (!window.apxMineProg || apxMineProg(p)));
   const pmap = () => { const m = new Map(); progs().forEach(p => m.set(String(p.id), p)); return m; };
-  // Legacy (pre-ApexOne) programmes stay 'initiated' but are running: treat started, not-ended ones as live so QCTO/data checks cover them.
+  // Run state comes from delivery.js (dvApi.runState): legacy programmes stay 'initiated' while running, so started (start date, or a
+  // captured register when there is no start date), not-ended ones are Active. Fallback below only if delivery.js did not load.
   const T00 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
-  const started = p => !!p.start_date && new Date(p.start_date) <= T00(), ended = p => !!p.end_date && new Date(p.end_date) < T00();
-  const live = p => p.status === 'active' || (p.status === 'initiated' && started(p) && !ended(p));
+  const rstate = p => window.dvApi?.runState ? dvApi.runState(p) : p.status === 'active' ? 'Active'
+    : !(p.start_date && new Date(p.start_date) <= T00()) ? 'Planned' : p.end_date && new Date(p.end_date) < T00() ? 'Completed' : 'Active';
+  const live = p => rstate(p) === 'Active';
+  const ymd = s => String(s || '').slice(0, 10);
   const pname = p => esc((p?.programme_name || '').replace('[TEST] ', '') || 'Programme');
   const goP = id => `location.hash='programmes';setTimeout(()=>window.dvProg&&dvProg(${+id}),60)`;
   const goH = h => `location.hash='${h}'`;
@@ -106,12 +109,28 @@
         const mm = [!x.contact_email && 'contact email', !x.contact_number && 'contact number'].filter(Boolean);
         if (mm.length) items.push(it(esc(x.client_name), 'Missing ' + mm.join(', ') + lv, goH('clients'), false, x.project_manager || 'hoo')); });
       return { h: 'Clients missing details', link: 'clients', items }; },
-    att(m) { const last = new Map(); (D().sessions || []).forEach(s => { const k = String(s.programme_id); if (dd(s.session_date) <= 0 && (!last.get(k) || s.session_date > last.get(k))) last.set(k, s.session_date); });
-      const A = window.dvApi, quiet = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -14 && A && A.learnersOf(p.id).length && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -14))
-        .map(p => it(pname(p), last.get(String(p.id)) ? `Last register ${fmt(last.get(String(p.id)))}: capture registers` : 'No register captured', `window.dvProg&&dvProg(${p.id});window.dvGo?dvGo('attendance','Register'):${goH('attendance')}`, true, 'pm', p.id));
-      const ab = new Map(); (D().att || []).forEach(a => { if (m.has(String(a.programme_id)) && /^a/i.test(a.status || '') && dd(a.session_date) >= -30) { const k = a.programme_id + '|' + a.learner_id; ab.set(k, (ab.get(k) || 0) + 1); } });
+    /* Attendance: a register = a date with at least one P / R / A mark (session records alone do not count; imported registers have
+       marks without session records). Flags running programmes with learners, 14+ days in, and no register in the last 14 days;
+       registers outside the programme dates; learners with 3+ absences in 30 days. */
+    att(m) { const A = window.dvApi, items = [], ab = new Map(); if (!A || !A.regDates) return { h: 'Attendance', link: 'attendance', items };
+      const reg = id => `window.dvProg&&dvProg(${id});window.dvGo?dvGo('attendance','Register'):${goH('attendance')}`;
+      [...m.values()].filter(p => p.status !== 'closed').forEach(p => { const r = A.regDates(p.id).filter(d => dd(d) <= 0), first = r[0], last = r[r.length - 1];
+        if (last && p.end_date && last > ymd(p.end_date)) items.push(it(pname(p), `Register on ${fmt(last)} is after the end date ${fmt(p.end_date)}: check the end date`, goP(p.id), true, 'pm', p.id));
+        if (first && p.start_date && first < ymd(p.start_date)) items.push(it(pname(p), `Register on ${fmt(first)} is before the start date ${fmt(p.start_date)}: check the start date`, goP(p.id), false, 'pm', p.id));
+        if (!live(p) || !A.learnersOf(p.id).length || (dd(p.start_date || first) ?? 1) > -14 || (last && dd(last) > -14)) return;
+        items.push(it(pname(p), last ? `Last register ${fmt(last)}: capture registers` : 'No register captured', reg(p.id), true, 'pm', p.id)); });
+      (D().att || []).forEach(a => { if (m.has(String(a.programme_id)) && A.AT(a.status) === 'A' && dd(a.session_date) <= 0 && dd(a.session_date) >= -30) { const k = a.programme_id + '|' + a.learner_id; ab.set(k, (ab.get(k) || 0) + 1); } });
       const hi = [...ab].filter(([, c]) => c >= 3).sort((a, b) => b[1] - a[1]).map(([k, c]) => { const [pid, lid] = k.split('|'); return it(lname(+lid), `${c} absences in 30 days · ${pname(m.get(pid))}`, `window.shOpen&&shOpen(${+pid},${+lid})`, c >= 5, 'pm', pid); });
-      return { h: 'Attendance', link: 'attendance', items: quiet.concat(hi) }; },
+      return { h: 'Attendance', link: 'attendance', items: items.concat(hi) }; },
+    /* PoE / learner documents (Attendance & PoE › Documents): running programmes with learners. Red when a required document is marked
+       Missing; amber when required documents are not yet checked, or nothing has been captured for the programme. */
+    poe(m) { const A = window.dvApi, items = []; if (!A || !A.docGaps) return { h: 'Learner documents', link: 'attendance', items };
+      const doc = id => `window.dvProg&&dvProg(${id});window.dvGo?dvGo('attendance','Documents'):${goH('attendance')}`, pl = n => n === 1 ? '' : 's';
+      [...m.values()].filter(live).forEach(p => { const g = A.docGaps(p.id); if (!g.learners) return;
+        if (!g.captured) return items.push(it(pname(p), `Documents not captured for ${g.learners} learner${pl(g.learners)}`, doc(p.id), false, 'pm', p.id));
+        if (g.missing) items.push(it(pname(p), `${g.missing} learner${pl(g.missing)} with a required document missing`, doc(p.id), true, 'pm', p.id));
+        if (g.open) items.push(it(pname(p), `${g.open} learner${pl(g.open)} with required documents not checked`, doc(p.id), false, 'pm', p.id)); });
+      return { h: 'Learner documents', link: 'attendance', items }; },
     learners(m) { const EP = new Map(); (D().enrol || []).forEach(e => { if (!EP.has(e.learner_id)) EP.set(e.learner_id, e.programme_id); });
       const L = (D().learners || []).filter(l => !/\[TEST\]|^test/i.test(l.first_name || '')), mine = !!(window.apxPMonly && apxPMonly());
       const r = L.filter(l => !mine || m.has(String(EP.get(l.id)))).map(l => ({ l, pid: EP.get(l.id), miss: [!l.id_number && 'ID number', !EP.has(l.id) && 'enrolment'].filter(Boolean) })).filter(o => o.miss.length);
@@ -119,7 +138,7 @@
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
-    pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated' && !started(p) && !ended(p)).map(p => ({ p, n: dd(p.start_date) })));
+    pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated' && rstate(p) === 'Planned').map(p => ({ p, n: dd(p.start_date) })));
       return { h: 'Programme Initiation', link: 'pi', items: r.map(o => it(pname(o.p), 'Not handed over yet' + (o.n != null ? ` · starts ${fmt(o.p.start_date)} · ${when(o.n)}` : ' · no start date'), goH('pi'), o.n != null && o.n <= 7, 'pi', o.p.id)) }; },
     dq() { return { h: 'Data quality', link: 'dq', items: (D().dq || []).filter(x => !x.decision).map(x => it(esc(((x.first_name || '') + ' ' + (x.last_name || '')).trim() || 'Learner'), esc(String(x.issue || 'Possible issue').replace(/_/g, ' ')), goH('dq'), false, 'qa')) }; },
     fam() { const items = []; (D().famc || []).forEach(x => { const nm = esc(x.full_name || 'Practitioner'), go = `location.hash='fam/${+x.assessor_id}'`;
@@ -136,10 +155,10 @@
   const SCREENS = {
     mywork: ['signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
     dashboard: ['dates', 'recs', 'visits', 'eisa', 'mods', 'reports'],
-    hoo: ['signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'enrol', 'sync'],
+    hoo: ['signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'poe', 'enrol', 'sync'],
     reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['dates', 'recs', 'visits', 'reports'],
     programmes: ['dates', 'gaps', 'recs'], pi: ['pi', 'gaps', 'dates'], learners: ['learners', 'att'], dq: ['dq', 'learners', 'enrol'],
-    enrolments: ['enrol', 'learners'], eisa: ['eisa', 'qcto'], qcto: ['eisa', 'qcto', 'enrol'], attendance: ['att'],
+    enrolments: ['enrol', 'learners'], eisa: ['eisa', 'qcto'], qcto: ['eisa', 'qcto', 'enrol'], attendance: ['att', 'poe'],
     visits: ['visits', 'recs'], recs: ['recs', 'visits'], modver: ['mods', 'eisa'], accred: ['accs'], signoff: ['signoffs', 'recs'],
     synchealth: ['sync'], assessors: ['mods', 'accs']
   };
@@ -187,7 +206,8 @@
     Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
   const lev = xs => xs.filter(x => x.warn).length > xs.length / 4 ? 'r' : xs.length ? 'a' : 'g';
   const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA coming up': () => 'EISA coming up',
-    'Attendance': x => /regist/i.test(plain(x.s)) ? 'no recent register' : 'high absences', 'Not started, programme running 30+ days': () => 'with learners not started', 'Accreditation': x => /^Expires/.test(plain(x.s)) ? 'expiring' : null };
+    'Attendance': x => /^(Last register|No register)/.test(plain(x.s)) ? 'no recent register' : /check the (start|end) date/.test(plain(x.s)) ? 'register outside dates' : 'high absences',
+    'Learner documents': x => /missing/.test(plain(x.s)) ? 'documents missing' : /not checked/.test(plain(x.s)) ? 'documents not checked' : 'documents not captured', 'Not started, programme running 30+ days': () => 'with learners not started', 'Accreditation': x => /^Expires/.test(plain(x.s)) ? 'expiring' : null };
   const why = x => (LAB[x.hh] && LAB[x.hh](x)) || plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
   const marks = xs => { const grp = f => { const g = new Map(); xs.forEach(x => { const k = f(x); if (!g.has(k)) g.set(k, { k, n: 0, w: 0 }); const o = g.get(k); o.n++; if (x.warn) o.w++; }); return [...g.values()]; };
     const r = grp(why); return (r.length > 4 ? grp(x => x.hh) : r).sort((a, b) => b.w - a.w || b.n - a.n); };
