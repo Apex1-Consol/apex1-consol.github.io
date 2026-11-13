@@ -440,7 +440,7 @@
   /* ---------- Sign-off queue (writes via RPC; admin only) ---------- */
   function applySignoff() {
     SO.length = 0; Object.keys(SOD).forEach(k => delete SOD[k]);
-    P.data.signoffs.forEach(s => { SO.push([String(s.id), s.kind, s.title, s.detail || '', s.ref_table === 'learners' ? '#dq' : '#signoff', s.submitted_by || '', fmt(s.created_at)]);
+    P.data.signoffs.forEach(s => { SO.push([String(s.id), s.kind, s.title, s.detail || '', s.ref_table === 'learners' ? '#dq' : s.ref_table === 'recommendations' ? '#recs' : '#signoff', s.submitted_by || '', fmt(s.created_at)]);
       if (s.status !== 'waiting') SOD[String(s.id)] = { s: s.status, t: fmt(s.decided_at), c: s.comment || '' }; });
   }
   soItems = () => SO;
@@ -613,7 +613,7 @@
         <td>${r.programme_id ? esc(progName(r.programme_id)) : '<span class="sub">—</span>'}${vis.length ? `<div class="sub">${vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ')}</div>` : ''}</td>
         <td>${f.Owner ? esc(f.Owner) : '<span class="badge b-bad">No owner</span>'}</td>
         <td>${due ? `<span style="${late ? 'color:var(--bad);font-weight:700' : ''}">${recDate(due)}</span>` : '<span class="badge b-bad">No date</span>'}</td>
-        <td style="text-align:right;white-space:nowrap"><button class="famact" onclick="previewRecEdit(${r.id})">Edit</button> &nbsp; ${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+        <td style="text-align:right;white-space:nowrap"><button class="famact" onclick="previewRecEdit(${r.id})">Edit</button> &nbsp; ${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : (r.fields?.Status === 'Closure requested' ? `<button class="btn sm" disabled title="Waiting in the Sign-off queue">Awaiting sign-off</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
   };
   function recForm(r) {
     const f = r?.fields || {}, vis = recVisits(f)[0] || '', o = (v, l, s) => `<option value="${esc(v)}" ${s ? 'selected' : ''}>${esc(l)}</option>`;
@@ -643,7 +643,11 @@
   window.previewRecEdit = id => { const r = P.data.recs.find(x => x.id === id); if (r) recForm(r); };
   window.previewRecResolve = async (id, done) => {
     const r = P.data.recs.find(x => x.id === id); if (!r) return;
-    try { await write('Recommendation', () => sb.from('recommendations').update({ resolved: done, resolved_at: done ? new Date().toISOString() : null, fields: { ...(r.fields || {}), Status: done ? 'Resolved' : 'Open' } }).eq('id', id).select('id')); await loadAll(); } catch (_) {}
+    try {
+      if (done) { await write('Recommendation', () => sb.rpc('request_rec_closure', { p_id: id, p_note: null })); toast('Sent to the Sign-off queue. It closes once an admin approves.'); }
+      else await write('Recommendation', () => sb.from('recommendations').update({ resolved: false, resolved_at: null, fields: { ...(r.fields || {}), Status: 'Open' } }).eq('id', id).select('id'));
+      await loadAll();
+    } catch (_) {}
   };
 
   /* ---------- FAM + clients (read) ---------- */
