@@ -272,7 +272,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   await t('My work: role tasks, admin can view as PM, hide for today', async () => {
     const { w, d } = await boot(sess(['admin'])); w.location.hash = 'mywork'; await tick();
     ok(!d.getElementById('view-mywork').hidden, 'My work not shown');
-    ok(d.getElementById('mwroles').querySelectorAll('button').length === 3, 'no View as switch for admin');
+    ok(d.getElementById('mwroles').querySelectorAll('button').length === 4, 'no View as switch for admin');
     w.mwRoleSet('pm'); const n = d.querySelectorAll('#mwtasks .mwtask').length;
     ok(n > 0 && /module/.test(d.getElementById('mwtasks').textContent), 'no PM tasks: ' + d.getElementById('mwtasks').textContent.slice(0, 120));
     d.querySelector('#mwtasks input').click(); ok(/1 selected/.test(d.getElementById('mwhead').textContent), 'bulk bar missing');
