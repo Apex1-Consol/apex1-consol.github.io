@@ -185,7 +185,7 @@
     $('mwgreet').textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who[0].toUpperCase() + who.slice(1) : '');
     const all = tasks(mwRole), hidden = hid(), list = all.filter(t => mwShowHidden || !hidden.includes(t.id)), nHid = all.length - all.filter(t => !hidden.includes(t.id)).length;
     $('mwdate').textContent = now.toLocaleDateString('en-ZA', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + (all.length - nHid) + ' thing' + (all.length - nHid === 1 ? '' : 's') + ' need you today';
-    $('mwroles').innerHTML = mine === 'admin' ? '<span class="sub" style="align-self:center;padding:0 8px">View as</span>' + [['pm', 'Project manager'], ['qa', 'QA / ETQA'], ['admin', 'Admin']].map(([k, t]) => `<button type="button" aria-pressed="${k === mwRole}" class="${k === mwRole ? 'on' : ''}" onclick="mwRoleSet('${k}')">${t}</button>`).join('') : '';
+    $('mwroles').innerHTML = mine === 'admin' ? '<span class="sub" style="align-self:center;padding:0 8px">View as</span>' + [['pm', 'Project manager'], ['qa', 'QA / ETQA'], ['pi', 'Programme Initiation'], ['admin', 'Admin']].map(([k, t]) => `<button type="button" aria-pressed="${k === mwRole}" class="${k === mwRole ? 'on' : ''}" onclick="mwRoleSet('${k}')">${t}</button>`).join('') : '';
     $('mwroles').hidden = mine !== 'admin';
     $('mwbanner').innerHTML = banner();
     const sel = list.filter(t => mwPick[t.id]).length;
