@@ -315,7 +315,7 @@ async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports
 /* Dashboard and My work: a one-line card for the current reporting month */
 async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
-  const s0 = await window.rpLoadTR(); const v = $('view-' + r); if (!s0 || !v) return;
+  const s0 = await window.rpLoadTR(); const v = $('view-' + r); if (r === 'mywork') { const o = $('rpdash-mywork'); if (o) o.remove(); return; } if (!s0 || !v) return;
   const me = String((P.user || {}).email || '').toLowerCase(), mine = !has(), SUB = ['review', 'changes', 'approved', 'sent'];
   const rows = s0.rows.filter(x => !mine || String(x.pm || '').toLowerCase() === me); if (mine && !rows.length) { const o = $('rpdash-' + r); if (o) o.remove(); return; }
   const late = rows.filter(x => !SUB.includes(x.stage)), sm = { month: s0.month, n: rows.length, sent: rows.length - late.length, od: late.length };

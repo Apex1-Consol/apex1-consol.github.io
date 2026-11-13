@@ -80,9 +80,12 @@
     reports(m) { const items = [];
       (D().reports || []).filter(x => !x.archived_at && (!x.programme_id || m.has(String(x.programme_id)))).forEach(x => { const nm = esc(x.programme_name_snapshot || x.client_name_snapshot || 'Report') + (x.month ? ' · ' + esc(String(x.month).slice(0, 7)) : ''), o = x.submitted_by_email || 'pm';
         if (x.status === 'needs_changes') items.push(it(nm, 'Needs changes' + (x.reviewer_note ? ': ' + esc(String(x.reviewer_note).slice(0, 60)) : ''), goH('reports'), true, o, x.programme_id));
+        else if (x.status === 'pending') items.push(it(nm, 'Submitted, waiting for review', goH('reports'), false, 'admin', x.programme_id));
         else if (x.status === 'approved' && !x.sent_at) items.push(it(nm, 'Approved, not sent to client', goH('reports'), (dd(x.reviewed_at) ?? 0) <= -3, o, x.programme_id));
         else if (x.remind_pm_at && dd(x.remind_pm_at) <= 0) items.push(it(nm, 'PM reminder due ' + fmt(x.remind_pm_at), goH('reports'), true, o, x.programme_id));
         else if (x.hold_until && dd(x.hold_until) <= 3) items.push(it(nm, 'Hold ends ' + fmt(x.hold_until) + (x.hold_reason ? ' · ' + esc(x.hold_reason) : ''), goH('reports'), dd(x.hold_until) < 0, o, x.programme_id)); });
+      const sm = window.rpSummary && window.rpSummary(); (sm && sm.rows || []).filter(x => (x.stage === 'draft' || x.stage === 'notstarted') && (!x.pid || m.has(String(x.pid)))).forEach(x =>
+        items.push(it(esc(x.prog || x.client || 'Report') + ' · ' + esc(sm.month), x.stage === 'draft' ? 'Report draft saved, not submitted' : 'Report not started', goH('reports'), true, x.pm || 'pm', x.pid)));
       return { h: 'Reports to move', link: 'reports', items }; },
     dates(m) { const r = byN([...m.values()].filter(live).flatMap(p => [['Starts', p.start_date], ['Ends', p.end_date]].map(([k, d]) => ({ p, k, d, n: dd(d) }))).filter(o => o.n != null && o.n >= -3 && o.n <= 21));
       return { h: 'Starting or ending soon', link: 'pmtracker', items: r.map(o => it(pname(o.p), `${o.k} ${fmt(o.d)} · ${when(o.n)}`, goP(o.p.id), o.k === 'Ends' && o.n <= 7, 'pm', o.p.id)) }; },
