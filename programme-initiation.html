@@ -359,6 +359,7 @@
         </select>
         <button type="button" class="btn primary" id="newBtn">+ New Programme</button>
         <button type="button" class="btn gold" id="importProgrammesBtn">Import Programme Data (Excel)</button>
+        <button type="button" class="btn" id="pasteProgrammesBtn" title="Copy rows (with the header row) from Excel and paste them here">📋 Paste from Excel</button>
         <button type="button" class="btn" id="exportAllBtn">Export All (CSV)</button>
       </div>
       <div id="cards"></div>
@@ -409,6 +410,25 @@
   <!-- HIDDEN FILE INPUTS -->
   <input type="file" id="rolloutFileInput" accept=".xlsx,.xls" style="display:none">
   <input type="file" id="programmeFileInput" accept=".xlsx,.xls" style="display:none">
+  <div id="pasteModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="pasteModalTitle">
+    <div class="modal-box">
+      <div class="modal-box-head">
+        <div>
+          <h2 id="pasteModalTitle">Paste from Excel</h2>
+          <p>In Excel, select the header row plus the programme rows, copy (Ctrl+C), then paste below (Ctrl+V). Each row becomes a draft. Leave out fees and other financial columns.</p>
+        </div>
+        <button type="button" class="btn small" id="pasteModalClose">Close ✕</button>
+      </div>
+      <div class="modal-box-body">
+        <textarea id="pasteBox" rows="12" style="width:100%;box-sizing:border-box;font-family:monospace;font-size:12px;white-space:pre;" placeholder="Client&#9;Programme&#9;Induction Date&#9;..."></textarea>
+        <div id="pastePreview" style="font-size:12px;margin:8px 0;color:var(--text-muted,#64748B);"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;">
+          <button type="button" class="btn" id="pasteCancelBtn">Cancel</button>
+          <button type="button" class="btn primary" id="pasteConfirmBtn">Create drafts</button>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- IMPORT REVIEW MODAL -->
   <div id="rolloutModalOverlay" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="rolloutModalTitle">
@@ -1403,6 +1423,42 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       };
       reader.readAsArrayBuffer(file);
     });
+
+    /* Paste from Excel: tab-separated clipboard text -> same import as the file route */
+    (function(){
+      const ov = document.getElementById('pasteModalOverlay');
+      const box = document.getElementById('pasteBox');
+      const pv = document.getElementById('pastePreview');
+      const close = () => ov.classList.remove('open');
+      const toWb = txt => XLSX.read(txt.replace(/\r\n?/g, '\n'), { type: 'string', raw: true, FS: '\t' });
+      function preview() {
+        const txt = box.value.trim();
+        if (!txt) { pv.textContent = ''; return; }
+        const lines = txt.split(/\r?\n/).filter(l => l.trim());
+        const headers = lines[0].split('\t');
+        const matched = Object.keys(IMPORT_FIELD_ALIASES).filter(k => findCol(headers, IMPORT_FIELD_ALIASES[k]) > -1);
+        const hasKey = findCol(headers, IMPORT_FIELD_ALIASES.clientName || []) > -1 || findCol(headers, IMPORT_FIELD_ALIASES.programmeName || []) > -1;
+        pv.textContent = hasKey
+          ? `${lines.length - 1} row(s) · ${matched.length} of ${headers.length} columns recognised`
+          : 'No Client or Programme column found. Include the header row.';
+      }
+      document.getElementById('pasteProgrammesBtn').addEventListener('click', () => {
+        box.value = ''; pv.textContent = ''; ov.classList.add('open'); box.focus();
+      });
+      box.addEventListener('input', preview);
+      document.getElementById('pasteModalClose').addEventListener('click', close);
+      document.getElementById('pasteCancelBtn').addEventListener('click', close);
+      document.getElementById('pasteConfirmBtn').addEventListener('click', () => {
+        const txt = box.value.trim();
+        if (!txt) { showToast('Nothing pasted'); return; }
+        try {
+          const count = importProgrammesWorkbook(toWb(txt));
+          if (count === 0) { showToast('No matching rows found. Include the header row with Client or Programme.'); return; }
+          saveData(); renderDashboard(); close();
+          showToast(`Created ${count} draft${count === 1 ? '' : 's'}`);
+        } catch (err) { console.error(err); showToast('Could not read the pasted data'); }
+      });
+    })();
 
     function exportAllCSV() {
       const cols = stages.filter(s => !s.rollout).flatMap(s => s.fields.map(f => f.id));
