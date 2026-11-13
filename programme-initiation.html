@@ -2337,6 +2337,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         if (el.type === 'checkbox' || el.type === 'file') return;
         el.addEventListener('input', e => onFieldChange(e, stage));
         el.addEventListener('blur', e => validateField(e.target, stage));
+        if (['clientName','programmeName'].includes(el.dataset.id)) el.addEventListener('change', e => applySmartDefaults(e.target.dataset.id));
       });
 
       wrap.querySelectorAll('.checkbox-group').forEach(group => {
@@ -2418,6 +2419,34 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         rec.updatedAt = Date.now();
         saveData();
       });
+    }
+
+    // Smart defaults: fill only EMPTY fields. Qualification -> Level (NQF); client -> details + usual PM from that client's latest programme.
+    const CLIENT_DEFAULT_FIELDS = ['projectManager','relationshipManager','provider','companyRegNumber','clientSETA','clientSDL','clientContactNumber','clientEmail','companyAddress'];
+    function applySmartDefaults(id) {
+      const rec = currentRec();
+      if (!rec || isRecordLocked(rec)) return;
+      const d = rec.data, filled = [];
+      if (id === 'programmeName' && !String(d.level || '').trim()) {
+        const m = String(d.programmeName || '').match(/NQF\s*(\d+)/i);
+        if (m) { d.level = 'NQF ' + m[1]; filled.push('Level'); }
+      }
+      if (id === 'clientName') {
+        const key = String(d.clientName || '').trim().toLowerCase();
+        const prev = key && programmes.filter(p => p.id !== rec.id && p.data && String(p.data.clientName || '').trim().toLowerCase() === key)
+          .sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0));
+        if (prev && prev.length) {
+          CLIENT_DEFAULT_FIELDS.forEach(f => {
+            if (String(d[f] || '').trim()) return;
+            const v = prev.map(p => p.data[f]).find(v => v && String(v).trim());
+            if (v) { d[f] = v; filled.push(f); }
+          });
+        }
+      }
+      if (!filled.length) return;
+      rec.updatedAt = Date.now();
+      saveData(); renderPanel(); renderTabsEl(); renderLiveDocument(rec);
+      showToast(id === 'clientName' ? `Filled ${filled.length} field(s) from this client's previous programme. Check and change if needed.` : 'Level set from the qualification (NQF).');
     }
 
     function onFieldChange(e, stage) {
