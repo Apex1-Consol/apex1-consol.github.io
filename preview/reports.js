@@ -229,7 +229,7 @@ window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };
 window.rpTR = async () => { TR = null; render(); await Promise.all([loadQ(), loadDr()]); await loadTR(); render(); };   // also reloads the allowed actions (my_report_queue)
 window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };
-window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => x.stage === 'sent' || (x.stage === 'approved' && x.t[1] === 'Approved')).length, od: rows.filter(x => x.t[0] === 'dan').length }; };
+window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => ['review', 'changes', 'approved', 'sent'].includes(x.stage)).length, od: rows.filter(x => !['review', 'changes', 'approved', 'sent'].includes(x.stage)).length }; };
 window.rpLoadTR = async () => { if (TR === null) { await loadDr(); await loadTR(); } return window.rpSummary(); };
 window.rpQF = f => { QF = f; render(); };
 window.rpReload = async () => { Q = null; render(); await loadQ(); render(); };
@@ -317,7 +317,7 @@ async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
   const sm = await window.rpLoadTR(); const v = $('view-' + r); if (!sm || !v) return;
   const html = `<section class="card" id="rpdash-${r}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px"><div style="flex:1 1 260px"><b>${esc(sm.month)} reports</b>
-    <div style="font-size:12.5px;color:var(--muted)">${sm.sent} of ${sm.n} sent to clients${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} overdue</span>` : ''}</div></div>
+    <div style="font-size:12.5px;color:var(--muted)">${sm.sent} of ${sm.n} submitted for review${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} not submitted</span>` : ''}</div></div>
     <span style="flex:1 1 160px;height:10px;border-radius:6px;background:var(--line2);overflow:hidden;display:flex"><span style="width:${sm.n ? Math.round(100 * sm.sent / sm.n) : 0}%;background:#25247B"></span></span>
     <a class="btn sm y" href="#reports">Open monthly reports</a></section>`;
   const old = $('rpdash-' + r); if (old) old.outerHTML = html; else v.insertAdjacentHTML('afterbegin', html);
