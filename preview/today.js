@@ -171,7 +171,7 @@
   const ovData = () => { const d = D(); if (OV.by && OV.d === d.progs && Date.now() - OV.t < 20000) return OV.by;
     const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
     Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
-  const lev = xs => xs.some(x => x.warn) ? 'r' : xs.length ? 'a' : 'g';
+  const lev = xs => xs.filter(x => x.warn).length > xs.length / 4 ? 'r' : xs.length ? 'a' : 'g';
   const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA coming up': () => 'EISA coming up',
     'Attendance': x => /regist/i.test(plain(x.s)) ? 'no recent register' : 'high absences', 'Not started, programme running 30+ days': () => 'with learners not started', 'Accreditation': x => /^Expires/.test(plain(x.s)) ? 'expiring' : null };
   const why = x => (LAB[x.hh] && LAB[x.hh](x)) || plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
