@@ -172,7 +172,9 @@
     const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
     Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
   const lev = xs => xs.some(x => x.warn) ? 'r' : xs.length ? 'a' : 'g';
-  const why = x => plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
+  const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA coming up': () => 'EISA coming up',
+    'Attendance': x => /regist/i.test(plain(x.s)) ? 'no recent register' : 'high absences', 'Not started, programme running 30+ days': () => 'with learners not started', 'Accreditation': x => /^Expires/.test(plain(x.s)) ? 'expiring' : null };
+  const why = x => (LAB[x.hh] && LAB[x.hh](x)) || plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
   const marks = xs => { const grp = f => { const g = new Map(); xs.forEach(x => { const k = f(x); if (!g.has(k)) g.set(k, { k, n: 0, w: 0 }); const o = g.get(k); o.n++; if (x.warn) o.w++; }); return [...g.values()]; };
     const r = grp(why); return (r.length > 4 ? grp(x => x.hh) : r).sort((a, b) => b.w - a.w || b.n - a.n); };
   window.apxNavDot = r => { if (!D().progs) return ''; const xs = ovData().get(r); if (!xs || !xs.length) return ''; const l = lev(xs);
