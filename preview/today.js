@@ -40,7 +40,7 @@
       if (nm) { const u = byName(nm); return u ? { n: disp(u), e: u.email } : { n: String(nm).split(/\s+/)[0], e: '' }; }
       o = 'hoo'; why = ' (no PM)'; }
     if (ROLE[o]) { const u = byRole(ROLE[o][0]); return u ? { n: disp(u), e: u.email, why } : { n: ROLE[o][1], e: '', why }; }
-    if (o === 'admin') return { n: 'Admin', e: '' };
+    if (o === 'admin') o = 'nasreen'; // unowned admin items go to Nasreen (oversees PMs, ETQA, QA, compliance); IT/sync is Roy's
     const u = byName(o); return u ? { n: disp(u), e: u.email } : { n: String(o).split(/[\s@]+/)[0], e: '' };
   }
   async function loadSide(force) {
@@ -123,7 +123,7 @@
       return { h: 'FAM Registry', link: 'fam', items }; },
     sync() { const o = D().outbox || [], f = o.filter(x => /fail|error/i.test(x.status || '')), p = o.filter(x => /pend|queue/i.test(x.status || ''));
       const g = new Map(); f.forEach(x => g.set(x.source_table, (g.get(x.source_table) || 0) + 1));
-      return { h: 'ClickUp sync', link: 'synchealth', items: [...g].map(([t, c]) => it(esc(t), `${c} failed · ${esc((f.find(x => x.source_table === t).last_error || '').slice(0, 70))}`, goH('synchealth'), true, 'admin')).concat(p.length ? [it('Waiting to send', `${p.length} change${p.length > 1 ? 's' : ''} queued`, goH('synchealth'), p.length > 50, 'admin')] : []) }; }
+      return { h: 'ClickUp sync', link: 'synchealth', items: [...g].map(([t, c]) => it(esc(t), `${c} failed · ${esc((f.find(x => x.source_table === t).last_error || '').slice(0, 70))}`, goH('synchealth'), true, 'roye')).concat(p.length ? [it('Waiting to send', `${p.length} change${p.length > 1 ? 's' : ''} queued`, goH('synchealth'), p.length > 50, 'roye')] : []) }; }
   };
 
   /* ---------- which blocks each screen shows (first = most relevant) ---------- */
