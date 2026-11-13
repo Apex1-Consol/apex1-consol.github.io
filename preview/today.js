@@ -133,12 +133,12 @@
   const MAX = 6, ALLB = Object.keys(B);
 
   /* snooze (7 days, this browser only), filters and the admin "By person" view */
-  const SK = 'ao.tdySnooze', TF = { f: 'all', who: null };
+  const SK = 'ao.tdySnooze', TF = { f: (()=>{ try { return localStorage.getItem('ao.tdyF') || null; } catch (_) { return null; } })(), who: null };
   const snz = () => { try { const o = JSON.parse(localStorage.getItem(SK) || '{}'), now = Date.now(); Object.keys(o).forEach(k => { if (o[k] < now) delete o[k]; }); return o; } catch (_) { return {}; } };
   const plain = s => String(s || '').replace(/<[^>]+>/g, '').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'");
   const hsh = s => { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return 'k' + (h >>> 0).toString(36); };
   window.tdySnooze = (k, on) => { const o = snz(); if (on) o[k] = Date.now() + 7 * 864e5; else delete o[k]; try { localStorage.setItem(SK, JSON.stringify(o)); } catch (_) {} window.shRefresh && shRefresh(); };
-  window.tdyF = (f, who) => { TF.f = f; TF.who = who || null; window.shRefresh && shRefresh(); };
+  window.tdyF = (f, who) => { TF.f = f; TF.who = who || null; try { if (f !== 'who') localStorage.setItem('ao.tdyF', f); } catch (_) {} window.shRefresh && shRefresh(); };
   const build = (scr, keys) => { const m = pmap(), out = [], S0 = snz(), R = ST.req || new Map();
     (keys || SCREENS[scr] || SCREENS.mywork).forEach(k => { let b; try { b = B[k](m); } catch (e) { return; } if (!b || (b.link && !ok(b.link))) return;
       b.items.forEach(x => { x.k = hsh(plain(x.go + '|' + x.t + '|' + x.o + '|' + String(x.s).split(' · ')[0].replace(/\d+ d (overdue|at this stage)|in \d+ d|today/g, ''))); x.z = !!S0[x.k]; x.w = owner(x); x.r = R.get(x.k) || null; x.h = b.h; x.link = b.link; }); out.push(b); });
@@ -168,9 +168,11 @@
   window.apxToday = scr => {
     if (!D().progs) return '<div class="empty"><b>Loading…</b></div>';
     if (!ST.list || !ST.req) loadSide(); else clearGone();
+    if (!TF.f || TF.f === 'who' && !isAdm()) TF.f = 'all';
     const adm = isAdm(), byP = TF.f === 'who', out = build(scr, byP && scr === 'hoo' ? ALLB : null), all = out.flatMap(b => b.items);
     const open = all.filter(x => !x.z), need = open.filter(x => x.warn && !x.r), wait = open.filter(x => x.r), mine = open.filter(mineX), zz = all.length - open.length;
     LAST = all;
+    if (TF.f === 'all' && !TF.set) { TF.set = 1; let sv = null; try { sv = localStorage.getItem('ao.tdyF'); } catch (_) {} if (!sv && mine.length) TF.f = 'mine'; }
     const pick = { all: x => !x.z, need: x => x.warn && !x.z && !x.r, mine: x => mineX(x) && !x.z, wait: x => x.r && !x.z, snz: x => x.z, who: x => !x.z && (!TF.who || x.w.n === TF.who) }[TF.f] || (x => !x.z);
     const chip = (f, n, l, c) => `<button type="button" class="tdyc${TF.f === f && !TF.who ? ' on' : ''}" aria-pressed="${TF.f === f}" onclick="tdyF('${f}')"><span class="badge ${c}">${n}</span> ${l}</button>`;
     const head = `<div class="sub">${scr in SCREENS ? 'What to act on now on this screen, and who must action it.' : 'Your day across ApexOne.'} ${fmt(new Date().toISOString())} · ${open.length} open</div>
