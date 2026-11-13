@@ -14,7 +14,10 @@
   const meE = () => String(P?.user?.email || '').toLowerCase();
   const progs = () => (D().progs || []).filter(p => !String(p.programme_name || '').startsWith('[TEST]') && (!window.apxMineProg || apxMineProg(p)));
   const pmap = () => { const m = new Map(); progs().forEach(p => m.set(String(p.id), p)); return m; };
-  const live = p => p.status === 'active';
+  // Legacy (pre-ApexOne) programmes stay 'initiated' but are running: treat started, not-ended ones as live so QCTO/data checks cover them.
+  const T00 = () => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; };
+  const started = p => !!p.start_date && new Date(p.start_date) <= T00(), ended = p => !!p.end_date && new Date(p.end_date) < T00();
+  const live = p => p.status === 'active' || (p.status === 'initiated' && started(p) && !ended(p));
   const pname = p => esc((p?.programme_name || '').replace('[TEST] ', '') || 'Programme');
   const goP = id => `location.hash='programmes';setTimeout(()=>window.dvProg&&dvProg(${+id}),60)`;
   const goH = h => `location.hash='${h}'`;
@@ -116,7 +119,7 @@
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
-    pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated').map(p => ({ p, n: dd(p.start_date) })));
+    pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated' && !started(p) && !ended(p)).map(p => ({ p, n: dd(p.start_date) })));
       return { h: 'Programme Initiation', link: 'pi', items: r.map(o => it(pname(o.p), 'Not handed over yet' + (o.n != null ? ` · starts ${fmt(o.p.start_date)} · ${when(o.n)}` : ' · no start date'), goH('pi'), o.n != null && o.n <= 7, 'pi', o.p.id)) }; },
     dq() { return { h: 'Data quality', link: 'dq', items: (D().dq || []).filter(x => !x.decision).map(x => it(esc(((x.first_name || '') + ' ' + (x.last_name || '')).trim() || 'Learner'), esc(String(x.issue || 'Possible issue').replace(/_/g, ' ')), goH('dq'), false, 'qa')) }; },
     fam() { const items = []; (D().famc || []).forEach(x => { const nm = esc(x.full_name || 'Practitioner'), go = `location.hash='fam/${+x.assessor_id}'`;
