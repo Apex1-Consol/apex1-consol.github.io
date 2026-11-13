@@ -165,6 +165,28 @@
     const gone = [...ST.req.keys()].filter(k => !all.has(k)); if (!gone.length) return;
     sb().from('fix_requests').update({ cleared_at: new Date().toISOString() }).in('item_key', gone).is('cleared_at', null).then(() => { gone.forEach(k => ST.req.delete(k)); window.shRefresh && shRefresh(); }, () => {}); }
 
+  /* ---------- Overview on My work: every area, every marker; role decides the rows ---------- */
+  const OVR = { pm: ['Delivery', 'recs', 'visits'], qa: ['Quality & compliance', 'eisa'], pi: ['pi', 'programmes', 'clients'] };
+  const OV = { open: null, t: 0, d: null, by: null };
+  const ovData = () => { const d = D(); if (OV.by && OV.d === d.progs && Date.now() - OV.t < 20000) return OV.by;
+    const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
+    Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
+  const lev = xs => xs.some(x => x.warn) ? 'r' : xs.length ? 'a' : 'g';
+  const why = x => plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
+  const marks = xs => { const grp = f => { const g = new Map(); xs.forEach(x => { const k = f(x); if (!g.has(k)) g.set(k, { k, n: 0, w: 0 }); const o = g.get(k); o.n++; if (x.warn) o.w++; }); return [...g.values()]; };
+    const r = grp(why); return (r.length > 4 ? grp(x => x.hh) : r).sort((a, b) => b.w - a.w || b.n - a.n); };
+  window.apxNavDot = r => { if (!D().progs) return ''; const xs = ovData().get(r); if (!xs || !xs.length) return ''; const l = lev(xs);
+    return `<span class="navdot ${l}" aria-label="${l === 'r' ? 'Urgent items' : 'Items to check'}"></span>`; };
+  window.ovTog = r => { OV.open = OV.open === r ? null : r; window.previewShell && previewShell(); };
+  window.apxOverview = role => { if (!D().progs || typeof NAV === 'undefined') return ''; const by = ovData(), f = OVR[role]; let nr = 0, na = 0;
+    const row = o => { const on = OV.open === o.r, w = new Map(); o.xs.forEach(x => w.set(x.w.n, (w.get(x.w.n) || 0) + 1));
+      return `<div class="ovr ${o.lv}"><button type="button" class="ovt" onclick="ovTog('${o.r}')" aria-expanded="${on}"><b>${esc(o.l)}</b><span class="ovc">${o.xs.length ? marks(o.xs).map(m => `<span class="ovp ${m.w ? 'r' : 'a'}">${m.n} ${esc(m.k)}</span>`).join('') : '<span class="ovp g">All clear</span>'}</span><span class="ovx" aria-hidden="true">${on ? '▾' : '▸'}</span></button>`
+        + (on ? `<div class="ovd"><span>${o.xs.length ? 'Who actions it: ' + [...w].sort((a, b) => b[1] - a[1]).map(([n, c]) => `${esc(n)} ${c}`).join(' · ') : 'Nothing open.'}</span><a href="#${o.r}">Open ${esc(o.l)} →</a></div>` : '') + '</div>'; };
+    const body = NAV.map(([g, its]) => [g, its.filter(([, r]) => by.has(r) && ok(r) && (!f || f.includes(g) || f.includes(r)))]).filter(([, its]) => its.length)
+      .map(([g, its]) => `<div class="ovg">${esc(g)}</div>` + its.map(([l, r]) => { const xs = by.get(r), lv = lev(xs); if (lv === 'r') nr++; else if (lv === 'a') na++; return { l, r, xs, lv }; })
+        .sort((a, b) => 'rag'.indexOf(a.lv) - 'rag'.indexOf(b.lv)).map(row).join('')).join('');
+    return body ? `<section class="card ov"><div class="ovh"><b>Overview</b><span class="sub">${nr} urgent · ${na} to check · click a row to see who actions it</span></div>${body}</section>` : ''; };
+
   window.apxToday = scr => {
     if (!D().progs) return '<div class="empty"><b>Loading…</b></div>';
     if (!ST.list || !ST.req) loadSide(); else clearGone();

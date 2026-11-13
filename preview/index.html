@@ -222,6 +222,15 @@ table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px
 .tl{display:flex;flex-direction:column;gap:12px}.tl>div{border-left:2px solid var(--line);padding-left:10px;font-size:13px}
 .lname{border:0;background:transparent;padding:2px 0;font:inherit;font-weight:600;color:var(--navy);text-decoration:underline;text-underline-offset:2px;cursor:pointer;text-align:left}
 /* My work */
+.ov{padding:14px 16px;margin-bottom:16px}.ovh{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.ovh b{font-size:16px;color:var(--navy)}
+.ovg{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:12px 0 4px}
+.ovr{border:1px solid var(--line);border-left:4px solid var(--line);background:var(--surface);margin-bottom:4px}.ovr.r{border-left-color:var(--bad)}.ovr.a{border-left-color:var(--warn)}.ovr.g{border-left-color:var(--ok)}
+.ovt{display:flex;align-items:center;gap:10px;width:100%;border:0;background:transparent;font:inherit;text-align:left;padding:8px 10px;cursor:pointer;color:var(--ink)}.ovt:hover{background:var(--surface2)}.ovt b{flex:0 0 200px;font-size:13px}
+.ovc{display:flex;flex-wrap:wrap;gap:4px;flex:1;min-width:0}.ovx{color:var(--muted)}
+.ovp{font-size:12px;font-weight:600;border-radius:10px;padding:1px 8px;white-space:nowrap}.ovp.r{background:var(--badbg);color:var(--bad)}.ovp.a{background:var(--warnbg);color:var(--warn)}.ovp.g{background:var(--okbg);color:var(--ok)}
+.ovd{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;padding:6px 10px 9px;border-top:1px solid var(--line2);font-size:12px;color:var(--muted)}.ovd a{font-weight:600}
+.navdot{width:7px;height:7px;border-radius:50%;flex:0 0 7px;margin-left:auto}.navdot.r{background:var(--bad)}.navdot.a{background:var(--warn)}
+@media(max-width:640px){.ovt b{flex-basis:110px}}
 .seg{display:flex;background:var(--soft);border-radius:8px;padding:3px;flex-wrap:wrap}
 .seg button{height:34px;padding:0 12px;white-space:nowrap;border:0;border-radius:6px;background:transparent;font:inherit;font-size:13px;color:var(--muted);cursor:pointer}
 .seg button.on{background:var(--surface);color:var(--navy);font-weight:600;box-shadow:0 1px 2px rgba(37,36,123,.15)}
@@ -412,6 +421,7 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
         <div id="mwroles" class="seg" role="group" aria-label="View as role"></div>
       </div>
       <div id="mwbanner"></div>
+      <div id="mwov"></div>
       <div class="row" style="align-items:flex-start">
         <section class="card" style="flex:2 1 480px;padding:0;overflow:hidden"><div class="mwhead" id="mwhead"></div><div id="mwtasks"></div></section>
         <div style="flex:1 1 280px;display:flex;flex-direction:column;gap:20px;min-width:0">
@@ -766,7 +776,7 @@ const ico=r=>`<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke
 let PINS=null;
 function navPin(ev,r){ev.preventDefault();ev.stopPropagation();PINS=PINS.includes(r)?PINS.filter(x=>x!==r):[...PINS,r];try{localStorage.setItem('navPins.v1',JSON.stringify(PINS))}catch(e){}renderNav(curNav);toast(PINS.includes(r)?'Pinned to the top of the menu':'Unpinned')}
 function renderNav(cur){curNav=cur;if(!PINS){try{PINS=JSON.parse(localStorage.getItem('navPins.v1'))}catch(e){}const flat=NAV.flatMap(([g,it])=>it);if(!Array.isArray(PINS))PINS=[];PINS=PINS.filter(r=>flat.some(x=>x[1]===r))}const flat=NAV.flatMap(([g,it])=>it),pinned=PINS.map(r=>flat.find(x=>x[1]===r)).filter(Boolean);
-  $('nav').innerHTML=(pinned.length?[['Pinned',pinned]]:[]).concat(NAV).map(([g,items])=>`<div class="navgroup"><span>${g}</span>${items.filter(([l,r])=>(!famOnly()||r==='fam')&&(!(window.NAVR&&NAVR[r])||NAVR[r]())).map(([l,r])=>r?`<a class="navlink${r===cur?' on':''}" href="#${r}" title="${esc(l)}"${r===cur?' aria-current="page"':''}>${ico(r)}<span class="lbl">${esc(l)}</span>${NC[r]&&NC[r]()?`<span class="navcount" aria-label="${NC[r]()} waiting">${NC[r]()}</span>`:''}<span class="navpin${PINS.includes(r)?' on':''}" role="button" tabindex="0" aria-pressed="${PINS.includes(r)}" title="${PINS.includes(r)?'Unpin':'Pin to top'}" aria-label="${PINS.includes(r)?'Unpin':'Pin'} ${esc(l)}" onclick="navPin(event,'${r}')" onkeydown="if(event.key==='Enter'||event.key===' ')navPin(event,'${r}')">★</span></a>`:`<a class="navlink dim" href="#" onclick="toast('${esc(l)} not mocked yet');return false">${esc(l)}</a>`).join('')}</div>`).join('');
+  $('nav').innerHTML=(pinned.length?[['Pinned',pinned]]:[]).concat(NAV).map(([g,items])=>`<div class="navgroup"><span>${g}</span>${items.filter(([l,r])=>(!famOnly()||r==='fam')&&(!(window.NAVR&&NAVR[r])||NAVR[r]())).map(([l,r])=>r?`<a class="navlink${r===cur?' on':''}" href="#${r}" title="${esc(l)}"${r===cur?' aria-current="page"':''}>${ico(r)}<span class="lbl">${esc(l)}</span>${NC[r]&&NC[r]()?`<span class="navcount" aria-label="${NC[r]()} waiting">${NC[r]()}</span>`:(window.apxNavDot?apxNavDot(r):'')}<span class="navpin${PINS.includes(r)?' on':''}" role="button" tabindex="0" aria-pressed="${PINS.includes(r)}" title="${PINS.includes(r)?'Unpin':'Pin to top'}" aria-label="${PINS.includes(r)?'Unpin':'Pin'} ${esc(l)}" onclick="navPin(event,'${r}')" onkeydown="if(event.key==='Enter'||event.key===' ')navPin(event,'${r}')">★</span></a>`:`<a class="navlink dim" href="#" onclick="toast('${esc(l)} not mocked yet');return false">${esc(l)}</a>`).join('')}</div>`).join('');
 }
 function famOnly(){const r=(window.__preview&&window.__preview.roles)||[];return r.length>0&&r.every(x=>x==='fam_admin'||x==='ohs')}
 function route(){
@@ -1244,8 +1254,8 @@ function learnerRules(){return `<div class="row">
 <script src="fam.js?v=20261112em"></script>
 <script src="delivery.js?v=20261112h"></script>
 <script src="handover.js?v=20261112d"></script>
-<script src="shell.js?v=20261112x"></script>
-<script src="today.js?v=20261113a"></script>
+<script src="shell.js?v=20261113a"></script>
+<script src="today.js?v=20261113b"></script>
 <script src="admin.js?v=20261112na"></script>
 <script src="reports.js?v=20261112p"></script>
 </body>
