@@ -229,7 +229,7 @@ window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
 window.rpTP = v => { TRPM = v; render(); };
 window.rpTR = async () => { TR = null; render(); await Promise.all([loadQ(), loadDr()]); await loadTR(); render(); };   // also reloads the allowed actions (my_report_queue)
 window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };
-window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, n: rows.length, sent: rows.filter(x => ['review', 'changes', 'approved', 'sent'].includes(x.stage)).length, od: rows.filter(x => !['review', 'changes', 'approved', 'sent'].includes(x.stage)).length }; };
+window.rpSummary = () => { if (!TR || TR.err) return null; const rows = TR.byM[TR.cur] || []; return { month: TR.cur, rows, n: rows.length, sent: rows.filter(x => ['review', 'changes', 'approved', 'sent'].includes(x.stage)).length, od: rows.filter(x => !['review', 'changes', 'approved', 'sent'].includes(x.stage)).length }; };
 window.rpLoadTR = async () => { if (TR === null) { await loadDr(); await loadTR(); } return window.rpSummary(); };
 window.rpQF = f => { QF = f; render(); };
 window.rpReload = async () => { Q = null; render(); await loadQ(); render(); };
@@ -315,9 +315,13 @@ async function onRoute() { if (location.hash.slice(1).split('/')[0] !== 'reports
 /* Dashboard and My work: a one-line card for the current reporting month */
 async function homeCard() {
   const r = location.hash.slice(1).split('/')[0] || 'mywork'; if (!['dashboard', 'mywork'].includes(r) || !P.user) return;
-  const sm = await window.rpLoadTR(); const v = $('view-' + r); if (!sm || !v) return;
-  const html = `<section class="card" id="rpdash-${r}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px"><div style="flex:1 1 260px"><b>${esc(sm.month)} reports</b>
-    <div style="font-size:12.5px;color:var(--muted)">${sm.sent} of ${sm.n} submitted for review${sm.od ? ` · <span style="color:var(--bad);font-weight:600">${sm.od} not submitted</span>` : ''}</div></div>
+  const s0 = await window.rpLoadTR(); const v = $('view-' + r); if (!s0 || !v) return;
+  const me = String((P.user || {}).email || '').toLowerCase(), mine = !has(), SUB = ['review', 'changes', 'approved', 'sent'];
+  const rows = s0.rows.filter(x => !mine || String(x.pm || '').toLowerCase() === me); if (mine && !rows.length) { const o = $('rpdash-' + r); if (o) o.remove(); return; }
+  const late = rows.filter(x => !SUB.includes(x.stage)), sm = { month: s0.month, n: rows.length, sent: rows.length - late.length, od: late.length };
+  const list = late.map(x => `<li>#${esc(x.pid)} ${esc(x.client)} – ${esc(x.prog)}${mine ? '' : ` · <b>${esc(pmName(x.pm))}</b>`} · <span class="famas">${x.stage === 'draft' ? 'draft saved, not submitted' : 'not started'}</span></li>`).join('');
+  const html = `<section class="card" id="rpdash-${r}" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:16px"><div style="flex:1 1 260px"><b>${mine ? 'Your ' : ''}${esc(sm.month)} reports</b>
+    <div style="font-size:12.5px;color:var(--muted)">${sm.sent} of ${sm.n} submitted for review${sm.od ? ` · <details style="display:inline"><summary style="display:inline;cursor:pointer;color:var(--bad);font-weight:600;text-decoration:underline">${sm.od} not submitted</summary><ul style="margin:6px 0 0 18px;color:var(--ink,inherit)">${list}</ul></details>` : ''}</div></div>
     <span style="flex:1 1 160px;height:10px;border-radius:6px;background:var(--line2);overflow:hidden;display:flex"><span style="width:${sm.n ? Math.round(100 * sm.sent / sm.n) : 0}%;background:#25247B"></span></span>
     <a class="btn sm y" href="#reports">Open monthly reports</a></section>`;
   const old = $('rpdash-' + r); if (old) old.outerHTML = html; else v.insertAdjacentHTML('afterbegin', html);
