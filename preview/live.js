@@ -440,7 +440,7 @@
   /* ---------- Sign-off queue (writes via RPC; admin only) ---------- */
   function applySignoff() {
     SO.length = 0; Object.keys(SOD).forEach(k => delete SOD[k]);
-    P.data.signoffs.forEach(s => { SO.push([String(s.id), s.kind, s.title, s.detail || '', s.ref_table === 'learners' ? '#dq' : s.ref_table === 'recommendations' ? '#recs' : '#signoff', s.submitted_by || '', fmt(s.created_at)]);
+    P.data.signoffs.forEach(s => { SO.push([String(s.id), s.kind, s.title, s.detail || '', s.ref_table === 'learners' ? '#dq' : s.ref_table === 'recommendations' ? '#recs' : s.ref_table === 'monitoring_visits' ? '#visit/' + s.ref_id : '#signoff', s.submitted_by || '', fmt(s.created_at)]);
       if (s.status !== 'waiting') SOD[String(s.id)] = { s: s.status, t: fmt(s.decided_at), c: s.comment || '' }; });
   }
   soItems = () => SO;
@@ -501,7 +501,7 @@
     const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
     const recs = P.data.recs.filter(r => (r.fields?.Visit || []).map(String).includes(String(v.id)));
     box.innerHTML = `<a class="back" href="#visits">← All visits</a>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="font-size:26px;flex-grow:1">${esc(vLabel(v))} · ${esc(vProg(v) ? progName(vProg(v)) : 'No programme')}</h1><button class="btn" onclick="previewVisitAI(${v.id})">✨ AI report</button><button class="btn" onclick="previewVisitPrint(${v.id})">Print report</button><button class="btn y" form="vform">Save visit</button></div>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h1 style="font-size:26px;flex-grow:1">${esc(vLabel(v))} · ${esc(vProg(v) ? progName(vProg(v)) : 'No programme')}</h1><button class="btn" onclick="previewVisitAI(${v.id})">✨ AI report</button><button class="btn" onclick="previewVisitPrint(${v.id})">Print report</button>${(() => { const so = vF(v)['Sign-off']; return so === 'Signed off' ? `<span class="badge b-ok">Signed off</span>` : so === 'Submitted' ? `<button class="btn" disabled title="Waiting in the Sign-off queue">Awaiting sign-off</button>` : `<button class="btn" onclick="previewVisitSignoff(${v.id})">${so === 'Returned' ? 'Resubmit for sign-off' : 'Submit for sign-off'}</button>`; })()}<button class="btn y" form="vform">Save visit</button></div>
       <form id="vform" class="card vform" style="display:flex;flex-direction:column;gap:14px">
         <h2 style="font-size:15px">Visit</h2><div class="qagrid">${inp('date', 'Date of visit', f['Date of Visit'], 'date')}<label>Programme<select name="prog"><option value="">—</option>${progs.map(p => `<option value="${p.id}" ${p.id === vProg(v) ? 'selected' : ''}>${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>${inp('venue', 'Venue', f.Venue)}${inp('pers', 'QCTO personnel', f['QCTO Personnel'])}</div>
         <h2 style="font-size:15px">Key monitoring areas (1 = Not yet adequate … 4 = Exceeds)</h2><div class="qagrid">${VKMA.map((l, i) => `<label>KMA${i + 1} · ${l}<select name="KMA${i + 1}">${o(i === 5 ? ['1', '2', '3', '4', 'N/A'] : ['1', '2', '3', '4'], f['KMA' + (i + 1)])}</select></label>`).join('')}
@@ -580,6 +580,7 @@
     out.innerHTML = rs.map((r, i) => `<div class="card" style="display:flex;flex-direction:column;gap:6px;margin-bottom:8px"><b>${r.x.k} · ${esc(r.x.l)} (scored ${r.x.s})</b><div style="white-space:pre-wrap">${esc(r.t || 'Could not generate: ' + (r.err || 'no text'))}</div>${r.t ? `<div><button class="btn sm y" onclick="previewRecUseAI(${visitId},${i})">Use</button></div>` : ''}</div>`).join('');
   };
   window.previewRecUseAI = (visitId, i) => { const t = (window.__recAI || [])[i]; document.getElementById('famov')?.remove(); previewRecAdd(visitId); const el = $('recform')?.elements; if (el && t) el.Text.value = t; };
+  window.previewVisitSignoff = async id => { try { await write('Visit', () => sb.rpc('request_visit_signoff', { p_id: id, p_note: null })); toast('Sent to the Sign-off queue.'); await loadAll(); renderVisit(id); } catch (err) { toast(err.message || String(err)); } };
   window.previewVisitPrint = id => {
     const v = P.data.visits.find(x => x.id === id); if (!v) return; const f = vF(v), w = window.open('', '_blank'); if (!w) return;
     const row = (k, val) => val || val === 0 ? `<tr><th>${k}</th><td>${esc(String(val))}</td></tr>` : '';

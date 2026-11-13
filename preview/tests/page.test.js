@@ -178,6 +178,10 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const b = [...d.querySelectorAll('#reclist button')].find(x => /Mark resolved/.test(x.textContent)); b.click(); await tick();
     const u = log.find(x => x.rpc === 'request_rec_closure'); ok(u && u.args.p_id === 90 && !log.some(x => x.table === 'recommendations'), JSON.stringify(u));
   });
+  await t('Visit: Submit for sign-off sends report to Sign-off queue', async () => {
+    const { w, log } = await boot(sess('admin')); await w.previewVisitSignoff(80); await tick();
+    const u = log.find(x => x.rpc === 'request_visit_signoff'); ok(u && u.args.p_id === 80, JSON.stringify(u));
+  });
   await t('Sync panel hidden for roles that cannot read the outbox', async () => {
     const { d } = await boot(sess('qa_specialist')); ok(d.getElementById('syncbox').hidden, 'QA sees outbox');
   });
