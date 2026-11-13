@@ -1,5 +1,0 @@
-<!doctype html><meta charset="utf-8"><title>relay</title><p id=s>ready</p><script>
-addEventListener('message',async e=>{if(e.origin!=='https://outlook.cloud.microsoft')return;const d=e.data||{};if(!d.buf)return;
-let r;try{const x=await fetch('https://nducwhlmudksgxggjrbo.supabase.co/functions/v1/inbox-attach-temp',{method:'POST',headers:{'x-key':d.key,'x-task':d.task,'x-name':encodeURIComponent(d.name)},body:d.buf});r=x.status+' '+(await x.text()).slice(0,80)}catch(err){r='ERR '+err}
-document.getElementById('s').textContent=d.i+' '+r;e.source.postMessage({i:d.i,r},e.origin)});
-</script>
