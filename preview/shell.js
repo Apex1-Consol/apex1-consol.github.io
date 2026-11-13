@@ -120,7 +120,7 @@
   /* ---------- My work ---------- */
   let mwRole = null, mwPick = {}, mwShowHidden = false;
   const hid = () => { const h = ls.get('hide', {}); return h.d === iso() ? h.ids || [] : []; };
-  const roleOf = () => roles().includes('admin') ? 'admin' : roles().includes('pi_specialist') ? 'pi' : (roles().some(r => ['qa_specialist', 'etqa'].includes(r)) ? 'qa' : 'pm');
+  const roleOf = () => roles().some(r => ['admin', 'head_of_ops'].includes(r)) ? 'admin' : roles().includes('pi_specialist') ? 'pi' : (roles().some(r => ['qa_specialist', 'etqa', 'compliance_officer'].includes(r)) ? 'qa' : 'pm');
   function tasks(role) {
     const a = A(), out = [], d = D(); if (!a) return out;
     const go = (pid, h, t) => `dvApi.setProg(${pid});dvGo('${h}','${t}')`;

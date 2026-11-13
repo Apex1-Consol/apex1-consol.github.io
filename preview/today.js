@@ -113,6 +113,14 @@
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
+    pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated').map(p => ({ p, n: dd(p.start_date) })));
+      return { h: 'Programme Initiation', link: 'pi', items: r.map(o => it(pname(o.p), 'Not handed over yet' + (o.n != null ? ` · starts ${fmt(o.p.start_date)} · ${when(o.n)}` : ' · no start date'), goH('pi'), o.n != null && o.n <= 7, 'pi', o.p.id)) }; },
+    dq() { return { h: 'Data quality', link: 'dq', items: (D().dq || []).filter(x => !x.decision).map(x => it(esc(((x.first_name || '') + ' ' + (x.last_name || '')).trim() || 'Learner'), esc(String(x.issue || 'Possible issue').replace(/_/g, ' ')), goH('dq'), false, 'qa')) }; },
+    fam() { const items = []; (D().famc || []).forEach(x => { const nm = esc(x.full_name || 'Practitioner'), go = `location.hash='fam/${+x.assessor_id}'`;
+        if (x.missing_or_expired_documents > 0) items.push(it(nm, `Missing or expired documents · ${x.missing_or_expired_documents}`, go, true, 'comp'));
+        if (!x.registration_count) items.push(it(nm, 'No SETA registration captured', go, false, 'comp'));
+        if (x.open_follow_ups > 0) items.push(it(nm, `Open follow-ups · ${x.open_follow_ups}`, go, false, 'comp')); });
+      return { h: 'FAM Registry', link: 'fam', items }; },
     sync() { const o = D().outbox || [], f = o.filter(x => /fail|error/i.test(x.status || '')), p = o.filter(x => /pend|queue/i.test(x.status || ''));
       const g = new Map(); f.forEach(x => g.set(x.source_table, (g.get(x.source_table) || 0) + 1));
       return { h: 'ClickUp sync', link: 'synchealth', items: [...g].map(([t, c]) => it(esc(t), `${c} failed · ${esc((f.find(x => x.source_table === t).last_error || '').slice(0, 70))}`, goH('synchealth'), true, 'admin')).concat(p.length ? [it('Waiting to send', `${p.length} change${p.length > 1 ? 's' : ''} queued`, goH('synchealth'), p.length > 50, 'admin')] : []) }; }
@@ -124,7 +132,7 @@
     dashboard: ['dates', 'recs', 'visits', 'eisa', 'mods', 'reports'],
     hoo: ['signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'enrol', 'sync'],
     reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['dates', 'recs', 'visits', 'reports'],
-    programmes: ['dates', 'gaps', 'recs'], pi: ['gaps', 'dates'], learners: ['learners', 'att'], dq: ['learners', 'enrol'],
+    programmes: ['dates', 'gaps', 'recs'], pi: ['pi', 'gaps', 'dates'], learners: ['learners', 'att'], dq: ['dq', 'learners', 'enrol'],
     enrolments: ['enrol', 'learners'], eisa: ['eisa', 'qcto'], qcto: ['eisa', 'qcto', 'enrol'], attendance: ['att'],
     visits: ['visits', 'recs'], recs: ['recs', 'visits'], modver: ['mods', 'eisa'], accred: ['accs'], signoff: ['signoffs', 'recs'],
     synchealth: ['sync'], assessors: ['mods', 'accs']
@@ -166,7 +174,7 @@
     sb().from('fix_requests').update({ cleared_at: new Date().toISOString() }).in('item_key', gone).is('cleared_at', null).then(() => { gone.forEach(k => ST.req.delete(k)); window.shRefresh && shRefresh(); }, () => {}); }
 
   /* ---------- Overview on My work: every area, every marker; role decides the rows ---------- */
-  const OVR = { pm: ['Delivery', 'recs', 'visits'], qa: ['Quality & compliance', 'eisa'], pi: ['pi', 'programmes', 'clients'] };
+  const OVR = { pm: ['Delivery', 'recs', 'visits'], qa: ['Quality & compliance', 'eisa', 'dq'], pi: ['pi', 'programmes', 'clients'] };
   const OV = { open: null, t: 0, d: null, by: null };
   const ovData = () => { const d = D(); if (OV.by && OV.d === d.progs && Date.now() - OV.t < 20000) return OV.by;
     const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
