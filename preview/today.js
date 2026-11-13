@@ -67,10 +67,10 @@
       const none = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -30 && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -90))
         .map(p => it(pname(p), last.get(String(p.id)) ? `Last visit ${fmt(last.get(String(p.id)))}: book a visit` : 'No visit recorded: book or capture a visit', goP(p.id), true, 'pm', p.id));
       return { h: 'Visits due', link: 'visits', items: due.concat(none) }; },
-    eisa(m) { const t = (D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.eisa_date && !x.eisa_outcome).map(x => ({ x, n: dd(x.eisa_date) })).filter(o => o.n >= -7 && o.n <= 30);
+    eisa(m) { const t = (D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.eisa_date && !x.eisa_outcome).map(x => ({ x, n: dd(x.eisa_date) })).filter(o => o.n != null && o.n <= 30);
       const g = new Map(); t.forEach(o => { const k = o.x.programme_id + '|' + String(o.x.eisa_date).slice(0, 10); if (!g.has(k)) g.set(k, { o, c: 0, n: o.n }); g.get(k).c++; });
       const w = byN((D().windows || []).map(x => ({ x, n: dd(x.registration_closing) })).filter(o => o.n != null && o.n >= 0 && o.n <= 21));
-      return { h: 'EISA coming up', link: 'eisa', items: byN([...g.values()]).map(({ o, c }) => it(pname(m.get(String(o.x.programme_id))), `${c} learner${c > 1 ? 's' : ''} · EISA ${fmt(o.x.eisa_date)} · ${when(o.n)}`, `window.dvGo?dvGo('eisa','Readiness'):${goH('eisa')}`, o.n <= 7, 'qa', o.x.programme_id))
+      return { h: 'EISA', link: 'eisa', items: byN([...g.values()]).map(({ o, c }) => it(pname(m.get(String(o.x.programme_id))), o.n < 0 ? `Result outstanding · ${c} learner${c > 1 ? 's' : ''} · EISA was ${fmt(o.x.eisa_date)} · ${when(o.n)}` : `${c} learner${c > 1 ? 's' : ''} · EISA ${fmt(o.x.eisa_date)} · ${when(o.n)}`, `window.dvGo?dvGo('eisa','Readiness'):${goH('eisa')}`, o.n <= 7, 'qa', o.x.programme_id))
         .concat(w.map(o => it(esc(o.x.label || o.x.qualification || 'EISA window'), `Registration closes ${fmt(o.x.registration_closing)} · ${when(o.n)}`, goH('eisa'), o.n <= 7, 'qa'))) }; },
     qcto(m) { const g = new Map();
       (D().tracker || []).forEach(x => { const p = m.get(String(x.programme_id)); if (p && x.current_status === 'Not Started' && (dd(p.start_date) ?? 1) <= -30) g.set(p.id, (g.get(p.id) || 0) + 1); });
@@ -205,7 +205,7 @@
     const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
     Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
   const lev = xs => xs.filter(x => x.warn).length > xs.length / 4 ? 'r' : xs.length ? 'a' : 'g';
-  const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA coming up': () => 'EISA coming up',
+  const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA': x => /^Result outstanding/.test(plain(x.s)) ? 'EISA result outstanding' : /^Registration closes/.test(plain(x.s)) ? 'registration closing' : 'EISA coming up',
     'Attendance': x => /^(Last register|No register)/.test(plain(x.s)) ? 'no recent register' : /check the (start|end) date/.test(plain(x.s)) ? 'register outside dates' : 'high absences',
     'Learner documents': x => /missing/.test(plain(x.s)) ? 'documents missing' : /not checked/.test(plain(x.s)) ? 'documents not checked' : 'documents not captured', 'Not started, programme running 30+ days': () => 'with learners not started', 'Accreditation': x => /^Expires/.test(plain(x.s)) ? 'expiring' : null };
   const why = x => (LAB[x.hh] && LAB[x.hh](x)) || plain(x.s).split(' · ')[0].replace(/:.*/, '').replace(/\b\d[\d/]*\b/g, '').replace(/\s+/g, ' ').trim();
