@@ -157,8 +157,10 @@
       if (ret) out.push({ id: 'sor', t: `${ret} sign-off item${ret > 1 ? 's' : ''} returned`, s: 'Waiting on the sender to resubmit', k: 'Sign-off', c: 'View', on: `location.hash='signoff'` });
       const ob = d.outbox || [], wait = ob.filter(o => ['queued', 'retrying'].includes(o.status)).length, bad = ob.filter(o => o.status === 'failed').length;
       if (wait || bad) out.push({ id: 'sync', t: `ClickUp sync: ${wait} waiting${bad ? ', ' + bad + ' failed' : ''}`, s: 'Usually the ClickUp rate limit; retries every 2 minutes', k: 'Sync', c: 'Details', on: `location.hash='dashboard'`, bad: bad ? 1 : 0 });
-      if (window.qaLeisaCheck) active().forEach(p => a.learnersOf(p.id).forEach(l => { const e = window.qaLeisaCheck(l.id, p.id); const n = e ? e[0].length : 0;
-        if (n) out.push({ id: `x${p.id}.${l.id}`, t: `Fix LEISA data (${n} issue${n > 1 ? 's' : ''})`, s: `${nm(l)} · ${short(p)} · ${e[0][0]}`, k: 'LEISA', c: 'Fix', on: go(p.id, 'eisa', 'LEISA file') }); }));
+      if (window.qaLeisaCheck) active().forEach(p => { const c = {}; let L = 0;
+        a.learnersOf(p.id).forEach(l => { const e = window.qaLeisaCheck(l.id, p.id); if (e && e[0].length) { L++; e[0].forEach(x => { c[x] = (c[x] || 0) + 1; }); } });
+        if (!L) return; const top = Object.keys(c).sort((x, y) => c[y] - c[x]), who = /SDPCode/.test(top[0]) ? 'Kathleen' : 'PM';
+        out.push({ id: `x${p.id}`, t: `Fix LEISA data: ${short(p)} (${L} learner${L > 1 ? 's' : ''})`, s: `${top[0]} (${c[top[0]]})${top.length > 1 ? ` + ${top.length - 1} other issue type${top.length > 2 ? 's' : ''}` : ''} · Fix by: ${who}`, k: 'LEISA', c: 'Fix', on: go(p.id, 'eisa', 'LEISA file') }); });
       const dq = (d.dq || []).length; if (dq) out.push({ id: 'dq', t: `Review ${dq} possible data-quality issue${dq > 1 ? 's' : ''}`, s: 'Data quality review', k: 'Data quality', c: 'Review', on: `location.hash='dq'` });
     }
     return out;
