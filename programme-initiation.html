@@ -104,6 +104,7 @@
     .stage-tab.done .stage-dot{background-color:var(--semantic-success-bg);color:var(--semantic-success-ink)}
     .stage-tab.active .stage-dot{background-color:var(--yellow);color:var(--deep-indigo)}
     .stage-count{font-family:var(--font-mono);font-size:10.5px;opacity:.8}
+    .stage-req{font-family:var(--font-mono);font-size:10.5px;font-weight:700;color:#b7791f;margin-left:2px}
 
     #summary{background:var(--semantic-success-bg);color:var(--semantic-success-ink);border-bottom:1px solid var(--semantic-success-border);padding:8px 20px;font-size:12.5px;font-weight:700;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
     #lockedBanner{background:var(--semantic-info-bg);color:var(--semantic-info-ink);border-bottom:1px solid var(--semantic-info-border);padding:10px 20px;font-size:12.5px;font-weight:700;display:none;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
@@ -1101,6 +1102,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
 
     function getValidationReport(rec) {
       const errors = [];
+      const links = [];
       const warnings = [];
       const d = rec.data;
       stages.forEach(s => {
@@ -1117,11 +1119,11 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
           const val = d[f.id];
           const empty = Array.isArray(val) ? val.length === 0 : (!val || String(val).trim() === '');
           if (f.required && empty) {
-            errors.push(`${s.label}: "${f.label}" is required.`);
+            errors.push(`${s.label}: "${f.label}" is required.`); links.push({s: stages.indexOf(s), f: f.id});
           } else if (f.afterField && val && d[f.afterField]) {
             if (new Date(val) < new Date(d[f.afterField])) {
               const prevLabel = s.fields.find(x => x.id === f.afterField)?.label || f.afterField;
-              errors.push(`${s.label}: "${f.label}" cannot be before "${prevLabel}".`);
+              errors.push(`${s.label}: "${f.label}" cannot be before "${prevLabel}".`); links.push({s: stages.indexOf(s), f: f.id});
             }
           }
         });
@@ -1131,7 +1133,12 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       if (numTarget > 0 && rosterCount !== numTarget) {
         warnings.push(`Learner Roster has ${rosterCount} name(s) while No. of Learners is set to ${numTarget}.`);
       }
-      return { errors, warnings };
+      return { errors, warnings, links };
+    }
+    function jumpToField(si, fid) {
+      closeHandoverModal();
+      activeTab = si; renderForm();
+      setTimeout(() => { const el = document.querySelector(`[data-id="${fid}"]`); if (el) { el.scrollIntoView({block:'center'}); el.focus && el.focus(); el.classList.add('error'); } }, 50);
     }
 
     /* ---------- DASHBOARD ---------- */
@@ -2209,10 +2216,12 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         btn.type = 'button';
         btn.className = 'stage-tab' + (i === activeTab ? ' active' : '') + (done ? ' done' : '');
         const countText = s.rollout ? `${filledCount(rec, s)} mod` : `${filledCount(rec, s)}/${totalCount(rec, s)}`;
+        const reqLeft = s.rollout ? 0 : s.fields.filter(f => { if (!f.required || !visibleField(f, rec.data)) return false; const v = rec.data[f.id]; return Array.isArray(v) ? v.length === 0 : (!v || String(v).trim() === ''); }).length;
+        btn.title = reqLeft ? `${reqLeft} required field(s) still empty. You can save now and finish later; required fields are checked on Submit.` : '';
         btn.innerHTML = `
           <span class="stage-dot">${done ? '✓' : (i + 1)}</span>
           <span>${esc(s.label)}</span>
-          <span class="stage-count">${esc(countText)}</span>
+          <span class="stage-count">${esc(countText)}</span>${reqLeft ? `<span class="stage-req">●${reqLeft}</span>` : ''}
         `;
         btn.onclick = () => { activeTab = i; renderForm(); };
         tabsEl.appendChild(btn);
@@ -2483,9 +2492,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       const rec = currentRec();
       const errBox = el.parentElement.querySelector('.errmsg');
       let error = '';
-      if (field.required && !rec.data[id]) {
-        error = `${field.label} is required.`;
-      } else if (field.afterField && rec.data[id] && rec.data[field.afterField]) {
+      if (field.afterField && rec.data[id] && rec.data[field.afterField]) {
         if (new Date(rec.data[id]) < new Date(rec.data[field.afterField])) {
           error = `${field.label} cannot be before ${stage.fields.find(f => f.id === field.afterField).label}.`;
         }
@@ -3140,13 +3147,14 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       const resultEl = document.getElementById('handoverPreviewResult');
       errEl.style.display = 'none';
 
-      const { errors, warnings } = getValidationReport(rec);
+      const { errors, warnings, links } = getValidationReport(rec);
       const summaryBox = document.getElementById('handoverValidationSummary');
       let html = '';
       if (errors.length > 0) {
         html += `<div style="padding:10px 12px;background:var(--semantic-danger-bg);color:var(--semantic-danger-ink);border:1px solid var(--semantic-danger-border);border-radius:6px;font-size:12px;margin-bottom:8px;">
           <b>Required fields missing or invalid (${errors.length}):</b>
-          <ul style="margin:4px 0 0 18px;padding:0;">${errors.map(e => `<li>${esc(e)}</li>`).join('')}</ul>
+          <ul style="margin:4px 0 0 18px;padding:0;">${errors.map((e, i) => `<li><a href="#" class="ho-jump" data-s="${links[i].s}" data-f="${escAttr(links[i].f)}" style="color:inherit">${esc(e)}</a></li>`).join('')}</ul>
+          <button type="button" class="btn small" id="hoJumpFirst" style="margin-top:6px">Go to first missing field</button>
         </div>`;
       } else {
         html += `<div style="padding:10px 12px;background:var(--semantic-success-bg);color:var(--semantic-success-ink);border:1px solid var(--semantic-success-border);border-radius:6px;font-size:12px;font-weight:700;margin-bottom:8px;">
@@ -3159,6 +3167,9 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         </div>`;
       }
       summaryBox.innerHTML = html;
+      summaryBox.querySelectorAll('.ho-jump').forEach(a => a.onclick = ev => { ev.preventDefault(); jumpToField(+a.dataset.s, a.dataset.f); });
+      const hoFirst = document.getElementById('hoJumpFirst');
+      if (hoFirst) hoFirst.onclick = () => jumpToField(links[0].s, links[0].f);
       document.getElementById('handoverConfirmBtn').disabled = errors.length > 0 || isRecordLocked(rec);
 
       const d = rec.data;
