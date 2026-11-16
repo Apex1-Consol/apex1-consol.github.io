@@ -286,25 +286,88 @@
   window.adHooRefresh = async () => { if (window.previewReload) await window.previewReload(); hooAt = new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit' }); renderHoo(); };
   function hooAuto(on) { clearInterval(hooTimer); hooTimer = on ? setInterval(() => { if (location.hash === '#hoo' && !document.hidden) window.adHooRefresh(); else hooAuto(false); }, 30000) : null; }
 
+  /* ---------- shared helpers (admin pages) ---------- */
+  const apP = id => (D().progsAll || D().progs || []).find(p => String(p.id) === String(id));
+  const apPid = p => '#' + (p.display_id || p.id);
+  const apCl = p => ((D().clients || []).find(c => String(c.id) === String(p?.client_id)) || {}).client_name || '';
+  const apLink = id => { const p = apP(id); return p ? `<a href="#programmes" onclick="dvApi.setProg(${p.id});setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)"><b>${esc(apPid(p))}</b></a>` : `#${esc(id)}`; };
+  const apTs = x => x ? new Date(x).toLocaleString('en-ZA', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
+  const apDays = x => x ? Math.floor((Date.now() - new Date(x)) / 864e5) : 0;
+  const apPg = (n, pg, fn, size = 25) => { const m = Math.max(1, Math.ceil(n / size)); return n > size ? `<div style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"><span class="famas">Page ${pg + 1} of ${m} · ${n} rows</span><button class="btn sm" ${pg ? '' : 'disabled'} onclick="${fn}(${pg - 1})">‹ Prev</button><button class="btn sm" ${pg + 1 < m ? '' : 'disabled'} onclick="${fn}(${pg + 1})">Next ›</button></div>` : ''; };
+
+  /* ---------- Sign-off queue (replaces the base renderSO) ---------- */
+  let SOS = 'waiting', SOK = '', SOQ = '', HS = null;
+  const soPid = s => s.ref_table === 'programmes' || s.ref_table === 'handoff_signoffs' ? s.ref_id
+    : s.ref_table === 'recommendations' ? ((D().recs || []).find(r => String(r.id) === String(s.ref_id)) || {}).programme_id
+    : s.ref_table === 'monitoring_visits' ? ((D().visits || []).find(r => String(r.id) === String(s.ref_id)) || {}).programme_id : null;
+  const soKind = k => { k = String(k || 'other').replace(/_/g, ' '); return k.charAt(0).toUpperCase() + k.slice(1); };
+  const soSt = s => s.status === 'waiting' ? 'waiting' : s.status === 'returned' ? 'returned' : 'done';
+  window.renderSO = function () {
+    const f = $('sofilter'), l = $('solist'); if (!f || !l) return;
+    if (HS === null) { HS = []; sb.from('handoff_signoffs').select('programme_id,status,updated_at,handed_over_at').then(r => { HS = r.data || []; if (location.hash === '#signoff') window.renderSO(); }); }
+    const all = D().signoffs || [], inS = s => SOS === 'all' || soSt(s) === SOS;
+    const txt = s => { const p = apP(soPid(s)); return [s.title, s.detail, s.submitted_by, s.kind, p && apPid(p), p && apCl(p), p && p.programme_name].join(' ').toLowerCase(); };
+    const sc = all.filter(inS), kinds = [...new Set(all.map(s => s.kind || 'other'))].sort();
+    const rows = sc.filter(s => (!SOK || (s.kind || 'other') === SOK) && (!SOQ || txt(s).includes(SOQ.toLowerCase())))
+      .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const cnt = k => all.filter(s => k === 'all' || soSt(s) === k).length;
+    f.removeAttribute('style'); f.className = '';
+    f.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center">${seg([['waiting', 'Waiting', cnt('waiting')], ['returned', 'Returned', cnt('returned')], ['done', 'Approved', cnt('done')], ['all', 'All', cnt('all')]], SOS, 'adSoS')}
+      <input id="soq" class="cellin" style="height:36px;min-width:240px" placeholder="Search #id, client, title, person" value="${esc(SOQ)}" oninput="adSoQ(this.value)"></div>
+      ${kinds.length ? `<div class="famtiles" style="margin-top:10px">${UI.tiles([{ t: 'By type', k: kinds.map(k => [esc(soKind(k)), sc.filter(s => (s.kind || 'other') === k).length, '', SOK === k, `adSoK('${esc(k)}')`]) }])}</div>` : ''}`;
+    const it = typeof soItems === 'function' ? soItems() : [];
+    const card = s => { const i = it.findIndex(x => x[0] === String(s.id)), p = apP(soPid(s)), st = soSt(s), open = soOpen === String(s.id) && st === 'waiting', age = apDays(s.created_at);
+      const href = s.ref_table === 'learners' ? '#dq' : s.ref_table === 'recommendations' ? '#recs' : s.ref_table === 'monitoring_visits' ? '#visit/' + s.ref_id : s.ref_table === 'handoff_signoffs' || s.kind === 'handover' ? '#handover/' + s.ref_id : '';
+      return `<article class="card" style="display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start">
+      <div style="flex:1 1 360px;min-width:0;display:flex;flex-direction:column;gap:6px">
+        <div style="display:flex;flex-wrap:wrap;gap:6px"><span class="badge b-n">${esc(soKind(s.kind))}</span>
+          ${st === 'waiting' ? `<span class="badge ${age > 7 ? 'b-bad' : age > 3 ? 'b-warn' : ''}">Waiting ${age} day${age === 1 ? '' : 's'}</span>` : `<span class="badge ${s.status === 'approved' ? 'b-ok' : 'b-warn'}">${s.status === 'approved' ? 'Approved' : 'Returned'} · ${esc((s.decided_by || '').split('@')[0])} ${s.decided_at ? fmtD(day(s.decided_at)) : ''}</span>`}</div>
+        ${p ? `<span>${apLink(p.id)} · ${esc(apCl(p))}<br><span class="sub">${esc(p.programme_name || '')}</span></span>` : ''}
+        <b style="font-size:15px">${esc(s.title || '')}</b>${s.detail ? `<span class="sub">${esc(s.detail)}</span>` : ''}
+        <span class="sub">Submitted by ${esc(s.submitted_by || '—')} · ${s.created_at ? fmtD(day(s.created_at)) : ''}${href ? ` · <a href="${href}">Open</a>` : ''}</span>
+        ${s.comment ? `<span class="sub">Comment: “${esc(s.comment)}”</span>` : ''}
+        ${open ? `<label class="f" style="margin-top:6px">What needs to change?<textarea id="socmt" rows="3" oninput="$('sosend').disabled=!this.value.trim()"></textarea></label><div style="display:flex;gap:8px"><button class="btn sm n" id="sosend" disabled onclick="soAct(${i},'returned')">Send back</button><button class="btn sm" onclick="soOpen=null;renderSO()">Cancel</button></div>` : ''}
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${i < 0 ? '' : st !== 'waiting' ? `<button class="btn sm" onclick="adSoReopen(${i})">Reopen decision</button>` : open ? '' : `<button class="btn sm" onclick="soOpen='${s.id}';renderSO()">Return…</button><button class="btn sm y" onclick="soAct(${i},'approved')">Approve</button>`}</div></article>`; };
+    const prep = (HS || []).filter(h => !h.handed_over_at && h.status !== 'handed_over' && apP(h.programme_id));
+    l.innerHTML = (rows.map(card).join('') || `<div class="empty"><b>${SOS === 'waiting' && !SOQ && !SOK ? 'Queue is clear' : 'Nothing matches'}</b><span>${SOS === 'waiting' && !SOQ && !SOK ? 'Nothing is waiting for a sign-off decision.' : 'Try another tab, type or search.'}</span></div>`)
+      + (SOS === 'waiting' && prep.length ? `<details class="card"><summary style="cursor:pointer"><b>Coming up · ${prep.length} hand-over${prep.length === 1 ? '' : 's'} being prepared</b> <span class="famas">Not in the queue yet: they arrive here when submitted</span></summary>
+        <div class="tw" style="margin-top:10px"><table class="dense">${H(['Programme', 'Client', 'Status', 'Last change', ''])}<tbody>${prep.sort((a, b) => new Date(a.updated_at) - new Date(b.updated_at)).map(h => { const p = apP(h.programme_id); return `<tr><td>${apLink(p.id)} <span class="sub">${esc(p.programme_name || '')}</span></td><td>${esc(apCl(p))}</td><td><span class="badge">Preparing</span></td><td>${apDays(h.updated_at)} days ago</td><td><a class="btn sm" href="#handover/${p.id}">Open</a></td></tr>`; }).join('')}</tbody></table></div></details>` : '');
+    if (soOpen && $('socmt')) $('socmt').focus();
+  };
+  window.adSoS = k => { SOS = k; window.renderSO(); };
+  window.adSoK = k => { SOK = SOK === k ? '' : k; window.renderSO(); };
+  window.adSoQ = v => { SOQ = v || ''; window.renderSO(); const e = $('soq'); if (e) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } };
+  window.adSoReopen = i => { if (confirm('Reopen this decision? The item goes back to Waiting.')) soAct(i); };
+
   /* ---------- Data & Sync Health (live: ClickUp sync queue + learner data quality) ---------- */
   let OQ = null, OQF = 'attention';
   const oqSt = r => r.queue_type === 'legacy_failure' ? 'legacy' : r.queue_status;
   const OQT = { attention: ['Needs attention', r => ['retrying', 'quarantined', 'failed', 'legacy'].includes(oqSt(r))], queued: ['Queued', r => oqSt(r) === 'queued'], retrying: ['Retrying', r => oqSt(r) === 'retrying'],
     quarantined: ['Quarantined', r => ['quarantined', 'failed'].includes(oqSt(r))], legacy: ['Legacy failures (30 days)', r => oqSt(r) === 'legacy'] };
+  let OH = null, OHt = '';
   async function renderOps() {
     const v = $('view-synchealth');
     if (!has('operations', 'project_manager')) { v.innerHTML = locked('Data & Sync Health', 'admin, operations or project manager'); return; }
-    if (!OQ) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>'; const r = await sb.from('v_clickup_operator_queue').select('*').order('updated_at', { ascending: false }).limit(500); OQ = r.error ? (say('Could not load the sync queue: ' + r.error.message), []) : r.data || []; }
+    if (!OQ) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>';
+      const [r, h] = await Promise.all([sb.from('v_clickup_operator_queue').select('*').order('updated_at', { ascending: false }).limit(500), sb.rpc('ops_health')]);
+      OQ = r.error ? (say('Could not load the sync queue: ' + r.error.message), []) : r.data || []; OH = h.error ? null : h.data; OHt = apTs(new Date()); }
     const rows = OQ.filter(OQT[OQF][1]), dq = D().dq || [];
-    const ob = D().outbox || [], okN = ob.filter(o => o.status === 'succeeded').length;
+    const ob = D().outbox || [], okN = ob.filter(o => o.status === 'succeeded').length, att = OQ.filter(OQT.attention[1]).length;
+    const al = OH ? (OH.alerts || []) : [];
+    const hk = OH ? [['Failed scheduled jobs (48 h)', OH.cron_fail, (OH.cron_list || []).join(', ')], ['Report emails not sent (7 days)', OH.mail_stuck, ''], ['Report cards stuck (10+ min)', OH.cards_dirty, ''], ['ClickUp sync alerts', al.length, al.map(a => a.message || a.code || JSON.stringify(a)).join('; ').slice(0, 200)]] : [];
+    const bad = att + hk.reduce((s, x) => s + (+x[1] || 0), 0);
     v.innerHTML = head('Data & Sync Health', 'ApexOne is the system of record; ClickUp mirrors it. Records are identified only by source table and record id.', (has() ? '<button class="btn" onclick="rpXlsx()" title="Every data set in one Excel file, test records left out">Backup: everything (.xlsx)</button>' : '') + '<button class="btn" onclick="adOpsReload()">Refresh</button>')
-      + `<div class="grid">${Object.entries(OQT).map(([k, [l, f]]) => kpi(l, OQ.filter(f).length)).join('')}${kpi('Synced (latest 500)', okN)}</div>
-      <section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><h2 style="font-size:17px;margin-bottom:10px">ClickUp sync queue</h2>${seg(Object.entries(OQT).map(([k, [l, f]]) => [k, l, OQ.filter(f).length]), OQF, 'adOpsF')}</div>
+      + `<section class="card" style="border-left:4px solid var(${bad ? '--bad' : '--ok'});display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center"><b style="font-size:16px">${bad ? `${bad} item${bad === 1 ? '' : 's'} need attention` : 'All healthy'}</b>
+        <span class="famas">${OH ? `Last scheduled job ${apTs(OH.last_cron)} · last report card sync ${apTs(OH.last_card_sync)} · ` : has() ? 'Health checks could not be loaded · ' : 'Health checks are admin only · '}checked ${OHt}</span></section>
+      <div class="famtiles">${UI.tiles([...(hk.length ? [{ t: 'Health checks', k: hk.map(([l, n, t]) => [l, n, n ? 'var(--bad)' : 'var(--ok)', false, '', t || (n ? 'Needs a look' : 'OK')]) }] : []),
+        { t: 'ClickUp sync queue', k: [...Object.entries(OQT).map(([k, [l, f]]) => { const n = OQ.filter(f).length; return [l, n, n && k !== 'queued' ? 'var(--bad)' : '', OQF === k, `adOpsF('${k}')`]; }), ['Synced (latest 500)', okN, 'var(--ok)', false, '']] }])}</div>
+      ${rows.length ? `<section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><h2 style="font-size:17px">ClickUp sync queue · ${esc(OQT[OQF][0])}</h2></div>
       <div class="tw"><table class="dense">${H(['Record', 'Status', 'Attempts', 'Last error', 'Next try', 'Updated', ''])}<tbody>
       ${rows.map(r => `<tr><td><code>${esc(r.source_table)}:${esc(r.source_record_id)}</code></td><td><span class="badge ${oqSt(r) === 'queued' ? '' : oqSt(r) === 'retrying' ? 'b-warn' : 'b-bad'}">${esc(oqSt(r))}</span></td>
         <td>${r.attempts ?? ''}</td><td style="max-width:360px">${esc(r.last_error || '')}</td><td>${r.next_action_at ? new Date(r.next_action_at).toLocaleString('en-ZA') : '—'}</td><td>${r.updated_at ? new Date(r.updated_at).toLocaleString('en-ZA') : ''}</td>
-        <td>${has() && r.queue_type !== 'legacy_failure' && oqSt(r) !== 'queued' ? `<button class="btn sm" onclick="adRequeue('${esc(r.item_id)}')">Requeue</button>` : ''}</td></tr>`).join('') || none(7, 'Nothing here. The queue is clear.')}
-      </tbody></table></div></section>
+        <td>${has() && r.queue_type !== 'legacy_failure' && oqSt(r) !== 'queued' ? `<button class="btn sm" onclick="adRequeue('${esc(r.item_id)}')">Requeue</button>` : ''}</td></tr>`).join('')}
+      </tbody></table></div></section>` : `<p class="note">ClickUp sync queue · ${esc(OQT[OQF][0])}: nothing here.</p>`}
       <section class="card" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center"><div style="flex-grow:1"><h2 style="font-size:17px">Learner data quality</h2>
         <span class="famas">${has() ? `${dq.length} learner record${dq.length === 1 ? '' : 's'} flagged (missing, placeholder or invalid ID, same name). Decisions are recorded only; nothing is merged automatically.` : 'Admins review flagged learner records.'}</span></div>
         ${has() ? '<a class="btn y" href="#dq">Review data quality →</a>' : ''}</section>`;
@@ -317,34 +380,55 @@
   };
 
   /* ---------- Audit log ---------- */
-  const AF = { user: '', table: '', action: '', from: '', to: '' }; let AL = null;
+  const AF = { user: '', table: '', action: '', from: '', to: '', q: '', imp: 1 }; let AL = null, AN = 0, AP = 0, AFC = null;
+  const auQ = (cols, cnt) => {
+    let q = sb.from('audit_log').select(cols, cnt ? { count: 'exact' } : undefined).order('created_at', { ascending: false });
+    if (AF.user) q = q.eq('user_name', AF.user); if (AF.table) q = q.eq('table_name', AF.table); if (AF.action) q = q.eq('action', AF.action);
+    if (AF.from) q = q.gte('created_at', AF.from); if (AF.to) q = q.lte('created_at', AF.to + 'T23:59:59');
+    if (AF.imp && !AF.user) q = q.not('user_name', 'is', null);
+    const s = (AF.q || '').replace(/[,()*%"]/g, ' ').trim();
+    if (s) q = /^\d+$/.test(s) ? q.or(`record_id.eq.${s},user_name.ilike.*${s}*`) : q.or(`user_name.ilike.*${s}*,table_name.ilike.*${s}*`);
+    return q;
+  };
+  const auRec = r => { const id = r.record_id; if (!id) return '';
+    if (r.table_name === 'programmes' && apP(id)) return apLink(id);
+    if (r.table_name === 'learners' && /^\d+$/.test(id)) return `<a href="javascript:void 0" onclick="window.previewLearnerEdit&&previewLearnerEdit(${id})">${esc(id)}</a>`;
+    const p = ['enrolments', 'qcto_tracker', 'attendance', 'eisa', 'monitoring_visits', 'recommendations', 'moderation_items'].includes(r.table_name) && (r.changes?.after || r.changes?.new || r.changes || {}).programme_id;
+    return esc(id) + (p && apP(p) ? ` <span class="sub">· ${apLink(p)}</span>` : ''); };
   async function renderAudit() {
     const v = $('view-audit');
     if (!has('head_of_ops')) { v.innerHTML = locked('Audit log', 'admin or Head of Operations'); return; }
+    if (!AFC) { const f = await sb.rpc('audit_facets'); AFC = f.data || { users: [], tables: [], actions: [] }; }
     if (!AL) {
       v.innerHTML = '<div class="empty"><b>Loading…</b></div>';
-      let q = sb.from('audit_log').select('id,action,table_name,record_id,user_name,user_role,changes,created_at').order('created_at', { ascending: false }).limit(500);
-      if (AF.user) q = q.eq('user_name', AF.user); if (AF.table) q = q.eq('table_name', AF.table); if (AF.action) q = q.eq('action', AF.action);
-      if (AF.from) q = q.gte('created_at', AF.from); if (AF.to) q = q.lte('created_at', AF.to + 'T23:59:59');
-      const r = await q; AL = r.error ? (say('Could not load the audit log: ' + r.error.message), []) : r.data || [];
+      const r = await auQ('id,action,table_name,record_id,user_name,user_role,changes,created_at', 1).range(AP * 25, AP * 25 + 24);
+      AL = r.error ? (say('Could not load the audit log: ' + r.error.message), []) : r.data || []; AN = r.count || AL.length;
     }
-    const opt = k => [...new Set(AL.map(x => x[k]).filter(Boolean))].sort();
     const ch = c => { if (!c) return ''; const a = c.after || c.new || c, b = c.before || c.old || {}; const keys = Object.keys(a).filter(k => !['updated_at', 'created_at', 'tenant_id'].includes(k) && JSON.stringify(a[k]) !== JSON.stringify(b[k])).slice(0, 4);
       return keys.map(k => `<div><b>${esc(k)}</b>: ${esc(JSON.stringify(a[k])).slice(0, 80)}</div>`).join(''); };
-    v.innerHTML = head('Audit log', 'Every create, update and delete, newest first (latest 500)', `<button class="btn" onclick="adAuF()">Clear filters</button><button class="btn" onclick="adAuCsv()">Export CSV</button><button class="btn" onclick="adAuReload()">Refresh</button>`)
+    const ago = n => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); }, today = ago(0);
+    const rng = [['', 'All time', ''], ['0', 'Today', today], ['7', '7 days', ago(7)], ['30', '30 days', ago(30)]];
+    const curR = (rng.find(x => x[2] === AF.from && !AF.to) || [null])[0];
+    v.innerHTML = head('Audit log', 'Every create, update and delete, newest first', `<button class="btn" onclick="adAuF()">Clear filters</button><button class="btn" onclick="adAuCsv()">Export CSV</button><button class="btn" onclick="adAuReload()">Refresh</button>`)
       + `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
-        ${sel('auf-u', 'User', opt('user_name'), AF.user, "adAuF('user',this.value)")}${sel('auf-t', 'Table', opt('table_name'), AF.table, "adAuF('table',this.value)")}${sel('auf-a', 'Action', opt('action'), AF.action, "adAuF('action',this.value)")}
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">Search<input id="auq" class="cellin" style="height:36px;min-width:220px" placeholder="Record id, user or table" value="${esc(AF.q)}" onchange="adAuF('q',this.value)"></label>
+        ${sel('auf-u', 'User', AFC.users || [], AF.user, "adAuF('user',this.value)")}${sel('auf-t', 'Table', AFC.tables || [], AF.table, "adAuF('table',this.value)")}${sel('auf-a', 'Action', AFC.actions || [], AF.action, "adAuF('action',this.value)")}
         <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">From<input type="date" class="cellin" style="height:36px" value="${AF.from}" onchange="adAuF('from',this.value)"></label>
-        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">To<input type="date" class="cellin" style="height:36px" value="${AF.to}" onchange="adAuF('to',this.value)"></label>
-        <span class="famas" style="margin-left:auto">${AL.length} entr${AL.length === 1 ? 'y' : 'ies'}</span></div>
+        <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)">To<input type="date" class="cellin" style="height:36px" value="${AF.to}" onchange="adAuF('to',this.value)"></label></div>
+        <div style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:10px 20px;border-bottom:1px solid var(--line2)">${seg(rng.map(([k, l]) => [k || 'all', l]), curR === '' ? 'all' : curR, 'adAuR')}
+        <label style="font-size:13px"><input type="checkbox" ${AF.imp ? 'checked' : ''} onchange="adAuF('imp',this.checked?1:0)"> Exclude imports / system</label>
+        <span class="famas" style="margin-left:auto">${AN} entr${AN === 1 ? 'y' : 'ies'}</span></div>
       <div class="tw"><table class="dense">${H(['When', 'User', 'Role', 'Action', 'Table', 'Record', 'Change'])}<tbody>
-      ${AL.map(r => `<tr><td style="white-space:nowrap">${new Date(r.created_at).toLocaleString('en-ZA')}</td><td>${esc(r.user_name || 'system')}</td><td>${esc(r.user_role || '')}</td>
-        <td><span class="badge ${r.action === 'delete' ? 'b-bad' : r.action === 'insert' ? 'b-ok' : ''}">${esc(r.action || '')}</span></td><td>${esc(r.table_name || '')}</td><td>${esc(r.record_id || '')}</td><td style="font-size:12px;max-width:380px">${ch(r.changes)}</td></tr>`).join('') || none(7, 'No entries match these filters.')}
-      </tbody></table></div></section>`;
+      ${AL.map(r => `<tr><td style="white-space:nowrap">${new Date(r.created_at).toLocaleString('en-ZA')}</td><td>${r.user_name ? esc(r.user_name) : '<span class="sub">Import / system</span>'}</td><td>${esc(r.user_role || '')}</td>
+        <td><span class="badge ${r.action === 'delete' ? 'b-bad' : r.action === 'insert' ? 'b-ok' : ''}">${esc(r.action || '')}</span></td><td>${esc(r.table_name || '')}</td><td>${auRec(r)}</td><td style="font-size:12px;max-width:380px">${ch(r.changes)}</td></tr>`).join('') || none(7, 'No entries match these filters.')}
+      </tbody></table></div>${apPg(AN, AP, 'adAuPg')}</section>`;
   }
-  window.adAuF = (k, val) => { if (!k) Object.keys(AF).forEach(x => AF[x] = ''); else AF[k] = val; AL = null; renderAudit(); };
-  window.adAuReload = () => { AL = null; renderAudit(); };
-  window.adAuCsv = () => csv('audit-log.csv', ['When', 'User', 'Role', 'Action', 'Table', 'Record', 'Changes'], (AL || []).map(r => [r.created_at, r.user_name, r.user_role, r.action, r.table_name, r.record_id, JSON.stringify(r.changes)]));
+  window.adAuF = (k, val) => { if (!k) { Object.keys(AF).forEach(x => AF[x] = ''); AF.imp = 1; } else AF[k] = val; AP = 0; AL = null; renderAudit(); };
+  window.adAuR = k => { const d = new Date(); if (k !== 'all') d.setDate(d.getDate() - +k); AF.from = k === 'all' ? '' : d.toISOString().slice(0, 10); AF.to = ''; AP = 0; AL = null; renderAudit(); };
+  window.adAuPg = p => { AP = Math.max(0, p); AL = null; renderAudit(); };
+  window.adAuReload = () => { AL = null; AFC = null; renderAudit(); };
+  window.adAuCsv = async () => { const r = await auQ('action,table_name,record_id,user_name,user_role,changes,created_at').limit(5000); if (r.error) return say('Export failed: ' + r.error.message);
+    csv('audit-log.csv', ['When', 'User', 'Role', 'Action', 'Table', 'Record', 'Changes'], (r.data || []).map(r => [r.created_at, r.user_name || 'Import / system', r.user_role, r.action, r.table_name, r.record_id, JSON.stringify(r.changes)])); };
 
   /* ---------- User management ---------- */
   const ROLES = [['admin', 'Admin'], ['head_of_ops', 'Head of Operations'], ['qa_specialist', 'QA specialist'], ['etqa', 'ETQA'], ['project_manager', 'Project manager'], ['operations', 'Operations'], ['pi_specialist', 'PI specialist'], ['compliance_officer', 'Compliance officer'], ['ohs', 'OHS (FAM Registry)']];
@@ -357,34 +441,52 @@
     return data;
   }
   const rl = r => Array.isArray(r) ? r.filter(Boolean).map(String) : r ? [String(r)] : [];
+  let UF = { r: '', q: '' };
+  const uProgs = u => { const n = (u.name || '').trim().toLowerCase(), e = (u.email || '').toLowerCase();
+    return (D().progsAll || D().progs || []).filter(p => !p.deleted_at && ((n && (p.project_manager_name || '').trim().toLowerCase() === n) || (e && [(p.owner_email || ''), (p.handed_over_to_email || '')].some(x => x.toLowerCase() === e)))); };
   async function renderUsers() {
     const v = $('view-users');
     if (!has()) { v.innerHTML = locked('User management', 'admin'); return; }
     if (!US) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>'; try { US = ((await ua('list', {})).users || []).sort((a, b) => (a.email || '').localeCompare(b.email || '')); } catch (e) { v.innerHTML = head('User management', 'Who can sign in and what they can do') + `<div class="empty"><b>Could not load users</b><span>${esc(e.message)}</span></div>`; return; } }
-    const me = (P.user?.email || '').toLowerCase();
+    const me = (P.user?.email || '').toLowerCase(), rs = p => window.dvApi?.runState ? dvApi.runState(p) : '';
+    const inR = u => !UF.r || (UF.r === 'never' ? !u.last_sign_in_at : rl(u.role).includes(UF.r));
+    const inQ = u => !UF.q || `${u.email} ${u.name || ''}`.toLowerCase().includes(UF.q.toLowerCase());
+    const list = US.map((u, i) => [u, i]).filter(([u]) => inR(u) && inQ(u)).sort(([a], [b]) => (!!a.last_sign_in_at - !!b.last_sign_in_at) || (a.email || '').localeCompare(b.email || ''));
+    const noPm = (D().progsAll || D().progs || []).filter(p => !p.deleted_at && rs(p) === 'Active' && !(p.project_manager_name || '').trim()).length;
+    const never = US.filter(u => !u.last_sign_in_at).length;
     v.innerHTML = head('User management', 'Who can sign in and what they can do. A role change applies when that person next signs in.', '<button class="btn y" onclick="adUserAdd()">+ Add user</button>')
-      + `<section class="card" style="padding:0"><div class="tw"><table class="dense">${H(['Email', 'Name', 'Roles', 'Last sign-in', ''])}<tbody>
-      ${US.map((u, i) => `<tr><td><b>${esc(u.email)}</b>${(u.email || '').toLowerCase() === me ? ' <span class="badge">You</span>' : ''}</td>
+      + `<div class="famtiles">${UI.tiles([{ t: `Users · ${US.length}`, k: [['All', US.length, '', !UF.r, `adUF('r','')`], ...ROLES.map(([k, l]) => [l, US.filter(u => rl(u.role).includes(k)).length, '', UF.r === k, `adUF('r','${k}')`]).filter(x => x[1])] },
+        { t: 'Needs attention', k: [['Never signed in', never, never ? 'var(--warn)' : 'var(--ok)', UF.r === 'never', `adUF('r','never')`], ['Running programmes with no PM', noPm, noPm ? 'var(--bad)' : 'var(--ok)', false, `location.hash='pmtracker'`]] }])}</div>
+      <section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><input id="usq" class="cellin" style="height:36px;min-width:260px" placeholder="Search email or name" value="${esc(UF.q)}" oninput="adUF('q',this.value)"></div>
+      <div class="tw"><table class="dense">${H(['Email', 'Name', 'Roles', 'Programmes', 'Last sign-in', ''])}<tbody>
+      ${list.map(([u, i]) => { const pm = rl(u.role).includes('project_manager'), ps = pm ? uProgs(u) : [], run = ps.filter(p => rs(p) === 'Active').length;
+        return `<tr><td><b>${esc(u.email)}</b>${(u.email || '').toLowerCase() === me ? ' <span class="badge">You</span>' : ''}</td>
         <td><input class="cellin" id="un-${i}" value="${esc(u.name || '')}" style="height:32px;min-width:140px"></td>
         <td><div style="display:flex;flex-wrap:wrap;gap:4px 12px">${ROLES.map(([k, l]) => `<label style="font-size:12px;white-space:nowrap"><input type="checkbox" data-u="${i}" value="${k}"${rl(u.role).includes(k) ? ' checked' : ''}> ${l}</label>`).join('')}</div></td>
+        <td style="white-space:nowrap">${!pm ? '<span class="sub">—</span>' : ps.length ? `<a href="#pmtracker">${ps.length}</a> <span class="sub">(${run} running)</span>` : `<span class="badge b-warn" title="No programme has this person's name as PM. Check the name matches the PM name on programmes.">None matched</span>`}</td>
         <td>${u.last_sign_in_at ? fmtD(day(u.last_sign_in_at)) : '<span class="badge b-warn">never</span>'}</td>
-        <td style="white-space:nowrap"><button class="btn sm y" onclick="adUserSave(${i})">Save</button>${(u.email || '').toLowerCase() === me ? '' : ` <button class="btn sm" style="color:var(--bad)" onclick="adUserRemove(${i})">Delete</button>`}</td></tr>`).join('') || none(5, 'No users.')}
-      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email.</p></section>`;
+        <td style="white-space:nowrap"><button class="btn sm y" onclick="adUserSave(${i})">Save</button>${(u.email || '').toLowerCase() === me ? '' : ` <button class="btn sm" style="color:var(--bad)" onclick="adUserRemove(${i})">Delete</button>`}</td></tr>`; }).join('') || none(6, 'No users match.')}
+      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email. Programmes = PM name on the programme matches the user's name (or the user's email is the programme owner).</p></section>`;
+    if (UF.q && document.activeElement?.id !== 'usq') { const e = $('usq'); if (e && UF._f) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }
   }
+  window.adUF = (k, val) => { UF[k] = val; UF._f = k === 'q'; renderUsers(); };
   const run = async (fn, ok) => { try { await fn(); US = null; say(ok); renderUsers(); } catch (e) { say('Not saved: ' + e.message); } };
   window.adUserSave = i => { const roles = [...document.querySelectorAll(`#view-users input[data-u="${i}"]:checked`)].map(x => x.value); const u = US[i]; rl(u.role).filter(r => !ROLES.some(x => x[0] === r)).forEach(r => roles.push(r));   // keep roles this screen does not show (e.g. demo)
     if (!roles.length) return say('Pick at least one role, or use Delete');
     run(() => ua('update', { user_id: u.id, role: roles, name: ($('un-' + i)?.value || '').trim(), tenant: u.tenant || 'apex-academy' }), 'Saved. Applies at their next sign-in.'); };
   window.adUserRemove = i => { const u = US[i]; if (!confirm(`Delete the sign-in account of ${u.email}? This cannot be undone.`)) return; run(() => ua('delete', { user_id: u.id }), 'User deleted'); };
   window.adUserAdd = () => {
-    const email = (prompt('Email address (@apexu.co.za)') || '').trim().toLowerCase(); if (!email) return;
-    if (!/^[^@\s]+@apexu\.co\.za$/.test(email)) return say('Only @apexu.co.za addresses');
-    const r = prompt('Roles, comma separated: ' + ROLES.map(x => x[0]).join(', '), 'project_manager'); if (!r) return;
-    const roles = r.split(',').map(x => x.trim()).filter(Boolean), bad = roles.filter(x => !ROLES.some(y => y[0] === x));
-    if (bad.length) return say('Unknown role: ' + bad.join(', '));
-    const name = (prompt('Full name', '') || '').trim();
-    run(() => ua('invite', { email, role: roles, name, tenant: 'apex-academy' }), 'Invitation sent to ' + email);
+    if (!window.apxDlg) return say('Form not available. Refresh the page.');
+    apxDlg('uaform', 'Add user', `<div class="qagrid"><label>Email (@apexu.co.za) *<input name="em" type="email" required></label><label>Full name *<input name="nm" required></label></div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0">${ROLES.map(([k, l]) => `<label style="font-size:13px;white-space:nowrap"><input type="checkbox" name="rl" value="${k}"${k === 'project_manager' ? ' checked' : ''}> ${l}</label>`).join('')}</div>
+      <p class="sub">An invitation email is sent to this address.</p>`,
+      async el => { const email = el.em.value.trim().toLowerCase(), name = el.nm.value.trim(), roles = [...document.querySelectorAll('#uaform input[name="rl"]:checked')].map(x => x.value);
+        if (!/^[^@\s]+@apexu\.co\.za$/.test(email)) throw new Error('Only @apexu.co.za addresses.');
+        if (!name) throw new Error('Full name is required.'); if (!roles.length) throw new Error('Pick at least one role.');
+        if ((US || []).some(u => (u.email || '').toLowerCase() === email)) throw new Error('This user already exists.');
+        await ua('invite', { email, role: roles, name, tenant: 'apex-academy' }); US = null; say('Invitation sent to ' + email); setTimeout(renderUsers, 0); }, 'Send invitation');
   };
+
 
   /* ---------- routing ---------- */
   const RENDER = { pmtracker: renderPM, assessors: renderAs, hoo: renderHoo, synchealth: renderOps, audit: renderAudit, users: renderUsers };
