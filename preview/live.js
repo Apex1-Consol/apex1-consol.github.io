@@ -229,9 +229,10 @@
   }
   function applyLearners() {
     LEARNERS.length = 0;
-    P.data.learners.forEach(l => { const e = P.data.enrol.filter(x => x.learner_id === l.id), live = e.find(enLive);
+    const RUNP = new Set(P.data.progs.filter(p => !p.deleted_at && dvApi.runState(p) === 'Active').map(p => p.id)), enRun = x => RUNP.has(x.programme_id) && !/withdrawn/i.test(x.fields?.Status || x.status || '');
+    P.data.learners.forEach(l => { const e = P.data.enrol.filter(x => x.learner_id === l.id), live = e.find(enRun);
       const pe = live || e[0], dqi = (P.data.dq || []).filter(r => r.learner_id === l.id && !r.decision).map(r => String(r.issue || ''));
-      LEARNERS.push({ lid: l.id, n: lName(l), id: lIdn(l) ? '••••••••' + lIdn(l).slice(-4) : '', pid: pe ? pe.programme_id : null, p: live ? progName(live.programme_id) : (e[0] ? progName(e[0].programme_id) + ' (' + enSt(e[0]).toLowerCase() + ')' : ''), s: live ? 'Active' : e.length ? 'Not active' : 'Not enrolled', t: lTest(l), bad: dqi.some(x => x.includes('invalid')), dup: dqi.some(x => x.includes('dup')) }); });
+      LEARNERS.push({ lid: l.id, n: lName(l), id: lIdn(l) ? '••••••••' + lIdn(l).slice(-4) : '', pid: pe ? pe.programme_id : null, p: live ? progName(live.programme_id) : (e[0] ? progName(e[0].programme_id) + ' (' + (P.data.progs.find(p => p.id === e[0].programme_id) ? dvApi.runState(P.data.progs.find(p => p.id === e[0].programme_id)) : enSt(e[0])).toLowerCase() + ')' : ''), s: live ? 'Active' : e.length ? 'Not active' : 'Not enrolled', t: lTest(l), bad: dqi.some(x => x.includes('invalid')), dup: dqi.some(x => x.includes('dup')) }); });
     lLoaded = true;
     const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.filter(x => !x.t).length + ' on record';
     const head = document.querySelector('#view-learners h1')?.parentElement;
