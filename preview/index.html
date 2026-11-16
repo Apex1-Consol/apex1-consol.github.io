@@ -597,7 +597,7 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Enrolments</h1><button class="btn" onclick="toast('Import from Excel')">Import</button><button class="btn y" onclick="toast('Enrol learners')">+ Enrol learners</button></div>
       <div class="card" style="background:var(--warnbg);border-color:var(--line);display:flex;flex-wrap:wrap;align-items:center;gap:12px">
         <span class="count b-warn" style="background:var(--surface)">174</span><span style="flex-grow:1"><b>Learners without an active enrolment</b><span class="sub" style="display:block;color:var(--warn)">Link them to a programme or archive them so reports stay accurate.</span></span>
-        <a class="btn" href="#learners" onclick="lF='Unlinked';lPage=0">See unlinked</a><a class="btn n" href="#dq">Check duplicates first</a>
+        <a class="btn" href="#learners" onclick="lF='Not enrolled';lPage=0">See not enrolled</a><a class="btn n" href="#dq">Check duplicates first</a>
       </div>
       <div class="card" style="padding:0">
         <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
@@ -1248,7 +1248,7 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261116d"></script>
+<script src="live.js?v=20261116e"></script>
 <script src="qa.js?v=20261116c"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>

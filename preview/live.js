@@ -223,13 +223,14 @@
   function applyLearners() {
     LEARNERS.length = 0;
     P.data.learners.forEach(l => { const e = P.data.enrol.filter(x => x.learner_id === l.id), live = e.find(enLive);
-      LEARNERS.push({ lid: l.id, n: lName(l), id: lIdn(l) ? '••••••••' + lIdn(l).slice(-4) : '', p: live ? progName(live.programme_id) : (e[0] ? progName(e[0].programme_id) + ' (' + enSt(e[0]).toLowerCase() + ')' : ''), s: live ? 'Active' : 'Unlinked', t: lTest(l) }); });
+      const pe = live || e[0], dqi = (P.data.dq || []).filter(r => r.learner_id === l.id && !r.decision).map(r => String(r.issue || ''));
+      LEARNERS.push({ lid: l.id, n: lName(l), id: lIdn(l) ? '••••••••' + lIdn(l).slice(-4) : '', pid: pe ? pe.programme_id : null, p: live ? progName(live.programme_id) : (e[0] ? progName(e[0].programme_id) + ' (' + enSt(e[0]).toLowerCase() + ')' : ''), s: live ? 'Active' : e.length ? 'Not active' : 'Not enrolled', t: lTest(l), bad: dqi.some(x => x.includes('invalid')), dup: dqi.some(x => x.includes('dup')) }); });
     lLoaded = true;
     const h = document.querySelector('#view-learners h1 .sub'); if (h) h.textContent = LEARNERS.filter(x => !x.t).length + ' on record';
     const head = document.querySelector('#view-learners h1')?.parentElement;
     if (head && !$('ladd')) head.insertAdjacentHTML('beforeend', '<button class="btn" id="limp" onclick="previewLearnerImport()">Import from Excel</button><button class="btn y" id="ladd" onclick="previewLearnerAdd()">+ Add learner</button>');
     head?.querySelectorAll('button:not(#ladd):not(#limp)').forEach(b => b.remove());
-    const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Programme</th><th>Status</th><th></th>';
+    const th = $('lrows')?.closest('table')?.querySelector('thead tr'); if (th) th.innerHTML = '<th>Learner</th><th>ID number</th><th>Client</th><th>Status</th><th></th>';
     const lcard = $('lrows')?.closest('.card'); if (lcard && !$('ltiles')) { lcard.insertAdjacentHTML('beforebegin', '<div id="ltiles" class="famtiles"></div>'); const tb = $('lfilter').parentElement; tb.className = 'famtool'; tb.removeAttribute('style'); $('lfilter').removeAttribute('style'); $('lfilter').className = ''; }
     renderLearners();
     if (location.hash.startsWith('#learner/')) renderLearner(+location.hash.split('/')[1]);
@@ -238,19 +239,22 @@
   window.lSetView = v => { lView = v; lPage = 0; renderLearners(); };
   renderLearners = function () {
     const q = ($('lq').value || '').trim().toLowerCase(), base = LEARNERS.filter(l => !l.t), all = base.length, act = base.filter(l => l.s === 'Active').length, noid = base.filter(l => !l.id).length;
-    if (!['All', 'Active', 'Unlinked', 'No ID'].includes(lF)) lF = 'All';
+    if (lF === 'Unlinked') lF = 'Not enrolled';
+    const FL = { 'No ID': l => !l.id, 'Invalid ID': l => l.bad, 'Possible duplicate': l => l.dup };
+    if (!['All', 'Active', 'Not enrolled', 'Not active', ...Object.keys(FL)].includes(lF)) lF = 'All';
+    const pOf = id => P.data.progs.find(p => p.id === id), cOf = id => clientOf(id)?.client_name || '', dt = d => d ? String(d).slice(0, 10) : '?';
     const tile = (k, v, c) => [k === 'All' ? 'All learners' : k, v, c, lF === k && k !== 'All', `lF='${lF === k ? 'All' : k}';lPage=0;renderLearners()`];
-    if ($('ltiles')) $('ltiles').innerHTML = UI.tiles([{ t: 'Enrolment', k: [tile('All', all), tile('Active', act, 'var(--ok)'), tile('Unlinked', all - act, 'var(--warn)')] }, { t: 'Needs attention', k: [tile('No ID', noid, 'var(--bad)')] }]);
+    if ($('ltiles')) $('ltiles').innerHTML = UI.tiles([{ t: 'Enrolment', k: [tile('All', all), tile('Active', act, 'var(--ok)'), tile('Not enrolled', base.filter(l => l.s === 'Not enrolled').length, 'var(--warn)'), tile('Not active', base.filter(l => l.s === 'Not active').length, 'var(--warn)')] }, { t: 'Needs attention', k: [tile('No ID', noid, 'var(--bad)'), tile('Invalid ID', base.filter(FL['Invalid ID']).length, 'var(--bad)'), tile('Possible duplicate', base.filter(FL['Possible duplicate']).length, 'var(--warn)')] }]);
     $('lfilter').innerHTML = UI.seg(['By programme', 'List'], lView, o => `lSetView('${o}')`);
-    let rows = base.filter(l => (lF === 'All' || (lF === 'No ID' ? !l.id : l.s === lF)) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q)));
-    const grp = l => l.p || 'Not enrolled', byP = lView === 'By programme';
+    let rows = base.filter(l => (lF === 'All' || (FL[lF] ? FL[lF](l) : l.s === lF)) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q) || cOf(l.pid).toLowerCase().includes(q) || String(l.pid) === q.replace('#', '')));
+    const grp = l => { if (!l.pid) return 'Not enrolled'; const p = pOf(l.pid); return '#' + l.pid + ' · ' + (cOf(l.pid) || 'No client') + ' · ' + l.p + (p ? ' · ' + dt(p.start_date) + ' – ' + dt(p.end_date) : ''); }, byP = lView === 'By programme';
     if (byP) rows = rows.slice().sort((a, b) => (!a.p - !b.p) || grp(a).localeCompare(grp(b)) || a.n.localeCompare(b.n));
     const cnt = {}; rows.forEach(l => { cnt[grp(l)] = (cnt[grp(l)] || 0) + 1; });
     const pages = Math.max(1, Math.ceil(rows.length / PER)); if (lPage >= pages) lPage = pages - 1; const pg = rows.slice(lPage * PER, lPage * PER + PER);
     let last = null;
     $('lrows').innerHTML = pg.map(l => {
-      const gh = byP && grp(l) !== last ? UI.gh(esc(grp(l)), cnt[grp(l)], l.p ? 'var(--navy)' : 'var(--warn)', 5) : ''; last = grp(l);
-      return gh + `<tr class="famtr" onclick="location.hash='learner/${l.lid}'"><td><b>${esc(l.n)}</b>${l.id ? '' : '<span class="famflag">No ID</span>'}</td><td class="sub">${l.id || '—'}</td><td>${l.p ? esc(l.p) : '<span class="sub">Not enrolled</span>'}</td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : '<span class="badge b-warn">Unlinked</span>'}</td><td style="text-align:right"><button class="famact" onclick="event.stopPropagation();previewLearnerEdit(${l.lid})">Edit</button></td></tr>`; }).join('') || '<tr><td colspan="5" class="sub">No learners match.</td></tr>';
+      const gh = byP && grp(l) !== last ? UI.gh(esc(grp(l)), cnt[grp(l)], l.pid ? 'var(--navy)' : 'var(--warn)', 5, l.pid ? esc(pOf(l.pid)?.project_manager_name || 'No PM') : '') : ''; last = grp(l);
+      return gh + `<tr class="famtr" onclick="location.hash='learner/${l.lid}'"><td><b>${esc(l.n)}</b>${l.id ? '' : '<span class="famflag">No ID</span>'}${l.bad ? '<span class="famflag">Invalid ID</span>' : ''}${l.dup ? '<span class="famflag">Possible duplicate</span>' : ''}</td><td class="sub">${l.id}</td><td>${byP ? esc(cOf(l.pid)) : (l.p ? esc((cOf(l.pid) ? cOf(l.pid) + ' · ' : '') + l.p) : '<span class="sub">Not enrolled</span>')}</td><td>${l.s === 'Active' ? '<span class="badge b-ok">Active</span>' : `<span class="badge b-warn">${l.s}</span>`}</td><td style="text-align:right"><button class="famact" onclick="event.stopPropagation();previewLearnerEdit(${l.lid})">Edit</button></td></tr>`; }).join('') || '<tr><td colspan="5" class="sub">No learners match.</td></tr>';
     $('lpager').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${rows.length ? lPage * PER + 1 : 0}–${lPage * PER + pg.length} of ${rows.length}</span>${pages > 1 ? `<button class="btn sm" ${lPage ? '' : 'disabled'} onclick="lPage--;renderLearners()">Previous</button><button class="btn sm" ${lPage < pages - 1 ? '' : 'disabled'} onclick="lPage++;renderLearners()">Next</button>` : ''}`;
   };
   loadLearners = renderLearners;
