@@ -149,7 +149,7 @@
       const f = r.fields || {}, p = prog(r.programme_id), L = [];
       if (p) L.push(`Programme ${pid(p)}: ${p.programme_name || ''}`);
       L.push(`Recommendation: ${String(f.Text || '').slice(0, 1500)}`); if (f['Due Date']) L.push(`Due date: ${f['Due Date']}`);
-      L.push('Write it as a closing note stating what was done, with [placeholders] for anything the facts do not say (e.g. [date completed], [evidence filed]).');
+      L.push('IMPORTANT: the facts do NOT say what was done. Do not claim any action was taken. Write a short closing-note TEMPLATE the user completes: one line restating the issue, then "Action taken: [describe what was done]", "Date completed: [date]", "Evidence: [where the evidence is filed]", "Checked by: [name]".');
       return L.join('\n');
     });
   }
