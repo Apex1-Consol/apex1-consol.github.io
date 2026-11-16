@@ -62,7 +62,9 @@
     recs(m) { const r = byN((D().recs || []).filter(x => !x.resolved && m.has(String(x.programme_id))).map(x => ({ x, n: dd(F(x, 'Due Date')) })));
       return { h: 'Open recommendations', link: 'recs', items: r.filter(o => o.n == null || o.n <= 14).map(o => it(esc(String(F(o.x, 'Text')).slice(0, 80) || 'Recommendation'), `${pname(m.get(String(o.x.programme_id)))} · ${o.n == null ? 'no due date' : 'due ' + when(o.n)}`, goH('recs'), o.n == null || o.n < 0, F(o.x, 'Owner') || 'pm', o.x.programme_id)) }; },
     visits(m) { const v = D().visits || [], last = new Map(), next = [];
-      v.forEach(x => { const k = String(x.programme_id), d = F(x, 'Date of Visit', 'Date'), n = F(x, 'Next Visit Date'); if (d && (!last.get(k) || d > last.get(k))) last.set(k, d); if (n && m.has(k)) next.push({ x, n: dd(n), d: n }); });
+      v.forEach(x => { const k = String(x.programme_id), d = F(x, 'Date of Visit', 'Date'), n = F(x, 'Next Visit Date'); if (d && (!last.get(k) || d > last.get(k))) last.set(k, d); if (n && m.has(k)) next.push({ x, n: dd(n), d: n, vd: d }); });
+      // Only the next date from a programme's latest visit counts; a later visit replaces an earlier visit's next date.
+      for (let i = next.length - 1; i >= 0; i--) { const o = next[i], L = last.get(String(o.x.programme_id)); if (L && (!o.vd || o.vd < L)) next.splice(i, 1); }
       const due = byN(next.filter(o => o.n != null && o.n <= 14)).map(o => it(pname(m.get(String(o.x.programme_id))), `Next visit ${fmt(o.d)} · ${when(o.n)}`, goH('visits'), o.n < 0, 'pm', o.x.programme_id));
       const none = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -30 && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -90))
         .map(p => it(pname(p), last.get(String(p.id)) ? `Last visit ${fmt(last.get(String(p.id)))}: book a visit` : 'No visit recorded: book or capture a visit', goP(p.id), true, 'pm', p.id));
