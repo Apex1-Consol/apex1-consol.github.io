@@ -443,7 +443,7 @@
   const rl = r => Array.isArray(r) ? r.filter(Boolean).map(String) : r ? [String(r)] : [];
   let UF = { r: '', q: '' };
   const uProgs = u => { const n = (u.name || '').trim().toLowerCase(), e = (u.email || '').toLowerCase();
-    return (D().progsAll || D().progs || []).filter(p => !p.deleted_at && ((n && (p.project_manager_name || '').trim().toLowerCase() === n) || (e && [(p.owner_email || ''), (p.handed_over_to_email || '')].some(x => x.toLowerCase() === e)))); };
+    const lp = e.split('@')[0]; return (D().progsAll || D().progs || []).filter(p => { const pn = (p.project_manager_name || '').trim().toLowerCase(); return !p.deleted_at && ((n && pn === n) || (!n && lp && pn.split(/\s+/)[0] === lp) || (e && [(p.owner_email || ''), (p.handed_over_to_email || '')].some(x => x.toLowerCase() === e))); }); };
   async function renderUsers() {
     const v = $('view-users');
     if (!has()) { v.innerHTML = locked('User management', 'admin'); return; }
@@ -466,7 +466,7 @@
         <td style="white-space:nowrap">${!pm ? '<span class="sub">—</span>' : ps.length ? `<a href="#pmtracker">${ps.length}</a> <span class="sub">(${run} running)</span>` : `<span class="badge b-warn" title="No programme has this person's name as PM. Check the name matches the PM name on programmes.">None matched</span>`}</td>
         <td>${u.last_sign_in_at ? fmtD(day(u.last_sign_in_at)) : '<span class="badge b-warn">never</span>'}</td>
         <td style="white-space:nowrap"><button class="btn sm y" onclick="adUserSave(${i})">Save</button>${(u.email || '').toLowerCase() === me ? '' : ` <button class="btn sm" style="color:var(--bad)" onclick="adUserRemove(${i})">Delete</button>`}</td></tr>`; }).join('') || none(6, 'No users match.')}
-      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email. Programmes = PM name on the programme matches the user's name (or the user's email is the programme owner).</p></section>`;
+      </tbody></table></div><p class="note" style="margin:12px 20px">Only @apexu.co.za addresses. Delete removes the sign-in account; it cannot be undone. Add user sends an invitation email. Programmes = PM name on the programme matches the user's name (or, with no name saved, the first part of their email matches the PM's first name).</p></section>`;
     if (UF.q && document.activeElement?.id !== 'usq') { const e = $('usq'); if (e && UF._f) { e.focus(); e.setSelectionRange(e.value.length, e.value.length); } }
   }
   window.adUF = (k, val) => { UF[k] = val; UF._f = k === 'q'; renderUsers(); };
