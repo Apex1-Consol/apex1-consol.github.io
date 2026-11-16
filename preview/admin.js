@@ -86,12 +86,14 @@
     ho: ['Awaiting hand-over', 'Started in Programme Initiation, hand-over not signed yet', p => !!p.intake_source_id && pf(p, '__stage') !== 'handed_over' && rs(p) !== 'Completed']
   };
   const SHORT = { end: 'Ending soon', reg: 'No register', vis: 'Visit due', lrn: 'No learners', rec: 'Recs overdue', ho: 'Awaiting hand-over' };
+  const nk = x => String(x || '').trim().replace(/^SP:\s*/i, '');
+  const setaOf = p => { if (pf(p, 'SETA')) return pf(p, 'SETA'); const a = (D().accs || []).find(x => nk(x.saqa_id) && nk(x.saqa_id) === nk(p.saqa_id)); return a ? (a.quality_partner || a.seta || '') : ''; };
   const why = p => Object.keys(ACT).filter(k => ACT[k][2](p));
   const GAPS = { saqa: ['No SAQA', 'No SAQA ID on the programme', noSaqa], dates: ['Missing or bad dates', 'Start or end date blank, or end before start', badDates] };
   function pmRows() {
     const q = PMF.qs.toLowerCase();
     return (D().progs || []).filter(p => (!PMF.st || PMF.st === 'All' || rs(p) === PMF.st) && (!PMF.pm || pmOf(p) === PMF.pm)
-      && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type) && (!PMF.seta || (pf(p, 'SETA') || '—') === PMF.seta)
+      && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type) && (!PMF.seta || (setaOf(p) || '—') === PMF.seta)
       && (!PMF.q || GAPS[PMF.q][2](p)) && (!PMF.a || ACT[PMF.a][2](p))
       && (!q || [p.display_id, p.id, '#' + p.id, clientName(p.client_id), p.qualification_name, p.programme_name, p.saqa_id].join(' ').toLowerCase().includes(q)));
   }
@@ -117,16 +119,16 @@
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}
         ${sel('pmf-c', 'Client', [...new Set(all.map(p => clientName(p.client_id)))].sort(), PMF.client, "adPM('client',this.value)")}
         ${sel('pmf-t', 'Programme type', [...new Set(all.map(p => p.programme_type || '—'))].sort(), PMF.type, "adPM('type',this.value)")}
-        ${sel('pmf-s', 'SETA', [...new Set(all.map(p => pf(p, 'SETA') || '—'))].sort(), PMF.seta, "adPM('seta',this.value)")}
+        ${sel('pmf-s', 'SETA', [...new Set(all.map(p => setaOf(p) || '—'))].sort(), PMF.seta, "adPM('seta',this.value)")}
         <button class="btn sm" onclick="adPM()">Clear filters</button><span class="famas" style="margin-left:auto">Showing ${rows.length} of ${all.length}</span></div>
-        <div class="tw"><table class="dense">${H(['Prog ID', 'Client', 'Qualification', 'Learners', 'Type', 'SETA', 'Dates', 'Facilitator', 'Assessor', 'State', ''])}<tbody>
+        <div class="tw"><table class="dense">${H(['Prog ID', 'State', 'Client', 'Qualification', 'Learners', 'Type · SETA', 'Dates', 'Facilitator / Assessor', ''])}<tbody>
         ${page.map((p, i, arr) => { const pm = pmOf(p), prev = i ? pmOf(arr[i - 1]) : null, st = rs(p), bd = badDates(p);
-          return (pm !== prev ? UI.gh(esc(pm), sorted.filter(x => pmOf(x) === pm).length, pm === 'Unassigned' ? 'var(--warn)' : 'var(--navy)', 11) : '') + `<tr class="famtr"><td>${esc(p.display_id || p.id)}</td><td>${esc(clientName(p.client_id))}</td>
+          return (pm !== prev ? UI.gh(esc(pm), sorted.filter(x => pmOf(x) === pm).length, pm === 'Unassigned' ? 'var(--warn)' : 'var(--navy)', 9) : '') + `<tr class="famtr"><td>${esc(p.display_id || p.id)}</td><td style="white-space:nowrap"><span class="badge ${st === 'Active' ? 'b-ok' : st === 'Planned' ? 'b-info' : ''}">${st}</span>${why(p).map(k => k === 'ho' ? `<div><a class="badge b-warn" href="#handover/${p.id}">${SHORT[k]}</a></div>` : `<div><span class="badge b-warn" title="${esc(ACT[k][1])}">${SHORT[k]}</span></div>`).join('')}</td><td>${esc(clientName(p.client_id))}</td>
           <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ' <span class="badge b-warn">No SAQA</span>'}${pf(p, 'Cohort') || p.group_name ? `<div class="sub">Cohort ${esc(pf(p, 'Cohort') || p.group_name)}</div>` : ''}</td><td>${learnersIn(p.id)}</td>
-          <td>${esc(p.programme_type || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
+          <td>${esc(p.programme_type || '—')}<div class="sub">${esc(setaOf(p) || '—')}</div></td>
           <td style="white-space:nowrap">${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">No start</span>'} – ${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">No end</span>'}${bd && p.start_date && p.end_date ? '<div><span class="badge b-bad">End before start</span></div>' : ''}</td>
-          <td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
-          <td><span class="badge ${st === 'Active' ? 'b-ok' : st === 'Planned' ? 'b-info' : ''}">${st}</span>${why(p).map(k => k === 'ho' ? `<div><a class="badge b-warn" href="#handover/${p.id}">${SHORT[k]}</a></div>` : `<div><span class="badge b-warn" title="${esc(ACT[k][1])}">${SHORT[k]}</span></div>`).join('')}</td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(11, 'No programmes match these filters.')}
+          <td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}<div class="sub">${esc(pf(p, 'Assessor') || '—')}</div></td>
+          <td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(9, 'No programmes match these filters.')}
         </tbody></table></div>${pages > 1 ? `<div class="pgbar" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"><button class="btn sm" ${PMF.pg ? '' : 'disabled'} onclick="adPMpg(-1)">Previous</button><span class="famas">Page ${PMF.pg + 1} of ${pages}</span><button class="btn sm" ${PMF.pg < pages - 1 ? '' : 'disabled'} onclick="adPMpg(1)">Next</button></div>` : ''}</section>`;
   }
   window.adPMpg = d => { PMF.pg += d; renderPM(); };
