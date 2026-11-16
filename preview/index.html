@@ -9,7 +9,7 @@ var c=navigator.clipboard,o=c&&c.writeText&&c.writeText.bind(c);
 var fb=function(t){var x=document.createElement('textarea');x.value=t;x.style.cssText='position:fixed;opacity:0';document.body.appendChild(x);x.select();var k=false;try{k=document.execCommand('copy')}catch(e){}x.remove();return k?Promise.resolve():Promise.reject(new Error('copy blocked'))};
 try{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:function(t){return o?o(t).catch(function(){return fb(t)}):fb(t)},readText:c&&c.readText&&c.readText.bind(c)}})}catch(e){}
 })();</script>
-<style>html.embed .side{display:none!important}</style>
+<style>html.embed .side{display:none!important}#plist .pick{padding:8px 12px}</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ApexOne Preview</title>
@@ -459,9 +459,9 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
     <!-- PROGRAMMES -->
     <main id="view-programmes" hidden>
       <div class="row">
-        <section class="card" style="flex:1 1 280px;padding:16px;display:flex;flex-direction:column;gap:10px">
+        <section class="card" style="flex:1 1 280px;padding:16px;display:flex;flex-direction:column;gap:10px;position:sticky;top:12px;align-self:flex-start">
           <div class="seg" id="pstatus"></div>
-          <div id="plist" style="display:flex;flex-direction:column;gap:10px"></div>
+          <div id="plist" style="display:flex;flex-direction:column;gap:8px;max-height:calc(100vh - 260px);min-height:240px;overflow-y:auto;padding-right:4px"></div>
           <button class="btn" style="border-style:dashed;color:var(--navy2)" onclick="window.dvProgEdit?dvProgEdit(null):toast('Loading…')">+ New programme</button>
         </section>
         <section style="flex:3 1 560px;min-width:0;display:flex;flex-direction:column;gap:16px">
