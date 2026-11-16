@@ -120,13 +120,16 @@
   }
 
   /* ---------- reads ---------- */
-  async function q(name, p) { const r = await p; if (r.error) { P.errors[name] = r.error.message; return []; } return r.data || []; }
+  async function q(name, p) { let r = await p; if (r.error) { P.errors[name] = r.error.message; return []; } let a = r.data || [];
+    // paging: the API returns at most 1000 rows per request, so keep fetching until a short page comes back
+    while (r.data && r.data.length === 1000 && typeof p.range === 'function') { r = await p.range(a.length, a.length + 999); if (r.error) { P.errors[name] = r.error.message; break; } a = a.concat(r.data || []); }
+    return a; }
   async function loadAll() {
     P.errors = {};
     const R = sb.schema('reports');
     const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows] = await Promise.all([
-      q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email,phone,fields').order('last_name')),
-      q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at,fields')),
+      q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email,phone,fields').order('last_name').order('id')),
+      q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at,fields').order('id')),
       q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields,display_id,entity,qualification_code,group_name,group_size,programme_status,accreditation_end_date,eisa_start_date,eisa_end_date,deleted_at')),
       q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager,sales_person,fields,deleted_at')),
       q('qcto_tracker', sb.from('qcto_tracker').select('*').order('id')),
@@ -146,9 +149,9 @@
       q('leisa_learner', sb.from('leisa_learner').select('*')),
       q('program_modules', sb.from('program_modules').select('*').order('module_number')),
       q('attendance_sessions', sb.from('attendance_sessions').select('*').order('session_date')),
-      q('attendance', sb.from('attendance').select('id,programme_id,learner_id,session_date,status,fields')),
-      q('eisa', sb.from('eisa').select('*')),
-      q('poe_checklist', sb.from('poe_checklist').select('id,programme_id,learner_id,fields,created_at,updated_at'))
+      q('attendance', sb.from('attendance').select('id,programme_id,learner_id,session_date,status,fields').order('id')),
+      q('eisa', sb.from('eisa').select('*').order('id')),
+      q('poe_checklist', sb.from('poe_checklist').select('id,programme_id,learner_id,fields,created_at,updated_at').order('id'))
     ]);
     Object.assign(P.data, { learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows });
     P.data.progsAll = progs; P.data.progs = progs.filter(p => !p.deleted_at);   // 233 of 260 programmes are soft-deleted on live
