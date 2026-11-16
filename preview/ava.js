@@ -95,7 +95,7 @@
       const j = await call({ type: 'ava', mode, question: q || PMODE[mode], page: pageName(route()), facts: context(mode), history: hist });
       S.msgs.push({ r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers });
     } catch (err) { S.msgs.push({ r: 'a', t: 'Sorry, I could not answer: ' + err.message, err: 1 }); }
-    S.busy = false; save(); render(true);
+    S.busy = false; save(); render(true); usage();
   }
   async function tool(label, body, key) {
     if (S.busy) return; S.busy = true; S.msgs.push({ r: 'u', t: label }); render(true);
@@ -104,9 +104,15 @@
       const t = j.no_data ? 'There is no data for this yet on this programme (nothing captured), so there is nothing to analyse.' : String(j[key] || '').trim() || '(No text returned)';
       S.msgs.push({ r: 'a', t, un: (j.fact_check || {}).unverified_numbers, draft: 1 });
     } catch (err) { S.msgs.push({ r: 'a', t: 'Sorry, I could not do that: ' + err.message, err: 1 }); }
-    S.busy = false; save(); render(true);
+    S.busy = false; save(); render(true); usage();
   }
 
+  async function usage() {
+    try { const { data } = await window.__sb.rpc('ava_usage'); const el = document.getElementById('avause'); if (!data || !el) return;
+      const left = Math.max(0, data.ava_cap - data.me.ava), all = Math.max(0, data.all_cap - data.me.all);
+      el.innerHTML = `${left} of ${data.ava_cap} Ava questions left today` + (all < 30 ? ` · ${all} AI requests left in total` : '') + (left <= 5 ? ' <b style="color:#b26b00">· running low</b>' : '');
+    } catch (_) {}
+  }
   /* ---------- rendering ---------- */
   const pByDisp = n => progAll().find(p => String(p.display_id || p.id) === String(n)) || progAll().find(p => String(p.id) === String(n));
   function fmt(t) {
@@ -148,7 +154,7 @@
   window.avaToggle = open => {
     S.open = open == null ? !S.open : open; const b = document.getElementById('avapanel'); if (!b) return;
     b.classList.toggle('on', S.open); document.getElementById('avafab').setAttribute('aria-expanded', S.open);
-    if (S.open) { render(true); setTimeout(() => document.getElementById('avain').focus(), 50); }
+    if (S.open) { render(true); usage(); setTimeout(() => document.getElementById('avain').focus(), 50); }
   };
   function mount() {
     if (document.getElementById('avafab') || !document.body) return;
@@ -173,7 +179,7 @@
 @media print{#avafab,#avapanel{display:none}}</style>`);
     document.body.insertAdjacentHTML('beforeend', `<button id="avafab" type="button" aria-controls="avapanel" aria-expanded="false" onclick="avaToggle()" title="Ask Ava (Ctrl+K)"><span class="st">✦</span>Ava<kbd>Ctrl K</kbd></button>
 <aside id="avapanel" role="dialog" aria-label="Ava assistant"><header><span class="st">✦</span><b>Ava</b><span class="sub">ApexOne assistant</span><button type="button" onclick="avaClear()">New chat</button><button type="button" onclick="avaToggle(false)" aria-label="Close">✕</button></header>
-<div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
+<div id="avause" class="avsm" style="padding:6px 14px 0"></div><div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
 <form onsubmit="event.preventDefault();const i=document.getElementById('avain');const v=i.value;i.value='';avaAsk(v)"><textarea id="avain" rows="1" maxlength="800" placeholder="Ask Ava… (no ID numbers or personal details)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea><button class="btn y" id="avasend">Send</button></form></aside>`);
     document.addEventListener('keydown', ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); avaToggle(); } else if (ev.key === 'Escape' && S.open) avaToggle(false); });
     window.addEventListener('hashchange', () => S.open && render());

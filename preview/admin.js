@@ -350,7 +350,7 @@
     const v = $('view-synchealth');
     if (!has('operations', 'project_manager')) { v.innerHTML = locked('Data & Sync Health', 'admin, operations or project manager'); return; }
     if (!OQ) { v.innerHTML = '<div class="empty"><b>Loading…</b></div>';
-      const [r, h] = await Promise.all([sb.from('v_clickup_operator_queue').select('*').order('updated_at', { ascending: false }).limit(500), sb.rpc('ops_health')]);
+      const [r, h, au] = await Promise.all([sb.from('v_clickup_operator_queue').select('*').order('updated_at', { ascending: false }).limit(500), sb.rpc('ops_health'), sb.rpc('ava_usage')]); window.__avaU = au.error ? null : au.data;
       OQ = r.error ? (say('Could not load the sync queue: ' + r.error.message), []) : r.data || []; OH = h.error ? null : h.data; OHt = apTs(new Date()); }
     const rows = OQ.filter(OQT[OQF][1]), dq = D().dq || [];
     const ob = D().outbox || [], okN = ob.filter(o => o.status === 'succeeded').length, att = OQ.filter(OQT.attention[1]).length;
@@ -362,6 +362,9 @@
         <span class="famas">${OH ? `Last scheduled job ${apTs(OH.last_cron)} · last report card sync ${apTs(OH.last_card_sync)} · ` : has() ? 'Health checks could not be loaded · ' : 'Health checks are admin only · '}checked ${OHt}</span></section>
       <div class="famtiles">${UI.tiles([...(hk.length ? [{ t: 'Health checks', k: hk.map(([l, n, t]) => [l, n, n ? 'var(--bad)' : 'var(--ok)', false, '', t || (n ? 'Needs a look' : 'OK')]) }] : []),
         { t: 'ClickUp sync queue', k: [...Object.entries(OQT).map(([k, [l, f]]) => { const n = OQ.filter(f).length; return [l, n, n && k !== 'queued' ? 'var(--bad)' : '', OQF === k, `adOpsF('${k}')`]; }), ['Synced (latest 500)', okN, 'var(--ok)', false, '']] }])}</div>
+      ${(() => { const U = window.__avaU; if (!U || !U.users) return ''; const us = U.users;
+        return `<section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><h2 style="font-size:17px">AI usage (Ava and AI features)</h2><span class="famas">Limits per person per day: Ava ${U.ava_cap} questions, all AI features ${U.all_cap}. They reset at midnight. The free Google quota is shared by everyone and resets about 10:00.</span></div>
+        ${us.length ? `<div class="tw"><table class="dense">${H(['User', 'Ava today', 'All AI today', 'Ava 7 days', 'All AI 7 days'])}<tbody>${us.map(x => { const w = x.ava_today >= U.ava_cap * .8 || x.all_today >= U.all_cap * .8; return `<tr><td>${esc(x.email)}</td><td>${x.ava_today} / ${U.ava_cap}${w ? ' <span class="badge b-warn">Near limit</span>' : ''}</td><td>${x.all_today} / ${U.all_cap}</td><td>${x.ava_7d}</td><td>${x.all_7d}</td></tr>`; }).join('')}</tbody></table></div>` : '<p class="note" style="padding:0 20px 14px">No AI use in the last 7 days.</p>'}</section>`; })()}
       ${rows.length ? `<section class="card" style="padding:0"><div style="padding:14px 20px;border-bottom:1px solid var(--line2)"><h2 style="font-size:17px">ClickUp sync queue · ${esc(OQT[OQF][0])}</h2></div>
       <div class="tw"><table class="dense">${H(['Record', 'Status', 'Attempts', 'Last error', 'Next try', 'Updated', ''])}<tbody>
       ${rows.map(r => `<tr><td><code>${esc(r.source_table)}:${esc(r.source_record_id)}</code></td><td><span class="badge ${oqSt(r) === 'queued' ? '' : oqSt(r) === 'retrying' ? 'b-warn' : 'b-bad'}">${esc(oqSt(r))}</span></td>
