@@ -2,7 +2,7 @@
    Free Gemini tier, so the browser sends only programme numbers, counts and labels the user can already see:
    no learner names, ID numbers, emails or phone numbers (the server strips those again). All AI calls go through ai-generate. */
 (() => {
-  const D = () => (window.P && P.data) || {};
+  const D = () => ((window.__preview || {}).data) || {};
   const A = () => window.dvApi;
   const e = s => String(s == null ? '' : s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const iso = (d = new Date()) => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10);
