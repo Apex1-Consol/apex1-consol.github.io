@@ -302,12 +302,13 @@
     const exp = AT.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
     $('akpis').innerHTML = ASTAT.slice().reverse().map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
       + `<div class="kpi"><span class="l">Expiring within 12 months</span><span class="v" style="color:${exp ? 'var(--bad)' : 'var(--ink)'}">${exp}</span><span class="n" style="color:var(--muted)">plan re-accreditation</span></div>`;
-    const nk = x => String(x || '').trim().replace(/^SP:\s*/i, ''), cap = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '', pcnt = {};
+    const nk = x => String(x || '').trim().replace(/^SP:\s*/i, ''), cap = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '', pcnt = {}; let actAll = [];
     { // Programme checks: expiring / not accredited (client-side from programmes + accreditation_items)
       const td = new Date().toISOString().slice(0, 10), t90 = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10);
       const kc = x => String(x || '').trim(), gr = {};
       A.filter(a => a.status === 'Accreditation granted' && kc(a.saqa_id)).forEach(a => { const k = kc(a.saqa_id); if (!gr[k] || String(a.accreditation_to || '9') > String(gr[k].accreditation_to || '9')) gr[k] = a; });
       const act = (P.data.progs || []).filter(p => kc(p.saqa_id || p.qualification_code) && !/complet|cancel|closed/i.test((p.status || '') + ' ' + (p.programme_status || '')) && (!p.end_date || p.end_date >= td));
+      actAll = act;
       act.forEach(p => { const k = nk(p.saqa_id || p.qualification_code); pcnt[k] = (pcnt[k] || 0) + 1; });
       const pLeg = p => { const k = kc(p.saqa_id || p.qualification_code); return !!(typeof LEG === 'object' && LEG && LEG[k]) || A.some(a => nk(a.saqa_id) === nk(k) && isLeg(a)); };
       const actT = aT === 'All types' ? act : act.filter(p => pLeg(p) === LGO);
@@ -332,6 +333,47 @@
     const rows = () => { const r = AT.filter(a => m(a) && sm(a)); return window.aS ? r.slice().sort((x, y) => String(x.accreditation_to || '9999').localeCompare(String(y.accreditation_to || '9999'))) : r; };
     const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? a.status === 'Desktop application to be submitted' : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted'].includes(a.status));
     const sel = a => QA() ? `<select class="cellsel" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
+    { // Cards view (default) with overview panel; table kept as second view
+      let aV = window.aV; try { aV = aV || localStorage.getItem('apxAccView'); } catch (e) { } aV = aV === 'table' ? 'table' : 'cards';
+      if (!$('aview')) $('atools').insertAdjacentHTML('beforeend', '<span class="seg" id="aview" style="flex:0 0 auto"></span>');
+      $('aview').innerHTML = ['cards', 'table'].map(v => `<button class="${v === aV ? 'on' : ''}" onclick="aV='${v}';try{localStorage.setItem('apxAccView','${v}')}catch(e){};renderA()">${v === 'cards' ? 'Cards' : 'Table'}</button>`).join('');
+      const tw = $('atable').parentElement;
+      if (!$('acards')) tw.insertAdjacentHTML('beforebegin', '<div id="acards" style="flex-wrap:wrap;gap:16px;align-items:flex-start;padding:16px 20px"></div>');
+      tw.style.display = aV === 'cards' ? 'none' : ''; $('acards').style.display = aV === 'cards' ? 'flex' : 'none';
+      if (aV === 'cards') {
+        const td0 = new Date().toISOString().slice(0, 10), d10 = v => v ? String(v).slice(0, 10) : '';
+        const flag = a => { const ml = monthsLeft(a), L = typeof LEG === 'object' && LEG ? LEG[nk(a.saqa_id)] : null;
+          if (a.status === 'Accreditation granted' && a.accreditation_to && d10(a.accreditation_to) < td0) return [0, 'b-bad', 'Expired ' + d10(a.accreditation_to)];
+          if (a.status === 'Desktop application to be submitted') return [0, 'b-bad', 'Application to submit'];
+          if (L && L[2] !== 'Yes') return [0, 'b-bad', 'Legacy · not extended'];
+          if (ml != null && ml < 6) return [0, 'b-bad', 'Expires in ' + Math.max(ml, 0) + ' months'];
+          if (ml != null && ml < 12) return [1, 'b-warn', 'Expires in ' + ml + ' months'];
+          if (a.status === 'Site visit scheduled') return [1, 'b-warn', 'Site visit scheduled' + (a.site_visit_date ? ' ' + d10(a.site_visit_date) : '')];
+          if (isLeg(a) && !L) return [1, 'b-warn', 'Legacy · no extension recorded'];
+          if (L) return [2, 'b-ok', 'Legacy · extended ' + (L[3] || '')];
+          if (a.status === 'Accreditation granted' && !a.accreditation_to) return [1, 'b-warn', 'End date not set'];
+          return [2, ABADGE[a.status] || 'b-n', a.status || 'Status not set']; };
+        let list = rows(); if (!window.aS) list = list.map((a, i) => [flag(a)[0], i, a]).sort((x, y) => x[0] - y[0] || x[1] - y[1]).map(x => x[2]);
+        const a = list.find(x => x.id === window.aPick) || list[0];
+        const cards = list.map(x => { const f = flag(x), n = pcnt[nk(x.saqa_id)] || 0;
+          return `<button class="pick${a && x.id === a.id ? ' on' : ''}" onclick="aPick=${x.id};renderA()"><span class="sub">${esc(x.saqa_id || 'ID not set')} · ${esc(cap(x.qual_type) || 'Type not set')}${x.nqf != null ? ' · NQF ' + x.nqf : ''}</span><b style="white-space:normal">${esc(x.title || 'Title not set')}</b><span><span class="badge ${f[1]}">${esc(f[2])}</span></span><span class="sub">${n} open programme${n === 1 ? '' : 's'} · ${esc(x.quality_partner || 'partner not set')}</span></button>`; }).join('') || '<p class="sub">No qualifications match.</p>';
+        let pane = '<p class="sub">No qualification selected.</p>';
+        if (a) { const lg = isLeg(a), f = flag(a), kv = (k, v) => `<div style="display:flex;gap:8px;align-items:center"><span class="sub" style="min-width:130px">${k}</span><span>${v || '<span class="sub">not set</span>'}</span></div>`;
+          const cn = p => { const c = (P.data.clients || []).find(x => x.id === p.client_id); return c ? c.client_name || (c.fields || {})['Company Name'] || '' : ''; };
+          const pr = actAll.filter(p => nk(p.saqa_id || p.qualification_code) === nk(a.saqa_id)).sort((x, y) => String(y.start_date || '').localeCompare(String(x.start_date || '')));
+          pane = `<h2 style="white-space:normal">${esc(a.title || 'Title not set')}</h2>
+            <span class="sub">${esc(a.saqa_id || 'ID not set')} · ${esc(cap(a.qual_type) || 'Type not set')} · NQF ${a.nqf ?? 'not set'} · ${a.credits != null ? a.credits + ' credits' : 'credits not set'}</span>
+            <span><span class="badge ${f[1]}">${esc(f[2])}</span> ${legB(a.saqa_id || '')}</span>
+            <div style="display:flex;flex-direction:column;gap:6px">${kv('Status', sel(a))}${kv('Accredited from', dIn(`qaA(${a.id},'accreditation_from',this.value)`, a.accreditation_from, 'Accredited from'))}${kv(lg ? 'Accredited / extended to' : 'Accredited to', dIn(`qaA(${a.id},'accreditation_to',this.value)`, a.accreditation_to, 'Accredited to'))}
+            ${kv('Provider', esc(cap(a.provider)))}${kv('SETA / quality partner', esc(a.quality_partner || ''))}
+            ${lg ? '' : kv('Desktop result date', dIn(`qaA(${a.id},'desktop_date',this.value)`, a.desktop_date, 'Desktop result date')) + kv('Site visit date', dIn(`qaA(${a.id},'site_visit_date',this.value)`, a.site_visit_date, 'Site visit date'))}
+            ${kv('SMME', tIn(`qaA(${a.id},'smme',this.value)`, a.smme, 'SMME', 130))}${lg ? '' : kv('QCTO advisor', tIn(`qaA(${a.id},'qcto_advisor',this.value)`, a.qcto_advisor, 'QCTO advisor', 130)) + kv('QCTO verifier', tIn(`qaA(${a.id},'qcto_verifier',this.value)`, a.qcto_verifier, 'QCTO verifier', 130))}</div>
+            <div><span class="sub">Feedback / next step</span><div style="white-space:normal">${esc(accFeedback(a)) || '<span class="sub">not set</span>'}</div></div>
+            <h2 style="font-size:15px;margin-top:8px">Open programmes (${pr.length})</h2>
+            <div class="list">${pr.map(p => `<a href="#programmes" onclick="window.dvApi&&dvApi.setProg(${p.id});setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)"><span style="flex-grow:1"><b style="display:block;white-space:normal">${esc(p.programme_name || 'Programme ' + p.id)} <span class="sub" style="font-weight:400">#${p.id}</span></b><span class="sub">${esc(cn(p) || 'client not set')} · PM ${esc(p.project_manager_name || 'not set')} · ${p.start_date || 'start not set'} to ${p.end_date || 'end not set'}</span></span></a>`).join('') || '<p class="sub">No open programmes on this qualification.</p>'}</div>`; }
+        $('acards').innerHTML = `<div style="flex:1 1 420px;display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;min-width:0">${cards}</div><aside class="card" style="flex:0 1 380px;display:flex;flex-direction:column;gap:10px;position:sticky;top:12px">${pane}</aside>`;
+      }
+    }
     $('atable').innerHTML = H(['No', 'Qualification / SP ID', 'Title', 'Status', 'Accredited from', LGO ? 'Accredited / extended to' : 'Accredited to', 'Open programmes', 'NQF', 'Credits', 'Type', 'Provider', 'SETA / quality partner'].concat(LGO ? [] : ['Desktop result date', 'Site visit date'], ['SMME'], LGO ? [] : ['QCTO advisor', 'QCTO verifier'], ['Feedback'])) + '<tbody>' +
       (rows().map(a => { const ml = monthsLeft(a), k = nk(a.saqa_id), n = pcnt[k] || 0, ok = /^[\w .-]+$/.test(k);
         const lb = legB(a.saqa_id || '') || (isLeg(a) ? '<span class="badge b-n">Legacy · no extension recorded</span>' : '');
