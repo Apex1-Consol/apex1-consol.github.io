@@ -788,7 +788,7 @@ function route(){
   if(!isLogin&&famOnly()&&r!=='fam'){location.replace('#fam');return;}
   $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
   document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);
-  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116b'}}
+  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116c'}}
 }
 addEventListener('hashchange',route);
 

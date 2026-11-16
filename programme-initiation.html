@@ -936,8 +936,8 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       if (isRecordLocked(rec)) return;
       const list = rec.data[id + 'Files'] || [], fl = list[idx]; if (!fl) return;
       if (!confirm(`Remove "${fl.name}"?`)) return;
-      await supabaseClient.from('programme_documents').delete().eq('file_path', fl.path);
       await supabaseClient.storage.from('programme-documents').remove([fl.path]);
+      await supabaseClient.from('programme_documents').delete().eq('file_path', fl.path);
       list.splice(idx, 1);
       if (!list.length && rec.data[id] === 'Yes') rec.data[id] = '';
       rec.updatedAt = Date.now(); saveData(); renderForm();
@@ -950,8 +950,8 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
     async function docPurge(rec) {
       const paths = Object.keys(rec.data || {}).filter(k => /Files$/.test(k)).flatMap(k => (rec.data[k] || []).map(x => x.path)).filter(Boolean);
       if (!paths.length) return;
-      await supabaseClient.from('programme_documents').delete().in('file_path', paths);
       await supabaseClient.storage.from('programme-documents').remove(paths);
+      await supabaseClient.from('programme_documents').delete().in('file_path', paths);
     }
     /* Accreditation check for the chosen qualification (Accreditation page in ApexOne). */
     const saqaOf = d => (String(d.programmeName || '').match(/SAQA ID:\s*(\d+)/i) || [])[1] || '';
@@ -973,7 +973,9 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
     /* Pick-lists from ApexOne's live records, so names match exactly (clients, FAM practitioners, PMs). */
     let LIVE_OPTS = {}, LIVE_CLIENTS = [], LIVE_ACC = [];
     const DELETED_IDS = new Set();
-    async function loadLiveOpts() {
+    async function loadLiveOpts(tries) {
+      tries = tries || 0;
+      try { await supabaseClient.auth.getSession(); } catch (e) {}
       const uniq = a => [...new Set(a.map(x => String(x || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y));
       const q = async (t, c) => { try { const { data } = await supabaseClient.from(t).select(c).limit(2000); return data || []; } catch (e) { return []; } };
       const [cl, fam, pr, acc] = await Promise.all([q('clients', 'client_name,sales_person,contact_email,contact_number,project_manager,fields,deleted_at'), q('assessors', 'full_name'), q('programmes', 'project_manager_name,deleted_at'), q('accreditation_items', 'saqa_id,status,accreditation_to,quality_partner,nqf,qual_type')]);
@@ -982,6 +984,9 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       LIVE_CLIENTS = cl.filter(r => !r.deleted_at); LIVE_ACC = acc;
       LIVE_OPTS = { clientName: uniq(cl.filter(live).map(r => r.client_name)), relationshipManager: uniq(cl.filter(live).map(r => r.sales_person)),
         projectManager: uniq(pr.filter(live).map(r => r.project_manager_name)), facilitator: famNames, assessor: famNames, moderator: famNames, academicAssociate: famNames };
+      if (!LIVE_OPTS.clientName.length && tries < 6) { setTimeout(() => loadLiveOpts(tries + 1), 1500); return; }
+      document.querySelectorAll('datalist[id^="dl_"]').forEach(dl => { const k = dl.id.slice(3); if (!LIVE_OPTS[k]) return;
+        const opts = [...new Set([...(LIVE_OPTS[k] || []), ...(peopleHistory[k] || [])])]; dl.innerHTML = opts.map(o => `<option value="${escAttr(o)}">`).join(''); });
     }
     let currentId = null;
     let activeTab = 0;
