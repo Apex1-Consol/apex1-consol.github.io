@@ -177,6 +177,7 @@
 <form onsubmit="event.preventDefault();const i=document.getElementById('avain');const v=i.value;i.value='';avaAsk(v)"><textarea id="avain" rows="1" maxlength="800" placeholder="Ask Ava… (no ID numbers or personal details)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea><button class="btn y" id="avasend">Send</button></form></aside>`);
     document.addEventListener('keydown', ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); avaToggle(); } else if (ev.key === 'Escape' && S.open) avaToggle(false); });
     window.addEventListener('hashchange', () => S.open && render());
+    const o = window.dvProg; if (typeof o === 'function') window.dvProg = id => { const r = o(id); if (S.open) setTimeout(render, 0); return r; };
   }
   window.avaAsk = q => ask(q, 'ask');
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
