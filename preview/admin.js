@@ -65,52 +65,68 @@
   if (anchor) Object.keys(VIEWS).forEach(k => { if (!$('view-' + k)) anchor.insertAdjacentHTML('beforebegin', `<main id="view-${k}" hidden></main>`); });
 
   /* ---------- PM Tracker (live: Project Manager Tracker) ---------- */
-  const PMF = { pm: '', client: '', type: '', seta: '', q: '', tc: '' };
+  const PMF = { pm: '', client: '', type: '', seta: '', q: '', a: '', st: 'Active', qs: '', pg: 0 };
   const toConf = p => String((p.fields || {}).imported) === 'true' && !(p.fields || {}).confirmed_at;
   const pf = (p, k) => ((p.fields || {})[k] || '');
   let PMS = []; Object.defineProperty(window, 'PMS_', { get: () => PMS });
-  const pmQuality = p => !(p.qualification_name || p.saqa_id) || !p.start_date || !p.end_date;
+  const pmOf = p => p.project_manager_name || 'Unassigned';
+  const rs = p => (window.dvApi && dvApi.runState) ? dvApi.runState(p) : 'Planned';
+  const noSaqa = p => !(String(p.saqa_id || '').trim() || String(pf(p, 'SAQA ID')).trim());
+  const badDates = p => !p.start_date || !p.end_date || day(p.end_date) < day(p.start_date);
+  const pmQuality = p => noSaqa(p) || badDates(p);
+  const dIn = d => d ? Math.round((new Date(day(d)) - new Date(iso())) / 864e5) : null;
+  const lastReg = p => { const r = (window.dvApi && dvApi.regDates) ? dvApi.regDates(p.id).filter(d => d <= iso()) : []; return r[r.length - 1] || ''; };
+  const nextVisit = p => { let last = '', nx = ''; (D().visits || []).filter(v => v.programme_id === p.id).forEach(v => { const f = v.fields || {}, d = f['Date of Visit'] || f.Date || ''; if (d >= last) { last = d; nx = f['Next Visit Date'] || ''; } }); return nx; };
+  const ACT = {
+    end: ['Ending in 30 days', 'Active programme ends within 30 days', p => rs(p) === 'Active' && dIn(p.end_date) !== null && dIn(p.end_date) >= 0 && dIn(p.end_date) <= 30],
+    reg: ['No register in 14 days', 'Running, but no attendance marked in the last 14 days', p => rs(p) === 'Active' && (!lastReg(p) || dIn(lastReg(p)) < -14)],
+    vis: ['Visit due or overdue', 'Next visit date from the latest visit is within 14 days or past', p => rs(p) === 'Active' && nextVisit(p) && dIn(nextVisit(p)) <= 14]
+  };
+  const GAPS = { saqa: ['No SAQA', 'No SAQA ID on the programme', noSaqa], dates: ['Missing or bad dates', 'Start or end date blank, or end before start', badDates] };
   function pmRows() {
-    return (D().progs || []).filter(p => (!PMF.pm || (p.project_manager_name || 'Unassigned') === PMF.pm)
+    const q = PMF.qs.toLowerCase();
+    return (D().progs || []).filter(p => (!PMF.st || PMF.st === 'All' || rs(p) === PMF.st) && (!PMF.pm || pmOf(p) === PMF.pm)
       && (!PMF.client || clientName(p.client_id) === PMF.client) && (!PMF.type || (p.programme_type || '—') === PMF.type) && (!PMF.seta || (pf(p, 'SETA') || '—') === PMF.seta)
-      && (!PMF.q || pmQuality(p)) && (!PMF.tc || toConf(p)));
+      && (!PMF.q || GAPS[PMF.q][2](p)) && (!PMF.a || ACT[PMF.a][2](p))
+      && (!q || [p.display_id, p.id, '#' + p.id, clientName(p.client_id), p.qualification_name, p.programme_name, p.saqa_id].join(' ').toLowerCase().includes(q)));
   }
   function renderPM() {
     const v = $('view-pmtracker');
     if (!has('qa_specialist', 'project_manager', 'pi_specialist')) { v.innerHTML = locked('PM Tracker', 'admin, QA, project manager or PI specialist'); return; }
-    const all = (D().progs || []).filter(apxMineProg), rows = pmRows().filter(apxMineProg);
-    const pms = [...new Set(all.map(p => p.project_manager_name || 'Unassigned'))].sort();
-    PMS = pms;
-    const cards = pms.map((n, i) => {
-      const ps = all.filter(p => (p.project_manager_name || 'Unassigned') === n);
-      const act = ps.filter(p => p.status === 'active').length, lrn = ps.reduce((s, p) => s + learnersIn(p.id), 0), gaps = ps.filter(pmQuality).length;
-      return `<button class="card" style="text-align:left;display:flex;flex-direction:column;gap:6px;cursor:pointer;${PMF.pm === n ? 'outline:2px solid var(--navy)' : ''}" onclick="adPM('pm',PMS_[${i}])">
-        <b>${esc(n)}</b><span class="famas">${ps.length} programme${ps.length === 1 ? '' : 's'} · ${act} active · ${lrn} learners</span>
-        ${gaps ? `<span class="badge b-warn">${gaps} missing qualification or dates</span>` : '<span class="badge b-ok">Data complete</span>'}</button>`;
-    }).join('');
-    v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager, from the programmes in ApexOne',
-      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button><button class="btn" onclick="adPMtpl()">Download template</button>${has('pi_specialist', 'project_manager') ? '<button class="btn" onclick="adIntake()">+ From signed proposal</button>' : ''}<button class="btn y" onclick="window.dvProgEdit ? dvProgEdit(null) : toast('Open Programmes to add one')">+ Add programme</button>`)
-      + (pms.length ? `<div class="famtiles">${UI.tiles([{ t: `Project managers · ${pms.length}`, k: pms.map((n, i) => [esc(n), all.filter(p => (p.project_manager_name || 'Unassigned') === n).length, n === 'Unassigned' ? 'var(--warn)' : '', PMF.pm === n, `adPM('pm',PMS_[${i}])`]) },
-        { t: 'Data gaps', k: [['Missing qualification or dates', all.filter(pmQuality).length, 'var(--warn)', !!PMF.q, `adPM('q','${PMF.q ? '' : '1'}')`]] },
-        { t: 'Imported', k: [['To confirm', all.filter(toConf).length, 'var(--warn)', !!PMF.tc, `adPM('tc','${PMF.tc ? '' : '1'}')`]] }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
+    const all = (D().progs || []).filter(apxMineProg), rows = pmRows().filter(apxMineProg), act = all.filter(p => rs(p) === 'Active');
+    const pms = [...new Set(all.map(pmOf))].sort(); PMS = pms;
+    const admin = (P.roles || []).includes('admin');
+    const cnt = st => all.filter(p => st === 'All' || rs(p) === st).length;
+    const tabs = ['Active', 'Planned', 'Completed', 'All'].map(t => `<button class="btn sm${PMF.st === t ? ' y' : ''}" onclick="adPM('st','${t}')">${t} (${cnt(t)})</button>`).join('');
+    const PER = 25, pages = Math.max(1, Math.ceil(rows.length / PER)); if (PMF.pg >= pages) PMF.pg = pages - 1;
+    const sorted = rows.slice().sort((a, b) => pmOf(a).localeCompare(pmOf(b)) || String(a.start_date || '').localeCompare(String(b.start_date || '')));
+    const page = sorted.slice(PMF.pg * PER, PMF.pg * PER + PER);
+    v.innerHTML = head('Project Manager Tracker', 'Caseload per project manager: programmes running now, with what needs attention',
+      `<a class="btn" href="#programmes">Programmes</a><button class="btn" onclick="adPMcsv()">Export CSV</button>${admin ? '<button class="btn" onclick="adPMtpl()">Download template</button>' : ''}<button class="btn y" onclick="location.hash='pi'" title="New programmes start in Programme Initiation, then go through hand-over">+ New programme (Programme Initiation)</button>`)
+      + (pms.length ? `<div class="famtiles">${UI.tiles([{ t: `Caseload · running now · ${act.length}`, k: pms.map((n, i) => { const ps = all.filter(p => pmOf(p) === n); return [esc(n), ps.filter(p => rs(p) === 'Active').length, n === 'Unassigned' ? 'var(--warn)' : '', PMF.pm === n, `adPM('pm',PMS_[${i}])`, `${ps.filter(p => rs(p) === 'Planned').length} planned`]; }) },
+        { t: 'Needs attention (running)', k: Object.keys(ACT).map(k => [ACT[k][0], all.filter(ACT[k][2]).length, 'var(--warn)', PMF.a === k, `adPM('a','${PMF.a === k ? '' : k}')`, ACT[k][1]]) },
+        { t: 'Data gaps (all programmes)', k: Object.keys(GAPS).map(k => [GAPS[k][0], all.filter(GAPS[k][2]).length, 'var(--warn)', PMF.q === k, `adPM('q','${PMF.q === k ? '' : k}')`, GAPS[k][1]]) }])}</div>` : '<div class="empty"><b>No programmes yet</b></div>')
       + `
-      <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
+      <section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:6px;padding:14px 20px 0">${tabs}</div><div style="display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end;padding:14px 20px;border-bottom:1px solid var(--line2)">
+        <label class="f" style="min-width:220px"><span>Search</span><input id="pmq" placeholder="Search #id, client, qualification" value="${esc(PMF.qs)}" oninput="adPMq(this.value)"></label>
         ${sel('pmf-pm', 'Project manager', pms, PMF.pm, "adPM('pm',this.value)")}
         ${sel('pmf-c', 'Client', [...new Set(all.map(p => clientName(p.client_id)))].sort(), PMF.client, "adPM('client',this.value)")}
         ${sel('pmf-t', 'Programme type', [...new Set(all.map(p => p.programme_type || '—'))].sort(), PMF.type, "adPM('type',this.value)")}
         ${sel('pmf-s', 'SETA', [...new Set(all.map(p => pf(p, 'SETA') || '—'))].sort(), PMF.seta, "adPM('seta',this.value)")}
-        <label style="display:flex;gap:6px;align-items:center;font-size:13px;height:36px"><input type="checkbox" ${PMF.q ? 'checked' : ''} onchange="adPM('q',this.checked?'1':'')"> Missing qualification or dates</label>
-        <button class="btn sm ghost" onclick="adPM()">Clear</button><span class="famas" style="margin-left:auto">Showing ${rows.length} of ${all.length}</span></div>
-        <div class="tw"><table class="dense">${H(['Prog ID', 'Project manager', 'Client', 'Qualification', 'Cohort', 'Learners', 'Employment', 'Mode', 'SETA', 'Type', 'NQF', 'Start', 'End', 'Facilitator', 'Assessor', 'Status', ''])}<tbody>
-        ${(() => { const pmOf = p => p.project_manager_name || 'Unassigned'; return rows.slice().sort((a, b) => pmOf(a).localeCompare(pmOf(b))); })().map((p, i, arr) => { const pm = p.project_manager_name || 'Unassigned', prev = i ? (arr[i - 1].project_manager_name || 'Unassigned') : null;
-          return (pm !== prev ? UI.gh(esc(pm), arr.filter(x => (x.project_manager_name || 'Unassigned') === pm).length, pm === 'Unassigned' ? 'var(--warn)' : 'var(--navy)', 17) : '') + `<tr class="famtr"><td>${esc(p.display_id || p.id)}</td><td>${esc(p.project_manager_name || 'Unassigned')}</td><td>${esc(clientName(p.client_id))}</td>
-          <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ''}</td><td>${esc(pf(p, 'Cohort') || p.group_name || '—')}</td><td>${learnersIn(p.id)}</td><td>${esc(pf(p, 'Employment Status') || '—')}</td><td>${esc(pf(p, 'Mode of Delivery') || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
-          <td>${esc(p.programme_type || '—')}</td><td>${esc(p.nqf_level || pf(p, 'NQF') || '—')}</td><td>${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">Missing</span>'}</td>
-          <td>${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">Missing</span>'}</td><td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
-          <td>${esc(p.status || '')}</td><td style="white-space:nowrap">${toConf(p) && has('project_manager') ? `<button class="btn sm y" onclick="adPMconf(${p.id})">Confirm</button> ` : ''}${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(17, 'No programmes match these filters.')}
-        </tbody></table></div></section>`;
+        <button class="btn sm" onclick="adPM()">Clear filters</button><span class="famas" style="margin-left:auto">Showing ${rows.length} of ${all.length}</span></div>
+        <div class="tw"><table class="dense">${H(['Prog ID', 'Client', 'Qualification', 'Learners', 'Type', 'SETA', 'Dates', 'Facilitator', 'Assessor', 'State', ''])}<tbody>
+        ${page.map((p, i, arr) => { const pm = pmOf(p), prev = i ? pmOf(arr[i - 1]) : null, st = rs(p), bd = badDates(p);
+          return (pm !== prev ? UI.gh(esc(pm), sorted.filter(x => pmOf(x) === pm).length, pm === 'Unassigned' ? 'var(--warn)' : 'var(--navy)', 11) : '') + `<tr class="famtr"><td>${esc(p.display_id || p.id)}</td><td>${esc(clientName(p.client_id))}</td>
+          <td>${esc(p.qualification_name || p.programme_name || '')}${p.saqa_id ? ` <span class="famas">SAQA ${esc(p.saqa_id)}</span>` : ' <span class="badge b-warn">No SAQA</span>'}${pf(p, 'Cohort') || p.group_name ? `<div class="sub">Cohort ${esc(pf(p, 'Cohort') || p.group_name)}</div>` : ''}</td><td>${learnersIn(p.id)}</td>
+          <td>${esc(p.programme_type || '—')}</td><td>${esc(pf(p, 'SETA') || '—')}</td>
+          <td style="white-space:nowrap">${p.start_date ? fmtD(day(p.start_date)) : '<span class="badge b-warn">No start</span>'} – ${p.end_date ? fmtD(day(p.end_date)) : '<span class="badge b-warn">No end</span>'}${bd && p.start_date && p.end_date ? '<div><span class="badge b-bad">End before start</span></div>' : ''}</td>
+          <td>${esc(personName(p.facilitator_id) || pf(p, 'Facilitator') || '—')}</td><td>${esc(pf(p, 'Assessor') || '—')}</td>
+          <td><span class="badge ${st === 'Active' ? 'b-ok' : st === 'Planned' ? 'b-info' : ''}">${st}</span></td><td style="white-space:nowrap">${window.dvProgEdit && has('project_manager') ? `<button class="btn sm" onclick="location.hash='programmes';setTimeout(()=>dvProgEdit(${p.id}),300)">Edit</button> ` : ''}<button class="btn sm" onclick="window.dvProg&&dvProg(${p.id});location.hash='programmes'">Open</button></td></tr>`; }).join('') || none(11, 'No programmes match these filters.')}
+        </tbody></table></div>${pages > 1 ? `<div class="pgbar" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"><button class="btn sm" ${PMF.pg ? '' : 'disabled'} onclick="adPMpg(-1)">Previous</button><span class="famas">Page ${PMF.pg + 1} of ${pages}</span><button class="btn sm" ${PMF.pg < pages - 1 ? '' : 'disabled'} onclick="adPMpg(1)">Next</button></div>` : ''}</section>`;
   }
-  window.adPM = (k, val) => { if (!k) Object.keys(PMF).forEach(x => PMF[x] = ''); else PMF[k] = PMF[k] === val && k === 'pm' ? '' : val; renderPM(); };
+  window.adPMpg = d => { PMF.pg += d; renderPM(); };
+  let pmT; window.adPMq = val => { PMF.qs = val; PMF.pg = 0; clearTimeout(pmT); pmT = setTimeout(() => { renderPM(); const e = $('pmq'); if (e) { e.focus(); e.setSelectionRange(val.length, val.length); } }, 250); };
+  window.adPM = (k, val) => { if (!k) { const st = PMF.st; Object.keys(PMF).forEach(x => PMF[x] = ''); PMF.st = st; PMF.pg = 0; } else { PMF[k] = PMF[k] === val && k === 'pm' ? '' : val; PMF.pg = 0; } renderPM(); };
   window.adPMconf = async id => {
     const p = (D().progs || []).find(x => x.id === id); if (!p) return;
     try {
