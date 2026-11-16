@@ -100,7 +100,8 @@
         if (!p.project_manager_name) items.push(it(pname(p), 'Missing PM: assign a project manager', goP(p.id), true, 'hoo', p.id));
         if (!p.saqa_id) items.push(it(pname(p), 'Missing SAQA ID', goP(p.id), false, 'qa', p.id));
         const mm = [!(p.start_date && p.end_date) && 'dates', live(p) && !L.has(String(p.id)) && 'learners'].filter(Boolean);
-        if (mm.length) items.push(it(pname(p), 'Missing ' + mm.join(' and '), goP(p.id), mm.length > 1, 'pm', p.id)); });
+        if (mm.length) items.push(it(pname(p), 'Missing ' + mm.join(' and '), goP(p.id), mm.length > 1, 'pm', p.id));
+        if (p.start_date && p.end_date && ymd(p.end_date) < ymd(p.start_date)) items.push(it(pname(p), `Missing dates: end date ${fmt(p.end_date)} is before start date ${fmt(p.start_date)}`, goP(p.id), true, 'pm', p.id)); });
       return { h: 'Programmes missing details', link: 'programmes', items }; },
     clients(m) { const used = new Set([...m.values()].filter(live).map(p => String(p.client_id)));
       const c = (D().clients || []).filter(x => !x.deleted_at && (!window.apxMineProg || used.has(String(x.id)))), items = [];
