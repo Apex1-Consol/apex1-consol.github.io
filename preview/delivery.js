@@ -292,14 +292,14 @@
     el.hidden = false;
     el.innerHTML = `<div class="famtiles">${UI.tiles([{ t: `Needs attention · ${FA.length} running programme${FA.length === 1 ? '' : 's'}`, k: Object.keys(AF).map(k => [AF[k][0], FA.filter(x => x[1].includes(k)).length, AF[k][2], aF === k, `dvAttF('${k}')`, AF[k][1]]) }])}</div>`
       + (aF ? `<div class="sub" style="margin-top:8px">Programme list shows only: <b>${AF[aF][0]}</b> · <a href="javascript:void 0" onclick="dvAttF('${aF}')">Clear</a></div>` : '');
-    const sel = document.querySelector('#view-attendance select'); if (!sel) return;
+    const sel = document.querySelector('#view-attendance label.f select:not(#ascope)'); if (!sel) return;
     const cn = p => client(p)?.client_name || 'No client';
     let list = aF ? FA.filter(x => x[1].includes(aF)).map(x => x[0]) : aScope === 'all' ? progs().filter(p => !p.deleted_at && learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p))) : FA.map(x => x[0]);
     list = list.slice().sort((a, b) => cn(a).localeCompare(cn(b)) || a.id - b.id);
     if (!list.some(p => p.id === dProg)) { const cur = prog(dProg); if (!aF && cur && learnersOf(cur.id).length) list.unshift(cur); else dProg = list[0]?.id ?? null; }
     sel.innerHTML = list.map(p => `<option value="${p.id}"${p.id === dProg ? ' selected' : ''}>#${p.id} · ${esc(cn(p))} · ${esc(p.programme_name || '')}${p.group_name ? ' · ' + esc(p.group_name) : ''}</option>`).join('') || '<option value="">No programmes</option>';
     sel.style.maxWidth = '640px'; sel.onchange = () => { dProg = +sel.value; renderAtt(); };
-    if (!$('ascope')) sel.closest('label').insertAdjacentHTML('beforebegin', '<select id="ascope" style="height:40px" aria-label="Which programmes" onchange="dvAttScope(this.value)"><option value="run">Running</option><option value="all">All</option></select>');
+    if (!$('ascope')) sel.insertAdjacentHTML('beforebegin', '<select id="ascope" style="height:40px;width:auto;flex:0 0 auto" aria-label="Which programmes" onchange="dvAttScope(this.value)"><option value="run">Running</option><option value="all">All</option></select>');
     $('ascope').value = aScope; $('ascope').disabled = !!aF;
   }
   function attStrip(p, FA) {
