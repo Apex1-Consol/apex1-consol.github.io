@@ -687,6 +687,7 @@
     if (head && !$('clq')) head.insertAdjacentHTML('beforeend', '<input id="clq" type="search" placeholder="Search clients, contacts, PM" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--surface);color:var(--ink);min-width:220px" oninput="previewClSearch(this.value)">');
     const q = clQ.toLowerCase(), shown = list.filter(c => !q || [clName(c), c.contact_person, c.project_manager, c.sales_person, clF(c).Sector].join(' ').toLowerCase().includes(q));
     $('clientcards').innerHTML = shown.map(c => { const m = clMou(c), cp = P.data.progs.filter(p => p.client_id === c.id), n = cp.length, bad = cp.filter(clBadDates).length;
+    if (window.apxPgIn) apxPgIn($('clientcards'), q);
       return `<button class="pick${c.id === clPick ? ' on' : ''}" onclick="previewClPick(${c.id})"><b>${esc(clName(c))}</b><span class="sub">${esc(clF(c).Sector || 'Sector not set')} · PM ${esc(c.project_manager || '—')}</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge ${m.cls}">${esc(m.s === 'No MOU recorded' ? m.s : 'MOU ' + m.s)}${m.note ? ' · ' + m.note : ''}</span>${bad ? `<span class="badge b-bad">${bad} end before start</span>` : ''}</span><span class="sub">${n} programme${n === 1 ? '' : 's'}</span></button>`; }).join('') || '<p class="sub">No clients match.</p>';
     const c = list.find(x => x.id === clPick), aside = document.querySelector('#view-clients aside');
     if (!aside) return;

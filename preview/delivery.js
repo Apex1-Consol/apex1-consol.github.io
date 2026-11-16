@@ -147,6 +147,7 @@
     if (!$('pq')) $('pstatus').insertAdjacentHTML('afterend', '<input id="pq" type="search" placeholder="Search programmes" oninput="dvPQ(this.value)" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:transparent;color:var(--ink)">');
     const q = pQ.toLowerCase(); if (q) { let gh = null, any = false; const close = () => { if (gh) gh.hidden = !any; };
       [...$('plist').children].forEach(b => { if (b.classList.contains('pickgh')) { close(); gh = b; any = b.textContent.toLowerCase().includes(q); return; } b.hidden = !(b.textContent.toLowerCase().includes(q) || (gh && gh.textContent.toLowerCase().includes(q))); any = any || !b.hidden; }); close(); }
+    if (window.apxPgIn) apxPgIn($('plist'), pStatus + '|' + q);
     const nb = [...side.querySelectorAll('button')].find(b => /New programme/.test(b.textContent));
     if (nb) { nb.textContent = '+ New programme'; nb.onclick = () => (CAN() || has('pi_specialist')) ? dvProgEdit(null) : say('Ask a project manager or PI specialist to add programmes'); }
     if (!$('pcsv')) side.insertAdjacentHTML('beforeend', '<button class="btn" id="pcsv" onclick="dvProgCsv()">Export CSV</button>');

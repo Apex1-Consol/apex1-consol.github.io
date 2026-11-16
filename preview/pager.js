@@ -21,4 +21,22 @@
   const go = () => { mo.observe(document.body, { childList: true, subtree: true }); run(); };
   document.body ? go() : document.addEventListener('DOMContentLoaded', go);
   window.apxPager = run;
+  // Card/pick lists (Programmes side list, Clients cards): 25 per page, bar inside the list, group headers follow their items.
+  window.apxPgIn = function (el, key, size) {
+    if (!el) return; size = size || 25;
+    const picks = [...el.children].filter(c => c.classList.contains('pick') && !c.hidden);
+    const pages = Math.max(1, Math.ceil(picks.length / size));
+    if (el._pk !== key || !el._pg) { el._pk = key; const on = picks.findIndex(c => c.classList.contains('on')); el._pg = on >= 0 && key === el._pk0 ? Math.floor(on / size) + 1 : (el._pk0 === undefined && on >= 0 ? Math.floor(on / size) + 1 : 1); el._pk0 = key; }
+    el._pg = Math.min(Math.max(1, el._pg), pages);
+    picks.forEach((c, i) => c.classList.toggle('pgh', Math.floor(i / size) + 1 !== el._pg));
+    let gh = null, any = false; const close = () => { if (gh) gh.classList.toggle('pgh', !any); };
+    [...el.children].forEach(c => { if (c.classList.contains('pickgh')) { close(); gh = c; any = false; } else if (c.classList.contains('pick') && !c.hidden && !c.classList.contains('pgh')) any = true; }); close();
+    let bar = el.querySelector(':scope > .pgbar'); if (bar) bar.remove();
+    if (picks.length <= size) return;
+    bar = document.createElement('div'); bar.className = 'pgbar'; bar.style.gridColumn = '1/-1';
+    const a = (el._pg - 1) * size + 1, b = Math.min(el._pg * size, picks.length);
+    bar.innerHTML = `<span>${a}–${b} of ${picks.length}</span><button type="button" data-d="-1"${el._pg === 1 ? ' disabled' : ''}>‹ Prev</button><span>Page ${el._pg} of ${pages}</span><button type="button" data-d="1"${el._pg === pages ? ' disabled' : ''}>Next ›</button>`;
+    bar.onclick = e => { const d = +(e.target.dataset && e.target.dataset.d); if (!d) return; el._pg += d; window.apxPgIn(el, key, size); el.scrollIntoView({ block: 'nearest' }); };
+    el.appendChild(bar);
+  };
 })();
