@@ -113,7 +113,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('QCTO tracker: status change writes the right column', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'qcto'; await tick();
-    ok(d.querySelectorAll('#qtable tbody tr').length === 1, 'tracker rows');
+    ok(d.querySelectorAll('#qtable tbody tr:not(.famgh) select').length > 0, 'tracker rows: ' + d.getElementById('qtable').textContent.slice(0, 200));
     await w.qSet(0, 'book', 'Booked'); await tick();
     const u = log.find(x => x.table === 'qcto_tracker'); ok(u && u.val.eisa_booking_status === 'Booked' && u.eq[1] === 50, JSON.stringify(u));
   });

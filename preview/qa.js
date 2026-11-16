@@ -110,31 +110,89 @@
   window.qaAddWindow = addWindow;
 
   const _renderQ = renderQ;
+  // Live view: occupational programmes only, withdrawn learners out, PMs see their own; grouped by programme, 25 learners a page.
+  let qScope = 'Running', qF = '', qQ = '', qPg = 0, qKey = '';
+  const qRS = p => (window.dvApi && dvApi.runState) ? dvApi.runState(p) : 'Active';
+  const qProg = r => (D().progs || []).find(p => p.id === r.pid);
+  const qWd = r => (D().enrol || []).some(e => e.learner_id === r.lid && e.programme_id === r.pid && /withdraw/i.test((e.fields || {}).Status || (e.fields || {}).status || e.status || ''));
+  const qPf = (p, ...k) => { const f = (p && p.fields) || {}; for (const x of k) if (f[x] && String(f[x]).trim()) return String(f[x]).trim(); return ''; };
+  const qFac = r => r.f || qPf(qProg(r), 'Facilitator', 'facilitator');
+  const qAss = r => qPf(qProg(r), 'Assessor', 'assessor');
+  function qBase() {
+    if (QT.length && QT[0].pid === undefined) augTracker();
+    return QT.map((r, i) => [r, i]).filter(([r]) => { const p = qProg(r); return p && !p.deleted_at && p.programme_type !== 'legacy' && !qWd(r) && (!window.apxMineProg || apxMineProg(p)); });
+  }
+  const qEnded = r => r.e && day(r.e) < iso();
+  const q30 = () => new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10);
+  const QFK = {
+    ns: ['Not started', r => r.cur === 'Not Started' && r.s && day(r.s) <= q30(), 'Programme running 30+ days, learner still Not Started', 'warn'],
+    mon: ['Monitoring delayed', r => r.mon === 'Delayed', 'Schedule a visit and record the Monitoring date', 'bad'],
+    sor: ['SOR pending after training end', r => r.sor === 'Pending' && qEnded(r), 'Usually outstanding PoE or workplace items', 'warn'],
+    rdy: ['SOR issued, EISA not booked', r => r.sor === 'Issued' && r.book === 'Pending Booking', 'Book before registration closes', 'bad'],
+    nyc: ['Not Yet Competent or Absent', r => /Not Yet Competent|Absent/.test(r.out || ''), 'Plan the re-write for the next official EISA date', 'bad']
+  };
+  window.qaQF = k => { qF = qF === k ? '' : k; if (k && QFK[k]) qScope = 'All'; renderQ(); };
+  window.qaQS = s => { qScope = s; renderQ(); };
+  window.qaQq = v => { qQ = v; renderQ(); };
+  window.qaQpg = n => { qPg = n; renderQ(); };
+
   renderQ = function () {
     if (!P.user) return _renderQ();
-    try { _renderQ(); } catch (e) { /* mock cohort view can trip on missing NQF; the table is rebuilt below */ } // KPIs, flags, filters
+    const admin = (P.roles || []).includes('admin');
+    const ib = [...document.querySelectorAll('#view-qcto .btn')].find(b => /Import tracker/.test(b.textContent)); if (ib) ib.hidden = !admin;
     const wins = (D().windows || []).filter(x => x.eisa_date >= iso()).sort((a, b) => a.eisa_date < b.eisa_date ? -1 : 1);
     $('qwin').innerHTML = (wins.length ? wins.map(w => { const dd = dDays(w.registration_closing);
       return `<div class="kv"><span>${esc(w.label || 'Official EISA')}${w.qualification ? ' · ' + esc(w.qualification) : ''}</span><span style="font-weight:600">${dIn(`qaWin(${w.id},'eisa_date',this.value)`, w.eisa_date, 'EISA date')}</span></div>
         <div class="kv"><span>Registration closes</span><span style="font-weight:600;color:${dd <= 30 ? 'var(--bad)' : 'var(--ink)'}">${dIn(`qaWin(${w.id},'registration_closing',this.value)`, w.registration_closing, 'Registration closing')} · ${dd} days</span></div>`; }).join('<hr style="border:0;border-top:1px solid var(--line2);margin:6px 0">')
-      : '<p class="sub">No upcoming EISA windows recorded.</p>') + (QA() ? '<button class="btn sm" style="margin-top:10px" onclick="qaAddWindow()">+ Add EISA window</button>' : '');
-    const fc = $('qclient').value, fp = $('qpm').value, fs = $('qstat').value;
-    const rows = QT.map((r, i) => [r, i]).filter(([r]) => (!fc || r.c === fc) && (!fp || r.pm === fp) && (!fs || r.cur === fs));
+      : '<p class="sub">No upcoming EISA windows recorded. QA adds the official dates.</p>') + (QA() ? '<button class="btn sm" style="margin-top:10px" onclick="qaAddWindow()">+ Add EISA window</button>' : '');
+
+    const base = qBase(), st = r => qRS(qProg(r)), cnt = s => base.filter(([r]) => s === 'All' || st(r) === (s === 'Running' ? 'Active' : s)).length;
+    const scoped = base.filter(([r]) => qScope === 'All' || st(r) === (qScope === 'Running' ? 'Active' : qScope));
+    // tiles: current status of the learners in scope (click = filter)
+    const sc = k => scoped.filter(([r]) => r.cur === k).length;
+    $('qkpis').className = ''; $('qkpis').innerHTML = `<div class="famtiles">${UI.tiles([{ t: `Learners · ${qScope === 'Running' ? 'running programmes' : qScope.toLowerCase()} · occupational only`, k: [
+      ['All', scoped.length, '', !qF, "qaQF('')", 'Learners on the tracker'], ['Not Started', sc('Not Started'), '', qF === 'c:Not Started', "qaQF('c:Not Started')", 'Current status'], ['In Progress', sc('In Progress'), '', qF === 'c:In Progress', "qaQF('c:In Progress')", 'Current status'], ['Completed', sc('Completed'), 'var(--ok)', qF === 'c:Completed', "qaQF('c:Completed')", 'Current status']] }])}</div>`;
+    const ns = new Set(base.filter(([r]) => QFK.ns[1](r)).map(([r]) => r.pid)).size;
+    $('qflags').innerHTML = Object.entries(QFK).map(([k, [t, f, s, c]]) => { const n = base.filter(([r]) => f(r)).length;
+      return `<a href="#qcto" onclick="qaQF('${k}');return false" style="${qF === k ? 'background:var(--line2)' : ''}"><span class="count b-${n ? c : 'ok'}">${n}</span><span style="flex-grow:1"><b style="display:block">${t}</b><span class="sub">${k === 'ns' ? `${ns} programme${ns === 1 ? '' : 's'} · ` : ''}${s}${k === 'rdy' && wins[0] ? ' · closes ' + fmtD(wins[0].registration_closing) : ''}</span></span></a>`; }).join('');
+
+    // toolbar: scope tabs, view switch, client / programme filters, search
+    if (!$('qscope')) $('qview').insertAdjacentHTML('afterend', '<div class="seg" id="qscope"></div>');
+    $('qscope').innerHTML = ['Running', 'Planned', 'Completed', 'All'].map(s => `<button class="${s === qScope ? 'on' : ''}" onclick="qaQS('${s}')">${s} (${cnt(s)})</button>`).join('');
+    $('qview').innerHTML = ['Learner rows', 'Cohort summary'].map(v => `<button class="${v === qV ? 'on' : ''}" onclick="qV='${v}';renderQ()">${v}</button>`).join('');
+    $('qstat').hidden = true;
+    if (!$('qq')) $('qstat').insertAdjacentHTML('afterend', '<input id="qq" class="fsel" type="search" placeholder="Search learner, client, #id" oninput="qaQq(this.value)" style="min-width:200px">');
+    const cl = $('qclient'), cv = cl.value; cl.innerHTML = '<option value="">Client: All</option>' + [...new Set(scoped.map(([r]) => r.c))].sort().map(v => `<option${v === cv ? ' selected' : ''}>${esc(v)}</option>`).join('');
+    const pg = $('qpm'), pv = pg.value, ps = [...new Map(scoped.filter(([r]) => !cl.value || r.c === cl.value).map(([r]) => [r.pid, r])).values()].sort((a, b) => (a.c + a.pid).localeCompare(b.c + b.pid));
+    pg.innerHTML = '<option value="">Programme: All</option>' + ps.map(r => { const p = qProg(r); return `<option value="${r.pid}"${String(r.pid) === pv ? ' selected' : ''}>#${esc(p.display_id || p.id)} · ${esc(r.c)} · ${esc(p.programme_name || '')}</option>`; }).join('');
+    const fc = cl.value, fp = pg.value, q = qQ.trim().toLowerCase();
+    const rows = (QFK[qF] ? base : scoped).filter(([r]) => (!fc || r.c === fc) && (!fp || String(r.pid) === fp) && (!qF || (QFK[qF] ? QFK[qF][1](r) : r.cur === qF.slice(2)))
+      && (!q || `${r.ln} ${r.sn} ${r.c} #${r.pid} ${r.p}`.toLowerCase().includes(q)))
+      .sort((a, b) => (a[0].c + '|' + String(a[0].pid).padStart(6, '0') + '|' + a[0].ln + a[0].sn).localeCompare(b[0].c + '|' + String(b[0].pid).padStart(6, '0') + '|' + b[0].ln + b[0].sn));
+    const key = [qScope, qF, fc, fp, q, qV].join('|'); if (key !== qKey) { qPg = 0; qKey = key; }
     const sel = (i, k, v) => `<select class="cellsel ${BADGE(v)}" aria-label="${k}" onchange="qSet(${i},'${k}',this.value)">${QV[k].map(o => `<option${o === v ? ' selected' : ''}>${o}</option>`).join('')}</select>`;
+    let pager = $('qpager'); if (!pager) { $('qtable').closest('.tw').insertAdjacentHTML('afterend', '<div id="qpager" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"></div>'); pager = $('qpager'); }
     if (qV === 'Learner rows') {
-      $('qtable').innerHTML = H(['No', 'Client Name', 'Project Manager', 'Facilitator', 'Assessor', 'Learner Name', 'Learner Surname', 'Learner ID Number', 'Programme Name', 'Duration', 'Start Date', 'End Date', 'Current Status', 'Monitoring Status', 'Monitoring Date', 'SOR Status', 'SOR Issued Date', 'EISA Booking Status', 'EISA Date', 'EISA Outcome', 'Next Official EISA Date 1', 'Registration Closing Date 1', 'Next Official EISA Date 2', 'Registration Closing Date 2', 'Comments']) + '<tbody>' +
-        rows.map(([r, i]) => { const w = winFor(r);
-          return `<tr><td>${i + 1}</td><td>${esc(r.c)}</td><td>${esc(r.pm)}</td><td>${esc(r.f)}</td><td>${tIn(`qaT(${i},'a',this.value)`, r.a, 'Assessor', 130)}</td><td style="font-weight:600">${esc(r.ln)}</td><td>${esc(r.sn || '')}</td><td>${r.id}</td><td>${esc(r.p)}</td><td>${tIn(`qaT(${i},'d',this.value)`, r.d, 'Duration', 90)}</td><td>${fmtD(r.s)}</td><td>${fmtD(r.e)}</td>
+      const PER = 25, pages = Math.max(1, Math.ceil(rows.length / PER)); if (qPg >= pages) qPg = pages - 1;
+      const page = rows.slice(qPg * PER, qPg * PER + PER); let last = null;
+      $('qtable').innerHTML = H(['No', 'Learner', 'Current Status', 'Monitoring Status', 'Monitoring Date', 'SOR Status', 'SOR Issued Date', 'EISA Booking Status', 'EISA Date', 'EISA Outcome', 'Comments']) + '<tbody>' +
+        page.map(([r, i], n) => { const p = qProg(r) || {}, w = winFor(r), as = qAss(r);
+          const gh = r.pid !== last ? UI.gh(`#${esc(p.display_id || p.id)} · ${esc(r.c)} · ${esc(p.programme_name || r.p)} · ${fmtD(r.s) || 'no start'} – ${fmtD(r.e) || 'no end'}`, rows.filter(([x]) => x.pid === r.pid).length, 'var(--navy)', 11,
+            `${esc(qRS(p))} · PM ${esc(r.pm || 'not set')} · Facilitator ${esc(qFac(r) || 'not set')} · Assessor ${esc(as || 'not set')} · Next EISA ${w[0] ? fmtD(w[0].eisa_date) + ' (closes ' + fmtD(w[0].registration_closing) + ')' : 'to be confirmed'}`) : ''; last = r.pid;
+          const ov = r.a && r.a !== as ? ` · Assessor ${esc(r.a)}` : '';
+          return gh + `<tr><td>${qPg * PER + n + 1}</td><td style="min-width:180px"><b>${esc(r.ln)} ${esc(r.sn || '')}</b><div class="sub">${r.idFull ? 'ID ' + r.id : '<span class="badge b-bad">No ID</span>'}${ov}</div></td>
           <td>${sel(i, 'cur', r.cur)}</td><td>${sel(i, 'mon', r.mon)}</td><td>${dIn(`qaT(${i},'monD',this.value)`, r.monD, 'Monitoring date')}</td><td>${sel(i, 'sor', r.sor)}</td><td>${dIn(`qaT(${i},'sorD',this.value)`, r.sorD, 'SOR issued date')}</td><td>${sel(i, 'book', r.book)}</td><td>${dIn(`qaT(${i},'eD',this.value)`, r.eD, 'EISA date')}</td><td>${sel(i, 'out', r.out)}</td>
-          <td>${w[0] ? fmtD(w[0].eisa_date) : '<span class="sub">To be confirmed</span>'}</td><td>${w[0] ? fmtD(w[0].registration_closing) : ''}</td><td>${w[1] ? fmtD(w[1].eisa_date) : '<span class="sub">To be confirmed</span>'}</td><td>${w[1] ? fmtD(w[1].registration_closing) : ''}</td>
-          <td>${tIn(`qaT(${i},'cm',this.value)`, r.cm, 'Comments', 240)}</td></tr>`; }).join('') + '</tbody>';
+          <td>${tIn(`qaT(${i},'cm',this.value)`, r.cm, 'Comments', 220)}</td></tr>`; }).join('') + (rows.length ? '' : '<tr><td colspan="11" class="sub" style="padding:16px">No learners match.</td></tr>') + '</tbody>';
+      $('qcount').textContent = rows.length + ' learner' + (rows.length === 1 ? '' : 's') + (base.length !== QT.length ? ` · ${QT.length - base.length} legacy, withdrawn or other PMs' rows hidden` : '');
+      pager.innerHTML = pages > 1 ? `<span class="sub">Page ${qPg + 1} of ${pages}</span><button class="btn sm" ${qPg ? '' : 'disabled'} onclick="qaQpg(${qPg - 1})">‹ Prev</button><button class="btn sm" ${qPg < pages - 1 ? '' : 'disabled'} onclick="qaQpg(${qPg + 1})">Next ›</button>` : '';
     } else {
-      const g = QCO.map((k, ci) => [k, ci, QT.filter(r => r.ci === ci)]).filter(([, , a]) => a.length && rows.some(([r]) => r.ci === a[0].ci));
+      pager.innerHTML = '';
+      const g = QCO.map((k, ci) => [k, ci, rows.filter(([r]) => r.ci === ci).map(([r]) => r)]).filter(([, , a]) => a.length);
       $('qtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification', 'NQF', 'Group', 'No. of learners', 'Employment status', 'Start date', 'End date', 'Enrolment requested', 'Enrolment received', 'EISA dates booked', 'Facilitator', 'Assessor', 'Mentor', 'Certification']) + '<tbody>' +
         g.map(([k, ci, a]) => { const m = (D().mods || []).find(x => x.sheet === 'QCTO projects' && x.programme_id === k.pid) || {}, p = (D().progs || []).find(x => x.id === k.pid) || {};
           const ed = {}; a.forEach(r => { if (r.eD) ed[r.eD] = (ed[r.eD] || 0) + 1; }); const cert = a.filter(r => r.out === 'Competent').length;
           return `<tr><td>${esc(m.entity || '—')}</td><td>${esc(k.pm)}</td><td>${esc(k.c)}</td><td>${esc(m.prog_type || p.programme_type || '—')}</td><td>${esc(k.p)}</td><td>${esc(p.nqf_level || '')}</td><td>${esc(m.groups || '—')}</td><td>${a.length}</td><td>${esc(m.employment || '—')}</td><td>${fmtD(k.s)}</td><td>${fmtD(k.e)}</td><td>${fmtD(day(m.enrolment_requested_date)) || '—'}</td><td>${fmtD(day(m.enrolment_received_date)) || '—'}</td>
-          <td>${Object.entries(ed).map(([dt, c]) => `${fmtD(dt)} × ${c}`).join('<br>') || '<span class="sub">—</span>'}</td><td>${esc(k.f)}</td><td>${esc(k.a || '')}</td><td>${esc(m.mentor || '—')}</td><td>${m.certification ? esc(m.certification) : cert ? `<span class="badge b-ok">${cert} competent</span>` : '<span class="sub">—</span>'}</td></tr>`; }).join('') + '</tbody>';
+          <td>${Object.entries(ed).map(([dt, c]) => `${fmtD(dt)} × ${c}`).join('<br>') || '<span class="sub">—</span>'}</td><td>${esc(qFac(a[0]))}</td><td>${esc(qAss(a[0]) || k.a || '')}</td><td>${esc(m.mentor || '—')}</td><td>${m.certification ? esc(m.certification) : cert ? `<span class="badge b-ok">${cert} competent</span>` : '<span class="sub">—</span>'}</td></tr>`; }).join('') + '</tbody>';
       $('qcount').textContent = g.length + ' cohorts · enrolment, mentor and certification come from Moderation & Verification › QCTO projects';
     }
   };
@@ -143,8 +201,8 @@
     const X = xl(); if (!X) return;
     const head = ['No of Learners', 'Client Name', 'Project Manager', 'Facilitator', 'Assessor', 'Learner Name', 'Learner Surname', 'Learner ID Number', 'Programme Name', 'Duration', 'Start Date ', 'End Date', 'Current Status', 'Monitoring Status', 'Monitoring Date', 'SOR Status', 'SOR Issued Date', 'EISA Booking Status', 'EISA Date', 'EISA Outcome', 'Next Official EISA Date 1', 'Registration Closing Date 1', 'Next Official  EISA Date 2', 'Registration Closing Date 2', 'Comments'];
     const tbc = 'To be confirmed';
-    const rows = QT.map((r, i) => { const w = winFor(r);
-      return [i + 1, r.c, r.pm, r.f, r.a, r.ln, r.sn, r.idFull || '', r.p, r.d, day(r.s), day(r.e), r.cur, r.mon, day(r.monD), r.sor, day(r.sorD) || tbc, r.book, day(r.eD) || tbc, r.out || 'Pending', w[0] ? w[0].eisa_date : tbc, w[0] ? w[0].registration_closing : tbc, w[1] ? w[1].eisa_date : tbc, w[1] ? w[1].registration_closing : tbc, r.cm]; });
+    const rows = qBase().map(([r], i) => { const w = winFor(r);
+      return [i + 1, r.c, r.pm, qFac(r), r.a || qAss(r), r.ln, r.sn, r.idFull || '', r.p, r.d, day(r.s), day(r.e), r.cur, r.mon, day(r.monD), r.sor, day(r.sorD) || tbc, r.book, day(r.eD) || tbc, r.out || 'Pending', w[0] ? w[0].eisa_date : tbc, w[0] ? w[0].registration_closing : tbc, w[1] ? w[1].eisa_date : tbc, w[1] ? w[1].registration_closing : tbc, r.cm]; });
     const wb = X.utils.book_new();
     const ws = sheet(X, [head, ...rows], { dateCols: [10, 11, 14, 16, 18, 20, 21, 22, 23] });
     rows.forEach((r, ri) => { const a = X.utils.encode_cell({ r: ri + 1, c: 7 }); ws[a] = { t: 's', v: String(r[7]) }; }); // ID numbers stay text
