@@ -180,20 +180,26 @@
   /* ---------- dashboard ---------- */
   function applyDashboard() {
     const d = P.data, test = new Set(d.learners.filter(lTest).map(l => l.id)), realL = d.learners.filter(l => !test.has(l.id));   // test records left out of the counts
-    const actE = d.enrol.filter(e => !test.has(e.learner_id) && enLive(e)), linked = new Set(actE.map(e => e.learner_id));
-    const unlinked = realL.filter(l => !linked.has(l.id)).length, openRecs = d.recs.filter(r => !r.resolved).length;
-    $('kpis').innerHTML = [['Learners', realL.length, 'on record', 'var(--muted)', 'learners'], ['Active enrolments', actE.length, unlinked + ' learners unlinked', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
-      ['Active programmes', d.progs.filter(p => p.status === 'active').length, 'in delivery', 'var(--muted)', 'programmes'], ['Open recommendations', openRecs, 'from monitoring visits', openRecs ? 'var(--bad)' : 'var(--muted)', 'recs'],
+    const rs = p => dvApi.runState(p), PR = new Map(d.progs.filter(p => !p.deleted_at).map(p => [p.id, p])), run = [...PR.values()].filter(p => rs(p) === 'Active');
+    const wd = e => /withdrawn/i.test(e.fields?.Status || e.status || ''), runIds = new Set(run.map(p => p.id));
+    const actE = d.enrol.filter(e => !test.has(e.learner_id) && !wd(e) && runIds.has(e.programme_id)), anyE = new Set(d.enrol.map(e => e.learner_id));
+    const unlinked = realL.filter(l => !anyE.has(l.id)).length, openRecs = d.recs.filter(r => !r.resolved).length;
+    const plan = [...PR.values()].filter(p => rs(p) === 'Planned').length;
+    $('kpis').innerHTML = [['Learners', realL.length, 'on record', 'var(--muted)', 'learners'], ['Active enrolments', actE.length, unlinked + ' not enrolled on any programme', unlinked ? 'var(--warn)' : 'var(--muted)', 'enrolments'],
+      ['Running programmes', run.length, plan + ' planned', 'var(--muted)', 'programmes'], ['Open recommendations', openRecs, 'from monitoring visits', openRecs ? 'var(--bad)' : 'var(--muted)', 'recs'],
       ['Waiting for sign-off', d.signoffs.filter(s => s.status === 'waiting').length, 'admin decisions', 'var(--muted)', 'signoff']]
       .map(([l, v, n, c, h]) => `<a class="kpi" href="#${h}"><span class="l">${l}</span><span class="v">${v}</span><span class="n" style="color:${c}">${n}</span></a>`).join('');
-    const t = d.tracker, fl = [[t.filter(r => r.monitoring_status === 'Delayed').length, 'QCTO monitoring Delayed', 'From the QCTO Projects Tracker', 'bad', 'qcto'],
+    const eW = new Set(d.enrol.filter(wd).map(e => e.id)), t = d.tracker.filter(r => { const p = PR.get(r.programme_id); return p && p.programme_type !== 'legacy' && !eW.has(r.enrolment_id); });
+    const fl = [[t.filter(r => r.monitoring_status === 'Delayed').length, 'QCTO monitoring Delayed', 'From the QCTO Projects Tracker (occupational learners)', 'bad', 'qcto'],
       [t.filter(r => r.sor_status === 'Issued' && r.eisa_booking_status === 'Pending Booking').length, 'SOR issued, EISA not booked', 'Book before registration closes', 'warn', 'qcto'],
       [d.mods.filter(m => m.sheet === 'Exit verification' && m.stage !== 'SoRs received').length, 'Exit verifications awaiting SoRs', 'Legacy SETA programmes', 'warn', 'modver'],
-      [openRecs, 'Open audit recommendations', 'Assign owners and due dates', 'bad', 'recs'], [unlinked, 'Learners without an active enrolment', 'Link or archive to keep reports accurate', 'warn', 'enrolments']];
+      [openRecs, 'Open audit recommendations', 'Assign owners and due dates', 'bad', 'recs'], [unlinked, 'Learners not enrolled on any programme', 'Enrol them or check for duplicates', 'warn', 'learners']];
     $('alerts').innerHTML = fl.map(([c, ti, s, k, h]) => `<a href="#${h}"><span class="count b-${c ? k : 'ok'}">${c}</span><span style="flex-grow:1"><b style="display:block">${ti}</b><span class="sub">${s}</span></span></a>`).join('');
-    $('progrows').innerHTML = d.progs.filter(p => p.status === 'active').map(p => { const n = d.enrol.filter(e => e.programme_id === p.id).length;
-      return `<tr><td><b>${esc(p.programme_name)}</b><div class="sub">${esc(clientOf(p.id)?.client_name || '')}</div></td><td>${n}</td><td><span class="sub">—</span></td><td>${t.filter(r => r.programme_id === p.id && r.sor_status === 'Issued').length} of ${n}</td></tr>`; }).join('') || '<tr><td colspan="4" class="sub">No active programmes</td></tr>';
-    $('visitlist').innerHTML = d.visits.map(v => `<a href="#visit" onclick="previewOpenVisit(${v.id})"><span class="date">VIS<b>${v.id}</b></span><span><b style="display:block">${esc(v.fields?.['Visit Title'] || 'Visit ' + v.id)}</b><span class="sub">${esc(progName(v.programme_id))}</span></span></a>`).join('') || '<p class="sub">No visits</p>';
+    const soon = run.filter(p => p.end_date).sort((a, b) => a.end_date.localeCompare(b.end_date)).slice(0, 10);
+    $('progrows').innerHTML = soon.map(p => { const n = d.enrol.filter(e => e.programme_id === p.id && !wd(e)).length;
+      return `<tr><td><a href="#programmes" onclick="dvApi.setProg(${p.id});setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)"><b>#${esc(p.display_id || p.id)}</b></a> <b>${esc(p.programme_name)}</b><div class="sub">${esc(clientOf(p.id)?.client_name || '')} · ends ${esc(p.end_date)}</div></td><td>${n}</td><td><span class="sub">—</span></td><td>${t.filter(r => r.programme_id === p.id && r.sor_status === 'Issued').length} of ${n}</td></tr>`; }).join('') || '<tr><td colspan="4" class="sub">No running programmes</td></tr>';
+    const vd = v => v.fields?.['Date of Visit'] || v.fields?.Date || '';
+    $('visitlist').innerHTML = d.visits.filter(v => PR.has(v.programme_id)).sort((a, b) => vd(b).localeCompare(vd(a))).slice(0, 8).map(v => `<a href="#visit" onclick="previewOpenVisit(${v.id})"><span class="date">${esc((v.fields?.['Visit ID'] || 'VIS-' + v.id).replace('VIS-', 'VIS '))}<b>${esc(vd(v).slice(5) || '')}</b></span><span><b style="display:block">#${esc(PR.get(v.programme_id).display_id || v.programme_id)} · ${esc(clientOf(v.programme_id)?.client_name || '')}</b><span class="sub">${esc(progName(v.programme_id))}</span></span></a>`).join('') || '<p class="sub">No visits</p>';
     $('aisum').textContent = 'AI summary is off in the preview (no AI calls are made against test data).';
   }
 
@@ -842,7 +848,7 @@
     box.innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="flex-grow:1">ClickUp sync (test folder)</h2><span class="sub">Delivered by the preview adapter to “Z. Redesign Preview (TEST)”</span></div>
       <div class="grid" style="margin-top:12px">${[['Queued', c('queued'), 'b-n'], ['Retrying', c('retrying'), 'b-warn'], ['Delivered', c('succeeded'), 'b-ok'], ['Quarantined (Sync Exception)', c('quarantined'), 'b-bad']]
       .map(([l, v, b]) => `<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="n"><span class="badge ${b}">${l.split(' ')[0]}</span></span></div>`).join('')}</div>
-      ${o.find(x => x.last_error) ? `<p class="sub" style="margin:10px 0 0">Last error: ${esc(o.find(x => x.last_error).last_error.slice(0, 160))}</p>` : ''}`;
+      ${o.find(x => x.last_error && ['retrying', 'quarantined', 'failed'].includes(x.status)) ? `<p class="sub" style="margin:10px 0 0">Last error: ${esc(o.find(x => x.last_error && ['retrying', 'quarantined', 'failed'].includes(x.status)).last_error.slice(0, 160))}</p>` : ''}`;
   }
 
   /* banner */

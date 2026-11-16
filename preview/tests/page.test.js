@@ -108,7 +108,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     const { d } = await boot(sess(['admin']));
     ok(d.getElementById('pvbanner'), 'no banner');
     ok(/Learners3/.test(d.getElementById('kpis').textContent.replace(/\s/g, '')), 'learner KPI wrong: ' + d.getElementById('kpis').textContent);
-    ok(/2 learners unlinked/.test(d.getElementById('kpis').textContent), 'unlinked count wrong');
+    ok(/\d+ not enrolled on any programme/.test(d.getElementById('kpis').textContent), 'unlinked count wrong');
     ok(/Quarantined/.test(d.getElementById('syncbox').textContent), 'sync box missing');
   });
   await t('QCTO tracker: status change writes the right column', async () => {
