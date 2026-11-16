@@ -355,25 +355,47 @@
       <label>EISA type<select name="et">${opt(ENET, f['EISA Type'])}</select></label><label>Funding type<select name="fund">${opt(ENFUND, f['Funding Type'])}</select></label><label>Site<input name="site" value="${esc(f.Site || '')}"></label></div>`,
       async el => { const nf = { ...f, Status: el.st.value || 'Active', 'Statement Status': el.ss.value, 'EISA Type': el.et.value, 'Funding Type': el.fund.value, Site: el.site.value.trim() };
         Object.keys(nf).forEach(k => { if (nf[k] === '' && !(k in f)) delete nf[k]; }); await write('Enrolment', () => sb.from('enrolments').update({ fields: nf }).eq('id', id).select('id')); }); };
-  let enProg = '', enQ = '';
+  let enProg = '', enQ = '', enPage = 0;
   function applyEnrolments() {
-    const d = P.data, lname = id => { const l = d.learners.find(x => x.id === id); return l ? lName(l) : 'Learner ' + id; };
-    const linked = new Set(d.enrol.filter(enLive).map(e => e.learner_id));
-    document.querySelector('#view-enrolments .count').textContent = d.learners.filter(l => !lTest(l) && !linked.has(l.id)).length;
+    const d = P.data, lmap = new Map(d.learners.map(l => [l.id, l])), lname = id => { const l = lmap.get(id); return l ? lName(l) : 'Learner ' + id; };
+    const pOf = id => d.progs.find(p => p.id === id), cOf = id => clientOf(id)?.client_name || '', rs = p => (window.dvApi && dvApi.runState) ? dvApi.runState(p) : 'Active';
+    const anyE = new Set(d.enrol.map(e => e.learner_id));
+    document.querySelector('#view-enrolments .count').textContent = d.learners.filter(l => !lTest(l) && !anyE.has(l.id)).length;
+    const bt = document.querySelector('#view-enrolments .count + span b'); if (bt) bt.textContent = 'Learners not enrolled on any programme';
+    const bs = document.querySelector('#view-enrolments .count + span .sub'); if (bs) bs.textContent = 'Enrol them on their programme, or check they are not duplicates. Learners on completed or planned programmes are not counted.';
+    const dqa = document.querySelector('#view-enrolments a[href="#dq"]'); if (dqa) dqa.onclick = () => { window.dqSet && dqSet('Possible duplicate'); };
     const head = document.querySelector('#view-enrolments h1')?.parentElement; if (head && !$('enadd')) { head.querySelectorAll('button').forEach(b => b.remove()); head.insertAdjacentHTML('beforeend', '<button class="btn y" id="enadd" onclick="previewEnrolAdd()">+ Enrol learners</button>'); }
-    const sel = document.querySelector('#view-enrolments label.f select'); if (sel && !sel.dataset.live) { sel.dataset.live = 1; sel.innerHTML = '<option value="">All programmes</option>' + progOpts(); sel.onchange = () => { enProg = sel.value; renderEn(); }; sel.insertAdjacentHTML('afterend', '<input type="search" id="enq" placeholder="Learner name" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:var(--ink)" oninput="previewEnQ(this.value)">'); }
+    const lab = document.querySelector('#view-enrolments label.f'); if (lab && !$('enq')) { lab.hidden = true; lab.insertAdjacentHTML('afterend', '<input type="search" id="enq" placeholder="Learner, client, #id or ID number" style="height:36px;min-width:260px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:var(--ink)" oninput="previewEnQ(this.value)">'); }
+    if (!$('enpager')) document.querySelector('#view-enrolments .tw')?.insertAdjacentHTML('afterend', '<div id="enpager" style="display:flex;gap:8px;align-items:center;padding:10px 20px"></div>');
     if (!$('ennote')) document.querySelector('#view-enrolments .card:last-of-type')?.insertAdjacentHTML('afterend', '<p class="sub" id="ennote">Module results (knowledge, practical, workplace, moderation) are in <a href="#attendance" onclick="aTab=\'PoE tracker\'">Attendance &amp; PoE › PoE tracker</a>; exam results in <a href="#eisa" onclick="eTab=\'Exam results\'">EISA readiness › Exam results</a>.</p>');
+    const dupKey = new Map(); d.enrol.forEach(e => { const k = e.learner_id + '|' + e.programme_id; dupKey.set(k, (dupKey.get(k) || 0) + 1); });
+    // status shown = Withdrawn from the enrolment itself, otherwise the programme's run state
+    const stOf = e => enSt(e) === 'Withdrawn' ? 'Withdrawn' : rs(pOf(e.programme_id));
+    const ST = ['All', 'Active', 'Planned', 'Completed', 'Withdrawn'], SB = { Active: 'b-ok', Planned: 'b-n', Completed: 'b-n', Withdrawn: 'b-warn' };
+    const grp = pid => { const p = pOf(pid); return '#' + pid + ' · ' + (cOf(pid) || 'No client') + ' · ' + (p?.programme_name || 'Programme ' + pid) + (p ? ' · ' + fmt(p.start_date) + ' – ' + fmt(p.end_date) : ''); };
     renderEn = function () {
-      const st = ['All', 'Active', 'Completed', 'Withdrawn'];
-      $('enfilter').innerHTML = st.map(s => `<button class="${s === enF ? 'on' : ''}" onclick="enF='${s}';renderEn()">${s}</button>`).join('');
-      const q = enQ.toLowerCase(), rows = d.enrol.filter(e => (enF === 'All' || enF.toLowerCase() === 'all' || enSt(e) === enF || (enF === 'Active' && enLive(e))) && (!enProg || String(e.programme_id) === enProg) && (!q || lname(e.learner_id).toLowerCase().includes(q)))
-        .sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
-      $('enrows').innerHTML = rows.slice(0, 300).map(e => `<tr><td><a href="#learner/${e.learner_id}"><b>${esc(lname(e.learner_id))}</b></a></td><td>${esc(progName(e.programme_id))}<div class="sub">${esc([ef(e)['Statement Status'] && 'Statement ' + ef(e)['Statement Status'], ef(e)['Funding Type'], ef(e).Site].filter(Boolean).join(' · '))}</div></td><td>${fmt(e.created_at)}</td><td><span class="badge ${enLive(e) ? 'b-ok' : 'b-n'}">${esc(enSt(e))}</span></td><td><button class="btn sm" onclick="previewEnrolEdit(${e.id})">Edit</button></td></tr>`).join('') + (rows.length > 300 ? `<tr><td colspan="5" class="sub">Showing 300 of ${rows.length}. Filter by programme to see the rest.</td></tr>` : '') || '<tr><td colspan="5" class="sub">No enrolments match.</td></tr>';
+      const base = d.enrol.filter(e => { const l = lmap.get(e.learner_id); return !l || !lTest(l); }), cnt = s => s === 'All' ? base.length : base.filter(e => stOf(e) === s).length;
+      $('enfilter').innerHTML = ST.map(s => `<button class="${s === enF ? 'on' : ''}" onclick="enF='${s}';enPage=0;renderEn()">${s} <span class="sub">${cnt(s)}</span></button>`).join('');
+      const q = enQ.toLowerCase().trim(), rows = base.filter(e => (enF === 'All' || stOf(e) === enF) && (!q || [lname(e.learner_id), cOf(e.programme_id), '#' + e.programme_id, pOf(e.programme_id)?.programme_name || '', lIdn(lmap.get(e.learner_id) || {})].join(' ').toLowerCase().includes(q)))
+        .sort((a, b) => grp(a.programme_id).localeCompare(grp(b.programme_id)) || lname(a.learner_id).localeCompare(lname(b.learner_id)));
+      const gc = {}; rows.forEach(e => { const g = grp(e.programme_id); gc[g] = (gc[g] || 0) + 1; });
+      const PER = 25, pages = Math.max(1, Math.ceil(rows.length / PER)); if (enPage >= pages) enPage = pages - 1; const pg = rows.slice(enPage * PER, enPage * PER + PER);
+      let last = '';
+      $('enrows').innerHTML = pg.map(e => { const g = grp(e.programme_id), p = pOf(e.programme_id), l = lmap.get(e.learner_id), idn = l ? lIdn(l) : '', f = ef(e), s = stOf(e), ed = f['Enrolment Date'] || f['Date Enrolled'] || f['Enrolled Date'];
+        const gh = g !== last ? UI.gh(esc(g), gc[g], 'var(--navy)', 5, esc(p?.project_manager_name || 'No PM')) : ''; last = g;
+        const flags = (!idn ? `<span class="famflag" style="cursor:pointer" onclick="previewLearnerEdit(${e.learner_id})">No ID</span>` : !said(String(idn)) ? `<span class="famflag" style="cursor:pointer" onclick="previewLearnerEdit(${e.learner_id})">Invalid ID</span>` : '') + (dupKey.get(e.learner_id + '|' + e.programme_id) > 1 ? '<span class="famflag" style="background:var(--badbg,#fde8e8);color:var(--bad)">Enrolled twice</span>' : '');
+        const sub = [f['Statement Status'] && 'Statement ' + f['Statement Status'], f['Funding Type'], f.Site, s === 'Withdrawn' && f['Withdrawal Reason'] && 'Withdrawn ' + fmt(f['Withdrawal Date']) + ': ' + f['Withdrawal Reason']].filter(Boolean).join(' · ');
+        return gh + `<tr><td><a href="#learner/${e.learner_id}"><b>${esc(lname(e.learner_id))}</b></a>${flags}</td><td>${esc(cOf(e.programme_id) || 'No client')}<div class="sub">${esc(sub)}</div></td><td>${p ? fmt(p.start_date) + ' – ' + fmt(p.end_date) : ''}${ed ? `<div class="sub">Enrolled ${fmt(ed)}</div>` : ''}</td><td><span class="badge ${SB[s] || 'b-n'}">${esc(s)}</span></td><td style="text-align:right;white-space:nowrap"><button class="btn sm" onclick="previewEnrolEdit(${e.id})">Edit</button>${s !== 'Withdrawn' ? ` <button class="btn sm" onclick="previewEnrolWithdraw(${e.id})">Withdraw</button>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="5" class="sub">No enrolments match.</td></tr>';
+      $('enpager').innerHTML = `<span class="sub" style="flex-grow:1">Showing ${rows.length ? enPage * PER + 1 : 0}–${enPage * PER + pg.length} of ${rows.length}</span>${pages > 1 ? `<button class="btn sm" ${enPage ? '' : 'disabled'} onclick="enPage--;renderEn()">Previous</button><button class="btn sm" ${enPage < pages - 1 ? '' : 'disabled'} onclick="enPage++;renderEn()">Next</button>` : ''}`;
     };
-    if (!['All', 'Active', 'Completed', 'Withdrawn'].includes(enF)) enF = 'All';
+    if (!ST.includes(enF)) enF = 'All';
     renderEn();
   }
-  window.previewEnQ = v => { enQ = v || ''; renderEn(); };
+  window.previewEnrolWithdraw = id => { const e = P.data.enrol.find(x => x.id === id); if (!e) return; const f = ef(e), l = P.data.learners.find(x => x.id === e.learner_id);
+    dlg('ewform', 'Withdraw learner', `<p><b>${esc(l ? lName(l) : 'Learner')}</b> · ${esc(progName(e.programme_id))}</p><p class="sub">Only this enrolment is marked Withdrawn. The learner record stays.</p><div class="qagrid"><label>Withdrawal date *<input type="date" name="wd" required value="${new Date().toISOString().slice(0, 10)}"></label><label>Reason *<input name="wr" required placeholder="e.g. resigned, found employment, medical"></label></div>`,
+      async el => { const nf = Object.assign({}, f, { Status: 'Withdrawn', 'Withdrawal Date': el.wd.value, 'Withdrawal Reason': el.wr.value.trim() }); if (!nf['Withdrawal Reason']) throw new Error('Reason is required.');
+        await write('Enrolment', () => sb.from('enrolments').update({ fields: nf }).eq('id', id).select('id')); }, 'Withdraw'); };
+  window.previewEnQ = v => { enQ = v || ''; enPage = 0; renderEn(); };
 
   /* ---------- QCTO tracker (writes) ---------- */
   function applyTracker() {
@@ -428,7 +450,7 @@
   let dqT = '', dqQ = '';
   const DQK = g => g.decided ? 'Decided' : g.issue === 'possible_duplicate' ? 'Possible duplicate' : g.issue === 'invalid_id' ? 'Invalid ID' : 'No ID';
   const DQDEC = { needs_fix: ['b-warn', 'Sent to PM'], not_duplicate: ['b-ok', 'Different people'], quarantined: ['b-n', 'Quarantined'], reviewed_ok: ['b-ok', 'Reviewed OK'], merge: ['b-warn', 'Merge requested'] };
-  window.dqTile = t => { dqT = dqT === t ? '' : t; renderDQ(); };
+  window.dqTile = t => { dqT = dqT === t ? '' : t; renderDQ(); }; window.dqSet = t => { dqT = t; };
   window.dqSearch = v => { dqQ = v.toLowerCase(); renderDQ(); };
   renderDQ = function () {
     if (!isAdmin()) { $('dqlist').innerHTML = '<div class="empty"><b>Admins only</b><span>Data quality review needs the admin role.</span></div>'; $('dqkpis').innerHTML = ''; $('dqfilter').innerHTML = ''; return; }
