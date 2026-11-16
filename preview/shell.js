@@ -191,6 +191,8 @@
     active().forEach(p => A().learnersOf(p.id).forEach(l => { const r = A().readiness(p, l); n++; if (r.booked) booked++; else if (r.c.every(Boolean)) ready++; else not++; }));
     return `<div class="mwban"><div class="days">${days}<small>DAY${days === 1 ? '' : 'S'}</small></div><div style="flex:1 1 300px"><b style="font-size:15px;display:block">EISA bookings for ${fmt(w.eisa_date)} close on ${fmt(w.registration_closing)}</b><span style="font-size:13px;color:#E4E4F4">${ready} ready · ${booked} booked · ${not} not ready across ${active().length} active programme${active().length === 1 ? '' : 's'}</span></div><button class="btn y" type="button" onclick="dvGo('eisa','Readiness')">Review readiness</button></div>`;
   }
+  window.apxMyTasks = () => { try { return tasks(mwRole || roleOf()); } catch (_) { return []; } };
+  window.apxRole = () => roleOf();
   window.mwRoleSet = r => { mwRole = r; mwPick = {}; renderMW(); };
   window.mwToggle = id => { mwPick[id] = !mwPick[id]; renderMW(); };
   window.mwHide = () => { const ids = hid().concat(Object.keys(mwPick).filter(k => mwPick[k])); ls.set('hide', { d: iso(), ids }); mwPick = {}; renderMW(); window.toast('Hidden until tomorrow'); };

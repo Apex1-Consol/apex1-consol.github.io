@@ -87,7 +87,7 @@
   /* ---------- Programmes ---------- */
   const PST = { Active: p => runState(p) === 'Active', Planned: p => runState(p) === 'Planned', Completed: p => runState(p) === 'Completed' };
   // shared with shell.js (My work, side panel)
-  window.dvApi = { readiness, why, learnersOf, modsOf, sessOf, attFor, resFor, kindsOf, attendance, absenceLimit, prog, progs, regDates, runState, docGaps: (...a) => docGaps(...a), AT, COL, KINDS, KLAB, RLAB, setProg: id => { dProg = id; } };
+  window.dvApi = { readiness, why, learnersOf, modsOf, sessOf, attFor, resFor, kindsOf, attendance, absenceLimit, prog, progs, regDates, runState, docGaps: (...a) => docGaps(...a), AT, COL, KINDS, KLAB, RLAB, setProg: id => { dProg = id; }, cur: () => dProg };
   window.dvProg = id => { dProg = id; pTab = 'Overview'; renderProg(); };
   window.dvGo = (hash, tab) => { if (hash === 'attendance') aTab = tab; if (hash === 'eisa') eTab = tab; location.hash = hash; setTimeout(() => { if (hash === 'attendance') renderAtt(); if (hash === 'eisa') renderE(); }, 0); };
   const _renderProg = renderProg;
