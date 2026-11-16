@@ -158,6 +158,7 @@
     if (st === 'handed_over' && pm) btns.push(`<button class="btn y" onclick="dvStage(${p.id},'activate_programme','Mark this programme as Active? This confirms you are taking it on.')">Activate</button>`);
     if (st === 'active' && pm) btns.push(`<button class="btn ghost" onclick="dvStage(${p.id},'close_programme','Mark this programme as Closed? This is the final stage.')">Close</button>`);
     box.innerHTML = btns.join('');
+    if (window.apxProgDocs && pTab !== 'Form 3') apxProgDocs(p.id, 'pdocs'); else if ($('pdocs')) $('pdocs').hidden = true;
     const sp = hd.querySelectorAll('span'); if (sp[0]) sp[0].textContent = `${{ initiated: 'Initiated · awaiting sign-off', handed_over: 'Handed over · awaiting activation', active: 'Active', closed: 'Closed' }[st] || st} · ${p.programme_type || p.qualification_type || 'Programme'}${p.display_id ? ' · ' + p.display_id : ''}`;
   };
   window.dvPQ = v => { pQ = v || ''; renderProg(); };

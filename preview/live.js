@@ -130,7 +130,7 @@
     const [learners, enrol, progs, clients, tracker, mods, accs, legacy, signoffs, visits, recs, assessors, famc, dq, outbox, reports, windows, leisaSettings, leisa, pmods, sessions, att, eisaRes, poeRows] = await Promise.all([
       q('learners', sb.from('learners').select('id,first_name,last_name,id_number,email,phone,fields').order('last_name').order('id')),
       q('enrolments', sb.from('enrolments').select('id,learner_id,programme_id,status,created_at,fields').order('id')),
-      q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields,display_id,entity,qualification_code,group_name,group_size,programme_status,accreditation_end_date,eisa_start_date,eisa_end_date,deleted_at')),
+      q('programmes', sb.from('programmes').select('id,programme_name,client_id,saqa_id,qualification_type,nqf_level,start_date,end_date,status,programme_type,project_manager_name,facilitator_id,provider,qualification_name,fields,display_id,entity,qualification_code,group_name,group_size,programme_status,accreditation_end_date,eisa_start_date,eisa_end_date,deleted_at,handed_over_to_email,intake_source_id')),
       q('clients', sb.from('clients').select('id,client_name,contact_person,contact_email,contact_number,project_manager,sales_person,fields,deleted_at')),
       q('qcto_tracker', sb.from('qcto_tracker').select('*').order('id')),
       q('moderation_items', sb.from('moderation_items').select('*').order('id')),

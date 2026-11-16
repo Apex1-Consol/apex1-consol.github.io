@@ -352,6 +352,17 @@
 
     <!-- DASHBOARD VIEW -->
     <section id="dashboard" aria-label="Programme Initiation Dashboard">
+      <div id="piHowto" style="background:#fff;border:1px solid var(--border-line);border-left:4px solid var(--yellow);border-radius:8px;padding:12px 16px;margin:0 0 14px;font-size:13px;line-height:1.55">
+        <div style="display:flex;justify-content:space-between;gap:10px"><b>How to start a programme</b><button type="button" class="btn small" onclick="try{localStorage.setItem('piHowtoHide','1')}catch(e){};this.closest('#piHowto').remove()">Got it</button></div>
+        <ol style="margin:6px 0 0 18px;padding:0">
+          <li><b>+ New Programme</b> (or <b>Paste from Excel</b> to start several at once).</li>
+          <li>Pick the client and qualification from the lists: details ApexOne already has fill in, and the accreditation status shows under the qualification.</li>
+          <li>Work through the stages in any order. It saves as you type; required fields are only checked when you submit.</li>
+          <li><b>Documents:</b> upload each document in its own slot. If one is still outstanding, choose <b>No</b> and give an expected date.</li>
+          <li><b>Submit for sign-off.</b> Once the approvers sign, the project manager gets the programme and its documents.</li>
+        </ol>
+      </div>
+      <script>try{if(localStorage.getItem('piHowtoHide'))document.getElementById('piHowto').remove()}catch(e){}</script>
       <div class="dash-controls">
         <input type="text" id="searchBox" placeholder="Search by client, programme, or PM...">
         <select id="statusFilter" aria-label="Filter programmes by status">
@@ -845,18 +856,18 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
           {id:'workplaceVenue', label:'Workplace Venue', type:'text', required:false},
           {id:'learnerRoster', label:'Learner Roster (one full name per line)', type:'textarea', required:false}
         ]},
-      { key:'documents', label:'Documents & Appendices', desc:'Compliance checklist and supporting document uploads.',
+      { key:'documents', label:'Documents & Appendices', desc:'Upload each document in its own slot. Uploading marks it Yes. If something is still outstanding, choose No and give an expected date: the PM sees this after hand-over.',
         fields:[
-          {id:'idsReceived', label:'All Certified Identity Documents Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'qualificationsReceived', label:'All Certified Highest Qualifications Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'cvsReceived', label:'All Curriculum Vitaes Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'disabilityLettersReceived', label:'All Disability Letters Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'backgroundCheck', label:'Background Check', type:'select', options:['','Yes','No'], required:false},
-          {id:'approvedScheduleReceived', label:'Approved Implementation Schedule', type:'select', options:['','Yes','No'], required:false},
-          {id:'learnerListReceived', label:'Learner List Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'learnerAgreementReceived', label:'Learner Agreement Received', type:'select', options:['','Yes','No'], required:false},
-          {id:'mieChecksCompleted', label:'MIE Checks Completed', type:'select', options:['','Yes','No'], required:false},
-          {id:'supportingDocuments', label:'Upload Supporting Documents', type:'file', required:false}
+          {id:'idsReceived', doc:true, label:'All Certified Identity Documents Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'qualificationsReceived', doc:true, label:'All Certified Highest Qualifications Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'cvsReceived', doc:true, label:'All Curriculum Vitaes Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'disabilityLettersReceived', doc:true, label:'All Disability Letters Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'backgroundCheck', doc:true, label:'Background Check', type:'select', options:['','Yes','No'], required:false},
+          {id:'approvedScheduleReceived', doc:true, label:'Approved Implementation Schedule', type:'select', options:['','Yes','No'], required:false},
+          {id:'learnerListReceived', doc:true, label:'Learner List Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'learnerAgreementReceived', doc:true, label:'Learner Agreement Received', type:'select', options:['','Yes','No'], required:false},
+          {id:'mieChecksCompleted', doc:true, label:'MIE Checks Completed', type:'select', options:['','Yes','No'], required:false},
+          {id:'otherDocs', doc:true, other:true, label:'Other supporting documents (no financial documents)', type:'text', required:false}
         ]},
       { key:'rollout', label:'Rollout Schedule', desc:'Module-by-module training and assessment timeline. Import from Excel or edit live.', rollout:true }
     ];
@@ -886,15 +897,89 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
 
     let programmes = [];
     let peopleHistory = {};
+    /* ---------- Documents: each file goes to the private 'programme-documents' store; the record keeps only a link.
+       On hand-over the files are linked to the new programme (DB trigger) and the PM sees them there. ---------- */
+    const FIN_RX = /invoice|quot(e|ation)|pro-?forma|statement|bank|payment|remittance|purchase.?order|\bPO\b|price/i;
+    let TENANT = null;
+    async function tenantId() {
+      if (TENANT) return TENANT;
+      const { data } = await supabaseClient.auth.getSession();
+      const u = data && data.session && data.session.user;
+      TENANT = u && ((u.app_metadata && u.app_metadata.tenant) || (u.user_metadata && u.user_metadata.tenant)) || null;
+      return TENANT;
+    }
+    async function docUpload(rec, stage, id, fileList) {
+      if (isRecordLocked(rec)) return;
+      const files = Array.from(fileList || []); if (!files.length) return;
+      const f = stage.fields.find(x => x.id === id) || {};
+      const t = await tenantId(); if (!t) { showToast('Upload failed: no tenant on this account'); return; }
+      const d = rec.data; d[id + 'Files'] = Array.isArray(d[id + 'Files']) ? d[id + 'Files'] : [];
+      let ok = 0;
+      for (const file of files) {
+        if (FIN_RX.test(file.name)) { showToast(`Not uploaded: "${file.name}" looks like a financial document. Financial documents are not kept here.`); continue; }
+        if (file.size > 10 * 1024 * 1024) { showToast(`Not uploaded: "${file.name}" is over 10 MB.`); continue; }
+        const safe = file.name.replace(/[^\w.\-]+/g, '_').slice(-120);
+        const path = `${t}/${rec.id}/${id}/${Date.now()}_${safe}`;
+        showToast(`Uploading ${file.name}…`);
+        const up = await supabaseClient.storage.from('programme-documents').upload(path, file, { contentType: file.type || undefined });
+        if (up.error) { showToast('Upload failed: ' + up.error.message); continue; }
+        const ins = await supabaseClient.from('programme_documents').insert({ tenant_id: t, intake_id: rec.id, doc_type: id, doc_label: (f.label || id).replace(/\s*\(no financial documents\)/i, ''), file_path: path, file_name: file.name, file_size: file.size });
+        if (ins.error) { await supabaseClient.storage.from('programme-documents').remove([path]); showToast('Upload failed: ' + ins.error.message); continue; }
+        d[id + 'Files'].push({ name: file.name, path, size: file.size }); ok++;
+      }
+      if (!ok) return;
+      d[id] = 'Yes'; delete d[id + 'Due']; delete d[id + 'Note'];
+      rec.updatedAt = Date.now(); saveData(); renderForm();
+      showToast(`${ok} file(s) uploaded`);
+    }
+    async function docRemove(rec, id, idx) {
+      if (isRecordLocked(rec)) return;
+      const list = rec.data[id + 'Files'] || [], fl = list[idx]; if (!fl) return;
+      if (!confirm(`Remove "${fl.name}"?`)) return;
+      await supabaseClient.from('programme_documents').delete().eq('file_path', fl.path);
+      await supabaseClient.storage.from('programme-documents').remove([fl.path]);
+      list.splice(idx, 1);
+      if (!list.length && rec.data[id] === 'Yes') rec.data[id] = '';
+      rec.updatedAt = Date.now(); saveData(); renderForm();
+    }
+    async function docOpen(path) {
+      const { data, error } = await supabaseClient.storage.from('programme-documents').createSignedUrl(path, 120);
+      if (error) { showToast('Cannot open: ' + error.message); return; }
+      window.open(data.signedUrl, '_blank', 'noopener');
+    }
+    async function docPurge(rec) {
+      const paths = Object.keys(rec.data || {}).filter(k => /Files$/.test(k)).flatMap(k => (rec.data[k] || []).map(x => x.path)).filter(Boolean);
+      if (!paths.length) return;
+      await supabaseClient.from('programme_documents').delete().in('file_path', paths);
+      await supabaseClient.storage.from('programme-documents').remove(paths);
+    }
+    /* Accreditation check for the chosen qualification (Accreditation page in ApexOne). */
+    const saqaOf = d => (String(d.programmeName || '').match(/SAQA ID:\s*(\d+)/i) || [])[1] || '';
+    const accFor = sq => LIVE_ACC.filter(a => String(a.saqa_id || '').replace(/^SP:/i, '').trim() === sq);
+    function accNote(d) {
+      const sq = saqaOf(d); if (!sq || !LIVE_ACC.length) return '';
+      const box = (c, t) => `<div style="font-size:12px;margin-top:6px;padding:6px 10px;border-radius:6px;border-left:3px solid ${c};background:var(--bg-page)">${t}</div>`;
+      const rows = accFor(sq);
+      if (!rows.length) return box('#d97706', `<b>No accreditation record</b> in ApexOne for SAQA ${esc(sq)}. Check with QA before submitting.`);
+      const g = rows.find(a => a.status === 'Accreditation granted');
+      if (!g) return box('#d97706', `<b>Not yet accredited:</b> SAQA ${esc(sq)} is at "${esc(rows[0].status || 'unknown')}".`);
+      const to = g.accreditation_to ? String(g.accreditation_to).slice(0, 10) : '';
+      const today = new Date().toISOString().slice(0, 10), end = d.trainingEndDate || '';
+      if (to && to < today) return box('#dc2626', `<b>Accreditation expired</b> on ${esc(to)}.`);
+      if (to && end && to < end) return box('#dc2626', `<b>Accreditation ends ${esc(to)}</b>, before the training end date (${esc(end)}).`);
+      return box('#16a34a', `Accredited${to ? ' until ' + esc(to) : ''}${g.quality_partner ? ' · ' + esc(g.quality_partner) : ''}.`);
+    }
+
     /* Pick-lists from ApexOne's live records, so names match exactly (clients, FAM practitioners, PMs). */
-    let LIVE_OPTS = {};
+    let LIVE_OPTS = {}, LIVE_CLIENTS = [], LIVE_ACC = [];
     const DELETED_IDS = new Set();
     async function loadLiveOpts() {
       const uniq = a => [...new Set(a.map(x => String(x || '').trim()).filter(Boolean))].sort((x, y) => x.localeCompare(y));
       const q = async (t, c) => { try { const { data } = await supabaseClient.from(t).select(c).limit(2000); return data || []; } catch (e) { return []; } };
-      const [cl, fam, pr] = await Promise.all([q('clients', 'client_name,sales_person,deleted_at'), q('assessors', 'full_name'), q('programmes', 'project_manager_name,deleted_at')]);
+      const [cl, fam, pr, acc] = await Promise.all([q('clients', 'client_name,sales_person,contact_email,contact_number,project_manager,fields,deleted_at'), q('assessors', 'full_name'), q('programmes', 'project_manager_name,deleted_at'), q('accreditation_items', 'saqa_id,status,accreditation_to,quality_partner,nqf,qual_type')]);
       const live = r => !r.deleted_at;
       const famNames = uniq(fam.map(r => r.full_name));
+      LIVE_CLIENTS = cl.filter(r => !r.deleted_at); LIVE_ACC = acc;
       LIVE_OPTS = { clientName: uniq(cl.filter(live).map(r => r.client_name)), relationshipManager: uniq(cl.filter(live).map(r => r.sales_person)),
         projectManager: uniq(pr.filter(live).map(r => r.project_manager_name)), facilitator: famNames, assessor: famNames, moderator: famNames, academicAssociate: famNames };
     }
@@ -1021,6 +1106,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       clonedRollout.sourceMeta = null;
       const clonedData = JSON.parse(JSON.stringify(src.data || {}));
       delete clonedData.intakeId;
+      Object.keys(clonedData).filter(k => /Files$/.test(k)).forEach(k => delete clonedData[k]);
       const clone = {
         id: nid,
         data: clonedData,
@@ -1044,6 +1130,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       }
       if (!confirm('Delete this programme record? This cannot be undone.')) return;
       DELETED_IDS.add(id);
+      if (target) docPurge(target);
       programmes = programmes.filter(p => p.id !== id);
       saveData();
       renderDashboard();
@@ -1098,7 +1185,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       const data = rec.data;
       const requiredFields = stage.fields.filter(f => f.required && visibleField(f, data));
       if (requiredFields.length === 0) {
-        const visibleFields = stage.fields.filter(f => visibleField(f, data));
+        const visibleFields = stage.fields.filter(f => !f.other && visibleField(f, data));
         return visibleFields.length > 0 && visibleFields.every(f => {
           const v = data[f.id];
           return Array.isArray(v) ? v.length > 0 : (v && String(v).trim() !== '');
@@ -1116,7 +1203,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       if (stage.rollout) return rec.rollout ? rec.rollout.modules.length : 0;
       const data = rec.data;
       return stage.fields.filter(f => {
-        if (!visibleField(f, data)) return false;
+        if (f.other || !visibleField(f, data)) return false;
         const v = data[f.id];
         return Array.isArray(v) ? v.length > 0 : (v && String(v).trim() !== '');
       }).length;
@@ -1125,7 +1212,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
     function totalCount(rec, stage) {
       if (stage.rollout) return null;
       const data = rec.data;
-      return stage.fields.filter(f => visibleField(f, data)).length;
+      return stage.fields.filter(f => !f.other && visibleField(f, data)).length;
     }
 
     function getValidationReport(rec) {
@@ -2247,7 +2334,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         const reqLeft = s.rollout ? 0 : s.fields.filter(f => { if (!f.required || !visibleField(f, rec.data)) return false; const v = rec.data[f.id]; return Array.isArray(v) ? v.length === 0 : (!v || String(v).trim() === ''); }).length;
         btn.title = reqLeft ? `${reqLeft} required field(s) still empty. You can save now and finish later; required fields are checked on Submit.` : '';
         btn.innerHTML = `
-          <span class="stage-dot">${done ? '✓' : (i + 1)}</span>
+          <span class="stage-dot">${done ? '✓' : (s.rollout ? '★' : (i + 1))}</span>
           <span>${esc(s.label)}</span>
           <span class="stage-count">${esc(countText)}</span>${reqLeft ? `<span class="stage-req">●${reqLeft}</span>` : ''}
         `;
@@ -2329,12 +2416,26 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       stage.fields.forEach(f => {
         if (!visibleField(f, d)) return;
         const div = document.createElement('div');
-        div.className = 'field' + (f.type === 'textarea' || f.type === 'checkboxes' || f.type === 'file' || f.id === 'programmeName' || f.id === 'companyAddress' ? ' full-span' : '');
+        div.className = 'field' + (f.doc || f.type === 'textarea' || f.type === 'checkboxes' || f.type === 'file' || f.id === 'programmeName' || f.id === 'companyAddress' ? ' full-span' : '');
         const val = f.type === 'checkboxes' ? (Array.isArray(d[f.id]) ? d[f.id] : []) : (d[f.id] || '');
         const filledClass = val && (Array.isArray(val) ? val.length > 0 : String(val).trim() !== '') ? 'filled' : '';
         let inputHtml = '';
 
-        if (f.type === 'checkboxes') {
+        if (f.doc) {
+          const files = Array.isArray(d[f.id + 'Files']) ? d[f.id + 'Files'] : [];
+          const yn = f.other ? '' : `<select class="${filledClass}" data-id="${f.id}" data-docyn="1" ${disAttr}>${['', 'Yes', 'No'].map(o => `<option value="${o}" ${o === val ? 'selected' : ''}>${o || 'Select...'}</option>`).join('')}</select>`;
+          const later = !f.other && val === 'No' ? `<div style="display:grid;grid-template-columns:150px 1fr;gap:6px;margin-top:6px">
+              <input type="date" data-id="${f.id}Due" value="${escAttr(d[f.id + 'Due'] || '')}" ${disAttr} title="Expected date">
+              <input type="text" data-id="${f.id}Note" value="${escAttr(d[f.id + 'Note'] || '')}" ${disAttr} placeholder="What is outstanding / who is sending it"></div>` : '';
+          inputHtml = `${yn}${later}
+            <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px">
+              ${files.map((fl, fi) => `<span style="display:inline-flex;align-items:center;gap:4px;font-size:12px;padding:3px 8px;background:var(--bg-page);border:1px solid var(--border-line);border-radius:6px">
+                <a href="#" data-docopen="${escAttr(fl.path)}" style="font-weight:600;color:var(--indigo)">${esc(fl.name)}</a>
+                ${locked ? '' : `<button type="button" data-docdel="${f.id}" data-docidx="${fi}" title="Remove" style="border:0;background:transparent;color:var(--muted);cursor:pointer">✕</button>`}</span>`).join('')}
+              ${locked ? '' : `<label class="btn small" style="cursor:pointer">&#8593; Upload<input type="file" data-docup="${f.id}" multiple style="display:none"></label>`}
+              ${files.length ? '' : '<span style="font-size:11.5px;color:var(--muted)">No file yet</span>'}
+            </div>`;
+        } else if (f.type === 'checkboxes') {
           inputHtml = `<div class="checkbox-group" data-id="${f.id}">
             ${f.options.map(o => `<label class="checkbox-item"><input type="checkbox" ${disAttr} value="${escAttr(o)}" ${val.includes(o) ? 'checked' : ''}> ${esc(o)}</label>`).join('')}
           </div>`;
@@ -2376,6 +2477,18 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         el.addEventListener('blur', e => validateField(e.target, stage));
         if (['clientName','programmeName'].includes(el.dataset.id)) el.addEventListener('change', e => applySmartDefaults(e.target.dataset.id));
       });
+
+      wrap.querySelectorAll('[data-docyn]').forEach(el => el.addEventListener('change', () => renderForm()));
+      wrap.querySelectorAll('[data-docup]').forEach(el => el.addEventListener('change', e => { docUpload(rec, stage, e.target.dataset.docup, e.target.files); e.target.value = ''; }));
+      wrap.querySelectorAll('[data-docdel]').forEach(el => el.addEventListener('click', e => { const b = e.currentTarget; docRemove(rec, b.dataset.docdel, parseInt(b.dataset.docidx, 10)); }));
+      wrap.querySelectorAll('[data-docopen]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); docOpen(e.currentTarget.dataset.docopen); }));
+      if (stage.key === 'client') {
+        const cn = wrap.querySelector('[data-id=clientName]'), pn = wrap.querySelector('[data-id=programmeName]');
+        const k = String(d.clientName || '').trim().toLowerCase();
+        if (cn && k && LIVE_CLIENTS.length && !LIVE_CLIENTS.some(c => String(c.client_name || '').trim().toLowerCase() === k))
+          cn.insertAdjacentHTML('afterend', '<div style="font-size:11.5px;color:#8a5a00;margin-top:4px">New client: not in ApexOne yet. It will be added on submit, so check the spelling against the list first.</div>');
+        if (pn) pn.insertAdjacentHTML('afterend', accNote(d));
+      }
 
       wrap.querySelectorAll('.checkbox-group').forEach(group => {
         const id = group.dataset.id;
@@ -2468,8 +2581,21 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
         const m = String(d.programmeName || '').match(/NQF\s*(\d+)/i);
         if (m) { d.level = 'NQF ' + m[1]; filled.push('Level'); }
       }
+      if (id === 'programmeName') {
+        const g = accFor(saqaOf(d)).find(a => a.status === 'Accreditation granted');
+        if (g && g.quality_partner && !String(d.qualificationSETA || '').trim()) { d.qualificationSETA = g.quality_partner; filled.push('Qualification SETA'); }
+        if (g && g.nqf && !String(d.level || '').trim()) { d.level = 'NQF ' + g.nqf; filled.push('Level'); }
+      }
       if (id === 'clientName') {
         const key = String(d.clientName || '').trim().toLowerCase();
+        const c = key && LIVE_CLIENTS.find(x => String(x.client_name || '').trim().toLowerCase() === key);
+        if (c) {
+          const cf = c.fields || {};
+          [['clientEmail', c.contact_email || cf.Email], ['clientContactNumber', c.contact_number || cf.Phone], ['companyAddress', cf.Address],
+           ['relationshipManager', c.sales_person], ['projectManager', c.project_manager]].forEach(([f, v]) => {
+            if (!String(d[f] || '').trim() && v && String(v).trim()) { d[f] = String(v).trim(); filled.push(f); }
+          });
+        }
         const prev = key && programmes.filter(p => p.id !== rec.id && p.data && String(p.data.clientName || '').trim().toLowerCase() === key)
           .sort((x, y) => (y.updatedAt || 0) - (x.updatedAt || 0));
         if (prev && prev.length) {
@@ -2480,10 +2606,10 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
           });
         }
       }
-      if (!filled.length) return;
+      if (!filled.length) { if (id === 'programmeName') renderPanel(); return; }
       rec.updatedAt = Date.now();
       saveData(); renderPanel(); renderTabsEl(); renderLiveDocument(rec);
-      showToast(id === 'clientName' ? `Filled ${filled.length} field(s) from this client's previous programme. Check and change if needed.` : 'Level set from the qualification (NQF).');
+      showToast(id === 'clientName' ? `Filled ${filled.length} field(s) from ApexOne and earlier programmes for this client. Check and change if needed.` : `Filled from the qualification: ${filled.join(', ')}.`);
     }
 
     function onFieldChange(e, stage) {
@@ -2845,7 +2971,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
       const indTime = ro.inductionTime || d.inductionTime || '';
       const totalCr = totalRolloutCredits(ro);
       const rosterLines = (d.learnerRoster || '').split('\n').map(s => s.trim()).filter(Boolean);
-      const files = Array.isArray(d.supportingDocuments) ? d.supportingDocuments : [];
+      const files = Object.keys(d).filter(k => /Files$/.test(k)).flatMap(k => Array.isArray(d[k]) ? d[k] : []);
 
       const columns = ro.columns && ro.columns.length ? ro.columns : cloneDefaultCols();
       const { perSubjectCols, moduleCols } = splitCols(columns);

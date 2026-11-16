@@ -170,6 +170,7 @@
       const dq = (d.dq || []).length; if (dq) out.push({ id: 'dq', t: `Review ${dq} possible data-quality issue${dq > 1 ? 's' : ''}`, s: 'Data quality review', k: 'Data quality', c: 'Review', on: `location.hash='dq'` });
     }
     if (window.apxDeskTasks) try { out.push(...window.apxDeskTasks()); } catch (e) {}
+    if (window.apxDocTasks) try { out.push(...window.apxDocTasks()); } catch (e) {}
     return out;
   }
   function banner() {

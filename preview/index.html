@@ -788,7 +788,7 @@ function route(){
   if(!isLogin&&famOnly()&&r!=='fam'){location.replace('#fam');return;}
   $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
   document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);
-  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116a'}}
+  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116b'}}
 }
 addEventListener('hashchange',route);
 
@@ -1248,15 +1248,16 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261116b"></script>
+<script src="live.js?v=20261116c"></script>
 <script src="qa.js?v=20261116c"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
-<script src="delivery.js?v=20261116a"></script>
-<script src="handover.js?v=20261112d"></script>
-<script src="shell.js?v=20261116b"></script>
+<script src="delivery.js?v=20261116b"></script>
+<script src="handover.js?v=20261116a"></script>
+<script src="shell.js?v=20261116c"></script>
 <script src="today.js?v=20261116i"></script>
 <script src="desk.js?v=20261116b"></script>
+<script src="progdocs.js?v=20261116a"></script>
 <script src="admin.js?v=20261116a"></script>
 <script src="reports.js?v=20261113c"></script>
 <script src="pager.js?v=20261113a"></script>
