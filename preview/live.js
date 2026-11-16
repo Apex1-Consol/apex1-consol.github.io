@@ -678,26 +678,28 @@
     const cls = s === 'Signed' ? (exp && exp <= soon ? 'b-warn' : 'b-ok') : s === 'Expired' ? 'b-bad' : s === 'Pending' || s === 'Draft' ? 'b-warn' : 'b-n';
     return { s: s || 'No MOU recorded', exp, cls, note: s === 'Signed' && exp && exp <= soon ? 'expires ' + clDate(exp) : '' };
   }
+  const clBadDates = p => p.start_date && p.end_date && String(p.end_date).slice(0, 10) < String(p.start_date).slice(0, 10);
+  const clRun = p => window.dvApi?.runState ? dvApi.runState(p) : (p.status || '');
   function applyClients() {
     const list = P.data.clients.filter(c => !c.deleted_at && (!window.apxPMonly || !apxPMonly() || apxMineName(c.project_manager) || P.data.progs.some(p => p.client_id === c.id && apxMineProg(p)))).sort((a, b) => clName(a).localeCompare(clName(b)));
     if (!list.find(c => c.id === clPick)) clPick = list[0]?.id ?? null;
     const head = document.querySelector('#view-clients h1')?.parentElement;
     if (head && !$('clq')) head.insertAdjacentHTML('beforeend', '<input id="clq" type="search" placeholder="Search clients, contacts, PM" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--surface);color:var(--ink);min-width:220px" oninput="previewClSearch(this.value)">');
     const q = clQ.toLowerCase(), shown = list.filter(c => !q || [clName(c), c.contact_person, c.project_manager, c.sales_person, clF(c).Sector].join(' ').toLowerCase().includes(q));
-    $('clientcards').innerHTML = shown.map(c => { const m = clMou(c), n = P.data.progs.filter(p => p.client_id === c.id).length;
-      return `<button class="pick${c.id === clPick ? ' on' : ''}" onclick="previewClPick(${c.id})"><b>${esc(clName(c))}</b><span class="sub">${esc(clF(c).Sector || 'Sector not set')} · PM ${esc(c.project_manager || '—')}</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge ${m.cls}">MOU ${esc(m.s)}${m.note ? ' · ' + m.note : ''}</span><span class="sub">${n} programme${n === 1 ? '' : 's'}</span></span></button>`; }).join('') || '<p class="sub">No clients match.</p>';
+    $('clientcards').innerHTML = shown.map(c => { const m = clMou(c), cp = P.data.progs.filter(p => p.client_id === c.id), n = cp.length, bad = cp.filter(clBadDates).length;
+      return `<button class="pick${c.id === clPick ? ' on' : ''}" onclick="previewClPick(${c.id})"><b>${esc(clName(c))}</b><span class="sub">${esc(clF(c).Sector || 'Sector not set')} · PM ${esc(c.project_manager || '—')}</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge ${m.cls}">${esc(m.s === 'No MOU recorded' ? m.s : 'MOU ' + m.s)}${m.note ? ' · ' + m.note : ''}</span>${bad ? `<span class="badge b-bad">${bad} end before start</span>` : ''}</span><span class="sub">${n} programme${n === 1 ? '' : 's'}</span></button>`; }).join('') || '<p class="sub">No clients match.</p>';
     const c = list.find(x => x.id === clPick), aside = document.querySelector('#view-clients aside');
     if (!aside) return;
     if (!c) { aside.innerHTML = '<p class="sub">No client selected.</p>'; return; }
-    const f = clF(c), m = clMou(c), kv = (k, v) => v ? `<div style="display:flex;gap:8px"><span class="sub" style="min-width:110px">${k}</span><span>${v}</span></div>` : '';
+    const f = clF(c), m = clMou(c), kv = (k, v, opt) => v || !opt ? `<div style="display:flex;gap:8px"><span class="sub" style="min-width:110px">${k}</span><span>${v || '<span class="sub">not set</span>'}</span></div>` : '';
     const progs = P.data.progs.filter(p => p.client_id === c.id).sort((a, b) => String(b.start_date || '').localeCompare(String(a.start_date || '')));
     aside.innerHTML = `<div style="display:flex;gap:8px;align-items:flex-start"><h2 style="flex-grow:1">${esc(clName(c))}</h2><button class="btn sm" onclick="previewClEdit(${c.id})">Edit</button></div>
       <span class="sub">${esc([f.Sector, f.Address].filter(Boolean).join(' · ') || 'Sector and address not set')}</span>
       <div style="display:flex;flex-direction:column;gap:6px">${kv('Contact', esc(c.contact_person || f['Contact Person'] || ''))}${kv('Email', (c.contact_email || f.Email) ? `<a href="mailto:${esc(c.contact_email || f.Email)}">${esc(c.contact_email || f.Email)}</a>` : '')}${kv('Phone', esc(c.contact_number || f.Phone || ''))}
-      ${kv('Project manager', esc(c.project_manager || ''))}${kv('Sales person', esc(c.sales_person || ''))}${kv('BEE level', esc(f['BEE Level'] || ''))}
-      ${kv('MOU', `<span class="badge ${m.cls}">${esc(m.s)}</span>`)}${kv('MOU signed', clDate(f['MOU Date Signed']))}${kv('MOU expiry', clDate(m.exp))}</div>
+      ${kv('Project manager', esc(c.project_manager || ''))}${kv('Sales person', esc(c.sales_person || ''))}${kv('BEE level', esc(f['BEE Level'] || ''), 1)}
+      ${kv('MOU', `<span class="badge ${m.cls}">${esc(m.s)}</span>`)}${kv('MOU signed', clDate(f['MOU Date Signed']), 1)}${kv('MOU expiry', clDate(m.exp), 1)}</div>
       <h2 style="font-size:15px;margin-top:8px">Programmes (${progs.length})</h2>
-      <div class="list">${progs.map(p => `<a href="#programmes"><span style="flex-grow:1"><b style="display:block">${esc(p.programme_name || 'Programme ' + p.id)}</b><span class="sub">${esc([p.status, p.start_date ? clDate(p.start_date) + (p.end_date ? ' – ' + clDate(p.end_date) : '') : ''].filter(Boolean).join(' · '))}</span></span></a>`).join('') || '<p class="sub">No programmes yet.</p>'}</div>`;
+      <div class="list">${progs.map(p => `<a href="#programmes" onclick="window.dvApi&&dvApi.setProg(${p.id});setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)"><span style="flex-grow:1"><b style="display:block">${esc(p.programme_name || 'Programme ' + p.id)} <span class="sub" style="font-weight:400">#${p.id}</span></b><span class="sub">${esc([clRun(p), p.start_date ? clDate(p.start_date) + (p.end_date ? ' – ' + clDate(p.end_date) : '') : 'no dates'].filter(Boolean).join(' · '))}</span>${clBadDates(p) ? ' <span class="badge b-bad">End before start</span>' : ''}</span></a>`).join('') || '<p class="sub">No programmes yet.</p>'}</div>`;
   }
   window.previewClPick = id => { clPick = id; applyClients(); };
   window.previewClSearch = v => { clQ = v || ''; applyClients(); };
