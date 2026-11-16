@@ -150,7 +150,7 @@
     if (window.apxPgIn) apxPgIn($('plist'), pStatus + '|' + q);
     const nb = [...side.querySelectorAll('button')].find(b => /New programme/.test(b.textContent));
     if (nb) { nb.textContent = '+ New programme'; nb.onclick = () => (CAN() || has('pi_specialist')) ? dvProgEdit(null) : say('Ask a project manager or PI specialist to add programmes'); }
-    if (!$('pcsv')) side.insertAdjacentHTML('beforeend', '<button class="btn" id="pcsv" onclick="dvProgCsv()">Export CSV</button>');
+    if (!$('pcsv')) { side.insertAdjacentHTML('beforeend', '<div id="pbtns" style="display:flex;gap:8px"><button class="btn" id="pcsv" style="flex:1;padding-left:8px;padding-right:8px" onclick="dvProgCsv()">Export CSV</button></div>'); if (nb) { nb.style.flex = '1'; nb.style.paddingLeft = nb.style.paddingRight = '8px'; $('pbtns').prepend(nb); } }
     const p = prog(dProg), hd = $('view-programmes').querySelector('.dark'); if (!p || !hd || hd.hidden) return;
     const box = hd.lastElementChild, st = p.status || 'initiated', pm = has('project_manager'), lead = has('pi_specialist', 'compliance_officer', 'head_of_ops');
     const btns = [`<button class="btn" onclick="window.previewProgAI?previewProgAI(${p.id}):toast('Loading…')">✨ AI summary</button>`];
