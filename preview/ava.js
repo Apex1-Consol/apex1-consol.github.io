@@ -132,10 +132,68 @@
     const end = iso(new Date(Date.now() + 30 * 864e5)), ps = progAll().filter(p => !p.deleted_at && mine(p) && rs(p) === 'Active' && p.end_date && p.end_date <= end).sort((a, b) => a.end_date.localeCompare(b.end_date));
     localMsg('Programmes ending in the next 30 days', ps.length ? `<ul>${ps.map(p => `<li><a href="#programmes" class="avl" onclick="avaGoP(${p.id});return false">${e(pid(p))}</a> · ${e(clientOf(p))} · ends ${e(p.end_date)} · ${A() ? A().learnersOf(p.id).length : 0} learners ${btn('What\'s missing?', `avaMissing(${p.id})`)}</li>`).join('')}</ul>` : '<p>No running programmes end in the next 30 days.</p>');
   };
+  const FLAGHELP = [
+    [/Visit due or overdue/, 'The next monitoring visit date from the last visit is close or past. Book the visit and record it.'],
+    [/No monitoring visit/, 'A running programme has no visit recorded yet. Record the visit when it happens (QA plans visits).'],
+    [/Open recommendations/, 'Actions from monitoring visits that are not closed. Do the work, then Request close with a note.'],
+    [/Attendance/, 'No recent register, registers outside the programme dates, or learners over the absence limit. Capture registers weekly.'],
+    [/Learner documents/, 'Learner documents (ID copy, agreement, qualification) are not captured or are missing on the documents grid.'],
+    [/missing ID or enrolment|Data quality/, 'Learners without a valid 13-digit SA ID, or not linked to a programme, or possible duplicates.'],
+    [/Programmes missing details/, 'Programmes without a PM, dates, learners or SAQA ID. Open the programme and click Edit.'],
+    [/Clients missing details/, 'Clients without a contact person, email, phone or PM. Open the client and fill in what you know.'],
+    [/EISA/, 'EISA results outstanding or EISAs coming up. Update booking, date and outcome on the QCTO Tracker.'],
+    [/Not started, programme running/, 'Learners still "Not Started" on the QCTO Tracker although the programme started 30+ days ago.'],
+    [/no QCTO row/, 'Occupational enrolments without a QCTO Tracker row.'],
+    [/Moderation/, 'Moderation or verification items not linked to a programme or waiting on SoRs/reports.'],
+    [/Accreditation/, 'Qualifications expiring soon, with no accreditation record, or with an application still to submit.'],
+    [/FAM Registry/, 'Practitioners with expired SETA registrations, missing documents or names not in the FAM Registry.'],
+    [/Programme Initiation|Waiting for sign-off/, 'Programmes captured in Programme Initiation that are not yet signed and handed over to the PM.'],
+    [/Reports to move/, 'Monthly client reports that are not started, past deadline or sent back with changes.'],
+    [/Starting or ending soon/, 'Programmes starting or ending in the next weeks: check learners, registers and close-out.'],
+    [/sync/i, 'ClickUp sync items waiting or failed. Usually the ClickUp rate limit; they retry by themselves.'],
+  ];
+  const fhelp = h => (FLAGHELP.find(([r]) => r.test(h)) || [])[1] || '';
   window.avaFlags = () => {
-    const g = new Map(); flags().forEach(x => { const k = x.lab + '|' + x.r; g.set(k, (g.get(k) || 0) + 1); });
-    localMsg('My open flags by page', g.size ? `<ul>${[...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => { const [l, r] = k.split('|'); return `<li>${lnk(l, r)}: ${n}</li>`; }).join('')}</ul>` : '<p>No open flags. ✓</p>');
+    const g = new Map(); flags().forEach(x => { const k = x.r + '|' + x.lab + '|' + x.hh; g.set(k, (g.get(k) || 0) + 1); });
+    const byP = new Map(); [...g.entries()].forEach(([k, n]) => { const [r, l, h] = k.split('|'); if (!byP.has(r)) byP.set(r, { l, n: 0, items: [] }); const o = byP.get(r); o.n += n; o.items.push([h, n]); });
+    localMsg('My open flags by page', byP.size ? [...byP.entries()].sort((a, b) => b[1].n - a[1].n).map(([r, o]) => `<p>${lnk(o.l, r)} · ${o.n}</p><ul>${o.items.sort((a, b) => b[1] - a[1]).map(([h, n]) => `<li><b>${e(h)}</b> (${n})${fhelp(h) ? `<br><span class="avsm">${e(fhelp(h))}</span>` : ''}</li>`).join('')}</ul>`).join('') : '<p>No open flags. ✓</p>');
   };
+  window.avaClientGaps = () => {
+    const mineC = new Set(progAll().filter(p => !p.deleted_at && mine(p)).map(p => p.client_id));
+    const cs = (D().clients || []).filter(c => !c.deleted_at && (role() === 'admin' || role() === 'pi' || mineC.has(c.id)));
+    const rows = cs.map(c => { const f = c.fields || {}, m = [];
+      if (!c.contact_person) m.push('contact person'); if (!c.contact_email) m.push('email'); if (!c.contact_number) m.push('phone');
+      if (!c.project_manager) m.push('PM'); if (!c.sales_person) m.push('sales person'); if (!f['MOU Status']) m.push('MOU status'); if (!f.Sector) m.push('sector');
+      return [c, m]; }).filter(x => x[1].length).sort((a, b) => b[1].length - a[1].length);
+    localMsg('Clients missing details', rows.length ? `<p>${rows.length} of ${cs.length} clients have gaps. Open ${lnk('Clients', 'clients')}, pick the client and click Edit.</p><ul>${rows.slice(0, 25).map(([c, m]) => `<li><b>${e(c.client_name)}</b>: ${e(m.join(', '))}</li>`).join('')}</ul>${rows.length > 25 ? `<p class="avsm">…and ${rows.length - 25} more.</p>` : ''}` : '<p>Every client has its details filled in. ✓</p>');
+  };
+  window.avaLearnerGaps = () => {
+    const a = A(), d = D(), ok = id => window.apxSaid ? apxSaid(String(id || '').trim()) : /^\d{13}$/.test(String(id || '').trim());
+    const ps = progAll().filter(p => !p.deleted_at && mine(p) && rs(p) === 'Active' && a && a.learnersOf(p.id).length);
+    const rows = ps.map(p => { const ls = a.learnersOf(p.id), bad = ls.filter(l => !ok(l.id_number)).length, dg = a.docGaps ? a.docGaps(p.id) : null;
+      const m = []; if (bad) m.push(`${bad} missing/invalid SA ID`); if (dg && !dg.captured) m.push('documents not captured'); else if (dg && dg.missing) m.push(`${dg.missing} documents missing`);
+      return [p, ls.length, m]; }).filter(x => x[2].length);
+    const enrolled = new Set((d.enrol || []).map(x => x.learner_id)), none = role() === 'admin' ? (d.learners || []).filter(l => !enrolled.has(l.id)).length : 0;
+    localMsg('Learner gaps by programme', (rows.length ? `<ul>${rows.slice(0, 25).map(([p, n, m]) => `<li><a href="#programmes" class="avl" onclick="avaGoP(${p.id});return false">${e(pid(p))}</a> · ${e(clientOf(p))} · ${n} learners: ${e(m.join(', '))}</li>`).join('')}</ul><p class="avsm">Fix IDs on ${lnk('Data quality', 'dq')}; documents on ${lnk('Attendance & PoE', 'attendance')} (Documents tab).</p>` : '<p>No ID or document gaps on your running programmes. ✓</p>') + (none ? `<p>${none} learners are not enrolled on any programme: see ${lnk('Enrolments', 'enrolments')}.</p>` : ''));
+  };
+  window.avaRate = async (i, v) => {
+    const m = S.msgs[i]; if (!m || m.rated) return; m.rated = v; save(); render();
+    const q = [...S.msgs.slice(0, i)].reverse().find(x => x.r === 'u');
+    try { await window.__sb.from('ava_feedback').insert({ rating: v, page: pageName(route()), question: String(q ? q.t : '').slice(0, 800), answer: String(m.t || '').slice(0, 4000) }); window.toast && toast(v > 0 ? 'Thanks!' : 'Thanks, noted so Ava can be improved.'); } catch (_) {}
+  };
+  /* weekly brief card on My work (admin, QA): one AI call per person per week, saved */
+  const wkKey = () => { const d = new Date(), k = new Date(d); k.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return 'week:' + me() + ':' + iso(k); };
+  async function weekly(force) {
+    const host = document.getElementById('view-mywork'); if (!host || host.hidden || !['admin', 'qa'].includes(role()) || !D().progs) return;
+    let c = document.getElementById('avawk'); if (!c) { const anchor = document.getElementById('mwov') || host.firstElementChild; anchor.insertAdjacentHTML('beforebegin', '<details class="card" id="avawk" open style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700"><span style="color:#d9a400">✦</span> Ava\'s weekly brief</summary><div id="avawkb" style="margin-top:8px;font-size:14px;line-height:1.45"></div></details>'); c = document.getElementById('avawk'); }
+    const b = document.getElementById('avawkb'), k = wkKey(), hit = cache.get(k);
+    if (hit && !force) { b.innerHTML = fmt(hit.t) + `<div class="avsm">Written ${e(hit.at)} for this week. ${btn('Refresh', 'avaWeekly(1)')}</div>`; return; }
+    if (weekly.busy) return; weekly.busy = 1; b.innerHTML = '<span class="avsm">Ava is writing this week\'s brief…</span>';
+    try { const j = await call({ type: 'ava', mode: 'brief', question: 'Weekly brief for this week', page: 'My work', facts: briefFacts().slice(0, 9000), history: [] });
+      cache.set(k, { t: j.answer || '', at: new Date().toLocaleString('en-ZA', { weekday: 'short', hour: '2-digit', minute: '2-digit' }) }); weekly.busy = 0; weekly(); }
+    catch (err) { weekly.busy = 0; b.innerHTML = `<span class="avsm">Could not write the brief: ${e(err.message)} ${btn('Try again', 'avaWeekly(1)')}</span>`; }
+  }
+  window.avaWeekly = f => weekly(!!f);
   window.avaFillText = async (label, facts, current) => {
     const j = await call({ type: 'ava', mode: 'fill', question: `Write the text for the "${label}" field of this record, ready to paste into the form. Use only the facts in the context; where a fact is missing, leave a [placeholder] instead of guessing. Plain professional text, no greeting, no headings, no page links, under 150 words.${current && current.trim() ? ' Improve and complete this draft: ' + current.slice(0, 1500) : ''}`, page: pageName(route()), facts: String(facts || '').slice(0, 6000), history: [] });
     usage(); return String(j.answer || '').replace(/\{\{\w+\}\}/g, '').trim();
@@ -194,6 +252,8 @@
       c.push([`PoE gaps ${n}`, `avaTool('PoE gaps ${n}',{type:'poe_gap_analysis',programme_id:${id}},'narrative')`]); c.unshift([`What's missing on ${n}?`, `avaMissing(${id})`]); }
     if (role() === 'pm' || role() === 'admin') c.push(['Ending in 30 days', 'avaEnding()']);
     c.push(['My flags by page', 'avaFlags()']);
+    if (r === 'clients') c.unshift(['Clients missing details', 'avaClientGaps()']);
+    if (['learners', 'dq', 'enrolments', 'attendance'].includes(r)) c.unshift(['Learner gaps by programme', 'avaLearnerGaps()']);
     if (r === 'fam' && (role() === 'admin' || role() === 'qa')) c.push(['FAM compliance digest', "avaTool('FAM compliance digest',{type:'fam_compliance_digest'},'narrative')"]);
     c.push(['Draft a follow-up', "avaMode('draft')"], ['How do I…', "avaHow()"]);
     return c.map(([l, on]) => `<button type="button" class="avc" onclick="${e(on)}">${e(l)}</button>`).join('');
@@ -203,7 +263,7 @@
     box.querySelector('#avachips').innerHTML = chips();
     const m = box.querySelector('#avamsgs');
     m.innerHTML = (S.msgs.length ? '' : `<div class="avhi"><b>Hi, I'm Ava.</b><p>Ask me how to do something in ApexOne, what needs your attention, or what a page or flag means. On a programme page I can summarise it and check attendance, EISA readiness and PoE gaps.</p><p class="avsm">I use the free AI tier, so I never send learner names, ID numbers, emails or phone numbers. Please don't type them. I can make mistakes: check before you act.</p></div>`)
-      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button></div>` : ''}</div>`).join('')
+      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button>${x.html || x.local ? '' : x.rated ? `<span class="avsm"> · ${x.rated > 0 ? '👍' : '👎'} thanks</span>` : ` <button type="button" title="Helpful" onclick="avaRate(${i},1)">👍</button> <button type="button" title="Wrong or not helpful" onclick="avaRate(${i},-1)">👎</button>`}</div>` : ''}</div>`).join('')
       + (S.busy ? '<div class="avm a avdots"><span></span><span></span><span></span></div>' : '');
     box.querySelector('#avasend').disabled = S.busy;
     if (scroll) m.scrollTop = m.scrollHeight;
@@ -249,5 +309,8 @@
     const o = window.dvProg; if (typeof o === 'function') window.dvProg = id => { const r = o(id); if (S.open) setTimeout(render, 0); return r; };
   }
   window.avaAsk = q => ask(q, 'ask');
+  const wk = () => setTimeout(() => weekly(), 400);
+  window.addEventListener('hashchange', () => { if (route() === 'mywork') wk(); });
+  (function waitData(n) { if (D().progs && window.apxRole) { if (route() === 'mywork') wk(); } else if (n < 60) setTimeout(() => waitData(n + 1), 1000); })(0);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();

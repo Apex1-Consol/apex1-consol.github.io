@@ -755,7 +755,7 @@
   window.previewRecResolve = async (id, done) => {
     const r = P.data.recs.find(x => x.id === id); if (!r) return;
     try {
-      if (done) { const note = prompt('Closing note: what was done to put it right?'); if (note === null) return; if (!note.trim()) { toast('Add a short closing note.'); return; } await write('Recommendation', () => sb.rpc('request_rec_closure', { p_id: id, p_note: note.trim() })); toast('Sent to the Sign-off queue. It closes once an admin approves.'); }
+      if (done) { const rf = r.fields || {}; dlg('rcform', 'Request close', `<p class="sub">${esc(String(rf.Text || '').slice(0, 300))}</p><label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Closing note: what was done to put it right? *<textarea name="note" rows="4" required style="border:1px solid var(--line);border-radius:8px;padding:8px;font:inherit;background:transparent;color:var(--ink)"></textarea></label><p class="sub">It goes to the Sign-off queue and closes once an admin approves.</p>`, async el => { const note = el.note.value.trim(); if (!note) throw new Error('Add a short closing note.'); await write('Recommendation', () => sb.rpc('request_rec_closure', { p_id: id, p_note: note })); toast('Sent to the Sign-off queue. It closes once an admin approves.'); }, 'Send for sign-off'); $('rcform').dataset.rec = id; return; }
       else await write('Recommendation', () => sb.from('recommendations').update({ resolved: false, resolved_at: null, fields: { ...(r.fields || {}), Status: 'Open' } }).eq('id', id).select('id'));
       await loadAll();
     } catch (_) {}

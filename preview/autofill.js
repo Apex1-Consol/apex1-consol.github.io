@@ -143,7 +143,17 @@
   }
 
   /* ---------- wiring ---------- */
-  const HOOK = { pform: programmeForm, ewform: withdrawForm, vaform: addVisitForm, vform: visitForm, recform: recForm };
+  function closeForm(form) {
+    const r = (D().recs || []).find(x => String(x.id) === String(form.dataset.rec)); if (!r) return;
+    avaFillBtn(form, form.elements.note, 'Closing note (what was done to resolve the recommendation)', () => {
+      const f = r.fields || {}, p = prog(r.programme_id), L = [];
+      if (p) L.push(`Programme ${pid(p)}: ${p.programme_name || ''}`);
+      L.push(`Recommendation: ${String(f.Text || '').slice(0, 1500)}`); if (f['Due Date']) L.push(`Due date: ${f['Due Date']}`);
+      L.push('Write it as a closing note stating what was done, with [placeholders] for anything the facts do not say (e.g. [date completed], [evidence filed]).');
+      return L.join('\n');
+    });
+  }
+  const HOOK = { rcform: f => setTimeout(() => closeForm(f), 0), pform: programmeForm, ewform: withdrawForm, vaform: addVisitForm, vform: visitForm, recform: recForm };
   function scan() {
     if (!document.getElementById('afcss')) document.head.insertAdjacentHTML('beforeend', css);
     Object.entries(HOOK).forEach(([id, fn]) => { const f = document.getElementById(id); if (f && !f.__afHooked) { f.__afHooked = 1; clearOnEdit(f); try { fn(f); } catch (err) { console.warn('[smart fill]', id, err); } } });

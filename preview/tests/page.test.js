@@ -175,7 +175,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('Recommendation: Request close sends closure to Sign-off queue', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'recs'; await tick();
-    w.prompt = () => 'Fixed'; const b = [...d.querySelectorAll('#reclist button')].find(x => /Request close/.test(x.textContent)); b.click(); await tick();
+    const b = [...d.querySelectorAll('#reclist button')].find(x => /Request close/.test(x.textContent)); b.click(); await tick(); const rf = d.getElementById('rcform'); rf.elements.note.value = 'Fixed'; rf.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
     const u = log.find(x => x.rpc === 'request_rec_closure'); ok(u && u.args.p_id === 90 && u.args.p_note === 'Fixed' && !log.some(x => x.table === 'recommendations'), JSON.stringify(u));
   });
   await t('Visit: Submit for sign-off sends report to Sign-off queue', async () => {
