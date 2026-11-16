@@ -86,14 +86,72 @@
     } catch (err) { throw err.name === 'AbortError' ? new Error('That took too long. Please try again.') : err; }
     finally { clearTimeout(tm); }
   }
+  /* ---------- answers without AI (no quota) ---------- */
+  const FAQ = [
+    [/withdraw/i, 'To withdraw a learner:\n- Open {{enrolments}} and search for the learner or programme.\n- Click **Withdraw** on that enrolment.\n- Enter the withdrawal date and reason (both required), then Save.\nOnly that enrolment is marked Withdrawn; the learner record stays.'],
+    [/(sa )?id( number)?s?\b.*(add|capture|fix|missing|invalid)|(add|capture|fix).*\bid\b/i, 'To add or fix a learner\'s SA ID:\n- Open {{dq}} and click the **No ID** or **Invalid ID** tile.\n- Click **Add SA ID** on the learner and enter the 13-digit South African ID.\nOnly South African citizens can be on programmes, so passports are not accepted. Your My work list shows a "Capture SA ID numbers" task per programme until they are done.'],
+    [/(register|attendance|session)/i, 'To capture a register:\n- Open {{attendance}} and pick the programme.\n- Click **+ Add session**, choose the date (inside the programme dates, up to today) and module, then Save session.\n- Tap each learner\'s cell to cycle Present → Late → Absent. It saves automatically.'],
+    [/module/i, 'To set up modules: open {{attendance}}, pick the programme, open the **PoE tracker** tab and click **+ Add module**. Give the module number, title and at least one KM, PM or WM code.'],
+    [/(add|record|capture).*visit|visit.*(add|record|capture)/i, 'To record a monitoring visit: open {{visits}}, click **+ Add visit** (or **+ Add visit** next to a programme with no visit), pick the programme and date, then fill in the KMA scores, judgement and next visit date on the visit page.'],
+    [/(close|request close|resolve).*recommend|recommend.*(close|resolve)/i, 'To close a recommendation: open {{recs}}, click **Request close** on it and write a closing note (what was done). It then waits in the {{signoff}} for an admin to approve. Overdue ones show on your My work list.'],
+    [/hand.?over|sign.?off/i, 'Hand-over: the PI specialist completes {{pi}} and submits. The programme then appears in the {{signoff}} for the project manager to review the documents and sign. Legacy (SETA) programmes do not go through hand-over.'],
+    [/(new|add|create|start).*programme|programme initiation/i, 'New programmes start in {{pi}} (PI specialist or admin): capture client, qualification, dates and people, upload the hand-over documents, then submit for hand-over to the PM. Project managers do not create programmes themselves.'],
+    [/(eisa|sor|statement of results).*(book|issue|status)|book.*eisa/i, 'EISA steps per learner on the {{qcto}}: set SOR to **SOR Issued** (with date), then Booking to **Booked** and enter the EISA date; after the assessment record the outcome. **Set for all** updates a whole cohort at once. {{eisa}} shows who is ready.'],
+    [/(monthly )?report/i, 'Monthly client reports are on {{reports}}: open the programme row, work through the stages (draft → review → sent). Overdue reports show on My work and the Overview.'],
+    [/(add|new).*learner|enrol/i, 'Learners are linked to programmes on {{enrolments}}. Every learner needs a valid 13-digit SA ID ({{dq}} shows gaps). To withdraw someone, use **Withdraw** on their enrolment rather than deleting anything.'],
+  ];
+  const faq = q => { if (q.length > 160 || !/^(how|where|what|can i|i want|help)/i.test(q.trim())) return null; const m = FAQ.find(([r]) => r.test(q)); return m ? m[1] : null; };
+  const cache = { get: k => { try { return JSON.parse(localStorage.getItem('apxAvaC:' + k) || 'null'); } catch (_) { return null; } }, set: (k, v) => { try { localStorage.setItem('apxAvaC:' + k, JSON.stringify(v)); } catch (_) {} } };
+  const me = () => (((window.__preview || {}).user || {}).email || 'me');
+  const nk = s => String(s || '').replace(/^SP:\s*/i, '').trim();
+  const btn = (l, on) => `<button type="button" class="avbtn" onclick="${e(on)}">${e(l)}</button>`;
+  const lnk = (l, r) => `<a href="#${r}" class="avl">${e(l)}</a>`;
+  function missing(p) {
+    const a = A(), d = D(), out = [], today = iso(), ed = `dvProgEdit(${p.id})`, leg = /legacy/i.test(p.programme_type || '');
+    const add = (t, act) => out.push(`<li>${e(t)} ${act}</li>`);
+    if (!p.start_date || !p.end_date) add('Start or end date missing', btn('Edit', ed)); else if (p.end_date < p.start_date) add('End date is before the start date', btn('Edit', ed));
+    if (!p.client_id) add('No client linked', btn('Edit', ed));
+    if (!p.project_manager_name) add('No project manager', btn('Edit', ed));
+    if (!nk(p.saqa_id)) add('No SAQA ID', btn('Edit', ed));
+    else if (!(d.accs || []).some(x => nk(x.saqa_id) === nk(p.saqa_id))) add(`No accreditation record for SAQA ${nk(p.saqa_id)} (QA to check)`, lnk('Accreditation', 'accred'));
+    ['Facilitator', 'Assessor'].forEach(k => { const v = String((p.fields || {})[k] || (p.fields || {})[k.toLowerCase()] || '').trim();
+      if (!v) add(`No ${k.toLowerCase()}`, btn('Edit', ed)); else if (!/\s/.test(v) && window.apxFamFull && apxFamFull(v)) add(`${k} is a first name only ("${v}"); full name in FAM Registry: ${apxFamFull(v)}`, btn('Edit', ed)); });
+    const ls = a ? a.learnersOf(p.id) : [];
+    if (!ls.length) add('No learners enrolled', lnk('Enrolments', 'enrolments'));
+    else { const bad = ls.filter(l => !(window.apxSaid ? apxSaid(String(l.id_number || '').trim()) : /^\d{13}$/.test(String(l.id_number || '').trim()))).length; if (bad) add(`${bad} learner${bad > 1 ? 's' : ''} with a missing or invalid SA ID`, lnk('Data quality', 'dq')); }
+    if (rs(p) === 'Active' && ls.length) { const r = a && a.regDates ? a.regDates(p.id) : []; const l = r[r.length - 1]; if (!l || l < iso(new Date(Date.now() - 14 * 864e5))) add(l ? `No register since ${l}` : 'No registers captured', lnk('Attendance & PoE', 'attendance')); }
+    if (!leg && a && a.modsOf && !a.modsOf(p.id).length) add('No modules set up (PoE tracker)', lnk('Attendance & PoE', 'attendance'));
+    if (rs(p) === 'Active' && !(d.visits || []).some(v => v.programme_id === p.id)) add('No monitoring visit recorded', lnk('Monitoring Visits', 'visits'));
+    const od = (d.recs || []).filter(r => r.programme_id === p.id && recOpen(r) && (r.fields || {})['Due Date'] && r.fields['Due Date'] < today).length;
+    if (od) add(`${od} overdue recommendation${od > 1 ? 's' : ''}`, lnk('Recommendations', 'recs'));
+    return `<p><b>${e(pid(p))} · ${e(clientOf(p))}</b><br>${e(p.programme_name || '')} · ${e(rs(p))}</p>` + (out.length ? `<p>${out.length} thing${out.length > 1 ? 's' : ''} to complete:</p><ul>${out.join('')}</ul>` : '<p>Nothing missing that ApexOne can check. ✓</p>');
+  }
+  const localMsg = (q, html) => { S.msgs.push({ r: 'u', t: q }); S.msgs.push({ r: 'a', html, local: 1 }); save(); render(true); };
+  window.avaMissing = id => { const p = progAll().find(x => x.id === id); if (p) localMsg(`What's missing on ${pid(p)}?`, missing(p)); };
+  window.avaEnding = () => {
+    const end = iso(new Date(Date.now() + 30 * 864e5)), ps = progAll().filter(p => !p.deleted_at && mine(p) && rs(p) === 'Active' && p.end_date && p.end_date <= end).sort((a, b) => a.end_date.localeCompare(b.end_date));
+    localMsg('Programmes ending in the next 30 days', ps.length ? `<ul>${ps.map(p => `<li><a href="#programmes" class="avl" onclick="avaGoP(${p.id});return false">${e(pid(p))}</a> · ${e(clientOf(p))} · ends ${e(p.end_date)} · ${A() ? A().learnersOf(p.id).length : 0} learners ${btn('What\'s missing?', `avaMissing(${p.id})`)}</li>`).join('')}</ul>` : '<p>No running programmes end in the next 30 days.</p>');
+  };
+  window.avaFlags = () => {
+    const g = new Map(); flags().forEach(x => { const k = x.lab + '|' + x.r; g.set(k, (g.get(k) || 0) + 1); });
+    localMsg('My open flags by page', g.size ? `<ul>${[...g.entries()].sort((a, b) => b[1] - a[1]).map(([k, n]) => { const [l, r] = k.split('|'); return `<li>${lnk(l, r)}: ${n}</li>`; }).join('')}</ul>` : '<p>No open flags. ✓</p>');
+  };
+  window.avaFillText = async (label, facts, current) => {
+    const j = await call({ type: 'ava', mode: 'fill', question: `Write the text for the "${label}" field of this record, ready to paste into the form. Use only the facts in the context; where a fact is missing, leave a [placeholder] instead of guessing. Plain professional text, no greeting, no headings, no page links, under 150 words.${current && current.trim() ? ' Improve and complete this draft: ' + current.slice(0, 1500) : ''}`, page: pageName(route()), facts: String(facts || '').slice(0, 6000), history: [] });
+    usage(); return String(j.answer || '').replace(/\{\{\w+\}\}/g, '').trim();
+  };
   const PMODE = { attention: 'What needs my attention?', brief: 'Give me a brief of where things stand', page: 'Explain this page', draft: 'Draft a follow-up message about what needs attention' };
-  async function ask(text, mode = 'ask') {
+  async function ask(text, mode = 'ask', refresh) {
     if (S.busy) return; const q = String(text || '').trim(); if (!q && mode === 'ask') return;
+    if (mode === 'ask') { const lf = faq(q); if (lf) { S.msgs.push({ r: 'u', t: q }); S.msgs.push({ r: 'a', t: lf, local: 1 }); save(); render(true); return; } }
+    const ck = mode === 'page' ? 'page:' + route() : mode === 'brief' ? 'brief:' + me() + ':' + iso() : null, hit = ck && cache.get(ck);
+    if (hit && !refresh) { S.msgs.push({ r: 'u', t: PMODE[mode] }); S.msgs.push({ r: 'a', t: hit.t, un: hit.un, cached: ck, at: hit.at }); save(); render(true); return; }
     S.busy = true; S.msgs.push({ r: 'u', t: q || PMODE[mode] }); render(true);
     try {
       const hist = S.msgs.slice(-7, -1).map(m => ({ r: m.r, t: String(m.t).slice(0, 1200) }));
       const j = await call({ type: 'ava', mode, question: q || PMODE[mode], page: pageName(route()), facts: context(mode), history: hist });
-      S.msgs.push({ r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers });
+      const m = { r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers }; S.msgs.push(m);
+      if (ck && j.answer) { const at = new Date().toTimeString().slice(0, 5); cache.set(ck, { t: m.t, un: m.un, at }); m.cached = ck; m.at = at; m.fresh = 1; }
     } catch (err) { S.msgs.push({ r: 'a', t: 'Sorry, I could not answer: ' + err.message, err: 1 }); }
     S.busy = false; save(); render(true); usage();
   }
@@ -124,6 +182,8 @@
     lines.forEach(l => { const m = l.match(/^\s*(?:[-*•]|\d+[.)])\s+(.*)$/); if (m) { if (!ul) { out.push('<ul>'); ul = true; } out.push('<li>' + m[1] + '</li>'); } else { if (ul) { out.push('</ul>'); ul = false; } out.push(l.trim() ? '<p>' + l + '</p>' : ''); } });
     if (ul) out.push('</ul>'); return out.join('');
   }
+  const fixBtns = t => { const ids = [...new Set((String(t).match(/#(\d{1,5})\b/g) || []).map(s => s.slice(1)))].map(pByDisp).filter(Boolean).slice(0, 3);
+    return ids.length ? `<div class="avact">${ids.map(p => btn(`What's missing on ${pid(p)}?`, `avaMissing(${p.id})`)).join(' ')}</div>` : ''; };
   window.avaGoP = id => { location.hash = 'programmes'; setTimeout(() => { A() && A().setProg(id); window.dvProg && dvProg(id); }, 60); };
   function chips() {
     const r = route(), c = [['What needs my attention?', "avaMode('attention')"], ['Explain this page', "avaMode('page')"]];
@@ -131,7 +191,9 @@
     const cp = r === 'programmes' && A() && A().cur ? progAll().find(p => p.id === A().cur()) : null;
     if (cp) { const n = pid(cp), id = cp.id; c.push([`Summarise ${n}`, `avaTool('Summarise ${n}',{type:'programme_summary',programme_id:${id}},'narrative')`], [`Attendance ${n}`, `avaTool('Attendance analysis ${n}',{type:'attendance_analysis',programme_id:${id}},'narrative')`]);
       if (!/legacy/i.test(cp.programme_type || '')) c.push([`EISA readiness ${n}`, `avaTool('EISA readiness ${n}',{type:'eisa_readiness_check',programme_id:${id}},'narrative')`]);
-      c.push([`PoE gaps ${n}`, `avaTool('PoE gaps ${n}',{type:'poe_gap_analysis',programme_id:${id}},'narrative')`]); }
+      c.push([`PoE gaps ${n}`, `avaTool('PoE gaps ${n}',{type:'poe_gap_analysis',programme_id:${id}},'narrative')`]); c.unshift([`What's missing on ${n}?`, `avaMissing(${id})`]); }
+    if (role() === 'pm' || role() === 'admin') c.push(['Ending in 30 days', 'avaEnding()']);
+    c.push(['My flags by page', 'avaFlags()']);
     if (r === 'fam' && (role() === 'admin' || role() === 'qa')) c.push(['FAM compliance digest', "avaTool('FAM compliance digest',{type:'fam_compliance_digest'},'narrative')"]);
     c.push(['Draft a follow-up', "avaMode('draft')"], ['How do I…', "avaHow()"]);
     return c.map(([l, on]) => `<button type="button" class="avc" onclick="${e(on)}">${e(l)}</button>`).join('');
@@ -141,12 +203,13 @@
     box.querySelector('#avachips').innerHTML = chips();
     const m = box.querySelector('#avamsgs');
     m.innerHTML = (S.msgs.length ? '' : `<div class="avhi"><b>Hi, I'm Ava.</b><p>Ask me how to do something in ApexOne, what needs your attention, or what a page or flag means. On a programme page I can summarise it and check attendance, EISA readiness and PoE gaps.</p><p class="avsm">I use the free AI tier, so I never send learner names, ID numbers, emails or phone numbers. Please don't type them. I can make mistakes: check before you act.</p></div>`)
-      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : fmt(x.t)}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button></div>` : ''}</div>`).join('')
+      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button></div>` : ''}</div>`).join('')
       + (S.busy ? '<div class="avm a avdots"><span></span><span></span><span></span></div>' : '');
     box.querySelector('#avasend').disabled = S.busy;
     if (scroll) m.scrollTop = m.scrollHeight;
   }
   window.avaMode = m => ask('', m);
+  window.avaRefresh = m => ask('', m, true);
   window.avaTool = tool;
   window.avaHow = () => { const i = document.getElementById('avain'); i.value = 'How do I '; i.focus(); };
   window.avaCopy = i => { const t = (S.msgs[i] || {}).t || ''; navigator.clipboard.writeText(t).then(() => window.toast && toast('Copied'), () => {}); };
@@ -172,7 +235,7 @@
 .avm{max-width:92%;padding:9px 12px;border-radius:12px}.avm p{margin:0 0 6px}.avm p:last-child{margin:0}.avm ul{margin:4px 0 6px;padding-left:18px}
 .avm.u{align-self:flex-end;background:#1f2a44;color:#fff;white-space:pre-wrap}.avm.a{align-self:flex-start;background:rgba(127,127,127,.1)}.avm.er{background:rgba(220,60,60,.12)}
 .avl{color:#2a6fdb;font-weight:600}.avw{margin-top:6px;font-size:12px;color:#b26b00}.avact{margin-top:6px}.avact button{border:0;background:none;color:inherit;opacity:.6;font-size:12px;cursor:pointer;padding:0}
-.avhi p{margin:6px 0}.avsm{font-size:12px;opacity:.7}
+.avbtn{border:1px solid var(--line,#ccc);background:none;color:inherit;border-radius:6px;padding:1px 8px;font-size:12px;cursor:pointer;margin:2px 0}.avhi p{margin:6px 0}.avsm{font-size:12px;opacity:.7}
 .avdots span{display:inline-block;width:6px;height:6px;margin:0 2px;border-radius:50%;background:currentColor;opacity:.4;animation:avd 1s infinite}.avdots span:nth-child(2){animation-delay:.2s}.avdots span:nth-child(3){animation-delay:.4s}@keyframes avd{50%{opacity:1}}
 #avapanel form{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line,#ddd)}
 #avain{flex:1;resize:none;min-height:40px;max-height:120px;padding:8px 10px;border:1px solid var(--line,#ccc);border-radius:10px;font:inherit;background:transparent;color:inherit}
