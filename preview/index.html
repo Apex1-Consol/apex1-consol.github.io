@@ -159,6 +159,7 @@ button.pill{border:0;height:44px;padding:0 14px}
 .navcount{margin-left:auto;min-width:22px;height:20px;border-radius:10px;background:var(--yellow);color:var(--navy);font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;padding:0 6px}
 .note{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;border-radius:10px;background:var(--soft);color:var(--ink);font-size:13px}
 .dqpair{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 20px;border-top:1px solid var(--line2)}
+.dqgh{padding:10px 20px 6px;border-top:1px solid var(--line2);background:var(--bg2,rgba(0,0,0,.02))}
 .dqpair .who{flex:1 1 260px;min-width:0}
 label.f input,label.f select,label.f textarea{color:var(--ink)}
 label.f textarea{border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font:inherit;font-weight:400;font-size:14px;background:var(--surface);resize:vertical}
@@ -711,11 +712,11 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
     <!-- DATA QUALITY -->
     <main id="view-dq" hidden>
       <a class="back" href="#learners">← All learners</a>
-      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Data quality review</h1><button class="btn" onclick="toast('Review log exported')">Export review log</button></div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px"><h1 style="font-size:26px;flex-grow:1">Data quality review</h1><button class="btn" onclick="dqExport()">Export review log</button></div>
       <div class="grid" id="dqkpis"></div>
       <div class="card" style="padding:0">
-        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)"><div class="seg" id="dqfilter" style="flex:0 1 640px;flex-wrap:wrap"></div></div>
-        <p class="note" style="margin:14px 20px 6px">Review decisions are recorded only. Nothing is deleted or merged automatically: "Same person" sends a merge request to the Sign-off queue. ID numbers are masked (POPIA).</p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)"><div id="dqfilter" style="display:flex;flex:1 1 auto"></div></div>
+        <p class="note" style="margin:14px 20px 6px">Only South Africans can be on programmes, so every learner needs a valid 13-digit SA ID. "Add SA ID" opens the learner; the row clears once a valid ID is saved. "Send to PM" flags it on the PM's My work. Nothing is deleted or merged automatically: "Same person" sends a merge request to the Sign-off queue. ID numbers are masked (POPIA).</p>
         <div id="dqlist"></div>
         <div class="pager" id="dqpager"></div>
       </div>
@@ -1249,13 +1250,13 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261116f"></script>
+<script src="live.js?v=20261116g"></script>
 <script src="qa.js?v=20261116c"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
 <script src="delivery.js?v=20261116d"></script>
 <script src="handover.js?v=20261116a"></script>
-<script src="shell.js?v=20261116c"></script>
+<script src="shell.js?v=20261116d"></script>
 <script src="today.js?v=20261116i"></script>
 <script src="desk.js?v=20261116b"></script>
 <script src="progdocs.js?v=20261116a"></script>

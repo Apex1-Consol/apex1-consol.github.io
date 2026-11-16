@@ -425,19 +425,36 @@
     Object.values(by).forEach(g => DQG.push({ n: g.n, a: g.rows, t: g.issue === 'possible_duplicate' ? 'Possible duplicate' : 'Same name', issue: g.issue, decided: g.rows.every(r => r.decision) ? g.rows[0].decision : null }));
   }
   const ISSUE = { missing_id: 'Missing ID', placeholder_id: 'Placeholder ID', invalid_id: 'Invalid ID', possible_duplicate: 'Possible duplicate' };
+  let dqT = '', dqQ = '';
+  const DQK = g => g.decided ? 'Decided' : g.issue === 'possible_duplicate' ? 'Possible duplicate' : g.issue === 'invalid_id' ? 'Invalid ID' : 'No ID';
+  const DQDEC = { needs_fix: ['b-warn', 'Sent to PM'], not_duplicate: ['b-ok', 'Different people'], quarantined: ['b-n', 'Quarantined'], reviewed_ok: ['b-ok', 'Reviewed OK'], merge: ['b-warn', 'Merge requested'] };
+  window.dqTile = t => { dqT = dqT === t ? '' : t; renderDQ(); };
+  window.dqSearch = v => { dqQ = v.toLowerCase(); renderDQ(); };
   renderDQ = function () {
     if (!isAdmin()) { $('dqlist').innerHTML = '<div class="empty"><b>Admins only</b><span>Data quality review needs the admin role.</span></div>'; $('dqkpis').innerHTML = ''; $('dqfilter').innerHTML = ''; return; }
-    const open = DQG.filter(g => !g.decided);
-    $('dqkpis').innerHTML = [['Needs review', open.length], ['Possible duplicates', DQG.filter(g => g.issue === 'possible_duplicate').length], ['ID problems', DQG.filter(g => g.issue !== 'possible_duplicate').length], ['Decided', DQG.length - open.length]]
-      .map(([l, v]) => `<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span></div>`).join('');
-    $('dqfilter').innerHTML = '';
-    $('dqlist').innerHTML = DQG.map((g, gi) => `<div class="dqpair"><div class="who"><div style="display:flex;gap:8px;align-items:center"><b>${esc(g.n)}</b><span class="badge ${g.issue === 'possible_duplicate' ? 'b-warn' : 'b-bad'}">${ISSUE[g.issue]}</span></div>
-      ${g.a.map(r => `<div class="sub">ID ${r.id_number_masked || '—'} · ${r.enrolment_count ? esc(r.programmes || '') : 'Not enrolled'}</div>`).join('')}</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">${g.decided ? `<span class="badge b-ok">${esc(g.decided)}</span>` : g.issue === 'possible_duplicate'
-        ? `<button class="btn sm" onclick="previewDQ(${gi},'merge')">Same person</button><button class="btn sm" onclick="previewDQ(${gi},'not_duplicate')">Different people</button><button class="btn sm" style="color:var(--bad)" onclick="previewDQ(${gi},'quarantined')">Quarantine</button>`
-        : `<button class="btn sm" onclick="previewDQ(${gi},'needs_fix')">Needs fix</button><button class="btn sm" onclick="previewDQ(${gi},'reviewed_ok')">Reviewed OK</button>`}</div></div>`).join('') || '<div class="empty"><b>No data-quality issues</b></div>';
-    $('dqpager').innerHTML = '';
+    const HT = { 'No ID': 'ID number is blank', 'Invalid ID': 'Fails the SA ID check (length, date or checksum)', 'Possible duplicate': 'Same ID or name as another learner', Decided: 'Already reviewed' };
+    $('dqkpis').innerHTML = ['No ID', 'Invalid ID', 'Possible duplicate', 'Decided'].map(t => `<div class="kpi" style="cursor:pointer;${dqT === t ? 'outline:2px solid var(--navy)' : ''}" title="${HT[t]}" onclick="dqTile('${t}')"><span class="l">${t}</span><span class="v">${DQG.filter(g => DQK(g) === t).length}</span><span class="sub">${HT[t]}</span></div>`).join('');
+    if (!$('dqq')) $('dqfilter').innerHTML = `<input id="dqq" placeholder="Search learner, client, programme or #id" style="flex:1 1 320px" oninput="dqSearch(this.value)">`;
+    const L = id => LEARNERS.find(x => x.lid === id) || {}, pOf = id => P.data.progs.find(p => p.id === id);
+    const items = DQG.map((g, gi) => { const l = L(g.a[0].learner_id), pr = l.pid ? pOf(l.pid) : null;
+      const key = l.pid ? '#' + l.pid + ' · ' + (clientOf(l.pid)?.client_name || 'No client') + ' · ' + (pr?.programme_name || '') : 'Not enrolled';
+      return { g, gi, l, key, pm: pr ? (pr.project_manager_name || 'No PM') : '' }; })
+      .filter(x => dqT ? DQK(x.g) === dqT : !x.g.decided)
+      .filter(x => !dqQ || (x.g.n + ' ' + x.key).toLowerCase().includes(dqQ))
+      .sort((x, y) => (x.key === 'Not enrolled') - (y.key === 'Not enrolled') || x.key.localeCompare(y.key) || x.g.n.localeCompare(y.g.n));
+    window.DQX = items; let last = null;
+    $('dqlist').innerHTML = items.map(({ g, gi, l, key, pm }) => { const n = items.filter(x => x.key === key).length;
+      const gh = key !== last ? `<div class="pickgh dqgh"><b>${esc(key)}</b> <span class="sub">${n} · ${l.pid ? 'PM: ' + esc(pm) : 'no programme'}</span></div>` : ''; last = key;
+      const dec = g.decided ? DQDEC[g.decided] || ['b-n', g.decided] : null, lid = g.a[0].learner_id;
+      return gh + `<div class="dqpair pick"><div class="who"><div style="display:flex;gap:8px;align-items:center"><a href="#learner/${lid}"><b>${esc(g.n)}</b></a><span class="badge ${g.issue === 'possible_duplicate' ? 'b-warn' : 'b-bad'}">${g.issue === 'possible_duplicate' ? 'Possible duplicate' : g.issue === 'invalid_id' ? 'Invalid ID' : 'No ID'}</span></div>
+      ${g.a.map(r => `<div class="sub">${r.id_number_masked && g.issue !== 'missing_id' ? 'ID ' + r.id_number_masked + ' · ' : ''}${r.enrolment_count ? esc(r.programmes || '') : 'Not enrolled'}</div>`).join('')}</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${dec ? `<span class="badge ${dec[0]}">${dec[1]}</span>` : ''}${g.issue === 'possible_duplicate'
+        ? (dec ? '' : `<button class="btn sm" onclick="previewDQ(${gi},'merge')">Same person</button><button class="btn sm" onclick="previewDQ(${gi},'not_duplicate')">Different people</button><button class="btn sm" style="color:var(--bad)" onclick="previewDQ(${gi},'quarantined')">Quarantine</button>`)
+        : `<button class="btn sm y" onclick="previewLearnerEdit(${lid})">Add SA ID</button>${dec ? '' : `<button class="btn sm" title="Flag for the PM; the My work task closes when the ID is captured" onclick="previewDQ(${gi},'needs_fix')">Send to PM</button>`}`}</div></div>`; }).join('') || '<div class="empty"><b>Nothing to review here</b></div>';
+    $('dqpager').innerHTML = ''; if (window.apxPgIn) apxPgIn($('dqlist'), dqT + '|' + dqQ, 25);
   };
+  window.dqExport = () => { const rows = [['Learner', 'Issue', 'Programme', 'PM', 'Decision']].concat((window.DQX || []).map(x => [x.g.n, DQK(x.g) === 'Decided' ? x.g.issue : DQK(x.g), x.key, x.pm, x.g.decided || ''])); const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n'); const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'data-quality-review.csv'; a.click(); };
+  window.apxSaid = id => said(id);
   window.previewDQ = async function (gi, decision) {
     const g = DQG[gi];
     if (decision === 'merge') { await write('Merge request', () => sb.rpc('request_learner_merge', { p_learner_ids: g.a.map(r => r.learner_id), p_note: 'From preview Data quality' })); toast('Merge request sent to the Sign-off queue'); }
