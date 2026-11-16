@@ -671,21 +671,52 @@
   const recShown = () => P.data.recs.filter(r => rF === 'All' || (rF === 'Resolved') === !!r.resolved)
     .sort((a, b) => (!!a.resolved - !!b.resolved) || String(a.fields?.['Due Date'] || '9999').localeCompare(String(b.fields?.['Due Date'] || '9999')));
   function applyRecs() { window.renderRecs(); }
+  let rT = '', rQ = '';
+  const recDue = r => { const f = r.fields || {}; return f['Due Date'] || f.Due || ''; };
+  const recP = r => r.programme_id ? (P.data.progsAll || P.data.progs).find(p => p.id === r.programme_id) || null : null;
+  const recDel = r => !!r.programme_id && (!recP(r) || !!recP(r).deleted_at);
+  const recWait = r => !r.resolved && (r.fields || {}).Status === 'Closure requested';
+  const recCl = id => (P.data.clients || []).find(c => c.id === id)?.client_name || '';
+  const recPid = p => p ? '#' + (p.display_id || p.id) : '';
+  window.previewRecT = k => { rT = rT === k ? '' : k; if (rT) rF = 'Open'; renderRecs(); };
+  window.previewRecQ = v => { rQ = v; renderRecs(); setTimeout(() => { const i = $('recq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); };
+  window.apxRecTasks = role => { const out = []; try {
+    const today = new Date().toISOString().slice(0, 10), me = ((P.user && P.user.email) || '').toLowerCase(), g = new Map();
+    P.data.recs.filter(r => !r.resolved && !recWait(r) && recDue(r) && recDue(r) < today && !recDel(r)).forEach(r => { const p = recP(r);
+      if (!((r.owner_email || '').toLowerCase() === me || (role === 'pm' && p && window.apxMineProg && apxMineProg(p)))) return;
+      const k = r.programme_id || 0; g.set(k, (g.get(k) || 0) + 1); });
+    g.forEach((n, pid) => { const p = recP({ programme_id: pid });
+      out.push({ id: `rec${pid}`, t: `Overdue recommendation${n > 1 ? 's' : ''}: ${p ? recPid(p) + ' ' + (p.programme_name || '') : 'no programme'} (${n})`, s: 'Fix it, then Request close (an admin signs it off)', k: 'Recommendations', c: 'Open', on: `previewRecQ('${p ? recPid(p) : ''}');location.hash='recs'`, bad: 1 }); });
+  } catch (e) {} return out; };
   window.renderRecs = function () {
-    const today = new Date().toISOString().slice(0, 10);
-    const rc = k => P.data.recs.filter(r => k === 'All' || (k === 'Resolved') === !!r.resolved).length;
-    $('recfilter').innerHTML = ['Open', 'Resolved', 'All'].map(s => `<button class="${s === rF ? 'on' : ''}" onclick="rF='${s}';renderRecs()">${s} · ${rc(s)}</button>`).join('');
-    const shown = recShown(), RG = [['Overdue', 'var(--bad)', r => !r.resolved && (r.fields?.['Due Date'] || r.fields?.Due || '') && (r.fields['Due Date'] || r.fields.Due) < today], ['Open', 'var(--warn)', r => !r.resolved], ['Resolved', 'var(--ok)', () => true]];
+    const today = new Date().toISOString().slice(0, 10), d30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
+    const mine = r => { const p = recP(r); return !P.roles.includes('project_manager') || P.roles.includes('admin') || !window.apxMineProg || (p && apxMineProg(p)); };
+    const base = P.data.recs.filter(mine), open = base.filter(r => !r.resolved);
+    const TK = { od: ['Overdue', 'Due date has passed', 'var(--bad)', r => recDue(r) && recDue(r) < today && !recWait(r)], due: ['Due in 30 days', 'Due within the next 30 days', 'var(--warn)', r => recDue(r) >= today && recDue(r) <= d30 && !recWait(r)],
+      own: ['No owner', 'Nobody named to fix it', 'var(--bad)', r => !(r.fields || {}).Owner], wait: ['Awaiting sign-off', 'Close requested, waiting for an admin', 'var(--warn)', recWait] };
+    const cnt = k => open.filter(TK[k][3]).length, tl = k => [TK[k][0], cnt(k), cnt(k) ? TK[k][2] : 'var(--muted)', rT === k, `previewRecT('${k}')`, TK[k][1]];
+    if (!$('rectiles')) { $('recfilter').insertAdjacentHTML('beforebegin', '<div id="rectiles" class="famtiles"></div>'); $('recfilter').insertAdjacentHTML('afterend', '<div class="famtool"><input id="recq" type="search" placeholder="Search text, #id, client, programme, VIS id" oninput="previewRecQ(this.value)" style="max-width:420px"></div>'); }
+    $('rectiles').innerHTML = UI.tiles([{ t: 'Open recommendations', k: [tl('od'), tl('due'), tl('own'), tl('wait')] }]);
+    if ($('recq').value !== rQ) $('recq').value = rQ;
+    const rc = k => base.filter(r => k === 'All' || (k === 'Resolved') === !!r.resolved).length;
+    $('recfilter').innerHTML = ['Open', 'Resolved', 'All'].map(s => `<button class="${s === rF ? 'on' : ''}" onclick="rF='${s}';rT='';renderRecs()">${s} · ${rc(s)}</button>`).join('');
+    const ql = rQ.trim().toLowerCase(), hay = r => { const p = recP(r), f = r.fields || {}; return [f.Text, f.Owner, p && recPid(p), p && p.programme_name, p && recCl(p.client_id), ...recVisits(f).map(v => 'vis-' + v)].join(' ').toLowerCase(); };
+    const shown = base.filter(r => (rF === 'All' || (rF === 'Resolved') === !!r.resolved) && (!rT || (!r.resolved && TK[rT][3](r))) && (!ql || hay(r).includes(ql.replace(/^#/, '#'))))
+      .sort((a, b) => (!!a.resolved - !!b.resolved) || String(recDue(a) || '9999').localeCompare(String(recDue(b) || '9999')));
+    const RG = [['Overdue', 'var(--bad)', r => !r.resolved && !recWait(r) && recDue(r) && recDue(r) < today], ['Awaiting sign-off', 'var(--warn)', recWait], ['Open', 'var(--warn)', r => !r.resolved], ['Resolved', 'var(--ok)', () => true]];
     const rg = r => RG.findIndex(g => g[2](r)), ordered = shown.map(r => [rg(r), r]).sort((x, y) => x[0] - y[0]).map(x => x[1]);
+    const adm = P.roles.includes('admin'), days = d => Math.round((new Date(today) - new Date(d)) / 864e5);
     let rLast = -1;
     $('reclist').innerHTML = !ordered.length ? '<section class="card"><div class="empty"><b>Nothing here</b></div></section>' : `<section class="card reccard" style="padding:0;overflow:hidden"><div class="tw"><table><thead><tr><th>Recommendation</th><th>Programme · visit</th><th>Owner</th><th>Due</th><th></th></tr></thead><tbody>${ordered.map(r => {
-      const f = r.fields || {}, due = f['Due Date'] || f.Due || '', late = !r.resolved && due && due < today, vis = recVisits(f), gi = rg(r);
+      const f = r.fields || {}, due = recDue(r), late = !r.resolved && !recWait(r) && due && due < today, vis = recVisits(f), gi = rg(r), p = recP(r), del = recDel(r);
       const gh = gi !== rLast ? UI.gh(RG[gi][0], ordered.filter(x => rg(x) === gi).length, RG[gi][1], 5) : ''; rLast = gi;
-      return gh + `<tr class="famtr"><td style="white-space:normal;min-width:260px"><b>${esc(f.Text || 'Recommendation')}</b>${r.resolved && r.resolved_at ? `<div class="sub">Resolved ${recDate(r.resolved_at)}</div>` : ''}</td>
-        <td>${r.programme_id ? esc(progName(r.programme_id)) : '<span class="sub">—</span>'}${vis.length ? `<div class="sub">${vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ')}</div>` : ''}</td>
+      const prog = del ? `<span class="badge b-bad" title="Programme ${r.programme_id} was deleted: move or close this recommendation">Programme deleted</span>` : p ? `<a href="#programmes" style="font-weight:700" onclick="dvApi.setProg(${p.id});dvProg&&dvProg()">${esc(recPid(p))}</a> · ${esc(recCl(p.client_id) || '—')}<div>${esc(p.programme_name || '')}</div>` : '<span class="sub">—</span>';
+      const act = r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : recWait(r) ? (adm ? `<a class="btn sm y" href="#signoff">Review in Sign-off queue</a>` : `<button class="btn sm" disabled title="Waiting in the Sign-off queue">Awaiting sign-off</button>`) : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Request close</button>`;
+      return gh + `<tr class="famtr"><td style="white-space:normal;min-width:260px"><b>${esc(f.Text || 'Recommendation')}</b>${r.resolved && r.resolved_at ? `<div class="sub">Resolved ${recDate(r.resolved_at)}</div>` : ''}${f['Closure Note'] && !r.resolved ? `<div class="sub">Closing note: ${esc(f['Closure Note'])}</div>` : ''}</td>
+        <td style="white-space:normal;min-width:180px;max-width:280px">${prog}${vis.length ? `<div class="sub">${vis.map(v => `<a href="#visit" onclick="previewOpenVisit(${+v || 0})">VIS-${esc(v)}</a>`).join(', ')}</div>` : ''}</td>
         <td>${f.Owner ? esc(f.Owner) : '<span class="badge b-bad">No owner</span>'}</td>
-        <td>${due ? `<span style="${late ? 'color:var(--bad);font-weight:700' : ''}">${recDate(due)}</span>` : '<span class="badge b-bad">No date</span>'}</td>
-        <td style="text-align:right;white-space:nowrap"><button class="famact" onclick="previewRecEdit(${r.id})">Edit</button> &nbsp; ${r.resolved ? `<button class="btn sm" onclick="previewRecResolve(${r.id},false)">Reopen</button>` : (r.fields?.Status === 'Closure requested' ? `<button class="btn sm" disabled title="Waiting in the Sign-off queue">Awaiting sign-off</button>` : `<button class="btn sm y" onclick="previewRecResolve(${r.id},true)">Mark resolved</button>`)}</td></tr>`; }).join('')}</tbody></table></div></section>`;
+        <td>${due ? `<span style="${late ? 'color:var(--bad);font-weight:700' : ''}">${recDate(due)}</span>${late ? `<div class="sub" style="color:var(--bad)">${days(due)} days overdue</div>` : ''}` : '<span class="badge b-bad">No date</span>'}</td>
+        <td style="text-align:right;white-space:nowrap"><button class="famact" onclick="previewRecEdit(${r.id})">Edit</button> &nbsp; ${act}</td></tr>`; }).join('')}</tbody></table></div></section>`;
   };
   function recForm(r) {
     const f = r?.fields || {}, vis = recVisits(f)[0] || '', o = (v, l, s) => `<option value="${esc(v)}" ${s ? 'selected' : ''}>${esc(l)}</option>`;
@@ -716,7 +747,7 @@
   window.previewRecResolve = async (id, done) => {
     const r = P.data.recs.find(x => x.id === id); if (!r) return;
     try {
-      if (done) { await write('Recommendation', () => sb.rpc('request_rec_closure', { p_id: id, p_note: null })); toast('Sent to the Sign-off queue. It closes once an admin approves.'); }
+      if (done) { const note = prompt('Closing note: what was done to put it right?'); if (note === null) return; if (!note.trim()) { toast('Add a short closing note.'); return; } await write('Recommendation', () => sb.rpc('request_rec_closure', { p_id: id, p_note: note.trim() })); toast('Sent to the Sign-off queue. It closes once an admin approves.'); }
       else await write('Recommendation', () => sb.from('recommendations').update({ resolved: false, resolved_at: null, fields: { ...(r.fields || {}), Status: 'Open' } }).eq('id', id).select('id'));
       await loadAll();
     } catch (_) {}

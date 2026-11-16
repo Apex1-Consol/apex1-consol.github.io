@@ -173,10 +173,10 @@ const ok = (c, m) => { if (!c) throw Error(m); };
     f.dispatchEvent(new w.Event('submit', { cancelable: true })); await tick();
     const u = log.find(x => x.table === 'programmes'); ok(u && u.val.display_id === 'APX-100' && u.val.fields['Prog ID'] === 'APX-100' && u.val.client_id === 7, JSON.stringify(u && u.val));
   });
-  await t('Recommendation: Mark resolved sends closure to Sign-off queue', async () => {
+  await t('Recommendation: Request close sends closure to Sign-off queue', async () => {
     const { w, d, log } = await boot(sess('admin')); w.location.hash = 'recs'; await tick();
-    const b = [...d.querySelectorAll('#reclist button')].find(x => /Mark resolved/.test(x.textContent)); b.click(); await tick();
-    const u = log.find(x => x.rpc === 'request_rec_closure'); ok(u && u.args.p_id === 90 && !log.some(x => x.table === 'recommendations'), JSON.stringify(u));
+    w.prompt = () => 'Fixed'; const b = [...d.querySelectorAll('#reclist button')].find(x => /Request close/.test(x.textContent)); b.click(); await tick();
+    const u = log.find(x => x.rpc === 'request_rec_closure'); ok(u && u.args.p_id === 90 && u.args.p_note === 'Fixed' && !log.some(x => x.table === 'recommendations'), JSON.stringify(u));
   });
   await t('Visit: Submit for sign-off sends report to Sign-off queue', async () => {
     const { w, log } = await boot(sess('admin')); await w.previewVisitSignoff(80); await tick();
