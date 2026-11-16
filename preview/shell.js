@@ -176,6 +176,7 @@
       if (noId + bad) out.push({ id: `sid${p.id}`, t: `Capture SA ID numbers: ${short(p)} (${noId + bad} learner${noId + bad > 1 ? 's' : ''})`, s: [noId && noId + ' blank', bad && bad + ' invalid'].filter(Boolean).join(' · ') + ' · only South Africans can be enrolled', k: 'Learners', c: 'Fix', on: go(p.id, 'learners', 'Learners') }); });
     if (window.apxQTasks) try { out.push(...window.apxQTasks(role)); } catch (e) {}
     if (window.apxRecTasks) try { out.push(...window.apxRecTasks(role)); } catch (e) {}
+    if (window.apxEisaTasks) try { out.push(...window.apxEisaTasks(role)); } catch (e) {}
     if (window.apxDeskTasks) try { out.push(...window.apxDeskTasks()); } catch (e) {}
     if (window.apxDocTasks) try { out.push(...window.apxDocTasks()); } catch (e) {}
     return out;

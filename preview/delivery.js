@@ -79,7 +79,7 @@
     const assessed = any && rows.every(([m, r]) => r && kindsOf(m).every(k => ['C', 'NYC'].includes(r[COL[k]])));
     const moderated = any && rows.every(([, r]) => r?.fields?.['Internal moderation'] === 'Yes');
     const t = (D().tracker || []).find(x => x.programme_id === p.id && x.learner_id === l.id);
-    return { c: [all('KM'), all('PM'), all('WM'), assessed, moderated, t?.sor_status === 'Issued'], booked: t?.eisa_booking_status === 'Booked' };
+    return { c: [all('KM'), all('PM'), all('WM'), assessed, moderated, t?.sor_status === 'Issued'], k: [any, any, any, any, any, !!t], booked: t?.eisa_booking_status === 'Booked', t };
   }
   const why = ['Every knowledge module competent', 'Every practical module competent', 'Every workplace module (logbook) competent',
     'Every module assessed: a final result (C or NYC) for each part, no rework or missing submissions', 'Every module ticked as internally moderated in the PoE tracker', 'SoR status is Issued in the QCTO tracker'];
@@ -510,19 +510,85 @@
     if (P.user && eTab === 'Exam results') { $('eisaready').hidden = true; if ($('leisa')) $('leisa').hidden = true; [...$('etabs').children].forEach(b => b.classList.toggle('on', b.textContent === 'Exam results')); picker('#view-eisa select', renderE); renderExams(ensure()); return; }
     if ($('examcard')) $('examcard').hidden = true;
     if (!P.user || eTab !== 'Readiness') return;
-    const p = ensure();
-    picker('#view-eisa select', renderE);
-    const ls = p ? learnersOf(p.id) : [], R = ls.map(l => [l, readiness(p, l)]);
-    const short = n => R.filter(([, r]) => r.c.filter(x => !x).length === n).length;
-    $('eisakpis').innerHTML = [['Ready for EISA', short(0), 'var(--ok)'], ['One criterion short', short(1), 'var(--warn)'], ['Two or more short', R.filter(([, r]) => r.c.filter(x => !x).length >= 2).length, 'var(--bad)'], ['EISA booked', R.filter(([, r]) => r.booked).length, 'var(--ink)']]
-      .map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span><span class="n sub">of ${ls.length} learners</span></div>`).join('');
-    $('eisarows').innerHTML = R.map(([l, r]) => { const ok = r.c.every(Boolean);
-      return `<tr><td style="font-weight:600">${lnk(l)}</td>${r.c.map((x, i) => `<td><span class="dot ${x ? 'b-ok' : 'b-bad'}" style="width:24px;height:24px" title="${why[i]}" aria-label="${x ? 'Met' : 'Not met'}: ${why[i]}">${x ? '✓' : '✕'}</span></td>`).join('')}
-        <td>${ok ? `<span class="badge b-ok">Ready${r.booked ? ' · booked' : ''}</span>` : '<span class="badge b-warn">Not yet</span>'}</td></tr>`; }).join('')
-      || '<tr><td colspan="8" class="sub">No learners enrolled on this programme.</td></tr>';
-    const sub = document.querySelector('#eisaready .card .sub');
-    if (sub) sub.textContent = 'All six must be met. Module results and moderation come from Attendance & PoE › PoE tracker; SoR from the QCTO tracker. Hover a mark for the rule.';
+    renderReady();
   };
+  /* EISA readiness: overview of occupational programmes near or past their end, then the learner grid for one programme */
+  let eScope = 'Due soon', eF = '', eQ = '', ePg = 0, eKey = '';
+  const isOcc = p => p && !p.deleted_at && p.programme_type !== 'legacy';
+  const mineP = p => !window.apxMineProg || apxMineProg(p);
+  const addD = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
+  const pidOf = p => '#' + (p.display_id || p.id);
+  const cName = p => client(p)?.client_name || '';
+  // bucket: ready / one / two / nodata (a criterion has no data yet, e.g. no modules set up)
+  const bucket = r => r.k.some(x => !x) ? 'nodata' : (n => n === 0 ? 'ready' : n === 1 ? 'one' : 'two')(r.c.filter(x => !x).length);
+  function eStats(p) {
+    const ls = learnersOf(p.id).filter(l => !wdr(p.id, l.id)), R = ls.map(l => [l, readiness(p, l)]), t = today();
+    const n = { ready: 0, one: 0, two: 0, nodata: 0 }; R.forEach(([, r]) => n[bucket(r)]++);
+    const tr = R.map(([, r]) => r.t).filter(Boolean);
+    const f = {
+      end: runState(p) === 'Active' && day(p.end_date) && day(p.end_date) <= addD(30) && ls.length && !n.ready ? 1 : 0,
+      rdy: tr.filter(x => x.sor_status === 'Issued' && x.eisa_booking_status !== 'Booked').length,
+      nod: tr.filter(x => x.eisa_booking_status === 'Booked' && !day(x.eisa_date)).length,
+      res: tr.filter(x => day(x.eisa_date) && day(x.eisa_date) < t && !x.eisa_outcome).length,
+      nomod: modsOf(p.id).length ? 0 : 1 };
+    return { p, ls, R, n, f, booked: R.filter(([, r]) => r.booked).length };
+  }
+  const EF = { end: ['Ending ≤30 days, none ready', 'var(--bad)', 'Running, ends within 30 days and no learner meets all six'], rdy: ['SoR issued, not booked', 'var(--bad)', 'Learners: SoR Issued in the QCTO tracker but EISA not Booked'],
+    nod: ['Booked, no EISA date', 'var(--warn)', 'Learners: Booked in the QCTO tracker with no EISA date'], res: ['Result outstanding', 'var(--bad)', 'Learners: EISA date has passed and no outcome is recorded'],
+    nomod: ['No modules set up', 'var(--warn)', 'Programmes: modules not captured in Attendance & PoE › PoE tracker, so readiness cannot be worked out'] };
+  const ESC = { 'Due soon': p => { const e = day(p.end_date); return e && e >= addD(-90) && e <= addD(90); }, Running: p => runState(p) === 'Active', Ended: p => runState(p) === 'Completed', All: () => true };
+  window.dvEScope = s => { eScope = s; eF = ''; renderE(); };
+  window.dvEF = k => { eF = eF === k ? '' : k; if (eF) eScope = 'All'; renderE(); };
+  window.dvEQ = v => { eQ = v || ''; renderE(); setTimeout(() => { const i = $('eq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); };
+  window.dvEPg = d => { ePg += d; renderE(); };
+  window.dvEOpen = id => { dProg = id; renderE(); setTimeout(() => { const c = $('eisarows'); if (c && c.scrollIntoView) c.closest('section').scrollIntoView({ block: 'start', behavior: 'smooth' }); }, 0); };
+  window.apxEisaTasks = role => { const out = []; try { if (role !== 'pm') return out;
+    progs().filter(p => isOcc(p) && mineP(p) && runState(p) === 'Active' && day(p.end_date) && day(p.end_date) <= addD(30) && learnersOf(p.id).length).forEach(p => { const s = eStats(p), not = s.ls.length - s.n.ready; if (!not) return;
+      out.push({ id: `eisa${p.id}`, t: `EISA readiness: ${pidOf(p)} ${p.programme_name || ''} (${not} not ready)`, s: `Ends ${fmtD(p.end_date)}`, k: 'EISA', c: 'Open', on: `location.hash='eisa';eTab='Readiness';dvEOpen(${p.id})` }); }); } catch (e) {} return out; };
+  function renderReady() {
+    const all = progs().filter(p => isOcc(p) && mineP(p) && learnersOf(p.id).length).sort((a, b) => cName(a).localeCompare(cName(b)) || a.id - b.id);
+    // programme picker: '#id · client · programme', occupational only (legacy has no EISA)
+    const el = document.querySelector('#view-eisa select');
+    if (!all.some(p => p.id === dProg)) dProg = (all.find(p => runState(p) === 'Active') || all[0])?.id ?? null;
+    if (el) { el.innerHTML = all.map(p => `<option value="${p.id}"${p.id === dProg ? ' selected' : ''}>${esc(pidOf(p) + ' · ' + cName(p) + ' · ' + (p.programme_name || ''))}</option>`).join('') || '<option>No occupational programmes with learners</option>'; el.style.maxWidth = '520px'; el.onchange = () => { dProg = +el.value; renderE(); }; }
+    // overview
+    if (!$('eover')) $('eisaready').insertAdjacentHTML('afterbegin', '<section class="card" style="padding:0" id="eover"></section>');
+    const S = all.map(eStats), inS = S.filter(x => ESC[eScope](x.p));
+    const cnt = k => S.filter(x => x.f[k]).length, lc = k => S.reduce((t, x) => t + x.f[k], 0);
+    const q = eQ.toLowerCase().trim();
+    let L = (eF ? S.filter(x => x.f[eF]) : inS).filter(x => !q || [pidOf(x.p), cName(x.p), x.p.programme_name, x.p.project_manager_name].join(' ').toLowerCase().includes(q));
+    L.sort((a, b) => (day(a.p.end_date) || '9') < (day(b.p.end_date) || '9') ? -1 : 1);
+    const key = eScope + '|' + eF + '|' + q; if (key !== eKey) { eKey = key; ePg = 0; }
+    const PER = 25, pages = Math.max(1, Math.ceil(L.length / PER)); ePg = Math.min(Math.max(ePg, 0), pages - 1); const pg = L.slice(ePg * PER, ePg * PER + PER);
+    const nB = (v, c) => v ? `<span class="badge ${c}">${v}</span>` : '<span class="sub">0</span>';
+    $('eover').innerHTML = `<div style="padding:16px 20px;display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h2 style="flex-grow:1">Programmes</h2>${UI.seg(Object.keys(ESC), eScope, o => `dvEScope('${o}')`)}
+        <input id="eq" type="search" placeholder="Search #id, client, programme, PM" value="${esc(eQ)}" oninput="dvEQ(this.value)" style="height:36px;min-width:240px"></div>
+      ${UI.tiles([{ t: 'Needs attention', k: Object.keys(EF).map(k => [EF[k][0], k === 'end' || k === 'nomod' ? cnt(k) : lc(k), EF[k][1], eF === k, `dvEF('${k}')`, EF[k][2]]) }])}
+      <span class="sub">Occupational programmes only (legacy has no EISA). ${eScope === 'Due soon' ? 'Due soon = ending within 90 days or ended in the last 90 days. ' : ''}Withdrawn learners are left out. Click a programme to see its learners.</span></div>
+      <div class="tw"><table class="dense"><thead><tr><th>Programme</th><th>Ends</th><th>Learners</th><th>Ready</th><th>1 short</th><th>2+ short</th><th>No data</th><th>Booked</th><th>Flags</th></tr></thead><tbody>${pg.map(x => `<tr style="cursor:pointer${x.p.id === dProg ? ';background:var(--soft,rgba(0,0,0,.04))' : ''}" onclick="dvEOpen(${x.p.id})">
+        <td style="white-space:normal;min-width:240px"><b>${esc(pidOf(x.p))}</b> · ${esc(cName(x.p))}<div class="sub">${esc(x.p.programme_name || '')} · ${esc(x.p.project_manager_name || 'No PM')} · ${runState(x.p)}</div></td>
+        <td>${fmtD(x.p.end_date) || '<span class="sub">No end</span>'}</td><td>${x.ls.length}</td><td>${nB(x.n.ready, 'b-ok')}</td><td>${nB(x.n.one, 'b-warn')}</td><td>${nB(x.n.two, 'b-bad')}</td><td>${x.n.nodata ? `<span class="badge" title="A criterion has no data yet">${x.n.nodata}</span>` : '<span class="sub">0</span>'}</td><td>${x.booked}</td>
+        <td style="white-space:normal">${Object.keys(EF).filter(k => x.f[k]).map(k => `<span class="badge ${EF[k][1] === 'var(--bad)' ? 'b-bad' : 'b-warn'}" style="margin:2px">${EF[k][0]}${k === 'end' || k === 'nomod' ? '' : ' ' + x.f[k]}</span>`).join('')}</td></tr>`).join('') || `<tr><td colspan="9" class="sub">No programmes ${eF ? 'with this flag' : 'in this view'}.</td></tr>`}</tbody></table></div>
+      <div style="padding:10px 20px;display:flex;gap:8px;align-items:center"><span class="sub" style="flex-grow:1">Showing ${L.length ? ePg * PER + 1 : 0}–${ePg * PER + pg.length} of ${L.length}</span>${pages > 1 ? `<button class="btn sm" ${ePg ? '' : 'disabled'} onclick="dvEPg(-1)">Previous</button><button class="btn sm" ${ePg < pages - 1 ? '' : 'disabled'} onclick="dvEPg(1)">Next</button>` : ''}</div>`;
+    // learner grid for the selected programme
+    const p = prog(dProg), st = p ? eStats(p) : { ls: [], R: [], n: { ready: 0, one: 0, two: 0, nodata: 0 }, booked: 0 };
+    const h2 = document.querySelector('#eisaready .card:not(#eover) h2'); if (h2) h2.innerHTML = p ? `Readiness by learner · <b>${esc(pidOf(p))}</b> <span class="sub" style="font-weight:400">${esc(cName(p))} · ${esc(p.programme_name || '')}</span>` : 'Readiness by learner';
+    $('eisakpis').innerHTML = [['Ready for EISA', st.n.ready, 'var(--ok)'], ['One criterion short', st.n.one, 'var(--warn)'], ['Two or more short', st.n.two, 'var(--bad)'], ['No data yet', st.n.nodata, 'var(--muted)'], ['EISA booked', st.booked, 'var(--ink)']]
+      .map(([l, v, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${v ? c : 'var(--muted)'}">${v}</span><span class="n sub">of ${st.ls.length} learners</span></div>`).join('');
+    const noMod = p && !modsOf(p.id).length;
+    const cell = (x, k, i) => !k ? `<td><span class="dot" style="width:24px;height:24px;background:var(--soft,#eee);color:var(--muted)" title="No data yet: ${i < 5 ? 'modules not set up in Attendance & PoE › PoE tracker' : 'no QCTO tracker row'}" aria-label="No data: ${why[i]}">–</span></td>`
+      : `<td><span class="dot ${x ? 'b-ok' : 'b-bad'}" style="width:24px;height:24px" title="${why[i]}" aria-label="${x ? 'Met' : 'Not met'}: ${why[i]}">${x ? '✓' : '✕'}</span></td>`;
+    $('eisarows').innerHTML = (noMod ? `<tr><td colspan="8"><span class="badge b-warn">No modules set up</span> <span class="sub">Knowledge, practical, workplace, assessment and moderation show “–” until modules and results are captured.</span> <button class="btn sm" onclick="dvGo('attendance','PoE tracker')">Capture modules</button></td></tr>` : '')
+      + st.R.map(([l, r]) => { const b = bucket(r), t = r.t || {}, ed = day(t.eisa_date);
+        const st2 = b === 'ready' ? `<span class="badge b-ok">Ready${r.booked ? ' · booked' : ''}</span>` : b === 'nodata' ? '<span class="badge">No data yet</span>' : '<span class="badge b-warn">Not yet</span>';
+        const mm = [t.sor_status === 'Issued' && t.eisa_booking_status !== 'Booked' ? 'SoR issued, not booked' : '', r.booked && !ed ? 'Booked, no EISA date' : '', ed && ed < today() && !t.eisa_outcome ? 'Result outstanding' : ''].filter(Boolean);
+        return `<tr><td style="font-weight:600">${lnk(l)}</td>${r.c.map((x, i) => cell(x, r.k[i], i)).join('')}
+        <td style="white-space:normal">${st2}${r.booked ? `<div class="sub">${ed ? 'EISA ' + fmtD(ed) : ''}${t.eisa_outcome ? ' · ' + esc(t.eisa_outcome) : ''}</div>` : ''}${mm.map(m => `<div><span class="badge b-warn" style="margin-top:2px">${m}</span></div>`).join('')}</td></tr>`; }).join('')
+      || '<tr><td colspan="8" class="sub">No learners enrolled on this programme.</td></tr>';
+    const sub = document.querySelector('#eisaready .card:not(#eover) .sub');
+    if (sub) sub.textContent = 'All six must be met. Module results and moderation come from Attendance & PoE › PoE tracker; SoR and booking from the QCTO tracker. “–” = no data yet. Hover a mark for the rule.';
+  }
 
   /* ---------- wire up after every data load (called from live.js applyAll) ---------- */
   let bound = false;
