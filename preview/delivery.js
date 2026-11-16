@@ -273,7 +273,7 @@
   let aF = null, aScope = 'run';
   const AF = { noreg: ['No register in 14 days', 'Running, no register captured in the last 14 days', 'var(--warn)'], low: ['Below 80% attendance', 'Late counts as attended', 'var(--bad)'],
     over: ['Over absence limit', 'At least one learner over 3 days (5 on 12-month programmes)', 'var(--bad)'], out: ['Register outside dates', 'Register before the start or after the end date', 'var(--bad)'],
-    docs: ['Documents not captured', 'No document marks on the Documents tab yet', 'var(--warn)'] };
+    docs: ['Documents not captured', 'No document marks on the Documents tab yet', 'var(--warn)'], nomod: ['No modules set up', 'Occupational programme with no modules, so the PoE tracker is empty', 'var(--warn)'] };
   function attFlags() {
     const ab = {}, t = today(); (D().att || []).forEach(a => { if (AT(a.status) === 'A') { const k = a.programme_id + '.' + a.learner_id; ab[k] = (ab[k] || 0) + 1; } });
     return progs().filter(p => !p.deleted_at && runState(p) === 'Active' && learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p))).map(p => {
@@ -283,6 +283,7 @@
       if (learnersOf(p.id).some(l => !wdr(p.id, l.id) && (ab[p.id + '.' + l.id] || 0) > lim)) f.push('over');
       if (rd.some(d => (p.start_date && d < day(p.start_date)) || (p.end_date && d > day(p.end_date)))) f.push('out');
       if (!docGaps(p.id).captured) f.push('docs');
+      if (p.programme_type !== 'legacy' && !modsOf(p.id).length) f.push('nomod');
       return [p, f, last]; });
   }
   window.dvAttF = k => { aF = aF === k ? null : k; dProg = null; renderAtt(); };
@@ -344,12 +345,35 @@
         : `<td>${v ? `<span class="badge ${RCL[v]}">${RLAB[v] || v}</span>` : '<span class="sub">—</span>'}</td>`; };
     const modc = (l, m) => { const on = resFor(p.id, l.id, m.module_number)?.fields?.['Internal moderation'] === 'Yes';
       return `<td style="text-align:center">${ed ? `<input type="checkbox" aria-label="${name(l)} module ${m.module_number} internally moderated"${on ? ' checked' : ''} onchange="dvMod(${l.id},${m.module_number},this.checked)">` : on ? '<span class="badge b-ok">Yes</span>' : '<span class="sub">No</span>'}</td>`; };
-    $('poetable').innerHTML = !ms.length ? '<tbody><tr><td class="sub">No modules set up for this programme yet.</td></tr></tbody>'
+    const modForm = ed && p.programme_type !== 'legacy' && (!ms.length || modOpen) ? `<div class="qagrid" id="dvmod" style="margin-top:10px"><label>Module number<input type="number" min="1" data-k="n" value="${(ms.reduce((t, m) => Math.max(t, m.module_number), 0)) + 1}"></label><label>Module title<input data-k="title" placeholder="As on the curriculum"></label>
+      ${KINDS.map(k => `<label>${KLAB[k]} code<input data-k="${k}" placeholder="Blank if this module has no ${KLAB[k].toLowerCase()} part"></label>`).join('')}</div>
+      <div style="display:flex;gap:8px;margin-top:8px"><button class="btn y sm" onclick="dvModAdd()">Add module</button>${ms.length ? '<button class="btn sm" onclick="dvModToggle()">Cancel</button>' : ''}</div><p class="sub" style="margin:6px 0 0">Use the module codes from the QCTO curriculum. Hours and facilitators are added on the programme's Form 3.</p>` : '';
+    { const hd = $('poecard').firstElementChild; hd.style.cssText = 'padding:16px 20px;display:flex;flex-wrap:wrap;gap:10px;align-items:center';
+      hd.innerHTML = `<h2 style="flex-grow:1">PoE tracker</h2>${ed && ms.length && p.programme_type !== 'legacy' ? '<button class="btn sm" onclick="dvModToggle()">+ Add module</button>' : ''}`;
+      let mf = $('dvmodbox'); if (!mf) { hd.insertAdjacentHTML('afterend', '<div id="dvmodbox" style="padding:0 20px 14px"></div>'); mf = $('dvmodbox'); }
+      mf.innerHTML = !ms.length ? (p.programme_type === 'legacy'
+        ? '<p class="sub" style="margin:0">Legacy programme: tracked by unit standards, so the knowledge / practical / workplace module tracker does not apply. Use the Documents tab for learner documents.</p>'
+        : `<p style="margin:0"><b>No modules set up for this programme yet.</b> <span class="sub">The PoE tracker, module results and EISA readiness all need the programme's modules.${ed ? ' Add them below.' : ' Ask the PM to add them.'}</span></p>${modForm}`) : modForm;
+      mf.hidden = !mf.innerHTML; }
+    $('poetable').innerHTML = !ms.length ? ''
       : `<thead><tr><th rowspan="2">Learner</th>${ms.map(m => `<th colspan="${kindsOf(m).length + 1}" style="text-align:center;border-left:1px solid var(--line)">Module ${m.module_number}</th>`).join('')}</tr>
         <tr>${ms.map(m => kindsOf(m).map((k, i) => `<th${i ? '' : ' style="border-left:1px solid var(--line)"'}>${KLAB[k]}</th>`).join('') + '<th>Moderated</th>').join('')}</tr></thead>
         <tbody>${ls.map(l => `<tr><td style="font-weight:600">${lnk(l)}</td>${ms.map(m => kindsOf(m).map(k => cell(l, m, k)).join('') + modc(l, m)).join('')}</tr>`).join('')}</tbody>`;
   };
   window.dvAddToggle = () => { addOpen = !addOpen; renderAtt(); };
+  let modOpen = false; window.dvModToggle = () => { modOpen = !modOpen; renderAtt(); };
+  window.dvModAdd = async () => {
+    const p = prog(dProg), box = $('dvmod'); if (!p || !box) return;
+    const v = {}; box.querySelectorAll('[data-k]').forEach(i => { v[i.dataset.k] = i.value.trim(); });
+    const n = +v.n; if (!n || n < 1) return say('Enter the module number');
+    if (modsOf(p.id).some(m => m.module_number === n)) return say('Module ' + n + ' already exists');
+    if (!v.title) return say('Enter the module title');
+    const comps = KINDS.filter(k => v[k]).map(k => ({ kind: k, code: v[k], title: v.title, hours: null, facilitator_id: null }));
+    if (!comps.length) return say('Enter at least one module code (knowledge, practical or workplace)');
+    const row = { tenant_id: P.tenant, programme_id: p.id, module_number: n, title: v.title, components: comps };
+    const r = await write('Module', () => sb.from('program_modules').insert(row).select());
+    (D().pmods = D().pmods || []).push((r && r[0]) || row); modOpen = false; say('Module ' + n + ' added'); renderAtt();
+  };
   window.dvAddSession = async () => {
     const p = prog(dProg), box = $('dvsess'); if (!p || !box) return;
     const v = {}; box.querySelectorAll('[data-k]').forEach(i => { v[i.dataset.k] = i.value.trim(); });
@@ -429,6 +453,12 @@
         else { const r = await write('Document list', () => sb.from('poe_checklist').insert({ tenant_id: P.tenant, programme_id: p.id, fields }).select()); pcRows().push((r && r[0]) || { fields, programme_id: p.id }); }
         $('famov').remove(); say('Document list saved'); renderAtt(); } catch (err) { $('dcerr').textContent = err.message || String(err); } };
   };
+  let docView = 'Grid'; window.dvDocView = v => { docView = v; renderAtt(); };
+  const DNX = { '': 'received', received: 'missing', missing: 'na', na: '' };
+  window.dvDocCyc = async (lid, doc) => { const p = prog(dProg); if (!p) return; const m = pcMarks(p.id, lid); m[doc] = DNX[m[doc] || '']; await pcSave(p.id, lid, m); renderAtt(); };
+  window.dvDocAll = async doc => { const p = prog(dProg); if (!p) return; let n = 0;
+    for (const l of learnersOf(p.id)) { if (wdr(p.id, l.id)) continue; const m = pcMarks(p.id, l.id); if (m[doc]) continue; m[doc] = 'received'; await pcSave(p.id, l.id, m); n++; }
+    say(n ? `Marked ${n} learner${n === 1 ? '' : 's'} as received` : 'Every learner is already marked'); renderAtt(); };
   function renderDocs(p) {
     let box = $('doccard'); if (!box) { $('poecard').insertAdjacentHTML('afterend', '<section class="card" id="doccard" hidden></section>'); box = $('doccard'); }
     box.hidden = aTab !== 'Documents'; if (aTab !== 'Documents' || !p) return;
@@ -436,11 +466,21 @@
     const done = l => { const m = pcMarks(p.id, l.id); return req.filter(d => m[d.id] === 'received' || m[d.id] === 'na').length; };
     const complete = ls.filter(l => done(l) === req.length).length;
     const btn = (l, d, st, lab, cls) => { const on = pcMarks(p.id, l.id)[d.id] === st; return ed ? `<button class="btn sm${on ? ' ' + cls : ''}" style="${on ? '' : 'opacity:.55'}" onclick="dvDoc(${l.id},'${esc(d.id)}','${st}')">${lab}</button>` : (on ? `<span class="badge ${cls === 'y' ? 'b-ok' : cls === 'n' ? 'b-bad' : 'b-n'}">${lab}</span>` : ''); };
-    box.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h2 style="flex-grow:1">Learner documents</h2><span class="sub">${complete} of ${ls.length} learners complete · ${req.length} required documents</span>${ed ? '<button class="btn sm" onclick="dvDocCfg()">Edit document list</button>' : ''}<button class="btn sm" onclick="dvDocCsv()">Export CSV</button></div>
-      <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">${ls.map(l => { const m = pcMarks(p.id, l.id), d0 = done(l), pc = req.length ? Math.round(d0 / req.length * 100) : 100;
-        return `<details class="card" style="padding:10px 14px"><summary style="display:flex;gap:10px;align-items:center;cursor:pointer"><b style="flex-grow:1">${name(l)}</b><span style="width:140px;height:8px;border-radius:4px;background:var(--soft);overflow:hidden"><i style="display:block;height:100%;width:${pc}%;background:${pc === 100 ? 'var(--ok)' : pc >= 60 ? '#E0A100' : 'var(--bad)'}"></i></span><span class="sub" style="min-width:90px">${d0}/${req.length} required</span></summary>
+    const MAP = { id_copy: 'idsReceived', learner_agreement: 'learnerAgreementReceived', qualification_cert: 'qualificationsReceived' };
+    const SCD = { received: ['Received', 'var(--ok)', '#fff'], missing: ['Missing', 'var(--bad)', '#fff'], na: ['N/A', 'var(--soft)', 'var(--muted)'] };
+    const miss = ls.filter(l => !wdr(p.id, l.id) && req.some(d => pcMarks(p.id, l.id)[d.id] === 'missing')).length;
+    const pack = d => { const n = window.apxProgDocCount && MAP[d.id] ? apxProgDocCount(p.id, MAP[d.id]) : 0;
+      return n ? `<div><a href="#programmes" onclick="setTimeout(()=>dvProg(${p.id}))" class="sub" style="font-weight:400">In hand-over pack (${n})</a></div>` : ''; };
+    if (docView === 'List') { box.innerHTML = head() + `<div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">${ls.map(l => { const m = pcMarks(p.id, l.id), d0 = done(l), pc = req.length ? Math.round(d0 / req.length * 100) : 100;
+        return `<details class="card" style="padding:10px 14px"><summary style="display:flex;gap:10px;align-items:center;cursor:pointer"><b style="flex-grow:1">${name(l)}</b><span class="sub" style="min-width:90px">${d0}/${req.length} required</span></summary>
           <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${docs.map(d => `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="flex:1 1 220px">${esc(d.label)}${d.required ? '' : ' <span class="sub">(optional)</span>'}</span>${btn(l, d, 'received', 'Received', 'y')}${btn(l, d, 'missing', 'Missing', 'n')}${btn(l, d, 'na', 'N/A', '')}
-            ${ed ? `<input placeholder="Note" value="${esc(m['note_' + d.id] || '')}" onchange="dvDocNote(${l.id},'${esc(d.id)}',this.value)" style="flex:1 1 160px;height:30px;border:1px solid var(--line);border-radius:6px;padding:0 6px;font:inherit;background:transparent;color:var(--ink)">` : `<span class="sub">${esc(m['note_' + d.id] || '')}</span>`}</div>`).join('')}</div></details>`; }).join('') || '<p class="sub">No learners enrolled on this programme.</p>'}</div>`;
+            ${ed ? `<input placeholder="Note" value="${esc(m['note_' + d.id] || '')}" onchange="dvDocNote(${l.id},'${esc(d.id)}',this.value)" style="flex:1 1 160px;height:30px;border:1px solid var(--line);border-radius:6px;padding:0 6px;font:inherit;background:transparent;color:var(--ink)">` : `<span class="sub">${esc(m['note_' + d.id] || '')}</span>`}</div>`).join('')}</div></details>`; }).join('') || '<p class="sub">No learners enrolled on this programme.</p>'}</div>`; return; }
+    const ord = req.concat(docs.filter(d => !d.required));
+    box.innerHTML = head() + (!ls.length ? '<p class="sub">No learners enrolled on this programme.</p>' : `<p class="sub" style="margin:8px 0">${ed ? 'Tap a cell to cycle Received → Missing → N/A → blank. Notes are in List view.' : 'Read only for your role.'}</p><div class="tw"><table class="dense" style="min-width:${200 + ord.length * 120}px"><thead><tr><th>Learner</th>${ord.map(d => `<th style="text-align:center;white-space:normal;min-width:110px">${esc(d.label)}${d.required ? '' : '<div class="sub" style="font-weight:400">optional</div>'}${pack(d)}${ed ? `<div><button class="btn sm" style="margin-top:4px;padding:2px 8px" onclick="dvDocAll('${esc(d.id)}')" title="Mark Received for every learner not yet marked">All received</button></div>` : ''}</th>`).join('')}<th>Required</th></tr></thead><tbody>${ls.map(l => {
+      const m = pcMarks(p.id, l.id), wd = wdr(p.id, l.id);
+      return `<tr${wd ? ' style="opacity:.55"' : ''}><td style="font-weight:600;white-space:normal">${lnk(l)}${wd ? ' <span class="badge b-n">Withdrawn</span>' : ''}</td>${ord.map(d => { const st = m[d.id] || '', [lab, bg, fg] = SCD[st] || ['·', 'var(--soft)', 'var(--muted)'], nt = m['note_' + d.id] || '';
+        return `<td style="text-align:center;padding:6px 4px">${ed ? `<button title="${esc(nt)}" aria-label="${name(l)} ${esc(d.label)}: ${lab}" onclick="dvDocCyc(${l.id},'${esc(d.id)}')" style="min-width:84px;height:32px;border:0;border-radius:8px;font-weight:600;background:${bg};color:${fg}">${lab}${nt ? ' ✎' : ''}</button>` : `<span class="badge" style="background:${bg};color:${fg}" title="${esc(nt)}">${lab}</span>`}</td>`; }).join('')}<td>${done(l)}/${req.length}</td></tr>`; }).join('')}</tbody></table></div>`);
+    function head() { return `<div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center"><h2 style="flex-grow:1">Learner documents</h2><span class="sub">${complete} of ${ls.length} learners complete · ${req.length} required documents</span>${miss ? `<span class="badge b-bad">${miss} learner${miss === 1 ? '' : 's'} missing documents</span>` : ''}<span class="famseg">${['Grid', 'List'].map(v => `<button class="${v === docView ? 'on' : ''}" onclick="dvDocView('${v}')">${v}</button>`).join('')}</span>${ed ? '<button class="btn sm" onclick="dvDocCfg()">Edit document list</button>' : ''}<button class="btn sm" onclick="dvDocCsv()">Export CSV</button></div>`; }
   }
   const csv = (nm, rows) => { const t = rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\r\n'); try { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['﻿' + t], { type: 'text/csv' })); a.download = nm; document.body.appendChild(a); a.click(); a.remove(); } catch (_) {} say('Exported ' + nm); };
   window.dvDocCsv = () => { const p = prog(dProg); if (!p) return; const docs = pcDocs(p.id);

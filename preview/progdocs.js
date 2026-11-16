@@ -15,6 +15,7 @@
     ['learnerListReceived', 'Learner list'], ['learnerAgreementReceived', 'Learner agreements'], ['mieChecksCompleted', 'MIE checks'], ['otherDocs', 'Other supporting documents']];
   const LAB = Object.fromEntries(DOCS);
   let ROWS = [];
+  window.apxProgDocCount = (pid, type) => ROWS.filter(r => r.programme_id === pid && r.doc_type === type).length;
 
   async function load() {
     if (!P.user) return;

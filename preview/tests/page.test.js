@@ -282,7 +282,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
       ok(w.dvApi.regDates(100).join() === '2026-06-10,2026-06-17', 'regDates ' + w.dvApi.regDates(100));
       ok(w.dvApi.runState(w.dvApi.prog(101)) === 'Active', 'legacy programme with a register and no start date should be Active');
       const g = w.dvApi.docGaps(100); ok(g.captured && g.missing === 1 && g.open === 0, 'docGaps ' + JSON.stringify(g));
-      w.eval("aTab='Documents'"); w.renderAtt(); await tick(); ok(/Learner Agreement/.test(d.getElementById('doccard').textContent) && /3\/4 required/.test(d.getElementById('doccard').textContent), 'legacy list / newest row');
+      w.eval("aTab='Documents'"); w.renderAtt(); await tick(); ok(/Learner Agreement/.test(d.getElementById('doccard').textContent) && /3\/4/.test(d.getElementById('doccard').textContent), 'legacy list / newest row');
     } finally { const k = JSON.parse(keep); DATA.attendance = k.a; DATA.programmes = k.p; DATA.enrolments = k.e; if (k.c) DATA.poe_checklist = k.c; else delete DATA.poe_checklist; }
   });
   await t('My work: role tasks, admin can view as PM, hide for today', async () => {
