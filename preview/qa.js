@@ -85,7 +85,7 @@
   window.qaT = async function (i, k, v) {
     const r = QT[i], before = r[k]; r[k] = v || (['cm', 'a', 'd'].includes(k) ? '' : null); renderQ();
     const rec = (D().tracker || []).find(x => x.id === r.dbid);
-    try { await write('Tracker', () => sb.from('qcto_tracker').update({ [TCOL[k]]: v || null }).eq('id', r.dbid)); if (rec) rec[TCOL[k]] = v || null; }
+    try { await write('Tracker', () => sb.from('qcto_tracker').update({ [TCOL[k]]: v || null }).eq('id', r.dbid)); if (rec) rec[TCOL[k]] = v || null; if (k === 'eD' && v && r.book === 'Pending Booking') await window.qSet(i, 'book', 'Booked'); }
     catch (e) { r[k] = before; renderQ(); }
   };
   // status change from live.js, plus: SOR "Issued" with no date fills today's date
@@ -116,6 +116,7 @@
   const qProg = r => (D().progs || []).find(p => p.id === r.pid);
   const qWd = r => (D().enrol || []).some(e => e.learner_id === r.lid && e.programme_id === r.pid && /withdraw/i.test((e.fields || {}).Status || (e.fields || {}).status || e.status || ''));
   const qPf = (p, ...k) => { const f = (p && p.fields) || {}; for (const x of k) if (f[x] && String(f[x]).trim()) return String(f[x]).trim(); return ''; };
+  const qDur = pid => { const c = {}; QT.filter(r => r.pid === pid && r.d).forEach(r => c[r.d] = (c[r.d] || 0) + 1); return Object.keys(c).sort((a, b) => c[b] - c[a])[0] || ''; };
   const qFac = r => r.f || qPf(qProg(r), 'Facilitator', 'facilitator');
   const qAss = r => qPf(qProg(r), 'Assessor', 'assessor');
   function qBase() {
@@ -129,8 +130,40 @@
     mon: ['Monitoring delayed', r => r.mon === 'Delayed', 'Schedule a visit and record the Monitoring date', 'bad'],
     sor: ['SOR pending after training end', r => r.sor === 'Pending' && qEnded(r), 'Usually outstanding PoE or workplace items', 'warn'],
     rdy: ['SOR issued, EISA not booked', r => r.sor === 'Issued' && r.book === 'Pending Booking', 'Book before registration closes', 'bad'],
-    nyc: ['Not Yet Competent or Absent', r => /Not Yet Competent|Absent/.test(r.out || ''), 'Plan the re-write for the next official EISA date', 'bad']
+    nyc: ['Not Yet Competent or Absent', r => /Not Yet Competent|Absent/.test(r.out || ''), 'Plan the re-write for the next official EISA date', 'bad'],
+    noid: ['No SA ID number', r => !r.idFull, 'Needed to register the learner for the EISA · click the learner to add it', 'bad'],
+    m1: ['In Progress after training ended', r => r.cur === 'In Progress' && qEnded(r), 'Mismatch: update Current Status', 'warn'],
+    m2: ['Completed but SOR still Pending', r => r.cur === 'Completed' && r.sor === 'Pending', 'Mismatch: issue the SOR or correct the status', 'warn'],
+    m3: ['EISA date set but not Booked', r => r.eD && r.book !== 'Booked', 'Mismatch: set EISA Booking Status', 'warn']
   };
+  const QMIS = ['m1', 'm2', 'm3'];
+  const QE = r => QA() || ((P.roles || []).includes('project_manager') && (!window.apxMineProg || apxMineProg(qProg(r) || {})));
+  const eD = (r, fn, v, lab) => QE(r) ? `<input type="date" class="cellin" aria-label="${lab}" value="${day(v)}" onchange="${fn}">` : fmtD(day(v));
+  const eT = (r, fn, v, lab, w = 160) => QE(r) ? `<input class="cellin" aria-label="${lab}" style="min-width:${w}px" value="${esc(v || '')}" onchange="${fn}">` : esc(v || '');
+  const qVis = pid => { const v = (D().visits || []).filter(x => String(x.programme_id || ((x.fields || {}).Programme || [])[0]) === String(pid)).map(x => (x.fields || {})['Date of Visit'] || (x.fields || {}).Date).filter(Boolean).sort(); return v[v.length - 1]; };
+  const qNext = pid => { const v = (D().visits || []).filter(x => String(x.programme_id || ((x.fields || {}).Programme || [])[0]) === String(pid)).sort((a, b) => String((a.fields || {})['Date of Visit']).localeCompare(String((b.fields || {})['Date of Visit']))); return v.length ? (v[v.length - 1].fields || {})['Next Visit Date'] : ''; };
+  let qPre = null;
+  window.qaQGo = pid => { qScope = 'All'; qF = ''; qPre = pid; location.hash = 'qcto'; setTimeout(renderQ, 50); };
+  // bulk: one status (and optional date) for every learner in one programme who is not already on it
+  const QBF = [['cur', 'Current Status', null], ['mon', 'Monitoring Status', 'monD'], ['sor', 'SOR Status', 'sorD'], ['book', 'EISA Booking Status', 'eD'], ['out', 'EISA Outcome', null]];
+  window.qaQBulk = pid => {
+    const opts = []; QBF.forEach(([k, l]) => QV[k].filter(Boolean).forEach(v => opts.push(`${l}: ${v}`)));
+    form('Set for all learners in this programme', [['what', 'Set', 'select', opts, opts[0]], ['date', 'Date (Monitoring, SOR issued or EISA date; optional)', 'date']], async v => {
+      const [l, val] = v.what.split(': '), [k, , dk] = QBF.find(x => x[1] === l), col = { cur: 'current_status', mon: 'monitoring_status', sor: 'sor_status', book: 'eisa_booking_status', out: 'eisa_outcome' }[k];
+      const rs = qBase().map(([r]) => r).filter(r => String(r.pid) === String(pid) && r[k] !== val); if (!rs.length) { say('Everyone is already on ' + val); return; }
+      const dt = v.date || (k === 'sor' && val === 'Issued' ? iso() : ''), upd = { [col]: val }; if (dt && dk) upd[TCOL[dk]] = dt;
+      await write('Tracker', () => sb.from('qcto_tracker').update(upd).in('id', rs.map(r => r.dbid)));
+      rs.forEach(r => { r[k] = val; if (dt && dk) r[dk] = dt; const t = (D().tracker || []).find(x => x.id === r.dbid); if (t) Object.assign(t, upd); });
+      say(`${val} set for ${rs.length} learner${rs.length === 1 ? '' : 's'}`); renderQ();
+    });
+  };
+  // My work: PM per running programme with flags; QA when no EISA windows are recorded
+  window.apxQTasks = role => { const out = []; try {
+    if (role === 'qa' || role === 'admin') { if (!(D().windows || []).some(x => x.eisa_date >= iso())) out.push({ id: 'qwin', t: 'Add the next official EISA windows', s: 'None recorded, so every learner shows "to be confirmed"', k: 'QCTO', c: 'Add', on: `location.hash='qcto'`, bad: 1 }); }
+    if (role === 'pm') { const g = new Map(); qBase().forEach(([r]) => { if (qRS(qProg(r)) !== 'Active') return; const ks = Object.keys(QFK).filter(k => k !== 'noid' && QFK[k][1](r)); if (ks.length) { const a = g.get(r.pid) || { n: 0, k: {} }; a.n++; ks.forEach(k => a.k[k] = (a.k[k] || 0) + 1); g.set(r.pid, a); } });
+      g.forEach((a, pid) => { const p = qProg({ pid }) || {}, top = Object.keys(a.k).sort((x, y) => a.k[y] - a.k[x]);
+        out.push({ id: `qt${pid}`, t: `Update QCTO tracker: #${p.display_id || pid} ${p.programme_name || ''} (${a.n})`, s: top.map(k => `${QFK[k][0]} ${a.k[k]}`).join(' · '), k: 'QCTO', c: 'Open', on: `qaQGo(${pid})` }); }); }
+  } catch (e) {} return out; };
   window.qaQF = k => { qF = qF === k ? '' : k; if (k && QFK[k]) qScope = 'All'; renderQ(); };
   window.qaQS = s => { qScope = s; renderQ(); };
   window.qaQq = v => { qQ = v; renderQ(); };
@@ -163,9 +196,9 @@
     $('qstat').hidden = true;
     if (!$('qq')) $('qstat').insertAdjacentHTML('afterend', '<input id="qq" class="fsel" type="search" placeholder="Search learner, client, #id" oninput="qaQq(this.value)" style="min-width:200px">');
     const cl = $('qclient'), cv = cl.value; cl.innerHTML = '<option value="">Client: All</option>' + [...new Set(scoped.map(([r]) => r.c))].sort().map(v => `<option${v === cv ? ' selected' : ''}>${esc(v)}</option>`).join('');
-    const pg = $('qpm'), pv = pg.value, ps = [...new Map(scoped.filter(([r]) => !cl.value || r.c === cl.value).map(([r]) => [r.pid, r])).values()].sort((a, b) => (a.c + a.pid).localeCompare(b.c + b.pid));
+    const pg = $('qpm'), pv = qPre != null ? String(qPre) : pg.value, ps = [...new Map(scoped.filter(([r]) => !cl.value || r.c === cl.value).map(([r]) => [r.pid, r])).values()].sort((a, b) => (a.c + a.pid).localeCompare(b.c + b.pid));
     pg.innerHTML = '<option value="">Programme: All</option>' + ps.map(r => { const p = qProg(r); return `<option value="${r.pid}"${String(r.pid) === pv ? ' selected' : ''}>#${esc(p.display_id || p.id)} · ${esc(r.c)} · ${esc(p.programme_name || '')}</option>`; }).join('');
-    const fc = cl.value, fp = pg.value, q = qQ.trim().toLowerCase();
+    qPre = null; const fc = cl.value, fp = pg.value, q = qQ.trim().toLowerCase();
     const rows = (QFK[qF] ? base : scoped).filter(([r]) => (!fc || r.c === fc) && (!fp || String(r.pid) === fp) && (!qF || (QFK[qF] ? QFK[qF][1](r) : r.cur === qF.slice(2)))
       && (!q || `${r.ln} ${r.sn} ${r.c} #${r.pid} ${r.p}`.toLowerCase().includes(q)))
       .sort((a, b) => (a[0].c + '|' + String(a[0].pid).padStart(6, '0') + '|' + a[0].ln + a[0].sn).localeCompare(b[0].c + '|' + String(b[0].pid).padStart(6, '0') + '|' + b[0].ln + b[0].sn));
@@ -178,11 +211,11 @@
       $('qtable').innerHTML = H(['No', 'Learner', 'Current Status', 'Monitoring Status', 'Monitoring Date', 'SOR Status', 'SOR Issued Date', 'EISA Booking Status', 'EISA Date', 'EISA Outcome', 'Comments']) + '<tbody>' +
         page.map(([r, i], n) => { const p = qProg(r) || {}, w = winFor(r), as = qAss(r);
           const gh = r.pid !== last ? UI.gh(`#${esc(p.display_id || p.id)} · ${esc(r.c)} · ${esc(p.programme_name || r.p)} · ${fmtD(r.s) || 'no start'} – ${fmtD(r.e) || 'no end'}`, rows.filter(([x]) => x.pid === r.pid).length, 'var(--navy)', 11,
-            `${esc(qRS(p))} · PM ${esc(r.pm || 'not set')} · Facilitator ${esc(qFac(r) || 'not set')} · Assessor ${esc(as || 'not set')} · Next EISA ${w[0] ? fmtD(w[0].eisa_date) + ' (closes ' + fmtD(w[0].registration_closing) + ')' : 'to be confirmed'}`) : ''; last = r.pid;
+            `${esc(qRS(p))} · PM ${esc(r.pm || 'not set')} · Facilitator ${esc(qFac(r) || 'not set')} · Assessor ${esc(as || 'not set')} · Duration ${esc(qDur(r.pid) || 'not set')} · Last visit ${fmtD(qVis(r.pid)) || 'none'}${qNext(r.pid) ? ' · Next visit ' + fmtD(qNext(r.pid)) : ''} · Next EISA ${w[0] ? fmtD(w[0].eisa_date) + ' (closes ' + fmtD(w[0].registration_closing) + ')' : 'to be confirmed'}${QE(r) ? ` <button class="btn sm" style="margin-left:8px" onclick="event.stopPropagation();qaQBulk(${r.pid})">Set for all…</button>` : ''}`) : ''; last = r.pid;
           const ov = r.a && r.a !== as ? ` · Assessor ${esc(r.a)}` : '';
-          return gh + `<tr><td>${qPg * PER + n + 1}</td><td style="min-width:180px"><b>${esc(r.ln)} ${esc(r.sn || '')}</b><div class="sub">${r.idFull ? 'ID ' + r.id : '<span class="badge b-bad">No ID</span>'}${ov}</div></td>
-          <td>${sel(i, 'cur', r.cur)}</td><td>${sel(i, 'mon', r.mon)}</td><td>${dIn(`qaT(${i},'monD',this.value)`, r.monD, 'Monitoring date')}</td><td>${sel(i, 'sor', r.sor)}</td><td>${dIn(`qaT(${i},'sorD',this.value)`, r.sorD, 'SOR issued date')}</td><td>${sel(i, 'book', r.book)}</td><td>${dIn(`qaT(${i},'eD',this.value)`, r.eD, 'EISA date')}</td><td>${sel(i, 'out', r.out)}</td>
-          <td>${tIn(`qaT(${i},'cm',this.value)`, r.cm, 'Comments', 220)}</td></tr>`; }).join('') + (rows.length ? '' : '<tr><td colspan="11" class="sub" style="padding:16px">No learners match.</td></tr>') + '</tbody>';
+          return gh + `<tr><td>${qPg * PER + n + 1}</td><td style="min-width:200px"><a href="#learners" style="font-weight:600;color:var(--navy)" onclick="window.previewLearnerEdit&&previewLearnerEdit(${r.lid});return false">${esc(r.ln)} ${esc(r.sn || '')}</a><div class="sub">${r.idFull ? 'ID ' + r.id : '<span class="badge b-bad">No SA ID</span>'}${ov}</div>${QMIS.filter(k => QFK[k][1](r)).map(k => `<span class="badge b-warn" style="margin-top:3px">${QFK[k][0]}</span>`).join(' ')}${r.mon === 'Delayed' ? ` <a class="badge b-bad" href="#visits" title="Record the visit on Monitoring Visits">Visit delayed</a>` : ''}</td>
+          <td>${sel(i, 'cur', r.cur)}</td><td>${sel(i, 'mon', r.mon)}</td><td>${eD(r, `qaT(${i},'monD',this.value)`, r.monD, 'Monitoring date')}</td><td>${sel(i, 'sor', r.sor)}</td><td>${eD(r, `qaT(${i},'sorD',this.value)`, r.sorD, 'SOR issued date')}</td><td>${sel(i, 'book', r.book)}</td><td>${eD(r, `qaT(${i},'eD',this.value)`, r.eD, 'EISA date')}</td><td>${sel(i, 'out', r.out)}</td>
+          <td>${eT(r, `qaT(${i},'cm',this.value)`, r.cm, 'Comments', 220)}</td></tr>`; }).join('') + (rows.length ? '' : '<tr><td colspan="11" class="sub" style="padding:16px">No learners match.</td></tr>') + '</tbody>';
       $('qcount').textContent = rows.length + ' learner' + (rows.length === 1 ? '' : 's') + (base.length !== QT.length ? ` · ${QT.length - base.length} legacy, withdrawn or other PMs' rows hidden` : '');
       pager.innerHTML = pages > 1 ? `<span class="sub">Page ${qPg + 1} of ${pages}</span><button class="btn sm" ${qPg ? '' : 'disabled'} onclick="qaQpg(${qPg - 1})">‹ Prev</button><button class="btn sm" ${qPg < pages - 1 ? '' : 'disabled'} onclick="qaQpg(${qPg + 1})">Next ›</button>` : '';
     } else {
