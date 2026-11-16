@@ -15,7 +15,8 @@
   const nm = l => l ? (l.first_name + ' ' + l.last_name).trim() : '';
   const short = p => (p?.programme_name || '').replace('[TEST] ', '');
   const learner = id => (D().learners || []).find(l => l.id === id);
-  const active = () => (D().progs || []).filter(p => p.status === 'active' && A() && A().learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p)));
+  // Running programmes, same rule as the Overview (dvApi.runState): legacy programmes stay 'initiated' while running.
+  const active = () => (D().progs || []).filter(p => (window.dvApi?.runState ? dvApi.runState(p) === 'Active' : p.status === 'active') && A() && A().learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p)));
 
   /* ---------- menu open / closed ---------- */
   const app = () => document.getElementById('shell');
@@ -146,6 +147,11 @@
       const open = (d.recs || []).filter(r => !r.resolved).length;
       if (open) out.push({ id: 'recs', t: `Close ${open} open recommendation${open > 1 ? 's' : ''}`, s: 'From monitoring visits', k: 'Recommendation', c: 'Review', on: `location.hash='recs'`, bad: 1 });
     }
+    { const G = { r: 'Record module results', n: 'Book reassessments (NYC)', w: 'Rework due', s: 'Not submitted', a: 'Learners over the absence limit', h: 'Add Form 3 hours', m: 'Moderate modules', o: 'Issue SoRs on the QCTO tracker' }, grp = new Map(), keep = [];
+      out.forEach(x => { const mm = /^([rnwsahmo])(\d+)\./.exec(x.id); if (!mm) return keep.push(x); const key = mm[1] + mm[2]; if (!grp.has(key)) grp.set(key, []); grp.get(key).push(x); });
+      grp.forEach((xs, key) => { if (xs.length === 1) return keep.push(xs[0]); const x = xs[0], prog = String(x.s).split(' · ').find(t => t && !/^Form 3$/.test(t) && !/criteria|waiting/.test(t) && xs.every(y => String(y.s).includes(t)) ) || '';
+        keep.push({ ...x, id: 'g' + key, t: `${G[key[0]]} (${xs.length})`, s: prog || x.s, bad: xs.some(y => y.bad) ? 1 : 0 }); });
+      out.length = 0; keep.forEach(x => out.push(x)); }
     if (role === 'pi') {
       const w = typeof soWaiting === 'function' ? soWaiting() : 0, ret = (d.signoffs || []).filter(s => s.status === 'returned').length;
       if (ret) out.push({ id: 'pir', t: `${ret} hand-over${ret > 1 ? 's' : ''} returned to fix`, s: 'Sign-off queue', k: 'Sign-off', c: 'Open', on: `location.hash='signoff'`, bad: 1 });
