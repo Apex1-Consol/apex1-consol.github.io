@@ -38,8 +38,8 @@ function drafts() {
   if (DR.err) return `<section class="card"><b>Saved drafts</b><div class="famas">Could not load: ${esc(DR.err)}</div></section>`;
   const rows = DRALL ? DR : DR.slice(0, 10);
   return `<section class="card" style="padding:0"><div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:14px 20px;border-bottom:1px solid var(--line2)">
-    <h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpDrOpen()">${DROPEN ? '▾' : '▸'} Saved drafts <span style="font-weight:400;color:var(--muted)">(${DR.length})</span></h2>${!DROPEN ? '' : DR.length > 10 ? `<button class="btn sm" onclick="rpDrAll()">${DRALL ? 'Show latest 10' : 'Show all ' + DR.length}</button>` : ''}<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Open in Report Generator ↗</a></div>
-    ${!DROPEN ? '' : DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => `<tr><td><b>${esc(d.client_name || '')}</b></td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(pmName(d.pm_email))}</td><td>${esc(when(d.saved_at || d.updated_at))}</td></tr>`).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
+    <h2 style="flex-grow:1;font-size:18px;cursor:pointer" onclick="rpDrOpen()">${DROPEN ? '▾' : '▸'} Saved drafts <span style="font-weight:400;color:var(--muted)">(${DR.length})</span>${(() => { const n = DR.filter(d => (Date.now() - new Date(d.updated_at || d.saved_at)) / 864e5 > 30).length; return n ? ` <span class="badge b-warn" style="font-size:12px">${n} stale (30+ days)</span>` : ''; })()}</h2>${!DROPEN ? '' : DR.length > 10 ? `<button class="btn sm" onclick="rpDrAll()">${DRALL ? 'Show latest 10' : 'Show all ' + DR.length}</button>` : ''}<a class="btn sm" href="/report-generator.html" target="_blank" rel="noopener">Open in Report Generator ↗</a></div>
+    ${!DROPEN ? '' : DR.length ? `<div class="tw"><table class="dense"><thead><tr><th>Client</th><th>Programme</th><th>Month</th><th>PM</th><th>Last saved</th></tr></thead><tbody>${rows.map(d => { const ag = Math.floor((Date.now() - new Date(d.updated_at || d.saved_at)) / 864e5); return `<tr><td><b>${esc(d.client_name || '')}</b>${d.programme_id ? `<div class="sub">${esc(rpPid(d.programme_id))}</div>` : ''}</td><td>${esc(d.programme_name || '')}</td><td>${esc(d.month || '')}</td><td>${esc(pmName(d.pm_email))}</td><td>${esc(when(d.saved_at || d.updated_at))}${ag >= 0 ? `<div class="sub">${ag} day${ag === 1 ? '' : 's'} ago</div>` : ''}${ag > 30 ? ' <span class="badge b-warn">Stale</span>' : ''}</td></tr>`; }).join('')}</tbody></table></div>` : '<div class="empty"><b>No saved drafts</b></div>'}</section>`;
 }
 window.rpDrOpen = () => { DROPEN = !DROPEN; render(); };
 window.rpDrAll = () => { DRALL = !DRALL; render(); };
@@ -63,7 +63,7 @@ function tone(x, month) {
   if (hu && t <= hu) return ['hold', 'On hold to ' + fmtD(hu)];
   const st = ['notstarted', 'draft', 'changes'].includes(x.stage) ? 'submit' : x.stage === 'review' ? 'review' : 'send';
   const due = dl[st], warn = st === 'submit' ? dl.submitWarn : st === 'send' ? dl.sendWarn : dl.review;
-  if (t > due) return ['dan', 'Overdue · due ' + fmtD(due)];
+  if (t > due) return ['dan', 'Past deadline · due ' + fmtD(due)];
   if (t >= warn) return ['warn', 'Due ' + fmtD(due)];
   return ['', 'Due ' + fmtD(due)];
 }
@@ -171,13 +171,13 @@ function archived() {
 }
 const needsAct = x => ['notstarted', 'changes'].includes(x.stage) || x.t[0] === 'dan';
 function pmView() {
-  const admin = has(), m = TR.cur, all = (TR.byM[m] || []).filter(x => !TRPM || x.pm === TRPM), rows = all.filter(x => !TRS || x.stage === TRS);
-  const tiles = `<div class="famtiles" style="padding:14px 20px">${UI.tiles([{ t: esc(m) + ' · ' + all.length + ' report' + (all.length === 1 ? '' : 's'), k: Object.keys(STAGE).map(k => [STAGE[k], all.filter(x => x.stage === k).length, STC[k], TRS === k, `rpTS('${k}')`]) }])}</div>`;
+  const admin = has(), m = TR.cur, all = (TR.byM[m] || []).filter(x => !TRPM || x.pm === TRPM), qq = TRQ.trim().toLowerCase(), rows = all.filter(x => (!TRS || x.stage === TRS) && (!qq || [rpPid(x.pid), x.client, x.prog, pmName(x.pm)].join(' ').toLowerCase().includes(qq)));
+  const tiles = `<div class="famtiles" style="padding:14px 20px">${UI.tiles([{ t: esc(m) + ' · ' + all.length + ' report' + (all.length === 1 ? '' : 's'), k: Object.keys(STAGE).map(k => [STAGE[k], all.filter(x => x.stage === k).length, STC[k], TRS === k, `rpTS('${k}')`]) }])}</div><div style="padding:0 20px 12px"><input id="rpq" class="cellin" style="height:36px;width:min(100%,360px)" placeholder="Search #id, client, programme or PM" value="${esc(TRQ)}" oninput="rpQ(this.value)"></div>`;
   const pms = [...new Set(rows.map(x => x.pm || ''))].sort((a, b) => (!a - !b) || pmName(a).localeCompare(pmName(b))), solo = pms.length === 1;
   const TB = { dan: 'b-bad', warn: 'b-warn', hold: 'b-n' }, drs = Array.isArray(DR) ? DR : [];
   const repRow = x => {
     const k = x.r ? 'r' + x.r.id : 'p' + x.pid, o = !!RPO[k], id = x.r ? +x.r.id : 0, p = (D().progsAll || D().progs || []).find(q => q.id === x.pid), dr = !x.r && drs.find(d => d.programme_id === x.pid && d.month === m);
-    return `<button class="ddrow sub2" aria-expanded="${o}" onclick="rpRO('${k}')"><span class="chev">${o ? '▾' : '▸'}</span><span style="flex:1;min-width:0"><b>${esc(x.prog || '')}</b><span class="sub"> · ${esc(x.client || '')}</span></span>
+    return `<button class="ddrow sub2" aria-expanded="${o}" onclick="rpRO('${k}')"><span class="chev">${o ? '▾' : '▸'}</span><span style="flex:1;min-width:0">${x.pid ? `<b class="rplink" style="text-decoration:underline;cursor:pointer" onclick="event.stopPropagation();rpGoP(${+x.pid})">${esc(rpPid(x.pid))}</b> ` : ''}<b>${esc(x.prog || '')}</b><span class="sub"> · ${esc(x.client || '')}${p && window.dvApi && dvApi.runState ? ' · ' + esc(dvApi.runState(p)) : ''}</span></span>
       <span style="font-size:13px;white-space:nowrap"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${STC[x.stage]};margin-right:6px"></span>${STAGE[x.stage]}</span>${TB[x.t[0]] ? `<span class="badge ${TB[x.t[0]]}">${esc(x.t[1])}</span>` : ''}</button>
       ${!o ? '' : `<div class="ddbody">${p ? stripOf(p) : ''}
         <div class="kv"><span>Deadline</span><span>${esc(x.t[1])}</span></div>
@@ -195,7 +195,7 @@ function pmView() {
         ${x.r ? `<div id="rpn-row-${id}" hidden><div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start"><textarea id="rpn-${id}" class="cellin" rows="2" placeholder="Note for the PM: what needs to change" style="flex:1 1 320px"></textarea><button class="btn sm y" onclick="rpAct(${id},'needs_changes',this)">Send to PM</button><button class="btn sm" onclick="rpNote(${id})">Cancel</button></div></div><div id="rph-${id}" hidden><div></div></div>` : ''}</div>`}`;
   };
   return tiles + (pms.map(pm => {
-    const list = rows.filter(x => (x.pm || '') === pm).sort((a, b) => needsAct(b) - needsAct(a) || String(a.client).localeCompare(String(b.client))), bad = list.filter(needsAct).length, key = pm || '_', o = solo || !!PMO[key];
+    const list = rows.filter(x => (x.pm || '') === pm).sort((a, b) => needsAct(b) - needsAct(a) || String(a.client).localeCompare(String(b.client))), bad = list.filter(needsAct).length, key = pm || '_', o = solo || !!(TRS || qq) || !!PMO[key];
     return `<button class="ddrow" aria-expanded="${o}" onclick="rpPMO('${esc(key).replace(/'/g, '&#39;')}')"><span class="chev">${o ? '▾' : '▸'}</span><b style="flex:1;min-width:0">${esc(pm ? pmName(pm) : 'Unassigned')}</b><span class="sub">${list.length} report${list.length === 1 ? '' : 's'}</span>${bad ? `<span class="ddact">${bad} need${bad === 1 ? 's' : ''} action</span>` : ''}</button>${o ? list.map(repRow).join('') : ''}`;
   }).join('') || `<div class="empty"><b>No reports for ${esc(m)}${TRS ? ' at this stage' : ''}</b></div>`)
     + `<p class="note" style="margin:12px 20px">${esc(m)} reports by project manager. "Needs action" = not started, changes requested or past its deadline. Click a PM to see their reports, and a report for its months and actions.</p>`;
@@ -226,6 +226,13 @@ function progView() {
 window.rpTV = v => { TRV = v; try { localStorage.setItem('rp.view', v); } catch (_) {} render(); };
 window.rpTM = m => { TRM = m; TRS = ''; render(); };
 window.rpTS = k => { TRS = TRS === k ? '' : k; render(); };
+let TRQ = '';
+function rpPid(pid) { const p = (D().progsAll || D().progs || []).find(q => q.id === pid); return '#' + ((p && p.display_id) || pid); }
+window.rpGoP = pid => { if (window.dvApi && dvApi.setProg) dvApi.setProg(pid); if (window.dvProg) dvProg(); else location.hash = '#programmes'; };
+window.rpQ = v => { TRQ = v; render(); const e = document.getElementById('rpq'); if (e) { e.focus(); e.setSelectionRange(v.length, v.length); } };
+window.apxRepTasks = role => { if (role !== 'pm' || !TR || TR.err || !P.user) return []; const me = String(P.user.email || '').toLowerCase();
+  return (TR.byM[TR.cur] || []).filter(x => String(x.pm || '').toLowerCase() === me && needsAct(x)).map(x => ({ id: 'rep' + (x.r ? x.r.id : 'p' + x.pid), k: 'Report', t: 'Monthly report: ' + rpPid(x.pid) + ' ' + (x.prog || x.client || ''), s: x.stage === 'notstarted' ? 'Not started' : x.stage === 'changes' ? 'Changes requested' : 'Past deadline', c: 'Open', bad: 1, on: `rpGoRep('${rpPid(x.pid)}')` })); };
+window.rpGoRep = q => { TRS = ''; TRQ = q; location.hash = '#reports'; render(); };
 window.rpTP = v => { TRPM = v; render(); };
 window.rpTR = async () => { TR = null; render(); await Promise.all([loadQ(), loadDr()]); await loadTR(); render(); };   // also reloads the allowed actions (my_report_queue)
 window.rpRemind = async (id, btn) => { btn.disabled = true; const r = await R.rpc('remind_pm', { p_report_id: id }); if (r.error) { btn.disabled = false; return say('Not sent: ' + r.error.message); } say('Reminder sent to the PM'); await rpTR(); };

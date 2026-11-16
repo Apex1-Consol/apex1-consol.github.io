@@ -177,6 +177,7 @@
     if (window.apxQTasks) try { out.push(...window.apxQTasks(role)); } catch (e) {}
     if (window.apxModTasks) try { out.push(...window.apxModTasks(role)); } catch (e) {}
     if (window.apxRecTasks) try { out.push(...window.apxRecTasks(role)); } catch (e) {}
+    if (window.apxRepTasks) try { out.push(...window.apxRepTasks(role)); } catch (e) {}
     if (window.apxEisaTasks) try { out.push(...window.apxEisaTasks(role)); } catch (e) {}
     if (window.apxDeskTasks) try { out.push(...window.apxDeskTasks()); } catch (e) {}
     if (window.apxDocTasks) try { out.push(...window.apxDocTasks()); } catch (e) {}
