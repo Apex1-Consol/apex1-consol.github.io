@@ -692,7 +692,7 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
     <!-- ACCREDITATION -->
     <main id="view-accred" hidden>
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:12px">
-        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">QCTO Accreditation</h1><span class="famas">Same as the <b>Accreditation</b> sheet, with its colour legend as statuses</span></div>
+        <div style="flex-grow:1;display:flex;flex-direction:column;gap:6px"><h1 style="font-size:26px">Accreditation (QCTO &amp; SETA)</h1><span class="famas">Occupational (QCTO) and legacy (SETA) qualifications, same as the <b>Accreditation</b> sheet</span></div>
         <button class="btn y" onclick="toast('Add qualification to accreditation pipeline')">+ Add qualification</button>
       </div>
       <div class="grid" id="akpis"></div>
@@ -1061,7 +1061,7 @@ function renderSO(){const it=soItems(),m=(x,f)=>f==='All'||(f==='Done')===!!SOD[
   if(soOpen&&$('socmt'))$('socmt').focus();
 }
 /* ===== QA / ETQA familiarity layer (rev48) ===== */
-Object.assign(ROUTES,{qcto:['QCTO Projects Tracker','Quality'],modver:['Moderation & Verification','Quality'],accred:['QCTO Accreditation','Quality']});
+Object.assign(ROUTES,{qcto:['QCTO Projects Tracker','Quality'],modver:['Moderation & Verification','Quality'],accred:['Accreditation (QCTO & SETA)','Set-up']});
 const fmtD=s=>s?s.split('-').reverse().join('/'):'';
 const BADGE=v=>({'Completed':'b-ok','Issued':'b-ok','Booked':'b-ok','Competent':'b-ok','Delayed':'b-bad','Not Yet Competent':'b-bad','Absent':'b-bad','Not Eligible':'b-bad','Pending':'b-warn','Pending Booking':'b-warn'}[v]||'b-n');
 const QV={cur:['Not Started','In Progress','Completed','On Hold','Withdrawn'],mon:['Not Due','Scheduled','Completed','Delayed'],sor:['Training In Progress','Pending','Issued','Not Applicable'],book:['Pending Booking','Booked','Delayed','Not Eligible'],out:['','Pending','Competent','Not Yet Competent','Absent']};
@@ -1249,7 +1249,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js?v=20261116b"></script>
-<script src="qa.js?v=20261112k"></script>
+<script src="qa.js?v=20261116a"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
 <script src="delivery.js?v=20261116a"></script>

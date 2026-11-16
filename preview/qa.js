@@ -296,8 +296,10 @@
   const _renderA = renderA;
   renderA = function () {
     if (!P.user) return _renderA();
-    const A = D().accs || [], c = s => A.filter(a => a.status === s).length;
-    const exp = A.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
+    const A = D().accs || [], aT = window.aT || 'All types', LGO = aT === 'Legacy (SETA)';
+    const isLeg = a => /legacy/i.test(a.qual_type || '') || !!(typeof LEG === 'object' && LEG && LEG[String(a.saqa_id || '').trim()]);
+    const tm = a => aT === 'All types' || isLeg(a) === LGO, AT = A.filter(tm), c = s => AT.filter(a => a.status === s).length;
+    const exp = AT.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
     $('akpis').innerHTML = ASTAT.slice().reverse().map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
       + `<div class="kpi"><span class="l">Expiring within 12 months</span><span class="v" style="color:${exp ? 'var(--bad)' : 'var(--ink)'}">${exp}</span><span class="n" style="color:var(--muted)">plan re-accreditation</span></div>`;
     { // Programme checks: expiring / not accredited (client-side from programmes + accreditation_items)
@@ -314,24 +316,26 @@
       if (!$('apchk')) $('akpis').insertAdjacentHTML('beforebegin', '<div id="apchk" style="margin-bottom:14px"></div>');
       const sel = window.aPC === 'exp' ? exp : window.aPC === 'na' ? na : null;
       const cl = p => { const c = (P.data.clients || []).find(x => x.id === p.client_id); return c ? c.client_name || (c.fields || {})['Company Name'] || '' : ''; };
-      $('apchk').innerHTML = UI.tiles([{ t: 'Programme checks', k: [['Accreditation expiring', exp.length, 'var(--bad)', window.aPC === 'exp', "aPC=aPC==='exp'?null:'exp';renderA()"], ['Not accredited', na.length, 'var(--bad)', window.aPC === 'na', "aPC=aPC==='na'?null:'na';renderA()"]] }])
+      $('apchk').innerHTML = UI.tiles([{ t: 'Programme checks', k: [['Accreditation expiring', exp.length, 'var(--bad)', window.aPC === 'exp', "aPC=aPC==='exp'?null:'exp';renderA()"], ['No accreditation record', na.length, 'var(--bad)', window.aPC === 'na', "aPC=aPC==='na'?null:'na';renderA()"]] }])
         + (sel ? `<div class="tw" style="margin-top:10px"><table class="dense">${H(['ID', 'Programme', 'Client', 'Qualification ID', 'Start', 'End', 'PM', 'Issue'])}<tbody>${sel.sort((x, y) => kc(x[0].saqa_id).localeCompare(kc(y[0].saqa_id))).map(([p, r]) => `<tr><td>${esc(p.display_id || p.id)}</td><td style="white-space:normal;font-weight:600">${esc(p.programme_name || '')}</td><td>${esc(cl(p))}</td><td>${esc(kc(p.saqa_id || p.qualification_code))}</td><td>${p.start_date || ''}</td><td>${p.end_date || ''}</td><td>${esc(p.project_manager_name || '')}</td><td style="white-space:normal">${esc(r)}</td></tr>`).join('') || '<tr><td colspan="8"><div class="empty"><b>None</b></div></td></tr>'}</tbody></table></div>` : '');
     }
     $('afilter').innerHTML = ['All', 'Granted', 'In progress', 'To submit', 'Expiring'].map(f => `<button class="${f === aF ? 'on' : ''}" onclick="aF='${f}';renderA()">${f}</button>`).join('');
+    if (!$('atype')) $('afilter').insertAdjacentHTML('afterend', '<div class="seg" id="atype" style="flex:0 1 460px"></div>');
+    $('atype').innerHTML = ['All types', 'Legacy (SETA)', 'Occupational (QCTO)'].map(f => `<button class="${f === aT ? 'on' : ''}" onclick="aT='${f}';renderA()">${f}</button>`).join('');
     const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? a.status === 'Desktop application to be submitted' : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted'].includes(a.status));
     const sel = a => QA() ? `<select class="cellsel" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
-    $('atable').innerHTML = H(['No', 'Qualification / SP ID', 'Title', 'NQF', 'Credits', 'Type', 'Provider', 'Quality SETA partner', 'SMME', 'QCTO advisor', 'QCTO verifier', 'Status', 'Desktop result date', 'Site visit date', 'Accredited from', 'Accredited to', 'Feedback']) + '<tbody>' +
-      (A.filter(m).map(a => { const ml = monthsLeft(a);
+    $('atable').innerHTML = H(['No', 'Qualification / SP ID', 'Title', 'NQF', 'Credits', 'Type', 'Provider', 'SETA / quality partner', 'SMME'].concat(LGO ? [] : ['QCTO advisor', 'QCTO verifier'], ['Status'], LGO ? [] : ['Desktop result date', 'Site visit date'], ['Accredited from', LGO ? 'Accredited / extended to' : 'Accredited to', 'Feedback'])) + '<tbody>' +
+      (AT.filter(m).map(a => { const ml = monthsLeft(a);
         return `<tr><td>${A.indexOf(a) + 1}</td><td>${esc(a.saqa_id || '')} ${legB(a.saqa_id || '')}</td><td style="white-space:normal;min-width:220px;font-weight:600">${esc(a.title || '')}</td><td>${a.nqf ?? ''}</td><td>${a.credits ?? ''}</td><td>${esc(a.qual_type || '')}</td><td>${esc(a.provider || '')}</td><td>${esc(a.quality_partner || '')}</td>
-        <td>${tIn(`qaA(${a.id},'smme',this.value)`, a.smme, 'SMME', 130)}</td><td>${tIn(`qaA(${a.id},'qcto_advisor',this.value)`, a.qcto_advisor, 'QCTO advisor', 130)}</td><td>${tIn(`qaA(${a.id},'qcto_verifier',this.value)`, a.qcto_verifier, 'QCTO verifier', 130)}</td>
-        <td>${sel(a)}</td><td>${dIn(`qaA(${a.id},'desktop_date',this.value)`, a.desktop_date, 'Desktop result date')}</td><td>${dIn(`qaA(${a.id},'site_visit_date',this.value)`, a.site_visit_date, 'Site visit date')}</td><td>${dIn(`qaA(${a.id},'accreditation_from',this.value)`, a.accreditation_from, 'Accredited from')}</td><td>${dIn(`qaA(${a.id},'accreditation_to',this.value)`, a.accreditation_to, 'Accredited to')}</td>
+        <td>${tIn(`qaA(${a.id},'smme',this.value)`, a.smme, 'SMME', 130)}</td>${LGO ? '' : `<td>${tIn(`qaA(${a.id},'qcto_advisor',this.value)`, a.qcto_advisor, 'QCTO advisor', 130)}</td><td>${tIn(`qaA(${a.id},'qcto_verifier',this.value)`, a.qcto_verifier, 'QCTO verifier', 130)}</td>`}
+        <td>${sel(a)}</td>${LGO ? '' : `<td>${dIn(`qaA(${a.id},'desktop_date',this.value)`, a.desktop_date, 'Desktop result date')}</td><td>${dIn(`qaA(${a.id},'site_visit_date',this.value)`, a.site_visit_date, 'Site visit date')}</td>`}<td>${dIn(`qaA(${a.id},'accreditation_from',this.value)`, a.accreditation_from, 'Accredited from')}</td><td>${dIn(`qaA(${a.id},'accreditation_to',this.value)`, a.accreditation_to, 'Accredited to')}</td>
         <td style="white-space:normal;min-width:200px">${esc(accFeedback(a))}${ml != null && ml < 12 ? ` <span class="badge ${ml < 6 ? 'b-bad' : 'b-warn'}">Expires in ${Math.max(ml, 0)} months</span>` : ''}</td></tr>`; }).join('')
         || `<tr><td colspan="17"><div class="empty"><b>No qualifications match</b></div></td></tr>`) + '</tbody>';
   };
   function addAccreditation() {
     if (!QA()) { say('Only QA, ETQA or an admin can add to the accreditation pipeline'); return; }
     form('Add qualification to the accreditation pipeline', [['saqa_id', 'Qualification / skills programme ID'], ['title', 'Title'], ['nqf', 'NQF level', 'number'], ['credits', 'Credits', 'number'],
-      ['qual_type', 'Type', 'select', ['Occupational Certificate', 'National Occupational Certificate', 'Higher Occupational Certificate', 'Advanced Occupational Diploma', 'Skills Programme', 'Part Qualification'], 'Occupational Certificate'],
+      ['qual_type', 'Type', 'select', ['legacy', 'Occupational Certificate', 'National Occupational Certificate', 'Higher Occupational Certificate', 'Advanced Occupational Diploma', 'Skills Programme', 'Part Qualification'], 'Occupational Certificate'],
       ['provider', 'Provider name', 'select', ['Catalyst AI (Pty) Ltd', 'Apex Business Academy Pty Ltd'], 'Catalyst AI (Pty) Ltd'], ['quality_partner', 'Quality SETA partner'], ['smme', 'SMME'], ['qcto_advisor', 'QCTO advisor'], ['qcto_verifier', 'QCTO verifier']],
       async v => {
         if (!v.saqa_id || !v.title) { say('ID and title are needed'); throw Error('fields'); }
