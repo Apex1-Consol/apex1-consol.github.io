@@ -148,6 +148,7 @@
     fam() { const items = []; (D().famc || []).forEach(x => { const nm = esc(x.full_name || 'Practitioner'), go = `location.hash='fam/${+x.assessor_id}'`;
         if (x.missing_or_expired_documents > 0) items.push(it(nm, `Missing or expired documents · ${x.missing_or_expired_documents}`, go, true, 'comp'));
         if (!x.registration_count) items.push(it(nm, 'No SETA registration captured', go, false, 'comp'));
+        if (x.expired_registrations > 0) items.push(it(nm, `SETA registration expired · ${x.expired_registrations}`, go, true, 'comp'));
         if (x.open_follow_ups > 0) items.push(it(nm, `Open follow-ups · ${x.open_follow_ups}`, go, false, 'comp')); });
       return { h: 'FAM Registry', link: 'fam', items }; },
     sync() { const o = D().outbox || [], f = o.filter(x => /fail|error/i.test(x.status || '')), p = o.filter(x => /pend|queue/i.test(x.status || ''));
