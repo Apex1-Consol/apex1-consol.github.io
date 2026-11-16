@@ -402,7 +402,7 @@
     const d = P.data; QCO.length = 0; QT.length = 0;
     const ps = [...new Set(d.tracker.map(r => r.programme_id))];
     ps.forEach(pid => { const p = d.progs.find(x => x.id === pid) || {}; const fac = d.assessors.find(a => a.id === p.facilitator_id);
-      QCO.push({ c: clientOf(pid)?.client_name || '', pm: p.project_manager_name || '', f: fac?.full_name || '', a: '', p: (p.saqa_id ? p.saqa_id + ' - ' : '') + (p.programme_name || '') + ' NQF ' + (p.nqf_level || '?'), d: '', s: p.start_date, e: p.end_date }); });
+      QCO.push({ c: clientOf(pid)?.client_name || '', pm: p.project_manager_name || '', f: fac?.full_name || '', a: '', p: (() => { const nm = (p.programme_name || '').trim(), sq = String(p.saqa_id || '').replace(/^SP:/i, '').trim(); return (sq && !nm.includes(sq) ? sq + ' - ' : '') + nm + (p.nqf_level && !/NQF/i.test(nm) ? ' NQF ' + p.nqf_level : ''); })(), d: '', s: p.start_date, e: p.end_date }); });
     d.tracker.forEach(r => { const ci = ps.indexOf(r.programme_id), k = QCO[ci], l = d.learners.find(x => x.id === r.learner_id) || {};
       QT.push({ dbid: r.id, ci, c: k.c, pm: k.pm, f: k.f, a: k.a, ln: l.first_name || '', sn: l.last_name || '', id: l.id_number ? '•••••••••' + String(l.id_number).slice(-4) : '', p: k.p, d: '', s: k.s, e: k.e,
         cur: r.current_status, mon: r.monitoring_status, monD: r.monitoring_date, sor: r.sor_status, sorD: r.sor_issued_date, book: r.eisa_booking_status, eD: r.eisa_date, out: r.eisa_outcome || '', cm: r.comments || '' }); });

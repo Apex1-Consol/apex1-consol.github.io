@@ -143,6 +143,7 @@
   const qVis = pid => { const v = (D().visits || []).filter(x => String(x.programme_id || ((x.fields || {}).Programme || [])[0]) === String(pid)).map(x => (x.fields || {})['Date of Visit'] || (x.fields || {}).Date).filter(Boolean).sort(); return v[v.length - 1]; };
   const qNext = pid => { const v = (D().visits || []).filter(x => String(x.programme_id || ((x.fields || {}).Programme || [])[0]) === String(pid)).sort((a, b) => String((a.fields || {})['Date of Visit']).localeCompare(String((b.fields || {})['Date of Visit']))); return v.length ? (v[v.length - 1].fields || {})['Next Visit Date'] : ''; };
   let qPre = null;
+  window.qaQCoh = pid => { qV = 'Learner rows'; qF = ''; qPre = pid; renderQ(); };
   window.qaQGo = pid => { qScope = 'All'; qF = ''; qPre = pid; location.hash = 'qcto'; setTimeout(renderQ, 50); };
   // bulk: one status (and optional date) for every learner in one programme who is not already on it
   const QBF = [['cur', 'Current Status', null], ['mon', 'Monitoring Status', 'monD'], ['sor', 'SOR Status', 'sorD'], ['book', 'EISA Booking Status', 'eD'], ['out', 'EISA Outcome', null]];
@@ -219,14 +220,25 @@
       $('qcount').textContent = rows.length + ' learner' + (rows.length === 1 ? '' : 's') + (base.length !== QT.length ? ` · ${QT.length - base.length} legacy, withdrawn or other PMs' rows hidden` : '');
       pager.innerHTML = pages > 1 ? `<span class="sub">Page ${qPg + 1} of ${pages}</span><button class="btn sm" ${qPg ? '' : 'disabled'} onclick="qaQpg(${qPg - 1})">‹ Prev</button><button class="btn sm" ${qPg < pages - 1 ? '' : 'disabled'} onclick="qaQpg(${qPg + 1})">Next ›</button>` : '';
     } else {
-      pager.innerHTML = '';
-      const g = QCO.map((k, ci) => [k, ci, rows.filter(([r]) => r.ci === ci).map(([r]) => r)]).filter(([, , a]) => a.length);
-      $('qtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification', 'NQF', 'Group', 'No. of learners', 'Employment status', 'Start date', 'End date', 'Enrolment requested', 'Enrolment received', 'EISA dates booked', 'Facilitator', 'Assessor', 'Mentor', 'Certification']) + '<tbody>' +
-        g.map(([k, ci, a]) => { const m = (D().mods || []).find(x => x.sheet === 'QCTO projects' && x.programme_id === k.pid) || {}, p = (D().progs || []).find(x => x.id === k.pid) || {};
-          const ed = {}; a.forEach(r => { if (r.eD) ed[r.eD] = (ed[r.eD] || 0) + 1; }); const cert = a.filter(r => r.out === 'Competent').length;
-          return `<tr><td>${esc(m.entity || '—')}</td><td>${esc(k.pm)}</td><td>${esc(k.c)}</td><td>${esc(m.prog_type || p.programme_type || '—')}</td><td>${esc(k.p)}</td><td>${esc(p.nqf_level || '')}</td><td>${esc(m.groups || '—')}</td><td>${a.length}</td><td>${esc(m.employment || '—')}</td><td>${fmtD(k.s)}</td><td>${fmtD(k.e)}</td><td>${fmtD(day(m.enrolment_requested_date)) || '—'}</td><td>${fmtD(day(m.enrolment_received_date)) || '—'}</td>
-          <td>${Object.entries(ed).map(([dt, c]) => `${fmtD(dt)} × ${c}`).join('<br>') || '<span class="sub">—</span>'}</td><td>${esc(qFac(a[0]))}</td><td>${esc(qAss(a[0]) || k.a || '')}</td><td>${esc(m.mentor || '—')}</td><td>${m.certification ? esc(m.certification) : cert ? `<span class="badge b-ok">${cert} competent</span>` : '<span class="sub">—</span>'}</td></tr>`; }).join('') + '</tbody>';
-      $('qcount').textContent = g.length + ' cohorts · enrolment, mentor and certification come from Moderation & Verification › QCTO projects';
+      const PER = 25, gm = new Map(); rows.forEach(([r]) => { if (!gm.has(r.pid)) gm.set(r.pid, []); gm.get(r.pid).push(r); });
+      const g = [...gm.entries()], pages = Math.max(1, Math.ceil(g.length / PER)); if (qPg >= pages) qPg = pages - 1;
+      const c = (a, f) => a.filter(f).length, pill = (n, t, k, tip) => `<span class="badge ${n ? k : ''}" title="${tip}" style="margin:1px 2px 1px 0">${t} ${n}/${'$N'}</span>`;
+      $('qtable').innerHTML = H(['Cohort', 'Project Manager', 'Learners', 'Progress', 'EISA dates booked', 'Enrolment requested / received', 'Facilitator / Assessor', 'Mentor', 'Certification']) + '<tbody>' +
+        g.slice(qPg * PER, qPg * PER + PER).map(([pid, a]) => { const k = QCO[a[0].ci] || {}, p = qProg(a[0]) || {}, m = (D().mods || []).find(x => x.sheet === 'QCTO projects' && x.programme_id === pid) || {};
+          const ed = {}; a.forEach(r => { if (r.eD) ed[r.eD] = (ed[r.eD] || 0) + 1; }); const n = a.length, cert = c(a, r => r.out === 'Competent');
+          const nqf = p.nqf_level || ((p.programme_name || '').match(/NQF\s*(\d+)/i) || [])[1] || '';
+          const mis = c(a, r => QMIS.some(x => QFK[x][1](r))), noid = c(a, r => !r.idFull), P_ = (x, t, cls, tip) => pill(x, t, cls, tip).replace('$N', n);
+          const grey = [p.group_name || m.groups, `${fmtD(k.s) || 'no start'} – ${fmtD(k.e) || 'no end'}`, qRS(p), m.entity || p.entity, m.prog_type || (p.programme_type === 'occupational' ? 'Occupational' : p.programme_type), nqf && 'NQF ' + nqf, m.employment].filter(Boolean).map(esc).join(' · ');
+          return `<tr class="famtr" style="cursor:pointer" title="Open the learners of this cohort" onclick="qaQCoh(${pid})"><td style="min-width:260px;max-width:380px;white-space:normal"><b style="color:var(--navy)">#${esc(p.display_id || pid)} · ${esc(k.c)}</b><div>${esc(k.p)}</div><div class="sub">${grey}</div></td>
+          <td>${esc(k.pm || '—')}</td><td>${n}</td>
+          <td style="min-width:220px;white-space:normal">${P_(c(a, r => r.sor === 'Issued'), 'SOR', 'b-info', 'SOR issued')}${P_(c(a, r => r.book === 'Booked'), 'Booked', 'b-info', 'EISA booked')}${P_(cert, 'Competent', 'b-ok', 'EISA outcome Competent')}${P_(c(a, r => /Not Yet Competent|Absent/.test(r.out || '')), 'NYC/Absent', 'b-bad', 'Not Yet Competent or Absent')}
+            ${mis ? `<div><span class="badge b-warn">${mis} mismatch${mis === 1 ? '' : 'es'}</span>` : '<div>'}${noid ? ` <span class="badge b-bad">${noid} no SA ID</span>` : ''}</div></td>
+          <td>${Object.entries(ed).sort().map(([dt, x]) => `${fmtD(dt)} × ${x}`).join('<br>') || '<span class="sub">—</span>'}</td>
+          <td>${fmtD(day(m.enrolment_requested_date)) || '—'} / ${fmtD(day(m.enrolment_received_date)) || '—'}</td>
+          <td style="white-space:normal;min-width:140px">${esc(qFac(a[0]) || 'not set')}<div class="sub">${esc(qAss(a[0]) || k.a || 'not set')}</div></td><td>${esc(m.mentor || '—')}</td>
+          <td>${m.certification ? esc(m.certification) : cert ? `<span class="badge b-ok">${cert} competent</span>` : '<span class="sub">—</span>'}</td></tr>`; }).join('') + (g.length ? '' : '<tr><td colspan="9" class="sub" style="padding:16px">No cohorts match.</td></tr>') + '</tbody>';
+      $('qcount').textContent = g.length + ' cohort' + (g.length === 1 ? '' : 's') + ' · click a cohort for its learners · enrolment, mentor and certification come from Moderation & Verification › QCTO projects';
+      pager.innerHTML = pages > 1 ? `<span class="sub">Page ${qPg + 1} of ${pages}</span><button class="btn sm" ${qPg ? '' : 'disabled'} onclick="qaQpg(${qPg - 1})">‹ Prev</button><button class="btn sm" ${qPg < pages - 1 ? '' : 'disabled'} onclick="qaQpg(${qPg + 1})">Next ›</button>` : '';
     }
   };
 
