@@ -161,6 +161,12 @@ button.pill{border:0;height:44px;padding:0 14px}
 .dqpair{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:14px 20px;border-top:1px solid var(--line2)}
 .dqgh{padding:10px 20px 6px;border-top:1px solid var(--line2);background:var(--bg2,rgba(0,0,0,.02))}
 .dqpair .who{flex:1 1 260px;min-width:0}
+.dqpair.pick{flex-direction:row;flex-wrap:nowrap;align-items:center;justify-content:space-between;text-align:left;border:0;border-top:1px solid var(--line2);border-radius:0;padding:8px 20px;gap:12px}
+.dqpair.pick .who{flex:1 1 auto}
+.dqpair.pick .who .sub{font-size:12px}
+.dqpair.pick>div:last-child{flex:0 0 auto}
+.dqgh{padding:8px 20px 4px!important;margin:0}
+@media(max-width:640px){.dqpair.pick{flex-wrap:wrap}}
 label.f input,label.f select,label.f textarea{color:var(--ink)}
 label.f textarea{border:1px solid var(--border2);border-radius:10px;padding:10px 12px;font:inherit;font-weight:400;font-size:14px;background:var(--surface);resize:vertical}
 .btn:disabled{opacity:.45;cursor:default}
@@ -1250,7 +1256,7 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261116g"></script>
+<script src="live.js?v=20261116h"></script>
 <script src="qa.js?v=20261116c"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
