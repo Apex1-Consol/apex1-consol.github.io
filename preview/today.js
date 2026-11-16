@@ -229,6 +229,7 @@
   const ovData = () => { const d = D(); if (OV.by && OV.d === d.progs && Date.now() - OV.t < 20000) return OV.by;
     const by = new Map(); build(null, ALLB).forEach(b => { const k = b.link || 'other'; if (!by.has(k)) by.set(k, []); b.items.forEach(x => { x.hh = b.h; by.get(k).push(x); }); });
     Object.assign(OV, { t: Date.now(), d: d.progs, by }); return by; };
+  window.apxOvItems = r => (D().progs ? ovData().get(r) || [] : []);
   const lev = xs => xs.filter(x => x.warn).length > xs.length / 4 ? 'r' : xs.length ? 'a' : 'g';
   const LAB = { 'Open recommendations': x => x.warn ? 'overdue' : 'due soon', 'Visits due': x => /^Next/.test(plain(x.s)) ? 'visit due' : 'no visit recorded', 'EISA': x => /^Result outstanding/.test(plain(x.s)) ? 'EISA result outstanding' : /^Registration closes/.test(plain(x.s)) ? 'registration closing' : 'EISA coming up',
     'Attendance': x => /^(Last register|No register)/.test(plain(x.s)) ? 'no recent register' : /check the (start|end) date/.test(plain(x.s)) ? 'register outside dates' : 'high absences',
