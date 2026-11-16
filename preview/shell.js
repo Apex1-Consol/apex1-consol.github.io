@@ -169,6 +169,7 @@
         out.push({ id: `x${p.id}`, t: `Fix LEISA data: ${short(p)} (${L} learner${L > 1 ? 's' : ''})`, s: `${top[0]} (${c[top[0]]})${top.length > 1 ? ` + ${top.length - 1} other issue type${top.length > 2 ? 's' : ''}` : ''} · Fix by: ${who}`, k: 'LEISA', c: 'Fix', on: go(p.id, 'eisa', 'LEISA file') }); });
       const dq = (d.dq || []).length; if (dq) out.push({ id: 'dq', t: `Review ${dq} possible data-quality issue${dq > 1 ? 's' : ''}`, s: 'Data quality review', k: 'Data quality', c: 'Review', on: `location.hash='dq'` });
     }
+    if (window.apxDeskTasks) try { out.push(...window.apxDeskTasks()); } catch (e) {}
     return out;
   }
   function banner() {
