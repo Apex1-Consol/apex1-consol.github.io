@@ -102,7 +102,8 @@
       const v = (D().visits || []).find(x => String(x.id) === String(E.Visit && E.Visit.value)), p = prog(E.programme_id && E.programme_id.value) || (v && prog(v.programme_id));
       if (p) sug(form, E.Owner, String(p.project_manager_name || '').trim().split(/\s+/)[0] || '', 'the programme PM');
       const vd = v && (v.fields || {})['Date of Visit'];
-      sug(form, E.Due, vd ? addDays(String(vd).slice(0, 10), 30) : addDays(iso(new Date()), 30), vd ? 'the visit date + 30 days' : 'today + 30 days');
+      const vdue = vd ? addDays(String(vd).slice(0, 10), 30) : '', ok = vdue && vdue >= iso(new Date());
+      sug(form, E.Due, ok ? vdue : addDays(iso(new Date()), 30), ok ? 'the visit date + 30 days' : 'today + 30 days');
     };
     form.addEventListener('change', ev => { if ((ev.target.name === 'Visit' || ev.target.name === 'programme_id')) go(); });
     if (!E.Owner.value) go();
