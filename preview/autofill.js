@@ -91,6 +91,7 @@
     if (p) L.push(`Programme ${pid(p)}: ${p.programme_name || ''} | ${p.start_date || '?'} to ${p.end_date || '?'}`);
     const K = ['Programme implementation', 'Human resources', 'Assessment strategy', 'Progress on implementation', 'General responsiveness', 'E-learning'];
     K.forEach((k, i) => { const el = E['KMA' + (i + 1)]; if (el && el.value) L.push(`KMA${i + 1} ${k}: score ${el.value}`); });
+    L.push('IMPORTANT: only the scores and fields above are known. Do not invent observations. Summarise what the scores mean per area and leave [observation] placeholders for the visitor to complete.');
     ['date', 'venue', 'overall', 'eisa', 'logbook', 'dropwhy'].forEach(n => { const el = E[n]; if (el && el.value) L.push(`${(el.closest('label') || {}).firstChild?.textContent || n}: ${el.value}`); });
     return L.join('\n');
   }
