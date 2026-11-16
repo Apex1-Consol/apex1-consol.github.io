@@ -505,35 +505,59 @@
   const VKMA = ['Programme Implementation', 'Human Resources', 'Assessment Strategy', 'Progress on Implementation', 'General Responsiveness', 'E-learning'];
   const VDROP = ['Employment Secured', 'Relocated', 'Financial Constraints', 'Health/Medical', 'Family/Personal', 'Academic Performance', 'Disciplinary', 'Lost Interest', 'Transport Issues', 'Other'];
   let vFilt = 'All', vCur = null, vView = 'By status';
-  window.previewVisitView = o => { vView = o; applyVisits(); };
   const vF = v => v.fields || {};
   const vDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
   const vProg = v => v.programme_id || +((vF(v).Programme || [])[0]) || null;
   const vLabel = v => vF(v)['Visit ID'] || 'VIS-' + String(v.id).padStart(3, '0');
   const vNext = v => vF(v)['Next Monitoring Date'] || vF(v)['Next Visit Date'] || '';
   const vJudge = j => j ? { 4: 'b-ok', 3: 'b-ok', 2: 'b-warn', 1: 'b-bad' }[+j] || 'b-n' : 'b-n';
+  let vScope = 'Running', vQ = '', vPg = 0, vKey = '';
+  window.previewVisitView = o => { vScope = o; vPg = 0; applyVisits(); };
+  window.previewVisitQ = s => { vQ = s; vPg = 0; applyVisits(); setTimeout(() => { const i = $('vq'); if (i) { i.focus(); i.setSelectionRange(i.value.length, i.value.length); } }, 0); };
+  window.previewVisitPg = n => { vPg = n; applyVisits(); };
   function applyVisits() {
-    const today = new Date().toISOString().slice(0, 10), all = P.data.visits.slice().sort((a, b) => String(vF(b)['Date of Visit'] || '').localeCompare(String(vF(a)['Date of Visit'] || '')));
+    const today = new Date().toISOString().slice(0, 10), d30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10), rs = p => (window.dvApi?.runState || (() => 'Active'))(p);
     const head = document.querySelector('#view-visits h1')?.parentElement; const btn = head?.querySelector('button'); if (btn) { btn.textContent = '+ Add visit'; btn.onclick = () => previewVisitAdd(); btn.removeAttribute('onclick'); }
-    const due = all.filter(v => vNext(v) && vNext(v) <= today), openRecs = id => P.data.recs.filter(r => !r.resolved && (r.fields?.Visit || []).map(String).includes(String(id))).length;
-    const low = v => +vF(v)['Overall Judgment'] && +vF(v)['Overall Judgment'] <= 2, withRecs = all.filter(v => openRecs(v.id) > 0);
-    const vt = (k, v, c) => [k === 'All' ? 'All visits' : k, v, c, vFilt === k && k !== 'All', `previewVisitFilter('${vFilt === k ? 'All' : k}')`];
+    const vd = v => String(vF(v)['Date of Visit'] || vF(v).Date || ''), byP = {};
+    P.data.visits.slice().sort((a, b) => vd(b).localeCompare(vd(a))).forEach(v => { const k = vProg(v) || 0; (byP[k] = byP[k] || []).push(v); });
+    const openRecs = id => P.data.recs.filter(r => !r.resolved && (r.fields?.Visit || []).map(String).includes(String(id))).length;
+    const cl = id => (P.data.clients || []).find(c => c.id === id)?.client_name || '';
+    const mine = p => !window.apxMineProg || apxMineProg(p);
+    const progs = P.data.progs.filter(p => !p.deleted_at && mine(p));
+    const FK = { od: ['Overdue', 'Next visit date has passed', 'var(--bad)'], due: ['Due in 30 days', 'Next visit within 30 days', 'var(--warn)'], none: ['Running with no visit', 'Running programme, no visit recorded', 'var(--bad)'], low: ['Low score', 'Latest visit judged 1 or 2', 'var(--bad)'], rec: ['Open recommendations', 'Unresolved recommendations from its visits', 'var(--warn)'] };
+    const info = p => { const vs = byP[p.id] || [], L = vs[0], nx = L ? vNext(L) : '', st = rs(p), fl = [];
+      if (L && nx && nx < today && st !== 'Completed') fl.push('od'); else if (L && nx && nx <= d30 && st !== 'Completed') fl.push('due');
+      if (!L && st === 'Active') fl.push('none'); if (L && +vF(L)['Overall Judgment'] && +vF(L)['Overall Judgment'] <= 2) fl.push('low');
+      if (vs.some(v => openRecs(v.id))) fl.push('rec'); return { p, vs, L, nx, st, fl }; };
+    const all = progs.map(info), scoped = all.filter(x => vScope === 'All' || (vScope === 'Running' ? x.st === 'Active' : x.st === 'Completed'));
+    const cnt = k => all.filter(x => x.fl.includes(k)).length;
     $('vkpis').className = 'famtiles';
-    $('vkpis').innerHTML = UI.tiles([{ t: 'Visits', k: [vt('All', all.length), vt('Next visit due', due.length, 'var(--bad)'), vt('Low score', all.filter(low).length, 'var(--bad)')] },
-      { t: 'Follow-up', k: [vt('Has open recommendations', withRecs.length, 'var(--warn)'), ['Average judgement', (() => { const j = all.map(v => +vF(v)['Overall Judgment']).filter(Boolean); return j.length ? (j.reduce((a, b) => a + b, 0) / j.length).toFixed(1) + ' / 4' : '—'; })()]] }]);
-    const th = $('vrows').closest('table').querySelector('thead tr'); if (th) th.innerHTML = '<th>Visit</th><th>Programme · Venue</th><th>Date</th><th>QCTO personnel</th><th>Judgement</th><th>Next visit</th>';
+    const vt = k => [FK[k][0], cnt(k), cnt(k) ? FK[k][2] : 'var(--muted)', vFilt === k, `previewVisitFilter('${vFilt === k ? 'All' : k}')`, FK[k][1]];
+    const nv = P.data.visits.filter(v => !vProg(v) || progs.some(p => p.id === vProg(v))).length;
+    $('vkpis').innerHTML = UI.tiles([{ t: 'Visits due', k: [vt('od'), vt('due'), vt('none')] }, { t: 'Follow-up', k: [vt('low'), vt('rec'), ['Visits recorded', nv, 'var(--muted)', false, '', 'All monitoring visits on record']] }]);
+    const showPers = P.data.visits.some(v => (vF(v)['QCTO Personnel'] || '').trim()), cols = showPers ? 6 : 5;
+    const th = $('vrows').closest('table').querySelector('thead tr'); if (th) th.innerHTML = '<th>Visit</th><th>Venue</th><th>Date</th>' + (showPers ? '<th>QCTO personnel</th>' : '') + '<th>Judgement</th><th>Next visit</th>';
     const tb = $('vfilter').parentElement; if (tb.className !== 'famtool') { tb.className = 'famtool'; tb.removeAttribute('style'); $('vfilter').removeAttribute('style'); $('vfilter').className = ''; }
-    $('vfilter').innerHTML = UI.seg(['By status', 'List'], vView, o => `previewVisitView('${o}')`) + `<span style="flex-grow:1"></span><span class="sub">Newest first</span>`;
-    let rows = all.filter(v => vFilt === 'All' || (vFilt === 'Next visit due' ? due.includes(v) : vFilt === 'Low score' ? low(v) : openRecs(v.id) > 0));
-    const VG = [['Next visit due', 'var(--bad)', v => due.includes(v)], ['Low score (1 or 2)', 'var(--bad)', low], ['Open recommendations', 'var(--warn)', v => openRecs(v.id) > 0], ['On track', 'var(--ok)', () => true]];
-    const gOf = v => VG.findIndex(g => g[2](v));
-    if (vView === 'By status') rows = rows.map(v => [gOf(v), v]).sort((a, b) => a[0] - b[0]).map(x => x[1]);
-    let vLast = -1;
-    $('vrows').innerHTML = rows.map(v => { const f = vF(v), nx = vNext(v), late = nx && nx <= today, gi = gOf(v);
-      const gh = vView === 'By status' && gi !== vLast ? UI.gh(VG[gi][0], rows.filter(x => gOf(x) === gi).length, VG[gi][1], 6) : ''; vLast = gi;
-      return gh + `<tr class="famtr" onclick="previewOpenVisit(${v.id})"><td><b>${esc(vLabel(v))}</b></td><td>${esc(vProg(v) ? progName(vProg(v)) : (f['Programme Name'] || [])[0] || '—')}<div class="sub">${esc(f.Venue || '')}</div></td><td>${vDate(f['Date of Visit'])}</td><td>${esc(f['QCTO Personnel'] || '—')}</td>
+    const sc = k => all.filter(x => k === 'All' || (k === 'Running' ? x.st === 'Active' : x.st === 'Completed')).length;
+    $('vfilter').innerHTML = UI.seg(['Running', 'Completed', 'All'], vScope, o => `previewVisitView('${o}')`).replace(/>(Running|Completed|All)</g, (m, o) => `>${o} (${sc(o)})<`) + `<input id="vq" type="search" placeholder="Search #id, client, programme, venue" value="${esc(vQ)}" oninput="previewVisitQ(this.value)" style="flex:1 1 240px;max-width:340px;margin-left:10px">`;
+    const q = vQ.trim().toLowerCase();
+    let list = (vFilt !== 'All' ? all.filter(x => x.fl.includes(vFilt)) : scoped.filter(x => x.vs.length || x.fl.includes('none')))
+      .filter(x => !q || ['#' + x.p.id, cl(x.p.client_id), x.p.programme_name, ...x.vs.map(v => vF(v).Venue), ...x.vs.map(vLabel)].join(' ').toLowerCase().includes(q));
+    const pri = x => ['od', 'low', 'due', 'rec'].map(k => x.fl.includes(k)).indexOf(true) >>> 0, rank = x => x.vs.length ? pri(x) : 1e10;
+    list.sort((a, b) => rank(a) - rank(b) || (a.nx || '9').localeCompare(b.nx || '9') || cl(a.p.client_id).localeCompare(cl(b.p.client_id)) || a.p.id - b.p.id);
+    const key = vScope + '|' + vFilt + '|' + q; if (key !== vKey) { vKey = key; vPg = 0; }
+    const PER = 25, pages = Math.max(1, Math.ceil(list.length / PER)); if (vPg >= pages) vPg = pages - 1;
+    const dt = p => [p.start_date, p.end_date].map(x => x ? vDate(x) : '?').join(' – ');
+    $('vrows').innerHTML = list.slice(vPg * PER, vPg * PER + PER).map(x => { const p = x.p;
+      const gh = UI.gh(`<a href="#programmes" onclick="event.stopPropagation();window.dvProg&&dvProg(${p.id})" style="color:inherit">#${esc(p.display_id || p.id)}</a> · ${esc(cl(p.client_id))} · ${esc(p.programme_name || '')} · ${dt(p)}`, x.vs.length, x.fl.length ? FK[x.fl[0]][2] : 'var(--ok)', cols,
+        [x.st === 'Active' ? 'Running' : x.st, p.project_manager_name || 'No PM', ...x.fl.map(k => FK[k][0])].map(esc).join(' · '));
+      if (!x.vs.length) return gh + `<tr><td colspan="${cols}"><span class="sub">No visit recorded.</span> <button class="btn sm" onclick="previewVisitAdd(${p.id})">+ Add visit</button></td></tr>`;
+      return gh + x.vs.map((v, i) => { const f = vF(v), nx = vNext(v), late = i === 0 && nx && nx < today && x.st !== 'Completed', soon = i === 0 && !late && nx && nx <= d30 && x.st !== 'Completed', orc = openRecs(v.id);
+        return `<tr class="famtr" onclick="previewOpenVisit(${v.id})"${i ? ' style="opacity:.7"' : ''}><td><a href="#visit/${v.id}" onclick="event.stopPropagation();previewOpenVisit(${v.id});return false" style="font-weight:700;color:var(--navy)">${esc(vLabel(v))}</a>${i ? '<div class="sub">Earlier visit</div>' : ''}</td><td>${esc(f.Venue || '—')}</td><td>${vDate(vd(v))}</td>${showPers ? `<td>${esc(f['QCTO Personnel'] || '—')}</td>` : ''}
         <td>${f['Overall Judgment'] ? `<span class="badge ${vJudge(f['Overall Judgment'])}">${esc(f['Overall Judgment'])} / 4</span>` : '<span class="sub">Not scored</span>'}</td>
-        <td>${nx ? `<span style="${late ? 'color:var(--bad);font-weight:600' : ''}">Next ${vDate(nx)}</span>` : '<span class="sub">No next date</span>'}${openRecs(v.id) ? `<div class="sub">${openRecs(v.id)} open recommendation${openRecs(v.id) > 1 ? 's' : ''}</div>` : ''}</td></tr>`; }).join('') || '<tr><td colspan="6" class="sub">No visits</td></tr>';
+        <td>${nx ? (i ? `<span class="sub">Next ${vDate(nx)}</span>` : `<span style="${late ? 'color:var(--bad);font-weight:600' : soon ? 'color:var(--warn);font-weight:600' : ''}">${late ? 'Overdue · ' : ''}Next ${vDate(nx)}</span>`) : '<span class="sub">No next date</span>'}${orc ? `<div class="sub">${orc} open recommendation${orc > 1 ? 's' : ''}</div>` : ''}</td></tr>`; }).join(''); }).join('') || `<tr><td colspan="${cols}" class="sub">Nothing here</td></tr>`;
+    let pager = $('vpager'); if (!pager) { $('vrows').closest('.tw').insertAdjacentHTML('afterend', '<div id="vpager" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"></div>'); pager = $('vpager'); }
+    pager.innerHTML = pages > 1 ? `<span class="sub">${list.length} programmes · page ${vPg + 1} of ${pages}</span><button class="btn sm" ${vPg ? '' : 'disabled'} onclick="previewVisitPg(${vPg - 1})">‹ Prev</button><button class="btn sm" ${vPg < pages - 1 ? '' : 'disabled'} onclick="previewVisitPg(${vPg + 1})">Next ›</button>` : '';
     if (location.hash.startsWith('#visit/')) renderVisit(+location.hash.split('/')[1]);
   }
   window.previewVisitFilter = s => { vFilt = s; applyVisits(); };
@@ -573,10 +597,10 @@
     };
   }
   const toast2 = m => { try { const t = $('toast'); t.textContent = m; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 1600); } catch (_) {} };
-  window.previewVisitAdd = () => {
-    const progs = P.data.progs.slice().sort((a, b) => String(a.programme_name || '').localeCompare(String(b.programme_name || '')));
+  window.previewVisitAdd = pre => {
+    const cn = id => (P.data.clients || []).find(c => c.id === id)?.client_name || '', progs = P.data.progs.filter(p => !p.deleted_at && (!window.apxMineProg || apxMineProg(p))).sort((a, b) => cn(a.client_id).localeCompare(cn(b.client_id)) || a.id - b.id);
     document.body.insertAdjacentHTML('beforeend', `<div id="famov" role="dialog" aria-modal="true" aria-label="Add visit"><form class="card" id="vaform"><h2>Add monitoring visit</h2><div class="qagrid">
-      <label>Programme *<select name="prog" required><option value="">—</option>${progs.map(p => `<option value="${p.id}">${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label><label>Date of visit *<input name="date" type="date" required></label><label>Venue<input name="venue"></label><label>QCTO personnel<input name="pers"></label></div>
+      <label>Programme *<select name="prog" required><option value="">—</option>${progs.map(p => `<option value="${p.id}" ${+pre === p.id ? 'selected' : ''}>#${esc(p.display_id || p.id)} · ${esc(cn(p.client_id))} · ${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label><label>Date of visit *<input name="date" type="date" required></label><label>Venue<input name="venue"></label><label>QCTO personnel<input name="pers"></label></div>
       <div class="sub" id="vaerr" style="color:var(--bad)"></div><div style="display:flex;gap:8px;justify-content:flex-end"><button type="button" class="btn" onclick="document.getElementById('famov').remove()">Cancel</button><button class="btn y">Save</button></form></div>`);
     $('vaform').onsubmit = async ev => {
       ev.preventDefault(); const el = $('vaform').elements, prog = el.prog.value, date = el.date.value;
