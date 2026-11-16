@@ -160,6 +160,16 @@
         if (!x.registration_count) items.push(it(nm, 'No SETA registration captured', go, false, 'comp'));
         if (x.expired_registrations > 0) items.push(it(nm, `SETA registration expired · ${x.expired_registrations}`, go, true, 'comp'));
         if (x.open_follow_ups > 0) items.push(it(nm, `Open follow-ups · ${x.open_follow_ups}`, go, false, 'comp')); });
+      /* Practitioner <-> programme link (names are text on the programme): exact full name, or a first name that only one FAM practitioner has. Anything else is listed, never guessed. */
+      const nz = s => String(s || '').trim().toLowerCase().replace(/\s+/g, ' '), fc = D().famc || [], full = new Map(), first = new Map(), hit = new Map(), miss = new Map();
+      fc.forEach(x => { const n = nz(x.full_name); if (!n) return; full.set(n, x); const f = n.split(' ')[0]; first.set(f, (first.get(f) || []).concat(x)); });
+      if (fc.length) progs().filter(live).forEach(p => Object.entries(p.fields || {}).forEach(([k, v]) => { if (typeof v !== 'string' || !['facilitator', 'assessor', 'moderator'].includes(k.toLowerCase())) return;
+        const n = nz(v); if (!n || /^(tbc|tba|n\/a|na|none|online|-+)$/.test(n)) return;
+        const x = full.get(n) || (!n.includes(' ') && (first.get(n) || []).length === 1 ? first.get(n)[0] : null);
+        const M = x ? hit : miss, key = x ? x.assessor_id : n, e = M.get(key) || { x, v: v.trim(), ps: new Set(), as: new Set() }; e.ps.add(p.id); e.as.add(v.trim()); M.set(key, e); }));
+      hit.forEach(e => { if (!(e.x.expired_registrations > 0)) return; const ids = [...e.ps], as = [...e.as].filter(a => nz(a) !== nz(e.x.full_name));
+        items.push(it(esc(e.x.full_name || 'Practitioner'), `Expired SETA registration on running programmes: ${ids.length}${as.length ? ` · named "${esc(as.join('", "'))}" on the programme` : ''}`, ids.length === 1 ? goP(ids[0]) : `location.hash='fam/${+e.x.assessor_id}'`, true, 'qa', ids.length === 1 ? ids[0] : undefined)); });
+      miss.forEach(e => { const ids = [...e.ps]; items.push(it(esc(e.v), `Name not in FAM Registry: ${ids.length} running programme${ids.length > 1 ? 's' : ''}; use the full name or add the practitioner`, ids.length === 1 ? goP(ids[0]) : goH('programmes'), false, 'qa', ids.length === 1 ? ids[0] : undefined)); });
       return { h: 'FAM Registry', link: 'fam', items }; },
     sync() { const o = D().outbox || [], f = o.filter(x => /fail|error/i.test(x.status || '')), p = o.filter(x => /pend|queue/i.test(x.status || ''));
       const g = new Map(); f.forEach(x => g.set(x.source_table, (g.get(x.source_table) || 0) + 1));
