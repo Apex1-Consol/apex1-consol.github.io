@@ -46,6 +46,7 @@
   const name = l => esc(l.first_name + ' ' + l.last_name);
   const lnk = l => `<button type="button" class="lname" onclick="shOpen(${dProg},${l.id})">${name(l)}</button>`;
   const client = p => (D().clients || []).find(c => c.id === p?.client_id);
+  const wdr = (pid, lid) => (D().enrol || []).some(e => e.programme_id === pid && e.learner_id === lid && /withdrawn/i.test(String((e.fields || {}).Status || e.status || '')));
   const months = p => p?.start_date && p?.end_date ? (new Date(p.end_date) - new Date(p.start_date)) / (30.4 * 864e5) : 12;
   const absenceLimit = p => months(p) >= 12 ? 5 : 3;            // induction pack: 5 days (12-month), 3 days (3-month)
 
@@ -65,7 +66,7 @@
 
   /* ---------- derived figures ---------- */
   function attendance(p, onlyModule) {
-    const ss = sessOf(p.id).filter(s => !onlyModule || modOfSession(s) === onlyModule), ls = learnersOf(p.id);
+    const ss = sessOf(p.id).filter(s => !onlyModule || modOfSession(s) === onlyModule), ls = learnersOf(p.id).filter(l => !wdr(p.id, l.id));
     let rec = 0, here = 0;
     ss.forEach(s => ls.forEach(l => { const v = AT(attFor(p.id, l.id, s.session_date)?.status); if (v) { rec++; if (v !== 'A') here++; } }));
     return { sessions: ss.length, rate: pct(here, rec) };
@@ -268,27 +269,59 @@
 
   /* ---------- Attendance & PoE ---------- */
   let addOpen = false;
-  /* Attendance below 80% per programme (as the Report Generator dashboard warns). R = late counts as attended. */
-  function attWarn() {
-    const by = {}; (D().att || []).forEach(a => { const st = String(a.status || (a.fields || {}).Status || '').toUpperCase().slice(0, 1); if (!'PAR'.includes(st) || !st) return; const o = by[a.programme_id] = by[a.programme_id] || [0, 0]; o[1]++; if (st !== 'A') o[0]++; });
-    const low = Object.entries(by).map(([pid, [ok, n]]) => ({ p: prog(+pid), pct: Math.round(100 * ok / n), n })).filter(x => x.p && !x.p.deleted_at && x.p.status !== 'closed' && x.pct < 80).sort((a, b) => a.pct - b.pct);
-    let el = $('attwarn'); if (!el) { $('atabs').insertAdjacentHTML('beforebegin', '<section class="card" id="attwarn" style="margin-bottom:12px"></section>'); el = $('attwarn'); }
-    el.hidden = !low.length;
-    el.innerHTML = low.length ? `<b>Attendance below 80%</b> <span class="sub">(${low.length} programme${low.length === 1 ? '' : 's'})</span><div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">${low.map(x => `<button class="btn sm" onclick="dvAttPick(${x.p.id})"><span class="badge ${x.pct < 50 ? 'b-bad' : 'b-warn'}">${x.pct}%</span>&nbsp;${esc(x.p.programme_name || '')}${x.p.group_name ? ' · ' + esc(x.p.group_name) : ''}</button>`).join('')}</div>` : '';
+  /* Attention tiles (running programmes, PMs see their own), programme picker '#id · client · programme', programme strip. */
+  let aF = null, aScope = 'run';
+  const AF = { noreg: ['No register in 14 days', 'Running, no register captured in the last 14 days', 'var(--warn)'], low: ['Below 80% attendance', 'Late counts as attended', 'var(--bad)'],
+    over: ['Over absence limit', 'At least one learner over 3 days (5 on 12-month programmes)', 'var(--bad)'], out: ['Register outside dates', 'Register before the start or after the end date', 'var(--bad)'],
+    docs: ['Documents not captured', 'No document marks on the Documents tab yet', 'var(--warn)'] };
+  function attFlags() {
+    const ab = {}, t = today(); (D().att || []).forEach(a => { if (AT(a.status) === 'A') { const k = a.programme_id + '.' + a.learner_id; ab[k] = (ab[k] || 0) + 1; } });
+    return progs().filter(p => !p.deleted_at && runState(p) === 'Active' && learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p))).map(p => {
+      const f = [], rd = regDates(p.id), past = rd.filter(d => d <= t), last = past[past.length - 1], lim = absenceLimit(p), r = attendance(p).rate;
+      if (!last || (new Date(t) - new Date(last)) / 864e5 > 14) f.push('noreg');
+      if (r != null && r < 80) f.push('low');
+      if (learnersOf(p.id).some(l => !wdr(p.id, l.id) && (ab[p.id + '.' + l.id] || 0) > lim)) f.push('over');
+      if (rd.some(d => (p.start_date && d < day(p.start_date)) || (p.end_date && d > day(p.end_date)))) f.push('out');
+      if (!docGaps(p.id).captured) f.push('docs');
+      return [p, f, last]; });
+  }
+  window.dvAttF = k => { aF = aF === k ? null : k; dProg = null; renderAtt(); };
+  window.dvAttScope = v => { aScope = v; aF = null; dProg = null; renderAtt(); };
+  function attTop(FA) {
+    let el = $('attwarn'); if (!el) { $('atabs').insertAdjacentHTML('beforebegin', '<div id="attstrip" class="card" style="margin-bottom:12px;padding:12px 20px"></div><section class="card" id="attwarn" style="margin-bottom:12px"></section>'); el = $('attwarn'); }
+    el.hidden = false;
+    el.innerHTML = `<div class="famtiles">${UI.tiles([{ t: `Needs attention · ${FA.length} running programme${FA.length === 1 ? '' : 's'}`, k: Object.keys(AF).map(k => [AF[k][0], FA.filter(x => x[1].includes(k)).length, AF[k][2], aF === k, `dvAttF('${k}')`, AF[k][1]]) }])}</div>`
+      + (aF ? `<div class="sub" style="margin-top:8px">Programme list shows only: <b>${AF[aF][0]}</b> · <a href="javascript:void 0" onclick="dvAttF('${aF}')">Clear</a></div>` : '');
+    const sel = document.querySelector('#view-attendance select'); if (!sel) return;
+    const cn = p => client(p)?.client_name || 'No client';
+    let list = aF ? FA.filter(x => x[1].includes(aF)).map(x => x[0]) : aScope === 'all' ? progs().filter(p => !p.deleted_at && learnersOf(p.id).length && (!window.apxMineProg || apxMineProg(p))) : FA.map(x => x[0]);
+    list = list.slice().sort((a, b) => cn(a).localeCompare(cn(b)) || a.id - b.id);
+    if (!list.some(p => p.id === dProg)) { const cur = prog(dProg); if (!aF && cur && learnersOf(cur.id).length) list.unshift(cur); else dProg = list[0]?.id ?? null; }
+    sel.innerHTML = list.map(p => `<option value="${p.id}"${p.id === dProg ? ' selected' : ''}>#${p.id} · ${esc(cn(p))} · ${esc(p.programme_name || '')}${p.group_name ? ' · ' + esc(p.group_name) : ''}</option>`).join('') || '<option value="">No programmes</option>';
+    sel.style.maxWidth = '640px'; sel.onchange = () => { dProg = +sel.value; renderAtt(); };
+    if (!$('ascope')) sel.closest('label').insertAdjacentHTML('beforebegin', '<select id="ascope" style="height:40px" aria-label="Which programmes" onchange="dvAttScope(this.value)"><option value="run">Running</option><option value="all">All</option></select>');
+    $('ascope').value = aScope; $('ascope').disabled = !!aF;
+  }
+  function attStrip(p, FA) {
+    const el = $('attstrip'); if (!el) return; el.hidden = !p; if (!p) return;
+    const x = FA.find(y => y[0].id === p.id), rd = regDates(p.id), t = today(), past = rd.filter(d => d <= t), last = past[past.length - 1];
+    const ls = learnersOf(p.id), w = ls.filter(l => wdr(p.id, l.id)).length, rs = runState(p);
+    const bits = [esc(client(p)?.client_name || 'No client'), 'PM ' + esc(p.project_manager_name || 'not set'), `${fmtD(day(p.start_date)) || 'No start'} → ${fmtD(day(p.end_date)) || 'No end'}`,
+      `${ls.length - w} learner${ls.length - w === 1 ? '' : 's'}${w ? ` (+${w} withdrawn)` : ''}`, `${sessOf(p.id).length} session${sessOf(p.id).length === 1 ? '' : 's'}`, 'Last register ' + (last ? fmtD(last) : 'none')];
+    el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center"><b>#${p.id}</b><span class="badge ${rs === 'Active' ? 'b-ok' : 'b-n'}">${rs === 'Active' ? 'Running' : rs}</span><span class="sub">${bits.join(' · ')}</span>${(x ? x[1] : []).map(k => `<span class="badge" style="background:${AF[k][2]};color:#fff">${AF[k][0]}</span>`).join('')}</div>`;
   }
   window.dvAttPick = id => { dProg = id; aTab = 'Register'; renderAtt(); };
   const _renderAtt = renderAtt;
   renderAtt = function () {
     if (!P.user) return _renderAtt();
-    const p = ensure();
-    picker('#view-attendance select', renderAtt);
-    attWarn();
+    const FA = attFlags(); attTop(FA);
+    const p = dProg == null ? null : ensure(); attStrip(p, FA);
     $('atabs').innerHTML = ['Register', 'PoE tracker', 'Documents'].map(t => `<button class="${t === aTab ? 'on' : ''}" onclick="aTab='${t}';renderAtt()">${t}</button>`).join('');
     $('regcard').hidden = aTab !== 'Register'; $('poecard').hidden = aTab !== 'PoE tracker'; renderDocs(p);
-    if (!p) { $('register').innerHTML = '<tbody><tr><td class="sub">No programmes with learners.</td></tr></tbody>'; $('poetable').innerHTML = ''; return; }
+    if (!p) { $('register').innerHTML = `<tbody><tr><td class="sub">${aF ? 'No programmes match this filter.' : 'No programmes with learners.'}</td></tr></tbody>`; $('poetable').innerHTML = ''; return; }
     const ls = learnersOf(p.id), ss = sessOf(p.id), ed = CAN(), lim = absenceLimit(p);
     const hint = $('regcard').querySelector('p.sub');
-    if (hint) hint.innerHTML = (ed ? 'Tap a cell to cycle Present → Late → Absent. Changes save automatically. ' : 'Read only for your role. ') + `R means late (counts as attended, as in the old app). The absence limit for this programme is ${lim} days.`;
+    if (hint) hint.innerHTML = (ed ? 'Tap a cell to cycle Present → Late → Absent. Changes save automatically. ' : 'Read only for your role. ') + `R means late and counts as attended. The absence limit for this programme is ${lim} days. Sessions can only be added on dates inside the programme dates, up to today.`;
     const head = $('regcard').firstElementChild;
     if (head && !$('dvadd')) head.insertAdjacentHTML('beforeend', '<button class="btn sm" onclick="dvAttCsv()">Export CSV</button><button class="btn sm" id="dvadd" onclick="dvAddToggle()">+ Add session</button>');
     if ($('dvadd')) $('dvadd').hidden = !ed;
@@ -301,7 +334,8 @@
       const cells = ss.map(s => { const v = AT(attFor(p.id, l.id, s.session_date)?.status); if (v) { rec++; if (v !== 'A') here++; if (v === 'A') ab++; }
         const [bg, fg] = v && SC[v] ? SC[v] : ['var(--soft)', 'var(--muted)'];
         return `<td style="text-align:center;padding:8px 4px">${ed ? `<button aria-label="${name(l)} ${fmtD(day(s.session_date))}: ${v || 'not recorded'}" onclick="dvMark(${l.id},'${day(s.session_date)}')" style="width:36px;height:36px;border:0;border-radius:8px;font-weight:700;background:${bg};color:${fg}">${v || '·'}</button>` : `<span class="dot" style="width:32px;height:32px;background:${bg};color:${fg}">${v || '·'}</span>`}</td>`; }).join('');
-      return `<tr><td style="font-weight:600">${lnk(l)}</td>${cells}<td style="font-weight:600">${rec ? pct(here, rec) + '%' : '—'}</td><td>${ab > lim ? `<span class="badge b-bad">${ab} · over ${lim}</span>` : ab}</td></tr>`; }).join('')}</tbody>`;
+      const wd = wdr(p.id, l.id);
+      return `<tr${wd ? ' style="opacity:.55"' : ''}><td style="font-weight:600">${lnk(l)}${wd ? ' <span class="badge b-n">Withdrawn</span>' : ''}</td>${cells}<td style="font-weight:600">${rec ? pct(here, rec) + '%' : '—'}</td><td>${ab > lim && !wd ? `<span class="badge b-bad">${ab} · over ${lim}</span>` : ab}</td></tr>`; }).join('')}</tbody>`;
     if (!ss.length) $('register').insertAdjacentHTML('beforeend', `<tbody><tr><td colspan="3" class="sub">No sessions yet.${ed ? ' Use “+ Add session”.' : ''}</td></tr></tbody>`);
     // PoE tracker: module results per part + internal moderation (feeds EISA readiness)
     const ms = modsOf(p.id);
@@ -320,7 +354,10 @@
     const p = prog(dProg), box = $('dvsess'); if (!p || !box) return;
     const v = {}; box.querySelectorAll('[data-k]').forEach(i => { v[i.dataset.k] = i.value.trim(); });
     if (!v.session_date) return say('Pick the session date');
-    if (sessOf(p.id).some(s => !s.imported && day(s.session_date) === v.session_date)) return say('There is already a session on that date');
+    if (v.session_date > today()) return say('A session cannot be in the future');
+    if (p.start_date && v.session_date < day(p.start_date)) return say('That date is before the programme start (' + fmtD(day(p.start_date)) + ')');
+    if (p.end_date && v.session_date > day(p.end_date)) return say('That date is after the programme end (' + fmtD(day(p.end_date)) + ')');
+    if (sessOf(p.id).some(s => day(s.session_date) === v.session_date)) return say('There is already a session or register on that date');
     const row = { tenant_id: P.tenant, programme_id: p.id, session_date: v.session_date, topic: v.topic || null, facilitator: v.facilitator || null, venue: v.venue || null,
       fields: { Date: v.session_date, Topic: v.topic, Facilitator: v.facilitator, Venue: v.venue, Programme: [String(p.id)], Module: v.module ? +v.module : null } };
     const r = await write('Session', () => sb.from('attendance_sessions').insert(row).select());
