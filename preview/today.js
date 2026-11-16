@@ -80,10 +80,20 @@
     mods(m) { const r = (D().mods || []).filter(x => (x.programme_id == null || m.has(String(x.programme_id))) && x.stage !== 'Submitted to PM').map(x => ({ x, n: dd(x.stage_date), e: dd(x.exit_verification_date) }));
       return { h: 'Moderation needing a push', link: 'modver', items: r.filter(o => o.x.stage === 'On hold' || (o.n != null && o.n <= -30) || (o.e != null && o.e >= 0 && o.e <= 30))
         .map(o => it(o.x.programme_id == null ? esc([o.x.client_name, o.x.qualification].filter(Boolean).join(' · ') || 'Moderation item ' + o.x.id) + ' · no programme linked' : pname(m.get(String(o.x.programme_id))), `${esc(o.x.stage || 'No stage')}${o.e != null && o.e >= 0 && o.e <= 30 ? ' · exit verification ' + fmt(o.x.exit_verification_date) : o.n != null ? ' · ' + (-o.n) + ' d at this stage' : ''}`, goH('modver'), o.x.stage === 'On hold' || o.n <= -30, 'qa', o.x.programme_id)) }; },
-    accs() { // Only a granted accreditation can expire; for applications the to-date is a process date, not an expiry.
+    accs(m) { // Only a granted accreditation can expire; for applications the to-date is a process date, not an expiry.
       const a = byN((D().accs || []).map(x => ({ x, n: x.status === 'Accreditation granted' ? dd(x.accreditation_to) : null })));
-      return { h: 'Accreditation', link: 'accred', items: a.filter(o => (o.n != null && o.n <= 120) || (o.x.status && o.x.status !== 'Accreditation granted'))
-        .map(o => it(esc(`${o.x.saqa_id || ''} ${o.x.title || ''}`.trim()), o.n != null && o.n <= 120 ? `Expires ${fmt(o.x.accreditation_to)} · ${when(o.n)}` : esc(o.x.status) + (o.x.site_visit_date ? ' · site visit ' + fmt(o.x.site_visit_date) : ''), goH('accred'), o.n != null && o.n <= 60, 'qa')) }; },
+      // Link to programmes by SAQA ID: running programmes whose qualification has no accreditation record, is not yet granted, or lapses before they end.
+      const nk = s => String(s || '').replace(/^\s*SP:\s*/i, '').trim(), A = new Map((D().accs || []).map(x => [nk(x.saqa_id), x])), g = new Map(), pi = [];
+      [...(m ? m.values() : [])].filter(live).forEach(p => { const k = nk(p.saqa_id); if (!k) return; if (!g.has(k)) g.set(k, []); g.get(k).push(p); });
+      g.forEach((ps, k) => { const x = A.get(k), n = ps.length, tail = `${n} running programme${n > 1 ? 's' : ''}`; let s = null;
+        if (!x) s = `No accreditation record: ${tail}; add the accreditation or correct the SAQA ID`;
+        else if (x.status !== 'Accreditation granted') s = `Running before accreditation granted: ${esc(x.status || 'no status')} · ${tail}`;
+        else { const e = dd(x.accreditation_to), le = ps.map(p => ymd(p.end_date)).filter(Boolean).sort().pop();
+          if (e != null && e < 0) s = `Accreditation expired: ${fmt(x.accreditation_to)} · ${tail}`;
+          else if (e != null && le && le > ymd(x.accreditation_to)) s = `Accreditation ends before programme end: ${fmt(x.accreditation_to)} vs ${fmt(le)} · ${tail}`; }
+        if (s) pi.push(it(x ? esc(`${k} ${x.title || ''}`.trim()) : esc(k) + ' · ' + pname(ps[0]), s, n === 1 ? goP(ps[0].id) : goH('accred'), true, 'qa')); });
+      return { h: 'Accreditation', link: 'accred', items: pi.concat(a.filter(o => (o.n != null && o.n <= 120) || (o.x.status && o.x.status !== 'Accreditation granted'))
+        .map(o => it(esc(`${o.x.saqa_id || ''} ${o.x.title || ''}`.trim()), o.n != null && o.n <= 120 ? `Expires ${fmt(o.x.accreditation_to)} · ${when(o.n)}` : esc(o.x.status) + (o.x.site_visit_date ? ' · site visit ' + fmt(o.x.site_visit_date) : ''), goH('accred'), o.n != null && o.n <= 60, 'qa'))) }; },
     signoffs() { const s = (D().signoffs || []).filter(x => !x.status || /wait|pend|submit|open/i.test(x.status));
       return { h: 'Waiting for sign-off', link: 'signoff', items: s.map(x => it(esc(x.title || x.kind || 'Item'), `From ${esc(x.submitted_by || 'unknown')}${x.created_at ? ' · ' + fmt(x.created_at) : ''}`, goH('signoff'), (dd(x.created_at) ?? 0) <= -3, 'comp')) }; },
     reports(m) { const items = [];
