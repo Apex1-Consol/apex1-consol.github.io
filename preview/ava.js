@@ -49,8 +49,8 @@
     tasks.slice(0, 40).forEach(t => L.push(`- [${t.k || 'Task'}] ${String(t.t || '').replace(/<[^>]+>/g, '')}`));
     if (tasks.length > 40) L.push(`- …and ${tasks.length - 40} more`);
     const byPage = new Map(); flags().forEach(x => { const k = x.lab + ' > ' + x.hh; if (!byPage.has(k)) byPage.set(k, { r: x.r, n: 0, w: 0, ids: [] }); const o = byPage.get(k); o.n++; if (x.warn) o.w++; if (x.pid) { const p = progAll().find(q => q.id === x.pid); if (p && o.ids.length < 8) o.ids.push(pid(p)); } });
-    L.push(`Overview flags (page > check: count, urgent, examples):`);
-    [...byPage.entries()].sort((a, b) => b[1].w - a[1].w || b[1].n - a[1].n).slice(0, 35).forEach(([k, o]) => L.push(`- ${k} {{${o.r}}}: ${o.n}${o.w ? `, ${o.w} urgent` : ''}${o.ids.length ? ` (${o.ids.join(', ')})` : ''}`));
+    L.push(`Overview flags (page > check: count, red flags, example programmes). Red means the Overview shows it red; it does NOT mean overdue. "Visits due" also counts running programmes with no visit recorded yet.`);
+    [...byPage.entries()].sort((a, b) => b[1].w - a[1].w || b[1].n - a[1].n).slice(0, 35).forEach(([k, o]) => L.push(`- ${k} {{${o.r}}}: ${o.n}${o.w ? `, ${o.w} red` : ''}${o.ids.length ? ` (${o.ids.join(', ')})` : ''}`));
     return L.join('\n');
   }
   function briefFacts() {
