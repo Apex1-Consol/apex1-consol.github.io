@@ -40,7 +40,7 @@
   function flags() {
     if (!window.apxOvItems) return [];
     const out = [], ids = new Map(progAll().map(p => [p.id, p]));
-    NAVF().forEach(([lab, r]) => (apxOvItems(r) || []).forEach(x => { const p = x.pid && ids.get(+x.pid); if (p && !mine(p)) return; out.push({ r, lab, hh: x.hh || lab, pid: p ? p.id : null, warn: !!x.warn }); }));
+    NAVF().forEach(([lab, r]) => (apxOvItems(r) || []).forEach(x => { const p = x.pid && ids.get(+x.pid); if (p && !mine(p)) return; const sp = String(x.s || '').replace(/<[^>]+>/g, '').trim(); out.push({ r, lab, hh: x.hh === 'Visits due' ? (/^Next/.test(sp) ? 'Visit due or overdue (next visit date)' : 'No monitoring visit recorded yet') : (x.hh || lab), pid: p ? p.id : null, warn: !!x.warn }); }));
     return out;
   }
   function attentionFacts() {
