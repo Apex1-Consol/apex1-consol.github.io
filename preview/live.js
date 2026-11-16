@@ -17,8 +17,8 @@
   window.__preview = P;
   /* Shared look (FAM Registry style) for every screen: KPI filter tiles, segmented switch, grouped table rows */
   window.UI = {
-    tiles: gs => gs.map(g => `<div class="famgrp" role="group" aria-label="${g.t}"><div class="famgl">${g.t}</div><div class="famgk">${g.k.map(([l, v, c, on, click]) => click
-      ? `<button type="button" class="kpi famk${on ? ' on' : ''}" onclick="${click}" aria-pressed="${!!on}" title="${on ? 'Click again to clear the filter' : 'Filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v && c ? c : v ? 'var(--ink)' : 'var(--muted)'}">${v}</span></button>`
+    tiles: gs => gs.map(g => `<div class="famgrp" role="group" aria-label="${g.t}"><div class="famgl">${g.t}</div><div class="famgk">${g.k.map(([l, v, c, on, click, h]) => click
+      ? `<button type="button" class="kpi famk${on ? ' on' : ''}" onclick="${click}" aria-pressed="${!!on}" title="${h ? h + '. ' : ''}${on ? 'Click again to clear the filter' : 'Click to filter the list'}"><span class="l">${l}</span><span class="v" style="color:${v && c ? c : v ? 'var(--ink)' : 'var(--muted)'}">${v}</span>${h ? `<span class="h" style="display:block;font-size:11px;line-height:1.3;color:var(--muted);margin-top:2px;font-weight:400">${h}</span>` : ''}</button>`
       : `<div class="kpi famk" style="cursor:default"><span class="l">${l}</span><span class="v" style="color:${c || 'var(--ink)'}">${v}</span></div>`).join('')}</div></div>`).join(''),
     seg: (opts, cur, fn) => `<div class="famseg" role="group">${opts.map(o => `<button type="button" class="${o === cur ? 'on' : ''}" aria-pressed="${o === cur}" onclick="${fn(o)}">${o}</button>`).join('')}</div>`,
     gh: (label, n, color, cols, note) => `<tr class="famgh"><td colspan="${cols}"><span class="famgd" style="background:${color}"></span>${label}<span class="famgn">${n}</span>${note ? `<span class="sub">${note}</span>` : ''}</td></tr>`
@@ -243,7 +243,8 @@
     const FL = { 'No ID': l => !l.id, 'Invalid ID': l => l.bad, 'Possible duplicate': l => l.dup };
     if (!['All', 'Active', 'Not enrolled', 'Not active', ...Object.keys(FL)].includes(lF)) lF = 'All';
     const pOf = id => P.data.progs.find(p => p.id === id), cOf = id => clientOf(id)?.client_name || '', dt = d => d ? String(d).slice(0, 10) : '?';
-    const tile = (k, v, c) => [k === 'All' ? 'All learners' : k, v, c, lF === k && k !== 'All', `lF='${lF === k ? 'All' : k}';lPage=0;renderLearners()`];
+    const HINT = { All: 'Everyone on record', Active: 'Enrolled on a programme running now', 'Not enrolled': 'No enrolment on any programme', 'Not active': 'Enrolled only on completed or planned programmes', 'No ID': 'ID number is blank', 'Invalid ID': 'Fails the SA ID check (length, date or checksum)', 'Possible duplicate': 'Same ID or name as another learner' };
+    const tile = (k, v, c) => [k === 'All' ? 'All learners' : k, v, c, lF === k && k !== 'All', `lF='${lF === k ? 'All' : k}';lPage=0;renderLearners()`, HINT[k]];
     if ($('ltiles')) $('ltiles').innerHTML = UI.tiles([{ t: 'Enrolment', k: [tile('All', all), tile('Active', act, 'var(--ok)'), tile('Not enrolled', base.filter(l => l.s === 'Not enrolled').length, 'var(--warn)'), tile('Not active', base.filter(l => l.s === 'Not active').length, 'var(--warn)')] }, { t: 'Needs attention', k: [tile('No ID', noid, 'var(--bad)'), tile('Invalid ID', base.filter(FL['Invalid ID']).length, 'var(--bad)'), tile('Possible duplicate', base.filter(FL['Possible duplicate']).length, 'var(--warn)')] }]);
     $('lfilter').innerHTML = UI.seg(['By programme', 'List'], lView, o => `lSetView('${o}')`);
     let rows = base.filter(l => (lF === 'All' || (FL[lF] ? FL[lF](l) : l.s === lF)) && (!q || l.n.toLowerCase().includes(q) || (l.id || '').includes(q) || (l.p || '').toLowerCase().includes(q) || cOf(l.pid).toLowerCase().includes(q) || String(l.pid) === q.replace('#', '')));

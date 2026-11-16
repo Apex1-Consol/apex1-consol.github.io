@@ -788,7 +788,7 @@ function route(){
   if(!isLogin&&famOnly()&&r!=='fam'){location.replace('#fam');return;}
   $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
   document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);
-  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=ROUTES[r][1];renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116c'}}
+  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=crumbOf(r);renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116c'}}
 }
 addEventListener('hashchange',route);
 
@@ -902,6 +902,7 @@ function renderRecs(){
 renderRecs();
 
 const PARENT={learner:'learners',visit:'visits'};
+function crumbOf(r){const grp=x=>(NAV.find(g=>g[1].some(i=>i[1]===x))||[])[0],lab=x=>((NAV.flatMap(g=>g[1]).find(i=>i[1]===x))||[])[0],pr=PARENT[r];if(pr&&grp(pr))return grp(pr)+' / '+lab(pr);return grp(r)||ROUTES[r][1]}
 
 /* Learners — 273 sample rows to test real density */
 const FN=['Nomvuyiseko Thandekile','Sipho','Ayanda','Lerato','Tshepo','Precious','Johannes Petrus','Thandiwe','Kagiso','Zanele','Mohammed Yusuf','Naledi','Bongani','Charmaine','Tatenda','Lindiwe','Pieter','Ntombizodwa','Rudo','Themba'];
@@ -1248,7 +1249,7 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261116e"></script>
+<script src="live.js?v=20261116f"></script>
 <script src="qa.js?v=20261116c"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
