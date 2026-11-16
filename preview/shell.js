@@ -175,6 +175,7 @@
     if (role !== 'admin' && window.apxSaid) active().forEach(p => { const ls2 = a.learnersOf(p.id).map(l => learner(l.id) || l), noId = ls2.filter(l => !(l.id_number || (l.fields || {})['National ID'])).length, bad = ls2.filter(l => { const v = l.id_number || (l.fields || {})['National ID']; return v && !apxSaid(v); }).length;
       if (noId + bad) out.push({ id: `sid${p.id}`, t: `Capture SA ID numbers: ${short(p)} (${noId + bad} learner${noId + bad > 1 ? 's' : ''})`, s: [noId && noId + ' blank', bad && bad + ' invalid'].filter(Boolean).join(' · ') + ' · only South Africans can be enrolled', k: 'Learners', c: 'Fix', on: go(p.id, 'learners', 'Learners') }); });
     if (window.apxQTasks) try { out.push(...window.apxQTasks(role)); } catch (e) {}
+    if (window.apxModTasks) try { out.push(...window.apxModTasks(role)); } catch (e) {}
     if (window.apxRecTasks) try { out.push(...window.apxRecTasks(role)); } catch (e) {}
     if (window.apxEisaTasks) try { out.push(...window.apxEisaTasks(role)); } catch (e) {}
     if (window.apxDeskTasks) try { out.push(...window.apxDeskTasks()); } catch (e) {}

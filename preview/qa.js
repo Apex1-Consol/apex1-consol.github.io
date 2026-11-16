@@ -300,32 +300,84 @@
       .map(([l, v, s, c]) => `<div class="kpi"><span class="l">${l}</span><span class="v" style="color:${c}">${v}</span><span class="n" style="color:var(--muted)">${s}</span></div>`).join('');
     $('mtabs').innerHTML = MTABS.map(t => `<button role="tab" aria-selected="${t === mTab}" class="${t === mTab ? 'on' : ''}" onclick="mTab='${t}';renderM()">${t}</button>`).join('');
     const st = (a, i, v) => QA() ? `<select class="cellsel" aria-label="Stage" onchange="mSet('${a}',${i},this.value)">${MSTAGE.map((s, k) => `<option value="${k}"${k === v ? ' selected' : ''}>${s}</option>`).join('')}</select>` : esc(MSTAGE[v]);
-    const q = v => esc(v || '') + ' ' + legB(v || ''), base = m => [m.entity, m.project_manager, m.client_name, m.prog_type].map(x => `<td>${esc(x || '')}</td>`).join('') + `<td style="white-space:normal;min-width:200px">${q(m.qualification)}</td><td>${esc(m.nqf || '')}</td>`;
-    const empty = n => `<tr><td colspan="${n}"><div class="empty"><b>Nothing on this sheet yet</b>${QA() ? '<span>Use “+ Add programme” to add one.</span>' : ''}</div></td></tr>`;
+    const mP = m => m.programme_id != null ? (D().progs || []).find(p => p.id === m.programme_id) : null;
+    const RS = m => { const p = mP(m); return window.dvApi && dvApi.runState ? dvApi.runState(p || { start_date: day(m.start_date), end_date: day(m.end_date), status: '' }) : 'Active'; };
+    const ixS = m => MSTAGE.indexOf(m.stage), td = iso();
+    const MF = { nl: ['Not linked', 'No programme linked: QA links it', m => !mP(m), 'var(--warn)'], oh: ['On hold', 'Stage is On hold', m => m.stage === 'On hold', 'var(--warn)'],
+      aw: ['Awaiting SoRs or report', 'Exit verification stage before SoRs received', m => m.sheet === 'Exit verification' && ixS(m) < 7, 'var(--warn)'],
+      ev: ['Verification date past, not done', 'Exit verification date has passed, SoRs not received', m => m.sheet === 'Exit verification' && ixS(m) < 7 && m.exit_verification_date && day(m.exit_verification_date) < td, 'var(--bad)'] };
+    const TK = { 'External moderation': ['nl', 'oh'], 'QCTO projects': ['nl'], 'Exit verification stats': ['nl', 'aw', 'ev'], 'Projects completed': ['nl'] }[mTab];
+    const scoped = mTab === 'External moderation' || mTab === 'QCTO projects';
+    const src = mTab === 'External moderation' ? MOD.map((r, i) => [mrec(r.dbid) || {}, i]) : mTab === 'Exit verification stats' ? VER.map((r, i) => [mrec(r.dbid) || {}, i]) : of(SHEET[mTab]).map(m => [m, -1]);
+    const mine = src.filter(([m]) => !(window.apxPMonly && apxPMonly()) || (mP(m) ? apxMineProg(mP(m)) : apxMineName(m.project_manager)));
+    if (!TK.includes(mF)) mF = '';
+    const inScope = ([m]) => !scoped || mF || mScope === 'All' || RS(m) === (mScope === 'Running' ? 'Active' : mScope);
+    const q = mQ.trim().toLowerCase(), hay = m => { const p = mP(m); return `${p ? '#' + (p.display_id || p.id) : ''} ${m.client_name} ${m.qualification} ${p ? p.project_manager_name : ''} ${m.project_manager} ${m.entity} ${m.seta} ${m.verifier || ''}`.toLowerCase(); };
+    const rows = mine.filter(inScope).filter(([m]) => (!mF || MF[mF][2](m)) && (!q || hay(m).includes(q)));
+    const key = [mTab, mScope, mF, q].join('|'); if (key !== mKey) { mPg = 0; mKey = key; }
+    let tools = $('mtools'); if (!tools) { $('mtabs').insertAdjacentHTML('afterend', '<div id="mtools" style="display:flex;flex-direction:column;gap:10px;margin-bottom:10px"><div id="mtiles" class="famtiles"></div><div id="mbar" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center"></div></div>'); tools = $('mtools'); }
+    const cnt = k => mine.filter(([m]) => MF[k][2](m)).length;
+    $('mtiles').innerHTML = UI.tiles([{ t: 'Needs attention', k: TK.map(k => [MF[k][0], cnt(k), cnt(k) ? MF[k][3] : 'var(--muted)', mF === k, `qaMF('${k}')`, MF[k][1]]) }]);
+    const sc = s => mine.filter(([m]) => s === 'All' || RS(m) === (s === 'Running' ? 'Active' : s)).length;
+    $('mbar').innerHTML = (scoped ? UI.seg(['Running', 'Planned', 'Completed', 'All'], mF ? 'All' : mScope, o => `qaMS('${o}')`).replace(/>(Running|Planned|Completed|All)</g, (x, o) => `>${o} (${sc(o)})<`) : '') +
+      `<input id="mq" type="search" placeholder="Search #id, client, qualification, PM" value="${esc(mQ)}" oninput="qaMQ(this.value)" style="flex:1 1 240px;max-width:340px">` +
+      (mTab !== 'Projects completed' && mTab !== 'Exit verification stats' ? `<label class="sub" style="margin-left:auto;display:flex;gap:6px;align-items:center"><input type="checkbox" ${mAll ? 'checked' : ''} onchange="qaMAll(this.checked)"> All sheet columns</label>` : '');
+    const tw = $('mtable').closest('.tw'); tw.classList.remove('tall');
+    let pager = $('mpager'); if (!pager) { tw.insertAdjacentHTML('afterend', '<div id="mpager" style="display:flex;gap:8px;align-items:center;justify-content:flex-end;padding:10px 20px"></div>'); pager = $('mpager'); }
+    const PER = 25, pages = Math.max(1, Math.ceil(rows.length / PER)); if (mPg >= pages) mPg = pages - 1;
+    const page = rows.slice(mPg * PER, mPg * PER + PER);
+    const W = 'style="white-space:normal;min-width:120px;max-width:200px"';
+    const progC = m => { const p = mP(m); return p ? `<a href="#programmes" style="font-weight:700;color:var(--navy)" onclick="dvApi.setProg(${p.id});dvProg&&dvProg(${p.id})">#${esc(p.display_id || p.id)}</a><div class="sub">${esc(RS(m))}</div>`
+      : `<span class="badge b-warn">Not linked</span>${QA() ? `<div><button class="btn sm" style="margin-top:4px" onclick="qaMLink(${m.id})">Link</button></div>` : ''}`; };
+    const pmC = m => { const p = mP(m); return esc((p && p.project_manager_name) || m.project_manager || '—'); };
+    const B = [['Programme', progC], ['Client', m => `${esc(m.client_name || '')}<div class="sub">${esc(m.entity || '')}</div>`, 0, W], ['Project Manager', pmC], ['Type', m => esc(m.prog_type || '')],
+      ['Qualification (OFO / ID)', m => esc(m.qualification || '') + ' ' + legB(m.qualification || ''), 0, 'style="white-space:normal;min-width:200px;max-width:320px"'], ['NQF', m => esc(m.nqf || '')]];
+    const G = ['Learners', m => m.learners ?? ''], dts = m => `${fmtD(day(m.start_date)) || '—'}<div class="sub">to ${fmtD(day(m.end_date)) || '—'}</div>`;
+    let cols, note;
     if (mTab === 'External moderation') {
-      $('mnote').innerHTML = 'Same columns as the External Moderation sheet. FEEDBACK is a stage plus a date, so it can be filtered and counted; free-text notes go in Comments. Legacy qualifications are flagged from the Pre-2009 list.';
-      $('mtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification (OFO / ID)', 'NQF', 'Learners', 'Groups', 'Employment', 'Start', 'End', 'Face-to-face or Online', 'Facilitator', 'Assessor', 'Moderator', 'SETA', 'Feedback stage', 'Stage date', 'Qualification registration date', 'Comments']) + '<tbody>' +
-        (MOD.map((r, i) => { const m = mrec(r.dbid) || {}; return `<tr>${base(m)}<td>${m.learners ?? ''}</td><td>${esc(m.groups || '')}</td><td>${esc(m.employment || '')}</td><td>${fmtD(day(m.start_date))}</td><td>${fmtD(day(m.end_date))}</td><td>${esc(m.delivery || '')}</td><td>${esc(m.facilitator || '')}</td><td>${esc(m.assessor || '')}</td><td>${esc(m.moderator || '')}</td><td>${esc(m.seta || '')}</td>
-          <td>${st('MOD', i, r[16])}</td><td>${dIn(`qaM(${m.id},'stage_date',this.value)`, m.stage_date, 'Stage date')}</td><td>${tIn(`qaM(${m.id},'qual_registration_date',this.value)`, m.qual_registration_date, 'Qualification registration date', 110)}</td><td>${tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 220)}</td></tr>`; }).join('') || empty(20)) + '</tbody>';
+      note = 'Same columns as the External Moderation sheet. FEEDBACK is a stage plus a date, so it can be filtered and counted; free-text notes go in Comments. Legacy qualifications are flagged from the Pre-2009 list.';
+      cols = [...B, G, ['Groups', m => esc(m.groups || ''), 1], ['Employment', m => esc(m.employment || ''), 1], ['Dates', dts], ['Face-to-face or Online', m => esc(m.delivery || ''), 1],
+        ['Facilitator / Assessor', m => `${esc(m.facilitator || '—')}<div class="sub">${esc(m.assessor || '—')}</div>`, 0, W], ['Moderator', m => esc(m.moderator || ''), 1], ['SETA', m => esc(m.seta || '')],
+        ['Feedback stage', (m, i) => st('MOD', i, MOD[i][16])], ['Stage date', m => dIn(`qaM(${m.id},'stage_date',this.value)`, m.stage_date, 'Stage date')],
+        ['Qualification registration date', m => tIn(`qaM(${m.id},'qual_registration_date',this.value)`, m.qual_registration_date, 'Qualification registration date', 110), 1], ['Comments', m => tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 220)]];
     } else if (mTab === 'QCTO projects') {
-      $('mnote').innerHTML = 'Same columns as the QCTO Projects sheet (QCTO active programmes). EISA dates are counted from the QCTO Projects Tracker, so they are not typed twice.';
-      $('mtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification (OFO / ID)', 'NQF', 'Groups', 'Learners', 'Employment', 'Start', 'End', 'Enrolment requested', 'Enrolment received', 'EISA dates (from tracker)', 'Facilitator', 'Assessor', 'Monitoring date', 'Approval of alternative site', 'Mentor', 'Certification', 'Comments']) + '<tbody>' +
-        (of('QCTO projects').map(m => { const ed = {}; (D().tracker || []).filter(t => t.programme_id && t.programme_id === m.programme_id && t.eisa_date).forEach(t => ed[t.eisa_date] = (ed[t.eisa_date] || 0) + 1);
-          return `<tr>${base(m)}<td>${esc(m.groups || '')}</td><td>${m.learners ?? ''}</td><td>${esc(m.employment || '')}</td><td>${fmtD(day(m.start_date))}</td><td>${fmtD(day(m.end_date))}</td>
-          <td>${dIn(`qaM(${m.id},'enrolment_requested_date',this.value)`, m.enrolment_requested_date, 'Enrolment requested')}</td><td>${dIn(`qaM(${m.id},'enrolment_received_date',this.value)`, m.enrolment_received_date, 'Enrolment received')}</td>
-          <td>${Object.entries(ed).map(([d, c]) => `${fmtD(d)} × ${c}`).join('<br>') || '<span class="sub">—</span>'}</td><td>${esc(m.facilitator || '')}</td><td>${esc(m.assessor || '')}</td>
-          <td>${tIn(`qaM(${m.id},'monitoring_date',this.value)`, m.monitoring_date, 'Monitoring date', 110)}</td><td>${tIn(`qaM(${m.id},'alt_site_approval',this.value)`, m.alt_site_approval, 'Approval of alternative site', 110)}</td><td>${tIn(`qaM(${m.id},'mentor',this.value)`, m.mentor, 'Mentor', 120)}</td><td>${tIn(`qaM(${m.id},'certification',this.value)`, m.certification, 'Certification', 220)}</td><td>${tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 220)}</td></tr>`; }).join('') || empty(21)) + '</tbody>';
+      note = 'Same columns as the QCTO Projects sheet (QCTO active programmes). EISA dates are counted from the QCTO Projects Tracker, so they are not typed twice.';
+      cols = [...B, ['Groups', m => esc(m.groups || ''), 1], G, ['Employment', m => esc(m.employment || ''), 1], ['Dates', dts],
+        ['Enrolment requested', m => dIn(`qaM(${m.id},'enrolment_requested_date',this.value)`, m.enrolment_requested_date, 'Enrolment requested')], ['Enrolment received', m => dIn(`qaM(${m.id},'enrolment_received_date',this.value)`, m.enrolment_received_date, 'Enrolment received')],
+        ['EISA dates (from tracker)', m => { const ed = {}; (D().tracker || []).filter(t => t.programme_id && t.programme_id === m.programme_id && t.eisa_date).forEach(t => ed[t.eisa_date] = (ed[t.eisa_date] || 0) + 1); return Object.entries(ed).map(([d, c]) => `${fmtD(d)} × ${c}`).join('<br>') || '<span class="sub">—</span>'; }],
+        ['Facilitator / Assessor', m => `${esc(m.facilitator || '—')}<div class="sub">${esc(m.assessor || '—')}</div>`, 0, W],
+        ['Monitoring date', m => tIn(`qaM(${m.id},'monitoring_date',this.value)`, m.monitoring_date, 'Monitoring date', 110), 1], ['Approval of alternative site', m => tIn(`qaM(${m.id},'alt_site_approval',this.value)`, m.alt_site_approval, 'Approval of alternative site', 110), 1],
+        ['Mentor', m => tIn(`qaM(${m.id},'mentor',this.value)`, m.mentor, 'Mentor', 120)], ['Certification', m => tIn(`qaM(${m.id},'certification',this.value)`, m.certification, 'Certification', 160)], ['Comments', m => tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 200)]];
     } else if (mTab === 'Exit verification stats') {
-      $('mnote').innerHTML = 'Same columns as the VERIFICATION STATS 2026 sheet. The status is a stage; choosing “SoRs received” fills the submission date, and “Submitted to PM” moves the programme to Projects completed.';
-      $('mtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification', 'NQF', 'Learners', 'Groups', 'SETA', 'Verifier', 'Exit verification date', 'Verification report received', 'Stage', 'Certificate / SoR submission date', 'Comments']) + '<tbody>' +
-        (VER.map((r, i) => { const m = mrec(r.dbid) || {}; return `<tr>${base(m)}<td>${m.learners ?? ''}</td><td>${esc(m.groups || '')}</td><td>${esc(m.seta || '')}</td><td>${tIn(`qaM(${m.id},'verifier',this.value)`, m.verifier, 'Verifier', 110)}</td>
-          <td>${dIn(`qaM(${m.id},'exit_verification_date',this.value)`, m.exit_verification_date, 'Exit verification date')}</td><td>${tIn(`qaM(${m.id},'verification_report_received',this.value)`, m.verification_report_received, 'Verification report received', 110)}</td><td>${st('VER', i, r[11])}</td><td>${dIn(`qaM(${m.id},'sor_submission_date',this.value)`, m.sor_submission_date, 'SoR submission date')}</td><td>${tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 220)}</td></tr>`; }).join('') || empty(15)) + '</tbody>';
+      note = 'Same columns as the VERIFICATION STATS 2026 sheet. The status is a stage; choosing “SoRs received” fills the submission date, and “Submitted to PM” moves the programme to Projects completed.';
+      cols = [...B, G, ['SETA', m => esc(m.seta || '')], ['Verifier', m => tIn(`qaM(${m.id},'verifier',this.value)`, m.verifier, 'Verifier', 110)],
+        ['Exit verification date', m => dIn(`qaM(${m.id},'exit_verification_date',this.value)`, m.exit_verification_date, 'Exit verification date') + (MF.ev[2](m) ? '<div><span class="badge b-bad">Past, not done</span></div>' : '')],
+        ['Verification report received', m => tIn(`qaM(${m.id},'verification_report_received',this.value)`, m.verification_report_received, 'Verification report received', 110)], ['Stage', (m, i) => st('VER', i, VER[i][11])],
+        ['Certificate / SoR submission date', m => dIn(`qaM(${m.id},'sor_submission_date',this.value)`, m.sor_submission_date, 'SoR submission date')], ['Comments', m => tIn(`qaM(${m.id},'comments',this.value)`, m.comments, 'Comments', 200)]];
     } else {
-      $('mnote').innerHTML = 'Same columns as the PROJECTS COMPLETED 2026 sheet. Programmes arrive here when the exit-verification stage is set to “Submitted to PM”.';
-      $('mtable').innerHTML = H(['Entity', 'Project Manager', 'Client', 'Type', 'Qualification', 'NQF', 'Learners', 'Groups', 'SETA', 'Exit verification date', 'Certificate / SoR submission date', 'Date submitted to PM']) + '<tbody>' +
-        (of('Projects completed').map(m => `<tr>${base(m)}<td>${m.learners ?? ''}</td><td>${esc(m.groups || '')}</td><td>${esc(m.seta || '')}</td><td>${fmtD(day(m.exit_verification_date))}</td><td>${dIn(`qaM(${m.id},'sor_submission_date',this.value)`, m.sor_submission_date || m.stage_date, 'SoR submission date')}</td><td>${dIn(`qaM(${m.id},'submitted_to_pm_date',this.value)`, m.submitted_to_pm_date, 'Date submitted to PM')}</td></tr>`).join('') || empty(12)) + '</tbody>';
+      note = 'Same columns as the PROJECTS COMPLETED 2026 sheet. Programmes arrive here when the exit-verification stage is set to “Submitted to PM”.';
+      cols = [...B, G, ['SETA', m => esc(m.seta || '')], ['Exit verification date', m => fmtD(day(m.exit_verification_date))],
+        ['Certificate / SoR submission date', m => dIn(`qaM(${m.id},'sor_submission_date',this.value)`, m.sor_submission_date || m.stage_date, 'SoR submission date')], ['Date submitted to PM', m => dIn(`qaM(${m.id},'submitted_to_pm_date',this.value)`, m.submitted_to_pm_date, 'Date submitted to PM')]];
     }
+    cols = cols.filter(c => mAll || !c[2]);
+    $('mnote').innerHTML = note + (mAll || !cols.length ? '' : ' Some sheet columns are hidden: tick “All sheet columns” to see them; Export has them all.');
+    $('mtable').innerHTML = H(cols.map(c => c[0])) + '<tbody>' + (page.map(([m, i]) => `<tr>${cols.map(c => `<td ${c[3] || ''}>${c[1](m, i)}</td>`).join('')}</tr>`).join('')
+      || `<tr><td colspan="${cols.length}"><div class="empty"><b>${src.length ? 'Nothing matches' : 'Nothing on this sheet yet'}</b>${!src.length && QA() ? '<span>Use “+ Add programme” to add one.</span>' : ''}</div></td></tr>`) + '</tbody>';
+    pager.innerHTML = `<span class="sub" style="margin-right:auto;padding-left:0">${rows.length} of ${src.length} row${src.length === 1 ? '' : 's'}</span>` + (pages > 1 ? `<span class="sub">Page ${mPg + 1} of ${pages}</span><button class="btn sm" ${mPg ? '' : 'disabled'} onclick="qaMPg(${mPg - 1})">‹ Prev</button><button class="btn sm" ${mPg < pages - 1 ? '' : 'disabled'} onclick="qaMPg(${mPg + 1})">Next ›</button>` : '');
   };
+  let mScope = 'Running', mF = '', mQ = '', mPg = 0, mKey = '', mAll = false;
+  window.qaMF = k => { mF = mF === k ? '' : k; renderM(); };
+  window.qaMS = s => { mScope = s; mF = ''; renderM(); };
+  window.qaMQ = v => { mQ = v; renderM(); const e = $('mq'); if (e) { e.focus(); e.setSelectionRange(v.length, v.length); } };
+  window.qaMPg = n => { mPg = n; renderM(); };
+  window.qaMAll = v => { mAll = v; renderM(); };
+  window.qaMLink = id => { const m = mrec(id); if (!m || !QA()) return; const cn = String(m.client_name || '').toLowerCase().trim(), cl = new Map((D().clients || []).map(c => [c.id, c.client_name || '']));
+    const ps = (D().progs || []).filter(p => !p.deleted_at).map(p => [p, (cl.get(p.client_id) || '')]).sort((a, b) => ((cn && b[1].toLowerCase().includes(cn) ? 1 : 0) - (cn && a[1].toLowerCase().includes(cn) ? 1 : 0)) || (a[1] + a[0].id).localeCompare(b[1] + b[0].id));
+    const opt = ([p, c]) => `${p.id} · #${p.display_id || p.id} · ${c} · ${p.programme_name || ''}`;
+    form(`Link to a programme · ${m.client_name || ''} · ${m.qualification || ''}`, [['pid', 'Programme (same client first)', 'select', ['— choose —', ...ps.map(opt)], '— choose —']],
+      async v => { const pid = parseInt(v.pid, 10); if (!pid) { say('Choose a programme'); throw Error('pid'); } await window.qaM(id, 'programme_id', pid); say('Linked'); }); };
+  window.apxModTasks = role => { if (role !== 'qa' && role !== 'admin') return []; const a = (D().mods || []).filter(m => m.sheet === 'Exit verification' && MSTAGE.indexOf(m.stage) < 7).length;
+    return a ? [{ id: 'modaw', t: `Moderation: ${a} awaiting SoRs or report`, s: 'Exit verification stage before SoRs received', k: 'Moderation', c: 'Open', on: `mTab='Exit verification stats';location.hash='modver';qaMF('aw')` }] : []; };
 
   function addModeration() {
     if (!QA()) { say('Only QA, ETQA or an admin can add to this list'); return; }
