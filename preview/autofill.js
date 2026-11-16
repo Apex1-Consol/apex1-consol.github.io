@@ -104,7 +104,7 @@
       const vd = v && (v.fields || {})['Date of Visit'];
       sug(form, E.Due, vd ? addDays(String(vd).slice(0, 10), 30) : addDays(iso(new Date()), 30), vd ? 'the visit date + 30 days' : 'today + 30 days');
     };
-    form.addEventListener('change', ev => { if (ev.isTrusted && (ev.target.name === 'Visit' || ev.target.name === 'programme_id')) go(); });
+    form.addEventListener('change', ev => { if ((ev.target.name === 'Visit' || ev.target.name === 'programme_id')) go(); });
     if (!E.Owner.value) go();
     if (E.Text) avaFillBtn(form, E.Text, 'Recommendation', () => {
       const v = (D().visits || []).find(x => String(x.id) === String(E.Visit && E.Visit.value)), p = prog(E.programme_id && E.programme_id.value) || (v && prog(v.programme_id)), f = (v && v.fields) || {}, L = [];
