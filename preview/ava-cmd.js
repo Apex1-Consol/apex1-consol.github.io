@@ -29,7 +29,7 @@
   }, done: () => !!tile(label) && tile(label).classList.contains('on') });
   const tileOn = l => !!tile(l) && tile(l).classList.contains('on');
   const tFilter = (label, set) => ({ t: `Filter to "${label}"`, run: async () => {
-    if (!await until(() => tile(label), 6000)) { if (Q(`#view-${route()} .famk`)) { C.empty = true; return 'None right now. Nothing to do here.'; } throw new Error(`"${label}" tile not found`); }
+    if (!await until(() => tile(label), 6000)) { if ([...document.querySelectorAll('.famk')].some(vis)) { C.empty = true; return 'None right now. Nothing to do here.'; } throw new Error(`"${label}" tile not found`); }
     if (!tileOn(label)) set(); await until(() => tileOn(label), 3000);
     const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} item${n === 1 ? '' : 's'}.`;
   }, done: () => tileOn(label) });
