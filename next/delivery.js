@@ -112,7 +112,10 @@
     hd.querySelectorAll('button').forEach(b => { b.hidden = true; });   // buttons are rebuilt below (Edit, stage, AI summary)
     const tabs = [['Overview', `pTab='Overview';renderProg()`], ['Form 3', `pTab='Form 3';renderProg()`], ['Learners ›', `location.hash='learners'`],
       ['Attendance ›', `dvGo('attendance','Register')`], ['PoE ›', `dvGo('attendance','PoE tracker')`], ['EISA readiness ›', `dvGo('eisa','Readiness')`], ['Visits ›', `location.hash='visits'`]];
-    $('ptabs').innerHTML = tabs.map(([t, f]) => `<button role="tab" aria-selected="${t === pTab}" class="${t === pTab ? 'on' : ''}" onclick="${f}">${t}</button>`).join('');
+    const TK = { 'Learners ›': ['learners', 'enrolments', 'dq'], 'Attendance ›': ['attendance'], 'PoE ›': ['poe'], 'EISA readiness ›': ['eisa'], 'Visits ›': ['visits', 'recs'] };
+    const tcnt = t => { if (!window.apxOvItems || !TK[t]) return ''; const xs = TK[t].flatMap(k => apxOvItems(k)).filter(x => String(x.pid) === String(p.id)); if (!xs.length) return ''; const r = xs.some(x => x.warn);
+      return ` <span class="navcnt ${r ? 'r' : 'a'}" aria-label="${xs.length} ${r ? 'items, some urgent' : 'items to check'}">${xs.length}</span>`; };
+    $('ptabs').innerHTML = tabs.map(([t, f], i) => (i === 2 ? '<span class="ptsep" aria-hidden="true"></span>' : '') + `<button role="tab" aria-selected="${t === pTab}" class="${t === pTab ? 'on' : ''}" onclick="${f}">${t}${tcnt(t)}</button>`).join('');
     { const sid = String(p.id), cnt = k => (D()[k] || []).filter(x => String(x.programme_id) === sid), ok = h => !window.NAVR || !NAVR[h] || NAVR[h]();
       const rel = [['qcto', 'QCTO tracker', cnt('tracker').length], ['modver', 'Moderation', cnt('mods').length], ['visits', 'Visits', cnt('visits').length], ['recs', 'Open recommendations', cnt('recs').filter(r => !r.resolved).length], ['reports', 'Reports', cnt('reports').length], ['enrolments', 'Enrolments', cnt('enrol').length]].filter(r => ok(r[0]));
       let rs = $('prelated'); if (!rs) { $('ptabs').insertAdjacentHTML('afterend', '<div id="prelated" class="sub" style="display:flex;flex-wrap:wrap;gap:6px 14px;margin:8px 0 4px"></div>'); rs = $('prelated'); }
