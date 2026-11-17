@@ -122,6 +122,7 @@ window.HO = (() => {
     try {
       const g = await rpc(fn, { p_programme_id: Number(s.pid), ...body });
       s.g = g;
+      if (window.aoInboxLoad) setTimeout(window.aoInboxLoad, 800);
       if (g && g.error) showToast('error', g.error.message);
       else if (okMsg) showToast('success', okMsg);
       return g;
