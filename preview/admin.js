@@ -42,7 +42,7 @@
   // menu items are hidden for roles that cannot open them (index.html renderNav reads this)
   // Page access per role, agreed with Stavros 12 Nov 2026. Admin and demo see everything; null = everyone.
   const PM = 'project_manager', PI = 'pi_specialist', QA = 'qa_specialist', ET = 'etqa';
-  const GATE = { mywork: null, desk: [], dashboard: null, reports: [PM, QA, ET, 'compliance_officer', 'head_of_ops'], hoo: ['head_of_ops'],
+  const GATE = { mywork: null, desk: [], dashboard: null, reports: [PM], hoo: ['head_of_ops'],
     clients: [PM, PI], pmtracker: [PM, PI], programmes: [PM, PI, QA], pi: [PI],
     learners: [PM, QA, ET], dq: [QA, ET], enrolments: [QA, ET], eisa: [QA, ET], qcto: [QA, ET, PI, PM],
     attendance: [PM, QA], visits: [PM, QA], recs: [PM, QA], modver: [QA, ET, PM], accred: [QA],
