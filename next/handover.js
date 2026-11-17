@@ -117,12 +117,13 @@ window.HO = (() => {
   }
   /* Automatic document check (rules only, no AI). Organisational gates only; never learner, facilitator or mentor documents. */
   const DCG = /^(c[123]|q[1-4]|w[124]|d[1345]|s[146])$/;
-  async function docCheck(id, quiet) {
+  async function docCheck(id, quiet, ai) {
     if (!DCG.test(id)) return; s.checking = id; render();
     try {
       const { data } = await sb.auth.getSession(), tok = data.session && data.session.access_token;
-      const res = await fetch(sb.supabaseUrl + '/functions/v1/doc-check', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ programme_id: Number(s.pid), gate: id }) });
+      const res = await fetch(sb.supabaseUrl + '/functions/v1/doc-check', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ programme_id: Number(s.pid), gate: id, ai: !!ai }) });
       const j = await res.json().catch(() => ({})); if (!res.ok || !j.ok) throw new Error(j.error || res.statusText);
+      if (j.note) showToast(j.note);
     } catch (e) { if (!quiet) showToast('error', 'Check not run: ' + e.message); }
     s.checking = null; await loadDocs(); render();
   }
@@ -436,7 +437,8 @@ window.HO = (() => {
     const ck = (s.checks || {})[x.id], cur = ck && list.some(d => d.id === ck.document_id) ? ck : null;
     const badge = !list.length || !DCG.test(x.id) ? '' : s.checking === x.id ? '<span class="ho-muted">Checking…</span>'
       : (cur ? `<span class="ph-pill" style="${cur.verdict === 'ok' ? 'background:var(--okbg);color:var(--ok)' : 'background:var(--warnbg);color:var(--warn)'}" title="Automatic check (${esc(cur.method)}), ${esc(String(cur.checked_at).slice(0, 16).replace('T', ' '))}. Advice only: Compliance still verifies.">${cur.verdict === 'ok' ? '&#10003; ' + esc(cur.reason) : '&#9888; Check: ' + esc(cur.reason)}</span> ` : '')
-        + `<a href="javascript:void 0" class="ho-muted" onclick="HO.docCheck('${x.id}')">${cur ? 'Re-check' : 'Check document'}</a>`;
+        + `<a href="javascript:void 0" class="ho-muted" onclick="HO.docCheck('${x.id}')">${cur ? 'Re-check' : 'Check document'}</a>`
+        + (cur ? ` <a href="javascript:void 0" class="ho-muted" title="Sends only a skeleton of allow-listed document words (no names, numbers except dates, emails or phones) to the free AI." onclick="HO.docCheck('${x.id}', false, true)">Second opinion (free AI)</a>` : '');
     return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${badge}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB</span>' : '')}</div>`;
   }
 
