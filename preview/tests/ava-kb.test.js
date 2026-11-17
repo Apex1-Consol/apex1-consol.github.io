@@ -43,4 +43,5 @@ w.document.getElementById('avacmdin').value = 'visits'; w.document.getElementByI
 ok(/Ava will:/.test(w.document.getElementById('avacmdbox').innerHTML) && /avacmdrun/.test(w.document.getElementById('avacmdbox').innerHTML), 'picking a playbook shows the plan with Run');
 w.avaCmd(false);
 ok(['modprep', 'verify', 'poe'].every(k => CM.PLAYBOOKS.some(p => p.k === k)) && CM.results('prepare moderation')[0].p.k === 'modprep' && CM.results('verify batch')[0].p.k === 'verify' && CM.results('chase poe gaps')[0].p.k === 'poe', 'QA playbooks defined and matched');
+ok([['hand over programme', 'pihand'], ['check client details', 'clients'], ['fam compliance check', 'famcheck'], ['renewals due', 'renew'], ['review sign-off queue', 'soreview'], ['what is blocking', 'soblock'], ['data health', 'health'], ['help gaps', 'helpgap'], ['onboarding status', 'onboard']].every(([q, k]) => (CM.results(q)[0] || {}).p && CM.results(q)[0].p.k === k), 'PI, OHS, sign-off and admin playbooks matched');
 console.log(fail ? fail + ' failed' : 'all passed'); process.exit(fail ? 1 : 0);

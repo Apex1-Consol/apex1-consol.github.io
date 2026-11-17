@@ -33,9 +33,9 @@
     if (!tileOn(label)) set(); await until(() => tileOn(label), 3000);
     const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} item${n === 1 ? '' : 's'}.`;
   }, done: () => tileOn(label) });
-  const needs = r => ({ t: 'Count every "Needs attention" tile', run: async () => {
+  const needs = (r, g = 'Needs attention') => ({ t: `Count every "${g}" tile`, run: async () => {
     await until(() => Q(`#view-${r} .famk`), 6000);
-    const ts = [...document.querySelectorAll(`#view-${r} .famgrp[aria-label^="Needs attention"] .famk`)].filter(vis).map(b => [txt(b.querySelector('.l')), parseInt(txt(b.querySelector('.v')), 10) || 0]).filter(x => x[1]);
+    const ts = [...document.querySelectorAll(`#view-${r} .famgrp[aria-label^="${g}"] .famk`)].filter(vis).map(b => [txt(b.querySelector('.l')), parseInt(txt(b.querySelector('.v')), 10) || 0]).filter(x => x[1]);
     return ts.length ? ts.map(x => `${x[0]}: ${x[1]}`).join(' · ') + '.' : 'Nothing needs attention here.';
   }, done: () => true });
   const mvTab = t => ({ t: `Open the "${t}" tab`, run: async () => {
@@ -44,6 +44,12 @@
   }, done: () => txt(Q('#mtabs .on')) === t });
   const mvOpen = go('modver', 'Moderation & Verification');
   const mvRow = () => [...document.querySelectorAll('#mtable tbody tr')].find(vis);
+  const soShow = (k, l) => ({ t: `Show "${l}" items`, run: async () => {
+    if (!window.adSoS) throw new Error('Sign-off queue not available');
+    await until(() => Q('#sofilter button'), 6000); adSoS(k); await sleep(250);
+    const b = [...document.querySelectorAll('#sofilter button')].find(x => txt(x).startsWith(l)), n = b ? parseInt((txt(b).match(/(\d+)\s*$/) || [])[1], 10) : NaN;
+    C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : isNaN(n) ? '' : `${n} item${n === 1 ? '' : 's'}.`;
+  }, done: () => true });
   const point = (t, el) => ({ t, run: async () => { const e = el(); if (e) pulse(e); return e ? '' : 'Nothing to point at.'; }, done: () => true });
 
   const PLAYBOOKS = [
@@ -74,7 +80,34 @@
       after: 'Start with any "Verification date past, not done" (red). Move each to SoRs received as they arrive.' },
     { k: 'poe', t: 'Chase PoE gaps: documents not captured', roles: ['qa', 'et', 'pm', 'admin'], words: 'poe portfolio evidence documents document chase gaps files',
       steps: [go('attendance', 'Attendance & PoE'), needs('attendance'), tFilter('Documents not captured', () => dvAttF('docs'))],
-      after: 'Pick each programme, open the Documents tab and mark what is in. Then do the same with "No modules set up".' }
+      after: 'Pick each programme, open the Documents tab and mark what is in. Then do the same with "No modules set up".' },
+    { k: 'pihand', t: 'Hand over a new programme to delivery', roles: ['pi', 'admin'], words: 'hand handover over initiation programme new start delivery pm',
+      steps: [go('pi', 'Programme Initiation'), point('Point at the initiation form', () => Q('#piFrame'))],
+      after: 'Fill in the initiation form, then submit it so the programme appears in PM Tracker for the PM.', next: ['Show me how', "avaGuide('pi','new')"] },
+    { k: 'clients', t: 'Check client details', roles: ['pi', 'admin', 'pm'], words: 'client clients details contact check email number',
+      steps: [go('clients', 'Clients'), point('Point at the client list', () => Q('#view-clients'))],
+      after: 'Open each client and check the contact person, email and number are filled in. Fix gaps with the owner.' },
+    { k: 'famcheck', t: 'FAM compliance check: expired registrations', roles: ['qa', 'admin'], words: 'fam compliance registry practitioners expired registrations ohs check',
+      steps: [go('fam', 'FAM Registry'), needs('fam', 'Registrations'), tFilter('Expired', () => famFilter('expired'))],
+      after: 'Open each practitioner and capture the renewed registration, or mark them inactive.', next: ['Show "Not captured"', "famFilter('pending')"] },
+    { k: 'renew', t: 'Renewals due in 30 days', roles: ['qa', 'admin'], words: 'renewals renewal due expiring expiry soon fam',
+      steps: [go('fam', 'FAM Registry'), tFilter('Due ≤30 days', () => famFilter('due_30'))],
+      after: 'Ask each practitioner for their renewal now.', next: ['Show 31–60 days', "famFilter('due_60')"] },
+    { k: 'soreview', t: 'Review the sign-off queue', roles: ['pi', 'admin'], words: 'review sign signoff off queue approve approvals waiting decision',
+      steps: [go('signoff', 'Sign-off queue'), soShow('waiting', 'Waiting'), point('Point at the first item', () => [...document.querySelectorAll('#solist > *')].find(vis))],
+      after: 'Open each item, then approve it or send it back with a comment.', next: ['Show me how', "avaGuide('signoff','review')"] },
+    { k: 'soblock', t: "What's blocking sign-off", roles: ['pi', 'admin'], words: 'blocking blocked stuck returned sent back signoff',
+      steps: [go('signoff', 'Sign-off queue'), soShow('returned', 'Returned')],
+      after: 'These were sent back. Each waits on the person who submitted it to fix and resubmit.' },
+    { k: 'health', t: 'Check data health', roles: ['admin'], words: 'data health sync failed jobs errors alerts system',
+      steps: [go('synchealth', 'Data & Sync Health'), needs('synchealth', 'Health checks')],
+      after: 'Anything above zero needs a look. Hover a tile for what it means.' },
+    { k: 'helpgap', t: 'Review help gaps (Ava feedback)', roles: ['admin'], words: 'help gaps feedback ava questions unanswered thumbs',
+      steps: [go('synchealth', 'Data & Sync Health'), point('Point at Ava feedback', () => { const b = [...document.querySelectorAll('#view-synchealth b')].find(x => txt(x).startsWith('Ava fe')); return b && b.parentElement; })],
+      after: 'Thumbs-down and unanswered questions show where a How to guide is missing.' },
+    { k: 'onboard', t: 'Onboarding status: who never signed in', roles: ['admin'], words: 'onboarding onboard users never signed sign staff accounts',
+      steps: [go('users', 'User management'), tFilter('Never signed in', () => adUF('r', 'never'))],
+      after: 'Remind them to sign in with their work email and use "Forgot password?".' }
   ];
 
   const C = { open: false, q: '', sel: 0, view: 'list', pb: null, st: [], undo: null };
@@ -134,7 +167,7 @@ ${done && C.empty ? '<p class="avsm" style="margin:6px 0"><b>Nothing to do on th
     }
     C.view = 'done'; paint(); log(p, true);
   };
-  window.avaCmdUndo = () => { const u = C.undo; const r = route(); if (r === 'pmtracker' && window.adPM) adPM(); else { const on = Q(`#view-${r} .famk.on`); if (on) on.click(); } if (u && location.hash !== u.hash) location.hash = u.hash; C.undo = null; C.view = 'list'; avaCmd(false); window.toast && toast('Undone: back where you were.'); };
+  window.avaCmdUndo = () => { const u = C.undo; const r = route(); if (r === 'pmtracker' && window.adPM) adPM(); else if (r === 'users' && window.adUF) adUF('r', ''); else if (r === 'signoff' && window.adSoS) adSoS('waiting'); else { const on = Q(`#view-${r} .famk.on`); if (on) on.click(); } if (u && location.hash !== u.hash) location.hash = u.hash; C.undo = null; C.view = 'list'; avaCmd(false); window.toast && toast('Undone: back where you were.'); };
   window.AVACMD = { PLAYBOOKS, results };
 
   function mount() {
