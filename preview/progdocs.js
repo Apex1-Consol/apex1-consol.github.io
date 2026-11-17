@@ -78,7 +78,7 @@
     const { data, error } = await sb.from('programme_documents').select('doc_type,doc_label,file_path,file_name,file_size,created_at,reviewed_at,reviewed_by').eq('programme_id', pid).order('id');
     const rows = error ? [] : (data || []), f = p.fields || {};
     // The old PI checklist is replaced by the verified gates once a programme has a sign-off record.
-    const ho = await sb.from('handoff_signoffs').select('status').eq('programme_id', pid).maybeSingle();
+    const ho = await sb.from('handoff_signoffs').select('status,trial_note').eq('programme_id', pid).maybeSingle();
     const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
     if (!rows.length && !out.length && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
@@ -126,6 +126,7 @@
           ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}
         </div>
       </div>
+      ${ho.data && ho.data.trial_note ? `<p class="sub" style="margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#EEF1FF;color:var(--ink)"><b>Trial hand-over:</b> these are demo documents, not a real pack.</p>` : ''}
       ${error ? `<p class="sub">Documents could not be loaded: ${esc(error.message)}</p>` : ''}
       ${rows.length ? `<div class="pdsecs">${order.map(k => `<div class="pdsec"><h4>${esc(k)} <span style="font-weight:400">· ${rowsBy[k].length} file${rowsBy[k].length === 1 ? '' : 's'}</span>${allOk(rowsBy[k]) ? ' <span class="pdok">· &#10003; all verified</span>' : ''}</h4>${rowsBy[k].map(line).join('')}</div>`).join('')}</div>`
         : '<p class="sub" style="margin:8px 0 0">No documents were uploaded.</p>'}

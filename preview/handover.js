@@ -194,7 +194,8 @@ window.HO = (() => {
     const err = g.error ? `<div class="ho-banner err" role="alert"><b>Not done:</b> ${esc(g.error.message)}</div>` : '';
     const lock = g.locked ? `<div class="ho-banner"><span>&#128274; Signed records are locked. ${g.stage === 'complete' ? 'Only the Head of Operations can reopen it.' : 'Any assigned signer can unlock it; every signature is then cleared and kept in the history.'}</span>
         ${me.can_unlock ? `<button class="btn btn-sm" onclick="HO.unlock()" ${s.busy ? 'disabled' : ''}>Unlock to edit</button>` : ''}</div>` : '';
-    return `${err}${readiness(g)}${lock}
+    const trial = g.trial_note ? `<div class="ho-banner" style="background:#EEF1FF;color:var(--ink);border:1px solid #9AA7E6;"><b>TRIAL HAND-OVER</b><span>${esc(g.trial_note)}</span></div>` : '';
+    return `${err}${trial}${readiness(g)}${lock}
       <div class="ho-steps" id="ho-t-ho-approvals">${['pi', 'compliance', 'ops'].map(st => stepCard(g, st)).join('')}</div>
       ${work(g)}
       ${deadlines(g)}
