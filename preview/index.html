@@ -449,10 +449,10 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
       <div class="row" style="align-items:stretch">
         <section class="card list" style="flex:3 1 420px"><h2 style="margin-bottom:8px">Needs attention</h2><div id="alerts"></div></section>
         <section class="dark" style="flex:2 1 320px;display:flex;flex-direction:column;gap:14px">
-          <div style="display:flex;align-items:center;gap:10px"><span class="tag">AI</span><h2 style="font-size:17px">Executive summary</h2></div>
+          <div style="display:flex;align-items:center;gap:10px"><span class="tag">✦</span><h2 style="font-size:17px">Ava</h2></div>
           <p id="aisum" style="margin:0;line-height:1.6;color:#ECECF8">The largest current risk is the backlog of open audit recommendations. A secondary data issue: many learners on record are not linked to an active enrolment, which understates delivery figures in reports.</p>
-          <span style="font-size:12px;color:#BEBDE3">Generated from live data · review before sharing</span>
-          <div style="display:flex;gap:8px;margin-top:auto;flex-wrap:wrap"><button class="btn y" onclick="regen()">Regenerate</button><button class="btn ghost" onclick="toast('Copied')">Copy text</button></div>
+          <span style="font-size:12px;color:#BEBDE3">All AI help is in Ava · drafts, review before sharing</span>
+          <div style="display:flex;gap:8px;margin-top:auto;flex-wrap:wrap"><button class="btn y" onclick="window.avaToggle&&avaToggle(true);window.avaAsk&&avaAsk('What needs my attention?')">Ask Ava what needs attention</button></div>
         </section>
       </div>
       <div class="row">
@@ -1257,11 +1257,11 @@ function learnerRules(){return `<div class="row">
 </script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="live.js?v=20261117z"></script>
+<script src="live.js?v=20261117z2"></script>
 <script src="qa.js?v=20261117z"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261112em"></script>
-<script src="delivery.js?v=20261116i"></script>
+<script src="delivery.js?v=20261117z2"></script>
 <script src="handover.js?v=20261116a"></script>
 <script src="shell.js?v=20261117z"></script>
 <script src="today.js?v=20261116i"></script>

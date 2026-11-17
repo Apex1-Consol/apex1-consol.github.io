@@ -154,7 +154,7 @@
     if (!$('pcsv')) { side.insertAdjacentHTML('beforeend', '<div id="pbtns" style="display:flex;gap:8px"><button class="btn" id="pcsv" style="flex:1;padding-left:8px;padding-right:8px" onclick="dvProgCsv()">Export CSV</button></div>'); if (nb) { nb.style.flex = '1'; nb.style.paddingLeft = nb.style.paddingRight = '8px'; $('pbtns').prepend(nb); } }
     const p = prog(dProg), hd = $('view-programmes').querySelector('.dark'); if (!p || !hd || hd.hidden) return;
     const box = hd.lastElementChild, st = p.status || 'initiated', pm = has('project_manager'), lead = has('pi_specialist', 'compliance_officer', 'head_of_ops');
-    const btns = [`<button class="btn" onclick="window.previewProgAI?previewProgAI(${p.id}):toast('Loading…')">✨ AI summary</button>`];
+    const btns = [`<button class="btn" onclick="window.avaToggle&&avaToggle(true);window.avaTool&&avaTool('Summarise #${p.display_id||p.id}',{type:'programme_summary',programme_id:${p.id}},'narrative')">✦ Ask Ava: summary</button>`];
     if (CAN() || pm) btns.push(`<button class="btn ghost" onclick="dvProgEdit(${p.id})">Edit</button>`);
     if (st === 'initiated' && lead) btns.push(`<a class="btn y" href="#handover/${p.id}">Sign-off &amp; hand-over</a>`);
     if (st === 'handed_over' && pm) btns.push(`<button class="btn y" onclick="dvStage(${p.id},'activate_programme','Mark this programme as Active? This confirms you are taking it on.')">Activate</button>`);
