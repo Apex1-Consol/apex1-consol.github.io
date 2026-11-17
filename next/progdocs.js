@@ -32,6 +32,31 @@
         k: 'Hand-over', c: 'Open', on: `dvApi.setProg(${p.id});location.hash='programmes';setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)` }));
   };
 
+  const SEC = { c: 'Programme and client', q: 'Qualification and accreditation', w: 'Workplace readiness', l: 'Learner and agreement readiness',
+    d: 'Delivery readiness', s: 'Statutory submissions and deadlines', h: 'Handover preparation' };
+  // One zip of every hand-over file, named after the programme; files are prefixed with their gate.
+  window.apxDocsZip = async pid => {
+    const btn = $('pdzip-' + pid); if (btn) { btn.disabled = true; btn.textContent = 'Preparing…'; }
+    try {
+      if (!window.JSZip) await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = ok; sc.onerror = () => no(new Error('zip library did not load')); document.head.appendChild(sc); });
+      const { data: rows, error } = await sb.from('programme_documents').select('doc_type,file_path,file_name').eq('programme_id', pid).order('id');
+      if (error) throw error;
+      const { data: urls, error: e2 } = await sb.storage.from('programme-documents').createSignedUrls(rows.map(r => r.file_path), 300);
+      if (e2) throw e2;
+      const zip = new JSZip(), used = {};
+      for (let i = 0; i < rows.length; i++) {
+        const r = rows[i], u = urls[i] && urls[i].signedUrl; if (!u) continue;
+        const pre = /^gate_/.test(r.doc_type) ? r.doc_type.slice(5).toUpperCase() + ' - ' : '';
+        let nm = (pre + r.file_name).replace(/[\\/:*?"<>|]+/g, '_'); used[nm] = (used[nm] || 0) + 1; if (used[nm] > 1) nm = nm.replace(/(\.[^.]*)?$/, ` (${used[nm]})$1`);
+        zip.file(nm, await (await fetch(u)).blob());
+      }
+      const p = progs().find(x => x.id === Number(pid)) || {};
+      const base = ('HO-' + String(pid).padStart(6, '0') + ' ' + (p.programme_name || 'hand-over documents')).replace(/[\\/:*?"<>|]+/g, '_').slice(0, 120);
+      const blob = await zip.generateAsync({ type: 'blob' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = base + '.zip'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    } catch (e) { say('Download failed: ' + e.message); }
+    if (btn) { btn.disabled = false; btn.textContent = 'Download all'; }
+  };
   window.apxDocOpen = async path => {
     const { data, error } = await sb.storage.from('programme-documents').createSignedUrl(path, 120);
     if (error) return say('Cannot open: ' + error.message);
@@ -57,19 +82,48 @@
     const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
     if (!rows.length && !out.length && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
-    const groups = {}; rows.forEach(r => (groups[r.doc_type] = groups[r.doc_type] || []).push(r));
     const kb = n => n ? (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB') : '';
     const unrev = rows.filter(r => !r.reviewed_at).length, isPM = (p.handed_over_to_email || '').toLowerCase() === me();
     const rev = rows.find(r => r.reviewed_at);
-    el.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
+    // Gate state from the sign-off page when it is open for this programme (✓ verified / N/A).
+    const hg = window.HO && HO._s && String(HO._s.pid) === String(pid) && HO._s.g, gst = {};
+    ((hg && hg.gates) || []).forEach(x => { gst[x.id] = x.state; });
+    const rowsBy = {};
+    rows.forEach(r => {
+      const gate = /^gate_/.test(r.doc_type) ? r.doc_type.slice(5) : null, sec = gate ? (SEC[gate[0]] || 'Other') : 'Programme Initiation uploads';
+      (rowsBy[sec] = rowsBy[sec] || []).push({ r, gate });
+    });
+    const order = [...Object.values(SEC), 'Other', 'Programme Initiation uploads'].filter(k => rowsBy[k]);
+    const line = ({ r, gate }) => {
+      const title = gate ? String(r.doc_label || '').replace(/^\s*\w+\s*[·\-]\s*/, '') : (LAB[r.doc_type] || r.doc_label || r.doc_type);
+      const st = gate && gst[gate], ok = st === 'verified' || st === 'na_confirmed';
+      return `<div class="pdl">
+        <span class="c">${gate ? esc(gate.toUpperCase()) : '·'}</span>
+        <span class="t" title="${esc(title)}">${esc(title)}</span>
+        <span class="f" title="${esc(r.file_name)} · ${esc(kb(r.file_size))}">&#128196; ${esc(r.file_name)} · ${esc(kb(r.file_size))}</span>
+        <span class="s">${ok ? '<span class="pdok">&#10003; verified</span>' : ''}</span>
+        <a href="javascript:void 0" class="o" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')">Open</a></div>`;
+    };
+    el.innerHTML = `<style>
+        .pdsecs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px 28px;margin-top:12px}
+        .pdsec h4{margin:0 0 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+        .pdl{display:grid;grid-template-columns:30px minmax(0,1.2fr) minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line2,#eee);font-size:13px}
+        .pdl .c{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700}
+        .pdl .t,.pdl .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+        .pdl .f{font-size:12px;color:var(--muted)} .pdl .o{font-weight:600}
+        .pdok{font-size:11.5px;color:var(--ok,#1a7f52);white-space:nowrap}
+        @media (max-width:600px){.pdl{grid-template-columns:30px minmax(0,1fr) auto}.pdl .f,.pdl .s{display:none}}
+      </style>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h3 style="margin:0;font-size:15px">Hand-over documents <span class="sub">(${rows.length} file${rows.length === 1 ? '' : 's'})</span></h3>
-        ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          ${rows.length ? `<button class="btn sm" id="pdzip-${pid}" onclick="apxDocsZip(${pid})">Download all</button>` : ''}
+          ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}
+        </div>
       </div>
       ${error ? `<p class="sub">Documents could not be loaded: ${esc(error.message)}</p>` : ''}
-      ${Object.keys(groups).length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px 24px;margin-top:10px">${Object.entries(groups).map(([k, list]) => `<div style="min-width:0">
-          <div class="sub" style="font-weight:600">${esc(LAB[k] || list[0].doc_label || k)}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${list.map(r => `<button class="btn sm" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')" title="${esc(kb(r.file_size))}">${esc(r.file_name)}</button>`).join('')}</div></div>`).join('')}</div>`
-        : '<p class="sub" style="margin:8px 0 0">No documents were uploaded in Programme Initiation.</p>'}
+      ${rows.length ? `<div class="pdsecs">${order.map(k => `<div class="pdsec"><h4>${esc(k)} <span style="font-weight:400">· ${rowsBy[k].length}</span></h4>${rowsBy[k].map(line).join('')}</div>`).join('')}</div>`
+        : '<p class="sub" style="margin:8px 0 0">No documents were uploaded.</p>'}
       ${out.length ? `<div style="margin-top:12px"><div class="sub" style="font-weight:600;color:var(--warn)">Still outstanding at hand-over</div><ul style="margin:4px 0 0 18px;padding:0">${out.map(([k, l]) =>
         `<li>${esc(l)}${f[k + 'Due'] ? ` · expected ${esc(f[k + 'Due'])}` : ''}${f[k + 'Note'] ? ` · ${esc(f[k + 'Note'])}` : ''}</li>`).join('')}</ul></div>` : ''}`;
   };
