@@ -250,7 +250,8 @@ window.HO = (() => {
     const ask_ = isPM ? `<div class="ho-card" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;border-left:4px solid var(--yellow)">
         <div style="flex:1;min-width:220px"><b>Your response</b><div class="ho-muted">Accept the hand-over once you have checked the pack, or raise a query.</div></div>
         <button class="btn y btn-sm" onclick="HO.pmRespond(true)" ${s.busy ? 'disabled' : ''}>Accept hand-over</button>
-        <button class="btn btn-sm" onclick="HO.pmRespond(false)" ${s.busy ? 'disabled' : ''}>Raise a query</button></div>`
+        <button class="btn btn-sm" onclick="HO.pmRespond(false)" ${s.busy ? 'disabled' : ''}>Raise a query</button>
+        ${window.avaHoBrief ? `<button class="btn btn-sm" onclick="HO.brief()" title="Plain-language summary from counts and dates only. No names or personal details are sent.">&#10022; Ava: brief me</button>` : ''}</div>`
       : (!pm.response && pm.email ? `<div class="ho-muted" style="margin:-4px 0 12px">Waiting for ${esc(pm.email)} to accept the hand-over.</div>` : '');
     return q + ask_;
   }
@@ -635,7 +636,24 @@ window.HO = (() => {
   async function closeRisk(id) { await act('handoff_risk_save', { p_risk: { id, status: 'mitigated' } }, 'Risk marked mitigated'); }
   async function ack(id) { await act('handoff_risk_ack', { p_risk_id: id }, 'Risk acknowledged'); }
 
-  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, deputy, setTrial, pmRespond, verifyTodo, toggleTodo, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
+  /* PM briefing for Ava (free AI): ONLY non-personal structured fields. Never names, IDs, emails, phones or learner details. */
+  function brief() {
+    const g = s.g; if (!g || !window.avaHoBrief) return;
+    const scrub = t => String(t || '').replace(/\S+@\S+/g, '…').replace(/\+?\d[\d\s-]{5,}\d/g, '…').replace(/\b(Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+\S+(\s+[A-Z]\S*)?/g, '…').slice(0, 120);
+    const raw = ((P.data.progsAll || P.data.progs || []).find(p => String(p.id) === String(s.pid))) || {}, d = (g.record && g.record.details) || {}, pr = (g.doc && g.doc.prog) || {};
+    const ap = (g.gates || []).filter(x => x.applicable), cnt = st => ap.filter(x => x.state === st).length;
+    const L = [`Hand-over of a training programme to the Project Manager (you). Stage: ${g.stage || ''}${g.trial_note ? ' (TRIAL run, not a real hand-over)' : ''}.`,
+      `Qualification: ${scrub(pr.qualification || raw.programme_name)}. Qualification type: ${scrub(d.qual_type)}. Learnership type: ${scrub(d.learnership_type)}. Funded: ${scrub(d.funded)}.`,
+      `Client company: ${scrub(pr.client)}.`,
+      `Programme dates: start ${raw.start_date || 'not set'}, end ${raw.end_date || 'not set'}. Handed over: ${String((g.record || {}).handed_over_at || '').slice(0, 10) || 'not yet'}.`,
+      `Learner count: ${Number(d.learners) || 'not given'}. Delivery sites: ${Number(d.sites_count) || 'not given'}.`,
+      `Gates: ${ap.length} applicable; ${cnt('verified')} verified, ${cnt('na_confirmed')} N/A confirmed, ${cnt('ready')} waiting verification, ${cnt('evidence') + cnt('blocked')} without evidence.`,
+      `Statutory deadlines: ${(g.deadlines || []).map(x => `${scrub(x.label)} due ${x.due || 'date not set'}`).join('; ') || 'none'}.`,
+      `Open risks: ${(g.risks || []).filter(r => r.status !== 'closed').map(r => `${r.severity} ${scrub(r.kind)}: ${scrub(r.title)}`).join('; ') || 'none'}.`,
+      `Still standing in the way: ${(g.blockers || []).length}.`];
+    avaHoBrief(L.join('\n'));
+  }
+  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, deputy, setTrial, pmRespond, brief, verifyTodo, toggleTodo, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
 })();
 
 ROUTES.handover = ['Sign-off & hand-over', 'Delivery']; PARENT.handover = 'programmes';

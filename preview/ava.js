@@ -373,6 +373,15 @@
     const o = window.dvProg; if (typeof o === 'function') window.dvProg = id => { const r = o(id); if (S.open) setTimeout(render, 0); return r; };
   }
   window.avaAsk = q => { S.tab = 'chat'; return ask(q, 'ask'); };
+  /* Hand-over briefing for the PM: facts are built by HO.brief() from non-personal structured fields only; free AI via the same path. */
+  window.avaHoBrief = async facts => {
+    if (S.busy) return; if (window.avaToggle && !S.open) avaToggle(true); S.tab = 'chat';
+    const q = 'Brief me on this hand-over in plain language: what it is, what I should do first, the deadlines and open risks.';
+    S.busy = true; S.msgs.push({ r: 'u', t: 'Brief me on this hand-over' }); render(true);
+    try { const j = await call({ type: 'ava', mode: 'ask', question: q, page: 'Hand-over', facts: String(facts).slice(0, 4000), history: [] }); S.msgs.push({ r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers }); }
+    catch (err) { S.msgs.push({ r: 'a', t: 'Ava could not write the brief right now (' + err.message + '). Everything it would use is on this page: deadlines, risks and the pack.', local: 1 }); }
+    S.busy = false; save(); render(true); usage();
+  };
   const wk = () => setTimeout(() => weekly(), 400);
   window.addEventListener('hashchange', () => { if (route() === 'mywork') wk(); });
   (function waitData(n) { if (D().progs && window.apxRole) { if (route() === 'mywork') wk(); } else if (n < 60) setTimeout(() => waitData(n + 1), 1000); })(0);
