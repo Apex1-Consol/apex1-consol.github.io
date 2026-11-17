@@ -662,10 +662,11 @@ window.HO = (() => {
     const scrub = t => String(t || '').replace(/\S+@\S+/g, '…').replace(/\+?\d[\d\s-]{5,}\d/g, '…').replace(/\b(Mr|Mrs|Ms|Miss|Dr|Prof)\.?\s+\S+(\s+[A-Z]\S*)?/g, '…').slice(0, 120);
     const raw = ((P.data.progsAll || P.data.progs || []).find(p => String(p.id) === String(s.pid))) || {}, d = (g.record && g.record.details) || {}, pr = (g.doc && g.doc.prog) || {};
     const ap = (g.gates || []).filter(x => x.applicable), cnt = st => ap.filter(x => x.state === st).length;
+    const dl = v => { const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v || ''); return m ? `${+m[3]} ${['January','February','March','April','May','June','July','August','September','October','November','December'][m[2] - 1]} ${m[1]}` : 'not set'; };
     const L = [`Hand-over of a training programme to the Project Manager (you). Stage: ${g.stage || ''}${g.trial_note ? ' (TRIAL run, not a real hand-over)' : ''}.`,
       `Qualification: ${scrub(pr.qualification || raw.programme_name)}. Qualification type: ${scrub(d.qual_type)}. Learnership type: ${scrub(d.learnership_type)}. Funded: ${scrub(d.funded)}.`,
       `Client company: ${scrub(pr.client)}.`,
-      `Programme dates: start ${raw.start_date || 'not set'}, end ${raw.end_date || 'not set'}. Handed over: ${String((g.record || {}).handed_over_at || '').slice(0, 10) || 'not yet'}.`,
+      `Programme dates (copy exactly): start ${dl(raw.start_date)}, end ${dl(raw.end_date)}. Handed over: ${dl(String((g.record || {}).handed_over_at || '').slice(0, 10)) || 'not yet'}. The hand-over pack documents are on this hand-over page (Hand-over pack section).`,
       `Learner count: ${Number(d.learners) || 'not given'}. Delivery sites: ${Number(d.sites_count) || 'not given'}.`,
       `Gates: ${ap.length} applicable; ${cnt('verified')} verified, ${cnt('na_confirmed')} N/A confirmed, ${cnt('ready')} waiting verification, ${cnt('evidence') + cnt('blocked')} without evidence.`,
       `Statutory deadlines: ${(g.deadlines || []).map(x => `${scrub(x.label)} due ${x.due || 'date not set'}`).join('; ') || 'none'}.`,
