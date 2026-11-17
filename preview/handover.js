@@ -202,7 +202,7 @@ window.HO = (() => {
       <section class="card" id="hoDocs" style="margin-top:14px"></section>${(setTimeout(() => window.apxProgDocs && apxProgDocs(s.pid, 'hoDocs')), '')}
       <h3 style="font-size:14px;margin:18px 0 8px;">Evidence review</h3>
       ${gatesHtml(g)}
-      <div class="ho-two" style="margin-top:14px;">${risksHtml(g)}${trail(g)}</div>`;
+      ${g.audit === false ? `<div style="margin-top:14px;">${risksHtml(g)}</div>` : `<div class="ho-two" style="margin-top:14px;">${risksHtml(g)}${trail(g)}</div>`}`;
   }
 
   function readiness(g) {
