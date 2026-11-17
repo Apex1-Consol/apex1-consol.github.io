@@ -516,6 +516,19 @@
     const n = ids[(ids.indexOf(famSel) + 1) % ids.length]; return `<button class="btn sm" onclick="famNextIn('${g}',${n})">Next in ${e(WGRP[g][0])} →</button>`;
   }
   window.famNextIn = (g, i) => { famShow(i); S.acted = g; renderPanel(); };
+  /* Current load from Ayanda's SME Allocation sheet (assessors.fields.sme, loaded 17 Nov 2026) */
+  function smeBlock(a) {
+    const m = (a.fields || {}).sme; if (!m) return '';
+    const t = new Date().toISOString().slice(0, 10), d60 = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10), iso = x => /^\d{4}-\d{2}-\d{2}$/.test(x || '');
+    const R = [...(m.facilitation || []).map(x => ['Facilitating', x[0], x[1], x[2], '']), ...(m.assessments || []).map(x => ['Assessing', x[0], x[1], x[2], x[3] == null ? '' : x[3]])]
+      .sort((x, y) => (iso(x[3]) ? x[3] : '9') < (iso(y[3]) ? y[3] : '9') ? -1 : 1);
+    const live = R.filter(r => !iso(r[3]) || r[3] >= t), soon = live.filter(r => iso(r[3]) && r[3] <= d60).length, wk = {};
+    live.forEach(r => { if (iso(r[3])) { const k = r[3].slice(0, 8) + String(Math.floor((+r[3].slice(8) - 1) / 7)); wk[k] = (wk[k] || 0) + 1; } });
+    const flags = [m.learners > 100 ? `${m.learners} learners being assessed` : '', Object.values(wk).some(n => n >= 3) ? '3 or more programmes end in the same week' : ''].filter(Boolean);
+    return `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Current load</h2><p class="sub" style="margin:2px 0 8px">From the SME Allocation sheet (13 Nov 2026) · ${live.length} open of ${R.length} · ${m.learners || 0} learners · ${soon} ending in 60 days</p>
+      ${flags.length ? `<div class="badge b-warn" style="margin-bottom:8px">⚠ ${e(flags.join(' · '))}</div>` : ''}
+      ${R.length ? `<table style="width:100%"><thead><tr><th>Work</th><th>Client</th><th>Qualification</th><th>Ends</th><th>Learners</th></tr></thead><tbody>${R.map(r => `<tr${iso(r[3]) && r[3] < t ? ' style="opacity:.55"' : ''}><td>${r[0]}</td><td>${e(r[1] || '')}</td><td>${e(r[2] || '—')}</td><td>${iso(r[3]) ? fmt(r[3]) : e(r[3] || '—')}</td><td>${e(String(r[4]))}</td></tr>`).join('')}</tbody></table>` : '<div class="sub">No current work on the sheet.</div>'}</div>`;
+  }
   function renderPanel() {
     const a = S.A[famSel] || S.A[0], box = $('fampanel');
     if (!a) { box.innerHTML = '<div style="padding:20px" class="sub">No practitioners yet. Add one to start.</div>'; return; }
@@ -579,7 +592,7 @@
         <div class="card"><h2 style="font-size:15px">Expiries</h2>${up.length ? up.map(r => `<div style="display:flex;gap:8px;align-items:baseline;padding:4px 0"><span style="flex-grow:1">${e(r.seta_name)} <span class="sub">${fmt(r.registration_expiry_date)}</span></span>${riskBadge(r)}</div>`).join('') : '<div class="sub">No expiry dates captured.</div>'}</div>
         <div class="card" style="grid-column:1/-1"><div style="display:flex;align-items:baseline;gap:8px"><h2 style="font-size:15px;flex-grow:1">Bookings</h2>${myB.length > 3 ? `<button class="btn sm" onclick="famTab('book')">All ${myB.length}</button>` : ''}${canWrite() ? `<button class="btn sm y" onclick="famBook(null,${a.id})">+ Book</button>` : ''}</div>${myB.length ? myB.slice(0, 3).map(bkRow).join('') : '<div class="sub">No current or upcoming bookings.</div>'}</div>
         ${c.complete ? '' : `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Still to capture</h2><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">${[!a.id_number ? ['Add ID number', `famEdit(${a.id})`] : null, TYPES.some(t => !onFile(a.id).includes(t)) ? [`Upload documents (${TYPES.filter(t => !onFile(a.id).includes(t)).length} missing)`, `famTab('docs')`] : null, !fx(a).popia_consent_at ? ['Record POPIA consent', `famConsent(${a.id})`] : null, regs.some(r => risk(r) === 'pending') ? ['Capture registration details', `famTab('regs')`] : null, !regs.length ? ['Add a registration', `famReg(${a.id})`] : null].filter(Boolean).map(([l, f]) => canWrite() ? `<button class="btn sm" onclick="${f}">${l}</button>` : `<span class="badge">${l}</span>`).join('')}</div></div>`}
-        <div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Can deliver</h2><p class="sub" style="margin:2px 0 8px">Qualifications in scope on a valid SETA registration, and the open programmes for each.</p>${canBlock(a)}</div></div>`;
+        <div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Can deliver</h2><p class="sub" style="margin:2px 0 8px">Qualifications in scope on a valid SETA registration, and the open programmes for each.</p>${canBlock(a)}</div>${smeBlock(a)}</div>`;
     } else if (S.tab === 'book') {
       body = `<div class="card"><div style="display:flex;align-items:baseline;gap:8px;margin-bottom:6px"><h2 style="font-size:15px;flex-grow:1">Current and upcoming bookings</h2><button class="btn sm" onclick="famFix(${a.id},'who')">Open in calendar</button>${canWrite() ? `<button class="btn sm y" onclick="famBook(null,${a.id})">+ Book</button>` : ''}</div>${myB.length ? myB.map(bkRow).join('') : '<div class="sub">No current or upcoming bookings.</div>'}</div>`;
     } else if (S.tab === 'regs') {
