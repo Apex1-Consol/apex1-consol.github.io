@@ -4,7 +4,7 @@
 (() => {
   const R = () => location.hash.slice(1).split('/')[0] || 'mywork';
   const Q = s => !!document.querySelector(s);
-  const vis = el => !!el && el.offsetParent !== null;
+  const vis = el => !!el && el.getClientRects().length > 0;
   const txt = el => (el.textContent || '').replace(/\s+/g, ' ').trim();
   const tile = l => [...document.querySelectorAll('.famk')].find(b => vis(b) && txt(b.querySelector('.l') || b).toLowerCase().startsWith(l.toLowerCase()));
   const btn = l => [...document.querySelectorAll('button,a.btn')].find(b => vis(b) && !b.closest('#avapanel') && txt(b).toLowerCase().startsWith(l.toLowerCase()));
@@ -56,14 +56,14 @@
   const PG = (name, purpose, guides = {}, fields = {}) => ({ name, purpose, guides, fields });
   const PAGES = {
     mywork: PG('My work', 'Your to-do list across ApexOne, built from your role. Each row says what to do and opens the right page.', {
-      start: { t: 'Work through my list', steps: [open('mywork'), { t: 'Start with the red rows: they are overdue or blocking someone.', sel: '#view-mywork .bad,#view-mywork table' }, { t: 'Click the action button on a row to go straight to the fix.', sel: '#view-mywork button' }] } }),
+      start: { t: 'Work through my list', steps: [open('mywork'), { t: 'Click a tile with a count (red first: overdue or blocking someone). It takes you straight to the fix.', sel: '#view-mywork [id^="mwt"]', done: () => R() !== 'mywork' }] } }),
     desk: PG('My desk', 'Your personal overview: what you own and what changed.', { start: { t: 'Use my desk', steps: [open('desk'), { t: 'Click a tile to filter what you own.', sel: '.famk' }] } }),
     dashboard: PG('Dashboard', 'Company-wide numbers: programmes, learners, visits and reports.', { read: { t: 'Read the dashboard', steps: [open('dashboard'), { t: 'Click a number to open the list behind it.', sel: '#view-dashboard .kpi' }] } }),
     hoo: PG('Consolidated view', 'All programmes and their health in one table, for heads of operations.', { read: { t: 'Find a programme', steps: [open('hoo'), { t: 'Search by #id or client.', sel: 'input[type=search]' }] } }),
     pmtracker: PG('PM Tracker', 'Caseload per project manager: running programmes and what needs attention on each.', {
       attention: { t: 'Find what needs my attention', roles: ['pm', 'admin', 'qa'], steps: [open('pmtracker'),
         { t: 'Click a "Needs attention" tile (for example Visit due or overdue). The list filters to those programmes.', sel: '.famgrp[aria-label="Needs attention"] .famk', done: anyOn },
-        { t: 'Click the #Prog ID on a row to open the programme.', sel: '#view-pmtracker .famtr a', done: at('programmes') },
+        { t: 'Click the #Prog ID on a row to open the programme.', sel: '#view-pmtracker a[title="Open programme"]', done: at('programmes') },
         { t: 'Ask Ava "What\'s missing?" on the programme, then fix each item.', sel: '#avafab' }] },
       dates: { t: 'Fix missing dates or SAQA ID', roles: ['pm', 'admin'], steps: [open('pmtracker'),
         { t: 'Click the "Missing or bad dates" (or "No SAQA") tile under Data gaps.', sel: 'tile:Missing or bad dates', done: () => T('Missing or bad dates') || T('No SAQA') },
@@ -91,7 +91,7 @@
     learner: PG('Learner', 'One learner\'s record, enrolments and documents.', {}),
     enrolments: PG('Enrolments', 'Which learner is on which programme. Withdraw here; never delete.', { withdraw: { t: 'Withdraw a learner', steps: [open('enrolments'), { t: 'Search the learner or programme.', sel: 'input[type=search]' }, { t: 'Click Withdraw, enter the date and reason (both required), Save.', sel: 'btn:Withdraw' }] } }),
     attendance: PG('Attendance & PoE', 'Registers, PoE tracker (modules and results) and learner documents per programme.', {
-      register: { t: 'Capture a register', steps: [open('attendance'), { t: 'Pick the programme.', sel: '#view-attendance .pick' }, { t: 'Click + Add session, choose date and module, Save session.', sel: 'btn:+ Add session' }, { t: 'Tap each learner\'s cell: Present → Late → Absent. It saves by itself.', sel: '#view-attendance table' }] },
+      register: { t: 'Capture a register', steps: [open('attendance'), { t: 'Pick the programme in the Programme list.', sel: '#view-attendance label.f select:not(#ascope)' }, { t: 'Click + Add session, choose date and module, Save session.', sel: 'btn:+ Add session' }, { t: 'Tap each learner\'s cell: Present → Late → Absent. It saves by itself.', sel: '#view-attendance table' }] },
       modules: { t: 'Set up modules', steps: [open('attendance'), { t: 'Open the PoE tracker tab.', sel: 'btn:PoE tracker' }, { t: 'Click + Add module: number, title and at least one KM, PM or WM code.', sel: 'btn:+ Add module' }] } }),
     eisa: PG('EISA readiness', 'Which learners meet all six criteria for the EISA, per programme.', { read: { t: 'Check readiness', steps: [open('eisa'), { t: 'Click a Needs attention tile, then a programme row to see its learners.', sel: '.famk' }, { t: 'Hover a ✓ / ✕ for the rule behind it.', sel: '#eisarows' }] } }),
     visits: PG('Monitoring visits', 'Visit records with KMA scores, judgement and next visit date.', { add: { t: 'Record a visit', roles: ['qa', 'admin', 'pm'], steps: [open('visits'), { t: 'Click + Add visit, pick the programme and date.', sel: 'btn:+ Add visit' }, { t: 'Fill in KMA scores, judgement and next visit date.', sel: '#view-visit' }] } }),
@@ -99,13 +99,13 @@
     recs: PG('Recommendations', 'Actions from monitoring visits, with due dates.', { close: { t: 'Close a recommendation', steps: [open('recs'), { t: 'Click Request close on it.', sel: 'btn:Request close' }, { t: 'Write what was done; it goes to the Sign-off queue for approval.', sel: 'textarea' }] } }),
     qcto: PG('QCTO Tracker', 'Per learner: status, SoR, EISA booking, date and outcome.', { book: { t: 'Book EISAs', roles: ['qa', 'admin', 'pm'], steps: [open('qcto'), { t: 'Set SOR to SOR Issued (with date).', sel: 'select' }, { t: 'Set Booking to Booked and enter the EISA date; Set for all does a cohort.', sel: 'btn:Set for all' }] } }),
     modver: PG('Moderation & Verification', 'External moderation and exit verification items, linked to programmes.', { link: { t: 'Link an item to a programme', roles: ['qa', 'admin'], steps: [open('modver'), { t: 'Open the item and pick its programme.', sel: '#view-modver table' }] } }),
-    pi: PG('Programme Initiation', 'New programmes start here: client, qualification, dates, people and hand-over documents.', { new: { t: 'Start a new programme', roles: ['pi', 'admin'], steps: [open('pi'), { t: 'Capture client, qualification, dates and people.', sel: '#view-pi form,#view-pi .card' }, { t: 'Upload the hand-over documents, then submit for hand-over.', sel: 'btn:Submit' }] } }),
+    pi: PG('Programme Initiation', 'New programmes start here: client, qualification, dates, people and hand-over documents.', { new: { t: 'Start a new programme', roles: ['pi', 'admin'], steps: [open('pi'), { t: 'In the form, capture client, qualification, dates and people.', sel: '#piFrame', self: 1 }, { t: 'Upload the hand-over documents, then Submit for hand-over. When practising, do NOT press Submit (this form can\'t be blocked): press "I\'ve done it".', sel: '#piFrame', self: 1 }] } }),
     signoff: PG('Sign-off queue', 'Hand-overs, closing notes and reports waiting for a decision.', { review: { t: 'Review an item', steps: [open('signoff'), { t: 'Open the item, check the documents.', sel: '#view-signoff table' }, { t: 'Approve, or Return with a note saying what to fix.', sel: 'btn:Approve' }] } }),
     clients: PG('Clients', 'Client companies, contacts, PM and MOU status.', { gaps: { t: 'Complete client details', steps: [open('clients'), { t: 'Pick the client and click Edit.', sel: 'btn:Edit' }, { t: 'Fill contact person, email, phone, PM, sector and MOU status.', sel: '#famov' }] } }),
     accred: PG('Accreditation', 'Qualifications Apex is accredited for, with expiry and SETA.', { read: { t: 'Check expiring accreditation', steps: [open('accred'), { t: 'Click the expiring tile.', sel: '.famk' }] } }),
     fam: PG('FAM Registry', 'Facilitators, assessors and moderators: SETA registrations, scope and documents.', { renew: { t: 'Renew a registration', roles: ['ohs', 'qa', 'admin'], steps: [open('fam'), { t: 'Click the Expired or Expiring tile.', sel: '.famk' }, { t: 'Open the practitioner, update the registration and upload the new letter.', sel: '#view-fam table' }] } }),
-    dq: PG('Data quality', 'Learners without a valid SA ID, not enrolled, or possible duplicates.', { id: { t: 'Fix a learner ID', steps: [open('dq'), { t: 'Click the No ID or Invalid ID tile.', sel: '.famk' }, { t: 'Click Add SA ID and enter the 13-digit South African ID.', sel: 'btn:Add SA ID' }] } }),
-    reports: PG('Reports', 'Monthly client reports: draft → review → sent.', { move: { t: 'Move a report on', steps: [open('reports'), { t: 'Open the programme row and complete the next stage.', sel: '#view-reports table' }] } }),
+    dq: PG('Data quality', 'Learners without a valid SA ID, not enrolled, or possible duplicates.', { id: { t: 'Fix a learner ID', steps: [open('dq'), { t: 'Find a learner with a red No ID or Invalid ID badge.', sel: '#view-dq .b-bad' }, { t: 'Click Add SA ID and enter the 13-digit South African ID.', sel: 'btn:Add SA ID' }] } }),
+    reports: PG('Reports', 'Monthly client reports: draft → review → sent.', { move: { t: 'Move a report on', steps: [open('reports'), { t: 'Open the programme row and complete the next stage.', sel: '#view-reports .ddrow' }] } }),
     assessors: PG('Assessors & Moderators', 'Registration status of assessors and moderators.', {}),
     synchealth: PG('Data & Sync Health', 'Health checks and the ClickUp sync queue (admin).', {}),
     audit: PG('Audit log', 'Who changed what and when (admin).', {}),

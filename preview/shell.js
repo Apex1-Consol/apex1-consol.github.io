@@ -76,7 +76,7 @@
   }
   function details(l, p) {
     const f = facts(l, p), a = A();
-    if (!f) return head(l, p, null) + '<div class="empty"><b>No programme</b><span>This learner is not enrolled on a programme in the preview.</span></div>';
+    if (!f) return head(l, p, null) + '<div class="empty"><b>No programme</b><span>This learner is not enrolled on a programme.</span></div>';
     const rows = f.ms.map(m => { const r = a.resFor(p.id, l.id, m.module_number), ks = a.kindsOf(m);
       return `<tr><td>${m.module_number}</td>${['KM', 'PM', 'WM'].map(k => `<td>${ks.includes(k) ? res(r?.[a.COL[k]]) : '<span class="sub">n/a</span>'}</td>`).join('')}<td>${r?.fields?.['Internal moderation'] === 'Yes' ? 'Yes' : '<span class="sub">No</span>'}</td></tr>`; }).join('');
     return head(l, p, f) +

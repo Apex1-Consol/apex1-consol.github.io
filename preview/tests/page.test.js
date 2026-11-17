@@ -106,7 +106,7 @@ const ok = (c, m) => { if (!c) throw Error(m); };
   });
   await t('admin: dashboard loads real counts, banner present', async () => {
     const { d } = await boot(sess(['admin']));
-    ok(d.getElementById('pvbanner'), 'no banner');
+    ok(!d.getElementById('pvbanner'), 'banner removed');
     ok(/Learners3/.test(d.getElementById('kpis').textContent.replace(/\s/g, '')), 'learner KPI wrong: ' + d.getElementById('kpis').textContent);
     ok(/\d+ not enrolled on any programme/.test(d.getElementById('kpis').textContent), 'unlinked count wrong');
     ok(/Quarantined/.test(d.getElementById('syncbox').textContent), 'sync box missing');

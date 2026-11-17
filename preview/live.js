@@ -9,8 +9,7 @@
     url: 'https://nducwhlmudksgxggjrbo.supabase.co',
     key: 'sb_publishable_G2BvFAbvXlrq9nwIl4Gupw_3qyTRe2b'
   };
-  // Messages from this layer are real, so drop the mock's " (mock)" suffix.
-  const toast = m => { window.toast(m); const t = document.getElementById('toast'); if (t) t.textContent = m; };
+  const toast = m => window.toast(m);
   const sb = window.supabase.createClient(CFG.url, CFG.key);
   window.__sb = sb;
   const P = { user: null, roles: [], tenant: null, data: {} };
@@ -109,7 +108,7 @@
     if (P.user) {
       document.querySelector('.me .avatar').textContent = (P.user.email || '?')[0].toUpperCase();
       document.querySelector('.me div div').textContent = P.user.email;
-      document.querySelector('.me div div+div').textContent = (P.roles.join(', ') || 'no role') + ' · NEW UI';
+      document.querySelector('.me div div+div').textContent = (P.roles.join(', ') || 'no role');
       const now = new Date(), h = now.getHours(), who = (P.user.email || '').split(/[@+.]/)[0];
       const g = $('greet'), gd = $('greetdate');
       if (g) g.textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who[0].toUpperCase() + who.slice(1) : '');
@@ -200,7 +199,7 @@
       return `<tr><td><a href="#programmes" onclick="dvApi.setProg(${p.id});setTimeout(()=>window.dvProg&&dvProg(${p.id}),50)"><b>#${esc(p.display_id || p.id)}</b></a> <b>${esc(p.programme_name)}</b><div class="sub">${esc(clientOf(p.id)?.client_name || '')} · ends ${esc(p.end_date)}</div></td><td>${n}</td><td><span class="sub">—</span></td><td>${t.filter(r => r.programme_id === p.id && r.sor_status === 'Issued').length} of ${n}</td></tr>`; }).join('') || '<tr><td colspan="4" class="sub">No running programmes</td></tr>';
     const vd = v => v.fields?.['Date of Visit'] || v.fields?.Date || '';
     $('visitlist').innerHTML = d.visits.filter(v => PR.has(v.programme_id)).sort((a, b) => vd(b).localeCompare(vd(a))).slice(0, 8).map(v => `<a href="#visit" onclick="previewOpenVisit(${v.id})"><span class="date">${esc((v.fields?.['Visit ID'] || 'VIS-' + v.id).replace('VIS-', 'VIS '))}<b>${esc(vd(v).slice(5) || '')}</b></span><span><b style="display:block">#${esc(PR.get(v.programme_id).display_id || v.programme_id)} · ${esc(clientOf(v.programme_id)?.client_name || '')}</b><span class="sub">${esc(progName(v.programme_id))}</span></span></a>`).join('') || '<p class="sub">No visits</p>';
-    $('aisum').textContent = 'AI summary is off in the preview (no AI calls are made against test data).';
+    $('aisum').textContent = 'Open a programme and use ✨ AI summary there.';
   }
 
   /* ---------- Learners + Enrolments (same fields as the old app) ---------- */
@@ -487,7 +486,7 @@
   window.apxSaid = id => said(id);
   window.previewDQ = async function (gi, decision) {
     const g = DQG[gi];
-    if (decision === 'merge') { await write('Merge request', () => sb.rpc('request_learner_merge', { p_learner_ids: g.a.map(r => r.learner_id), p_note: 'From preview Data quality' })); toast('Merge request sent to the Sign-off queue'); }
+    if (decision === 'merge') { await write('Merge request', () => sb.rpc('request_learner_merge', { p_learner_ids: g.a.map(r => r.learner_id), p_note: 'From Data quality' })); toast('Merge request sent to the Sign-off queue'); }
     else await write('Review', () => sb.from('learner_quality_reviews').insert(g.a.map(r => ({ tenant_id: P.tenant, learner_id: r.learner_id, issue: r.issue, decision, reviewed_by: P.user.email }))));
     await loadAll(); renderDQ();
   };
@@ -846,12 +845,10 @@
     if (!can('project_manager', 'operations')) { box.hidden = true; return; }
     const o = P.data.outbox, c = s => o.filter(x => x.status === s).length;
     box.hidden = false;
-    box.innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="flex-grow:1">ClickUp sync (test folder)</h2><span class="sub">Delivered by the preview adapter to “Z. Redesign Preview (TEST)”</span></div>
+    box.innerHTML = `<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap"><h2 style="flex-grow:1">ClickUp sync</h2><span class="sub">Changes queued for ClickUp</span></div>
       <div class="grid" style="margin-top:12px">${[['Queued', c('queued'), 'b-n'], ['Retrying', c('retrying'), 'b-warn'], ['Delivered', c('succeeded'), 'b-ok'], ['Quarantined (Sync Exception)', c('quarantined'), 'b-bad']]
       .map(([l, v, b]) => `<div class="kpi"><span class="l">${l}</span><span class="v">${v}</span><span class="n"><span class="badge ${b}">${l.split(' ')[0]}</span></span></div>`).join('')}</div>
       ${o.find(x => x.last_error && ['retrying', 'quarantined', 'failed'].includes(x.status)) ? `<p class="sub" style="margin:10px 0 0">Last error: ${esc(o.find(x => x.last_error && ['retrying', 'quarantined', 'failed'].includes(x.status)).last_error.slice(0, 160))}</p>` : ''}`;
   }
 
-  /* banner */
-  document.body.insertAdjacentHTML('afterbegin', '<div id="pvbanner" style="position:sticky;top:0;z-index:50;background:#FBDC00;color:#25247B;font-weight:700;text-align:center;padding:6px 12px;font-size:13px">NEW UI · live ApexOne data · changes here are real</div>');
 })();

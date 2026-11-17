@@ -730,7 +730,7 @@
     augTracker(); rebuildMods(); rebuildLEI();
     renderQ(); renderM(); renderA(); renderLeg(); if (typeof renderE === 'function') renderE();
     if (bound) return; bound = true;
-    rebind('Import: columns matched', () => say('Import is switched off in the preview: it only holds test data. In the live app this will match columns by heading.'));
+    rebind('Import: columns matched', () => say('Import by column heading is not switched on yet.'));
     rebind('Exported QCTO Projects Tracker.xlsx', exportTracker);
     rebind('Add programme to the moderation list', addModeration);
     rebind('Exported External Moderation', exportModeration);

@@ -200,7 +200,7 @@
     if (!window.XLSX) return say('Excel library not loaded');
     const ws = XLSX.utils.aoa_to_sheet([['Project manager', 'Client', 'Programme name', 'Qualification', 'SAQA ID', 'Programme type', 'NQF level', 'Start date (yyyy-mm-dd)', 'End date (yyyy-mm-dd)', 'Facilitator']]);
     const wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Programmes'); XLSX.writeFile(wb, 'pm-tracker-template.xlsx');
-    say('Template downloaded. Import stays switched off in the preview.');
+    say('Template downloaded. Import is not switched on yet.');
   };
 
   /* ---------- Assessors & Moderators (live menu "09 SETA Assessments") ---------- */

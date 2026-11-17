@@ -53,7 +53,7 @@
     } else if (P.view === 'run') {
       h += `<p class="avsm">Practice: do each step yourself on the real screen. Saves are blocked. Hints used: ${P.hints}.</p><ol class="avkl">`
         + P.l.g.steps.map((st, i) => `<li class="${i < P.i ? 'ok' : i === P.i ? 'now' : ''}"><span>${i < P.i ? '✓ ' : ''}${esc(st.t)}</span></li>`).join('') + '</ol>'
-        + `<div class="avkb"><button type="button" class="btn" onclick="avaPHint()">Show me (hint)</button><button type="button" class="btn" onclick="avaPSkip()">Can't do this step</button><button type="button" class="btn" onclick="avaPStop()">Stop</button></div>`;
+        + `<div class="avkb">${P.l.g.steps[P.i] && P.l.g.steps[P.i].self ? '<button type="button" class="btn y" onclick="avaPSelf()">I\'ve done it</button>' : ''}<button type="button" class="btn" onclick="avaPHint()">Show me (hint)</button><button type="button" class="btn" onclick="avaPSkip()">Can't do this step</button><button type="button" class="btn" onclick="avaPStop()">Stop</button></div>`;
     } else {
       const nx = lessons(r).find(l => !skills()[l.id]);
       h += `<p><b>Passed ${'★'.repeat(P.score)}${'☆'.repeat(3 - P.score)}</b> <span class="avsm">(${P.hints} hint${P.hints === 1 ? '' : 's'})</span></p><p class="avsm">${pr.ready ? `All done: you're <b>${NAME[r] || 'PM'} ready ✓</b>.` : `${pr.n}/${pr.of} on your path.`}</p>`
@@ -65,7 +65,8 @@
   window.avaLearn = open => { const box = Q('#avacoach'); if (!box) return; const o = open === undefined ? box.hidden : !!open; if (!o) { avaPStop(true); box.hidden = true; return; } P.view = 'list'; box.hidden = false; paint(); };
   window.avaLearnGuide = id => { const l = byId(id); if (!l) return; avaLearn(false); location.hash = l.r; window.avaGuide && avaGuide(l.r, l.k); };
   window.avaPractise = id => { const l = byId(id); if (!l) return; clearInterval(P.timer); Object.assign(P, { on: true, l, i: 0, hints: 0, hit: -1, view: 'run' }); Q('#avacoach').hidden = false; if (window.avaToggle) avaToggle(false); paint(); P.timer = setInterval(tick, 400); tick(); };
-  window.avaPHint = () => { const st = P.l && P.l.g.steps[P.i], el = st && KB().find(st.sel); P.hints++; if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('avpulse'); void el.offsetWidth; el.classList.add('avpulse'); setTimeout(() => el.classList.remove('avpulse'), 3200); } else window.toast && toast('Not on screen yet: finish the step before it first.'); paint(); };
+  window.avaPHint = () => { const st = P.l && P.l.g.steps[P.i], el = st && KB().find(st.sel); if (el) { P.hints++; el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('avpulse'); void el.offsetWidth; el.classList.add('avpulse'); setTimeout(() => el.classList.remove('avpulse'), 3200); } else window.toast && toast('Nothing to point at yet. Do the step before it, or press "Can\'t do this step" if it doesn\'t apply.'); paint(); };
+  window.avaPSelf = () => { if (!P.on) return; P.hit = Math.max(P.hit, P.i); tick(); paint(); };
   window.avaPSkip = () => { if (!P.on) return; P.hints++; P.hit = Math.max(P.hit, P.i); tick(); paint(); };
   window.avaPStop = quiet => { const was = P.on; P.on = false; clearInterval(P.timer); if (was && quiet !== true) { P.view = 'list'; paint(); } };
   window.AVACOACH = { PATHS, lessons, progress, guard, P };
