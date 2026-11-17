@@ -169,7 +169,7 @@
       if (i >= 2 && i < 6 && (D().tracker || []).some(x => x.programme_id === p.id && x.eisa_date)) i = 4;
       const ms = modsOf(p.id) || [], tr = ms.filter(m => m.trained).length;
       let sp = $('pstep'); if (!sp) { hd.insertAdjacentHTML('afterend', '<div id="pstep" class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px"></div>'); sp = $('pstep'); }
-      sp.innerHTML = `<ol class="steps">${L.map((s, k) => `<li class="${k < i ? 'done' : k === i ? 'cur' : ''}"><span>${k < i ? '✓' : k + 1}</span>${s}</li>`).join('')}</ol><div class="sub">${i < 6 ? `Now: <b>${L[i]}</b> · owner ${O[i]}` : 'All stages done'}${ms.length ? ` · Modules trained: <b>${tr} of ${ms.length}</b>` : ' · No modules set up yet'}</div>`; }
+      sp.innerHTML = `<ol class="psteps">${L.map((s, k) => `<li class="${k < i ? 'done' : k === i ? 'cur' : ''}"><span>${k < i ? '✓' : k + 1}</span>${s}</li>`).join('')}</ol><div class="sub">${i < 6 ? `Now: <b>${L[i]}</b> · owner ${O[i]}` : 'All stages done'}${ms.length ? ` · Modules trained: <b>${tr} of ${ms.length}</b>` : ' · No modules set up yet'}</div>`; }
     if (window.apxProgDocs && pTab !== 'Form 3') apxProgDocs(p.id, 'pdocs'); else if ($('pdocs')) $('pdocs').hidden = true;
     const sp = hd.querySelectorAll('span'); if (sp[0]) sp[0].textContent = `${{ initiated: 'Initiated · awaiting sign-off', handed_over: 'Handed over · awaiting activation', active: 'Active', closed: 'Closed' }[st] || st} · ${p.programme_type || p.qualification_type || 'Programme'}${p.display_id ? ' · ' + p.display_id : ''}`;
   };
