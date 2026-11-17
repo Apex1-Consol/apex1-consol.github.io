@@ -195,10 +195,10 @@ window.HO = (() => {
     const lock = g.locked ? `<div class="ho-banner"><span>&#128274; Signed records are locked. ${g.stage === 'complete' ? 'Only the Head of Operations can reopen it.' : 'Any assigned signer can unlock it; every signature is then cleared and kept in the history.'}</span>
         ${me.can_unlock ? `<button class="btn btn-sm" onclick="HO.unlock()" ${s.busy ? 'disabled' : ''}>Unlock to edit</button>` : ''}</div>` : '';
     return `${err}${readiness(g)}${lock}
-      ${g.audit === false ? DOCS_CARD() : ''}
       <div class="ho-steps" id="ho-t-ho-approvals">${['pi', 'compliance', 'ops'].map(st => stepCard(g, st)).join('')}</div>
       ${work(g)}
       ${deadlines(g)}
+      ${g.audit === false ? DOCS_CARD() : ''}
       ${packForm(g)}
       ${g.audit === false ? '' : DOCS_CARD()}
       <h3 style="font-size:14px;margin:18px 0 8px;">Evidence review</h3>
@@ -206,7 +206,7 @@ window.HO = (() => {
       ${g.audit === false ? `<div style="margin-top:14px;">${risksHtml(g)}</div>` : `<div class="ho-two" style="margin-top:14px;">${risksHtml(g)}${trail(g)}</div>`}`;
   }
 
-  const DOCS_CARD = () => `<section class="card" id="hoDocs" style="margin-top:14px"></section>${(setTimeout(() => window.apxProgDocs && apxProgDocs(s.pid, 'hoDocs')), '')}`;
+  const DOCS_CARD = () => `<section class="card" id="hoDocs" style="margin:14px 0"></section>${(setTimeout(() => window.apxProgDocs && apxProgDocs(s.pid, 'hoDocs')), '')}`;
   function readiness(g) {
     return `<div class="ho-card ho-ready ${esc(g.tone)}">
       <div class="hl">${esc(g.headline)}<div class="next">${esc(nextLine(g))}</div></div>

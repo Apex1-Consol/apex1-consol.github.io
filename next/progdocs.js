@@ -105,7 +105,7 @@
         <a href="javascript:void 0" class="o" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')">Open</a></div>`;
     };
     el.innerHTML = `<style>
-        .pdsecs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,520px),1fr));gap:14px 28px;margin-top:12px}
+        .pdsecs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px 28px;margin-top:12px}
         .pdsec h4{margin:0 0 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
         .pdl{display:grid;grid-template-columns:30px minmax(0,1.2fr) minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line2,#eee);font-size:13px}
         .pdl .c{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700}
