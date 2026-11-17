@@ -773,7 +773,7 @@
   const CL_SECTORS = ['Agriculture', 'Construction', 'Education & Training', 'Energy', 'Financial Services', 'Government/Public Sector', 'Healthcare', 'Hospitality & Tourism', 'ICT', 'Insurance', 'Manufacturing', 'Mining', 'Retail & Wholesale', 'Transport & Logistics', 'Other'];
   const CL_BEE = ['Level 1', 'Level 2', 'Level 3', 'Level 4', 'Level 5', 'Level 6', 'Level 7', 'Level 8', 'Non-Compliant'];
   const CL_MOU = ['Signed', 'Draft', 'Pending', 'Expired', 'Not Required'];
-  let clPick = null, clQ = '';
+  let clPick = null, clQ = '', clPm = '', clSort = { k: 'name', d: 1 };
   const clF = c => c.fields || {};
   const clName = c => c.client_name || clF(c)['Company Name'] || 'Client ' + c.id;
   const clDate = d => { const t = d && new Date(d); return t && !isNaN(t) ? t.toLocaleDateString('en-ZA', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
@@ -792,9 +792,15 @@
     const head = document.querySelector('#view-clients h1')?.parentElement;
     if (head && !$('clq')) head.insertAdjacentHTML('beforeend', '<input id="clq" type="search" placeholder="Search clients, contacts, PM" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 10px;font:inherit;background:var(--surface);color:var(--ink);min-width:220px" oninput="previewClSearch(this.value)">');
     const q = clQ.toLowerCase(), shown = list.filter(c => !q || [clName(c), c.contact_person, c.project_manager, c.sales_person, clF(c).Sector].join(' ').toLowerCase().includes(q));
-    $('clientcards').innerHTML = shown.map(c => { const m = clMou(c), cp = P.data.progs.filter(p => p.client_id === c.id), n = cp.length, bad = cp.filter(clBadDates).length;
-    if (window.apxPgIn) apxPgIn($('clientcards'), q);
-      return `<button class="pick${c.id === clPick ? ' on' : ''}" onclick="previewClPick(${c.id})"><b>${esc(clName(c))}</b><span class="sub">${esc(clF(c).Sector || 'Sector not set')} · PM ${esc(c.project_manager || '—')}</span><span style="display:flex;gap:6px;flex-wrap:wrap;align-items:center"><span class="badge ${m.cls}">${esc(m.s === 'No MOU recorded' ? m.s : 'MOU ' + m.s)}${m.note ? ' · ' + m.note : ''}</span>${bad ? `<span class="badge b-bad">${bad} end before start</span>` : ''}</span><span class="sub">${n} programme${n === 1 ? '' : 's'}</span></button>`; }).join('') || '<p class="sub">No clients match.</p>';
+    const pms = [...new Set(list.map(c => c.project_manager).filter(Boolean))].sort();
+    if (head && !$('clpm')) $('clq').insertAdjacentHTML('afterend', '<select id="clpm" onchange="previewClPm(this.value)" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:var(--surface);color:var(--ink)"></select>');
+    if ($('clpm')) $('clpm').innerHTML = '<option value="">All PMs</option>' + pms.map(x => `<option${x === clPm ? ' selected' : ''}>${esc(x)}</option>`).join('');
+    const rows = shown.filter(c => !clPm || c.project_manager === clPm).map(c => { const m = clMou(c), cp = P.data.progs.filter(p => p.client_id === c.id); return { c, m, n: cp.length, bad: cp.filter(clBadDates).length }; });
+    const key = { name: r => clName(r.c).toLowerCase(), pm: r => (r.c.project_manager || '~').toLowerCase(), mou: r => r.m.s === 'No MOU recorded' ? '~' : r.m.s, n: r => -r.n }[clSort.k];
+    rows.sort((x, y) => { const u = key(x), v = key(y); return (u < v ? -1 : u > v ? 1 : 0) * clSort.d; });
+    const th = (k, l, st = '') => `<th style="text-align:left;padding:8px 10px;cursor:pointer;white-space:nowrap;${st}" onclick="previewClSort('${k}')">${l}${clSort.k === k ? (clSort.d > 0 ? ' ▲' : ' ▼') : ''}</th>`;
+    const cc = $('clientcards'); cc.style.display = 'block';
+    cc.innerHTML = rows.length ? `<div class="sub" style="margin:0 0 6px">${rows.length} client${rows.length === 1 ? '' : 's'}</div><div style="overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)"><table id="cltable" style="width:100%;border-collapse:collapse;font-size:14px"><thead><tr style="border-bottom:1px solid var(--line)">${th('name', 'Client')}${th('pm', 'PM')}${th('mou', 'MOU')}${th('n', 'Programmes', 'text-align:right')}</tr></thead><tbody>${rows.map(({ c, m, n, bad }) => `<tr onclick="previewClPick(${c.id})" style="cursor:pointer;border-top:1px solid var(--line);${c.id === clPick ? 'background:var(--hl,rgba(0,90,200,.08));box-shadow:inset 3px 0 0 var(--accent,#0a58ca)' : ''}"><td style="padding:7px 10px"><b>${esc(clName(c))}</b>${bad ? ` <span class="badge b-bad">${bad} end before start</span>` : ''}</td><td style="padding:7px 10px" class="sub">${esc(c.project_manager || '—')}</td><td style="padding:7px 10px">${m.s === 'No MOU recorded' ? '<span class="sub">—</span>' : `<span class="badge ${m.cls}">${esc(m.s)}${m.note ? ' · ' + m.note : ''}</span>`}</td><td style="padding:7px 10px;text-align:right">${n}</td></tr>`).join('')}</tbody></table></div>` : '<p class="sub">No clients match.</p>';
     const c = list.find(x => x.id === clPick), aside = document.querySelector('#view-clients aside');
     if (!aside) return;
     if (!c) { aside.innerHTML = '<p class="sub">No client selected.</p>'; return; }
@@ -810,6 +816,8 @@
   }
   window.previewClPick = id => { clPick = id; applyClients(); };
   window.previewClSearch = v => { clQ = v || ''; applyClients(); };
+  window.previewClPm = v => { clPm = v || ''; applyClients(); };
+  window.previewClSort = k => { clSort = { k, d: clSort.k === k ? -clSort.d : (k === 'n' ? 1 : 1) }; applyClients(); };
   function clForm(c) {
     const f = c ? clF(c) : {}, o = (list, v) => `<option value="">—</option>` + (v && !list.includes(v) ? [v, ...list] : list).map(x => `<option ${x === v ? 'selected' : ''}>${esc(x)}</option>`).join('');
     const inp = (n, l, v, t = 'text', ex = '') => `<label>${l}<input name="${n}" type="${t}" value="${esc(v || '')}" ${ex}></label>`;
