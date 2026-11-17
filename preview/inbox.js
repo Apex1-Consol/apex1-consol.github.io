@@ -23,13 +23,13 @@
     if (!box) { box = document.createElement('div'); box.id = 'aoInbox'; main.insertBefore(box, main.children[1] || null); }
     const link = (h, title, sub, right = '') => `<a href="#${esc(h)}" style="display:flex;gap:12px;align-items:center;padding:10px 0;border-top:1px solid var(--line);margin-top:8px;color:inherit;text-decoration:none">
       <span style="flex:1;min-width:0"><span style="display:block;font-weight:600">${title}</span><span class="sub">${sub}</span></span>${right}</a>`;
-    const near = dls.filter(d => daysTo(d.due) <= 30);
+    const near = dls.filter(d => daysTo(d.due) >= -60).slice(0, 5);
     const dlRow = d => { const n = daysTo(d.due), col = n < 0 ? 'var(--bad,#b42318)' : n <= 7 ? '#8A5100' : 'var(--muted)';
       return link('handover/' + d.programme_id, `${esc(d.label)} · ${esc(dmy(d.due))}${d.trial ? ' <span class="sub">(trial)</span>' : ''}`, `${esc(d.programme)} · ${esc(d.rule || '')}`,
         `<span style="font-size:12px;font-weight:600;color:${col};white-space:nowrap">${dueText(n)}</span>`); };
     const waiting = rows.length || near.length ? `<div class="card" style="margin-top:16px;border-left:4px solid var(--yellow)">
       <b>Waiting for you</b>${rows.map(r => link(r.link || 'mywork', esc(r.title), `${esc(r.detail || '')} · ${esc(dmy(r.created_at))}`)).join('')}
-      ${near.length ? `<div class="sub" style="margin-top:12px;font-weight:600">Statutory deadlines (next 30 days)</div>${near.map(dlRow).join('')}` : ''}</div>` : '';
+      ${near.length ? `<div class="sub" style="margin-top:12px;font-weight:600">Your statutory deadlines</div>${near.map(dlRow).join('')}` : ''}</div>` : '';
     const pipeCard = canPipe() && pipe.length ? `<div class="card" style="margin-top:16px">
       <div style="display:flex;justify-content:space-between;align-items:baseline"><b>Hand-overs in progress</b><span class="sub">${pipe.filter(x => x.turn !== 'Done').length} open</span></div>
       ${pipe.map(x => { const w = x.waiting_days, col = x.turn === 'Done' ? 'var(--ok,#1a7f52)' : w > 7 ? 'var(--bad,#b42318)' : w > 3 ? '#8A5100' : 'var(--muted)';
