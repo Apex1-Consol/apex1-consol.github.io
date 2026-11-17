@@ -21,7 +21,7 @@ const openEditProgramme = id => { location.hash = 'programmes'; setTimeout(() =>
 // those RPCs with the signed-in user's Supabase session. Nothing here decides
 // whether something is allowed; a refused call comes back with the reason.
 window.HO = (() => {
-  const s = { pid: null, tab: 'overview', g: null, busy: false, cat: null, assignable: {}, err: null, open: new Set(), docs: [] };
+  const s = { pid: null, tab: 'overview', g: null, busy: false, cat: null, assignable: {}, err: null, open: new Set(), docs: [], todo: false };
 
   const STEP = {
     pi:         { n: 'Step 1', t: 'Programme Initiator', verb: 'Pack prepared',       attest: 'I prepared this handover pack and the evidence is filed as described.' },
@@ -120,6 +120,40 @@ window.HO = (() => {
     }
     render();
   }
+  // A proper dialog instead of the browser's prompt/confirm. Fields: [{k, label, type:'text'|'textarea'|'date'|'select', options:[[v,l]], value}].
+  function ask({ title, html = '', fields = [], ok = 'OK', danger = false }) {
+    return new Promise(done => {
+      const w = document.createElement('div');
+      w.setAttribute('role', 'dialog'); w.setAttribute('aria-modal', 'true');
+      w.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(10,20,40,.45);display:flex;align-items:center;justify-content:center;padding:16px';
+      const f = fields.map(x => `<label style="display:block;font-size:12px;color:var(--muted);margin:10px 0 4px">${esc(x.label)}</label>` + (x.type === 'textarea'
+        ? `<textarea data-k="${x.k}" rows="3" style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit">${esc(x.value || '')}</textarea>`
+        : x.type === 'select' ? `<select data-k="${x.k}" style="width:100%;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit">${x.options.map(([v, l]) => `<option value="${esc(v)}">${esc(l)}</option>`).join('')}</select>`
+        : `<input data-k="${x.k}" type="${x.type || 'text'}" value="${esc(x.value || '')}" ${x.min ? `min="${x.min}"` : ''} ${x.max ? `max="${x.max}"` : ''} style="width:100%;box-sizing:border-box;padding:8px;border:1px solid var(--line);border-radius:8px;font:inherit">`)).join('');
+      w.innerHTML = `<div style="background:var(--surface,#fff);color:var(--ink);border-radius:14px;max-width:460px;width:100%;padding:20px 22px;box-shadow:0 10px 40px rgba(0,0,0,.25)">
+        <div style="font-weight:700;font-size:16px;margin-bottom:8px">${esc(title)}</div><div style="font-size:13.5px;line-height:1.5">${html}</div>${f}
+        <div class="ho-err" style="color:var(--bad,#b42318);font-size:12.5px;min-height:16px;margin-top:8px"></div>
+        <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:8px"><button class="btn btn-sm" data-x>Cancel</button>
+        <button class="btn btn-sm ${danger ? '' : 'y'}" data-ok style="${danger ? 'background:var(--bad,#b42318);color:#fff;border-color:transparent' : ''}">${esc(ok)}</button></div></div>`;
+      const close = v => { w.remove(); document.removeEventListener('keydown', key); done(v); };
+      const key = e => { if (e.key === 'Escape') close(null); };
+      document.addEventListener('keydown', key);
+      w.querySelector('[data-x]').onclick = () => close(null);
+      w.onclick = e => { if (e.target === w) close(null); };
+      w.querySelector('[data-ok]').onclick = () => {
+        const v = {}; let miss = null;
+        w.querySelectorAll('[data-k]').forEach(el => { v[el.dataset.k] = el.value.trim(); const fx = fields.find(x => x.k === el.dataset.k); if (fx && fx.required && !v[el.dataset.k] && !miss) miss = fx.label; });
+        if (miss) { w.querySelector('.ho-err').textContent = miss + ' is needed'; return; }
+        close(fields.length ? v : true);
+      };
+      document.body.appendChild(w);
+      const first = w.querySelector('[data-k]') || w.querySelector('[data-ok]'); if (first) first.focus();
+    });
+  }
+  // Who loses their signature if the record changes now.
+  const signedList = g => ['pi', 'compliance', 'ops'].map(k => [k, (g.signatures || {})[k]]).filter(([, x]) => x && x.state === 'valid')
+    .map(([k, x]) => `<li><b>${esc(x.name)}</b> (${esc(STEP[k].t)})</li>`);
+
   // Every write goes through one place: call, show the database's answer, re-render.
   async function act(fn, body, okMsg) {
     if (s.busy) return null;
@@ -195,16 +229,31 @@ window.HO = (() => {
     const lock = g.locked ? `<div class="ho-banner"><span>&#128274; Signed records are locked. ${g.stage === 'complete' ? 'Only the Head of Operations can reopen it.' : 'Any assigned signer can unlock it; every signature is then cleared and kept in the history.'}</span>
         ${me.can_unlock ? `<button class="btn btn-sm" onclick="HO.unlock()" ${s.busy ? 'disabled' : ''}>Unlock to edit</button>` : ''}</div>` : '';
     const trial = g.trial_note ? `<div class="ho-banner" style="background:#EEF1FF;color:var(--ink);border:1px solid #9AA7E6;"><b>TRIAL HAND-OVER</b><span>${esc(g.trial_note)}</span></div>` : '';
-    return `${err}${trial}${readiness(g)}${lock}
+    const isAdmin = (P.roles || []).includes('admin'), canTrial = (isAdmin || me.can_edit) && g.stage !== 'complete';
+    const trialCtl = canTrial ? `<div style="display:flex;justify-content:flex-end;margin:-6px 0 10px"><button class="btn btn-sm" onclick="HO.setTrial(${g.trial_note ? 'false' : 'true'})" ${s.busy ? 'disabled' : ''}>${g.trial_note ? 'Remove trial mark' : 'Mark as trial run'}</button></div>` : '';
+    return `${err}${trial}${trialCtl}${readiness(g)}${lock}
       <div class="ho-steps" id="ho-t-ho-approvals">${['pi', 'compliance', 'ops'].map(st => stepCard(g, st)).join('')}</div>
       ${work(g)}
       ${deadlines(g)}
-      ${g.stage === 'complete' ? `${DOCS_CARD()}${checklistFold(g)}` : `${packForm(g)}
+      ${g.stage === 'complete' ? `${pmCard(g)}${DOCS_CARD()}${checklistFold(g)}` : `${packForm(g)}
       <h3 style="font-size:14px;margin:18px 0 8px;">Evidence review</h3>
       ${gatesHtml(g)}`}
       ${g.audit === false ? `<div style="margin-top:14px;">${risksHtml(g)}</div>` : `<div class="ho-two" style="margin-top:14px;">${risksHtml(g)}${trail(g)}</div>`}`;
   }
 
+  // The PM ends the hand-over: accept, or raise a query that goes to the Initiator and the Head of Ops.
+  function pmCard(g) {
+    const pm = g.pm || {}, isPM = !!pm.email && (P.user && P.user.email || '').toLowerCase() === String(pm.email).toLowerCase();
+    if (pm.response === 'accepted') return `<div class="ho-banner" style="background:var(--okbg);color:var(--ok)">&#10003; Accepted by ${esc(pm.by || '')} · ${when(pm.at)}${pm.note ? ' · ' + esc(pm.note) : ''}</div>`;
+    const q = pm.response === 'query' ? `<div class="ho-banner err"><span><b>PM query</b> · ${esc(pm.by || '')} · ${when(pm.at)}<br>${esc(pm.note || '')}</span>
+        ${(g.me || {}).can_unlock ? '<span class="ho-muted">Answer the PM, or unlock to correct the pack.</span>' : ''}</div>` : '';
+    const ask_ = isPM ? `<div class="ho-card" style="display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;border-left:4px solid var(--yellow)">
+        <div style="flex:1;min-width:220px"><b>Your response</b><div class="ho-muted">Accept the hand-over once you have checked the pack, or raise a query.</div></div>
+        <button class="btn y btn-sm" onclick="HO.pmRespond(true)" ${s.busy ? 'disabled' : ''}>Accept hand-over</button>
+        <button class="btn btn-sm" onclick="HO.pmRespond(false)" ${s.busy ? 'disabled' : ''}>Raise a query</button></div>`
+      : (!pm.response && pm.email ? `<div class="ho-muted" style="margin:-4px 0 12px">Waiting for ${esc(pm.email)} to accept the hand-over.</div>` : '');
+    return q + ask_;
+  }
   // After hand-over the pack (files by section) is the main view; the working checklist folds away underneath.
   function checklistFold(g) {
     const ap = (g.gates || []).filter(x => x.applicable), ok = ap.filter(x => x.state === 'verified' || x.state === 'na_confirmed').length;
@@ -226,7 +275,8 @@ window.HO = (() => {
   function stepCard(g, st) {
     const meta = STEP[st], me = g.me || {}, a = (g.assignees || {})[st], sig = (g.signatures || {})[st];
     const can = (me.can_sign || {})[st] || {}, mine = (me.steps || []).includes(st), cur = g.stage === st;
-    const opts = s.assignable[st];
+    const opts = s.assignable[st], dep = (g.deputies || {})[st];
+    const canDeputy = cur && !sig && (mine || (P.roles || []).some(r => r === 'admin' || r === 'head_of_ops'));
     const assign = me.can_assign && opts
       ? `<select aria-label="${esc(meta.t)}" onchange="HO.assign('${st}', this.value)" ${s.busy ? 'disabled' : ''}>
            ${a ? '' : '<option value="">Choose…</option>'}
@@ -238,7 +288,7 @@ window.HO = (() => {
     if (sig) {
       body = `<div class="sig ${sig.state === 'valid' ? '' : 'bad'}">${sig.state === 'valid' ? '&#10003; ' + esc(meta.verb) : '&#9888; No longer valid'} · ${esc(sig.name)}<br>
         <span class="ho-muted">${when(sig.at)} · record ${esc(String(sig.hash || '').slice(0, 8))}${sig.why ? ' · ' + esc(sig.why) : ''}</span></div>`;
-    } else if (mine && cur) {
+    } else if ((mine || (dep && dep.me)) && cur) {
       body = `<label class="ho-attest"><input type="checkbox" id="ho-att-${st}" ${can.ok ? '' : 'disabled'}> ${esc(meta.attest)}</label>
         <input type="text" id="ho-name-${st}" placeholder="Type your name to sign" autocomplete="off" ${can.ok ? '' : 'disabled'}>
         <button class="btn y btn-sm" onclick="HO.sign('${st}')" ${can.ok && !s.busy ? '' : 'disabled'}>Sign: ${esc(meta.verb)}</button>
@@ -246,7 +296,9 @@ window.HO = (() => {
     } else {
       body = `<div class="why">${esc(can.reason || (cur ? 'Waiting for the assigned signer' : ''))}</div>`;
     }
-    return `<div class="ho-step ${cur ? 'current' : ''}"><div class="n">${meta.n}${mine ? ' · you' : ''}</div><div class="t">${esc(meta.t)}</div>${assign}${body}</div>`;
+    const acting = dep ? `<div class="why" style="color:var(--ink)">Acting: <b>${esc(dep.name)}</b> until ${day(dep.until)} · ${esc(dep.reason)}</div>` : '';
+    const depLink = canDeputy && !dep ? `<button class="btn btn-sm" style="align-self:flex-start" onclick="HO.deputy('${st}')" ${s.busy ? 'disabled' : ''}>Name an acting signer</button>` : '';
+    return `<div class="ho-step ${cur ? 'current' : ''}"><div class="n">${meta.n}${mine ? ' · you' : dep && dep.me ? ' · you (acting)' : ''}</div><div class="t">${esc(meta.t)}</div>${assign}${acting}${body}${depLink}</div>`;
   }
 
   function work(g) {
@@ -300,12 +352,21 @@ window.HO = (() => {
   }
 
   function gatesHtml(g) {
+    const groups = [], me = g.me || {}, todo = (g.gates || []).filter(x => x.applicable && x.state === 'ready');
+    const bar = me.can_verify && todo.length ? `<div class="ho-banner" style="justify-content:space-between">
+        <span><b>${todo.length} gate${todo.length === 1 ? '' : 's'} to verify</b>${todo.some(x => x.changed) ? ` · ${todo.filter(x => x.changed).length} changed since you last verified` : ''}</span>
+        <span style="display:flex;gap:8px"><button class="btn btn-sm" onclick="HO.toggleTodo()">${s.todo ? 'Show all gates' : 'Show only these'}</button>
+        <button class="btn y btn-sm" onclick="HO.verifyTodo()" ${s.busy ? 'disabled' : ''}>Verify all ${todo.length}…</button></span></div>` : '';
+    const show = s.todo && bar ? todo : g.gates;
+    return bar + gatesGroups(g, show, s.todo && !!bar);
+  }
+  function gatesGroups(g, list, forceOpen) {
     const groups = [];
-    g.gates.forEach(x => { let gr = groups.find(y => y.id === x.grp); if (!gr) groups.push(gr = { id: x.grp, title: x.grp_title, gates: [] }); gr.gates.push(x); });
+    list.forEach(x => { let gr = groups.find(y => y.id === x.grp); if (!gr) groups.push(gr = { id: x.grp, title: x.grp_title, gates: [] }); gr.gates.push(x); });
     return groups.map(gr => {
       const ap = gr.gates.filter(x => x.applicable), bad = ap.filter(x => x.state === 'blocked').length, ev = ap.filter(x => x.state === 'evidence').length;
       const ok = ap.filter(x => x.state === 'verified' || x.state === 'na_confirmed').length;
-      const open = s.open.has(gr.id);
+      const open = forceOpen || s.open.has(gr.id);
       return `<details class="ho-group" id="ho-grp-${esc(gr.id)}" ${open ? 'open' : ''} ontoggle="HO.remember('${esc(gr.id)}', this.open)">
         <summary><span class="ho-dot ${bad ? '' : ev ? 'amber' : ok === ap.length ? 'green' : 'grey'}"></span>${esc(gr.title)}
           <span class="c">${ap.length} apply · ${bad ? bad + ' blocked · ' : ''}${ev ? ev + ' need evidence · ' : ''}${ok} verified</span></summary>
@@ -332,7 +393,7 @@ window.HO = (() => {
     const evi = x.evidence || {};
     const edit = decl ? `<div class="ho-muted">Declared not applicable: “${esc(decl.why)}” · ${esc(decl.by || '')}</div>`
       : `<div class="row">${facts}
-          <div style="grid-column:span 2;min-width:0;"><label>Evidence (document name or link in the evidence folder)</label><input data-he="ref" value="${esc(evi.ref || '')}" ${ed ? '' : 'disabled'} placeholder="e.g. Drive › Client › Signed agreements.pdf"></div>
+          <div style="grid-column:span 2;min-width:0;"><label>Evidence: attach a file below, or paste a full link (https://…)</label><input data-he="ref" value="${esc(evi.ref || '')}" ${ed ? '' : 'disabled'} placeholder="https://… link to the document"></div>
           <div style="grid-column:1/-1;min-width:0;">${gateFiles(x, ed)}</div>
           ${x.deadline ? `<div><label>Date submitted (if already sent)</label><input data-he="date" type="date" value="${esc(evi.date || '')}" ${ed ? '' : 'disabled'}></div>` : ''}
         </div>`;
@@ -490,7 +551,57 @@ window.HO = (() => {
     await act('handoff_save', { p_patch: { na_decl: { [id]: { why } } }, p_version: ver() }, id.toUpperCase() + ' declared not applicable');
   }
   async function undeclareNA(id) { await act('handoff_save', { p_patch: { na_decl: { [id]: null } }, p_version: ver() }, id.toUpperCase() + ' applies again'); }
-  async function assign(step, uid) { if (uid) await act('handoff_assign', { p_step: step, p_user: uid }, STEP[step].t + ' assigned'); }
+  async function assign(step, uid) {
+    if (!uid) return;
+    const list = signedList(s.g);
+    if (list.length) {
+      const ok = await ask({ title: `Change who signs ${STEP[step].t}?`, danger: true, ok: 'Change and clear signatures',
+        html: `Changing a signer changes the signed record, so these signatures will no longer be valid and must be given again:<ul style="margin:6px 0 0 18px;padding:0">${list.join('')}</ul>
+          <p style="margin:10px 0 0">If the signer is only away, use <b>Name an acting signer</b> instead: it keeps every signature.</p>` });
+      if (!ok) { render(); return; }
+    }
+    await act('handoff_assign', { p_step: step, p_user: uid }, STEP[step].t + ' assigned');
+  }
+  // Acting signer: the deputy signs as themselves; the record says who they acted for. Signatures are untouched.
+  async function deputy(step) {
+    let opts = [];
+    try { opts = await rpc('handoff_assignable', { p_step: step }); } catch (e) { showToast('error', e.message); return; }
+    const taken = Object.values(s.g.assignees || {}).map(a => a && a.id);
+    opts = (opts || []).filter(u => !taken.includes(u.id));
+    if (!opts.length) { showToast('error', 'Nobody else with this role is free to act'); return; }
+    const until = new Date(Date.now() + 14 * 864e5).toISOString().slice(0, 10), max = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10);
+    const a = (s.g.assignees || {})[step] || {};
+    const v = await ask({ title: `Acting ${STEP[step].t}`, ok: 'Name acting signer',
+      html: `${esc(a.name || 'The assigned signer')} stays assigned and every signature stays valid. The acting signer signs as themselves; the record shows they acted for ${esc(a.name || 'them')}.`,
+      fields: [{ k: 'who', label: 'Acting signer', type: 'select', options: opts.map(u => [u.id, `${u.name} · ${u.email}`]) },
+        { k: 'until', label: 'Until (at most 60 days)', type: 'date', value: until, min: new Date().toISOString().slice(0, 10), max },
+        { k: 'why', label: 'Reason', type: 'text', required: true, value: '' }] });
+    if (!v) return;
+    await act('handoff_deputy_set', { p_step: step, p_deputy: v.who, p_until: v.until, p_reason: v.why }, 'Acting signer named');
+  }
+  async function setTrial(on) {
+    const ok = await ask({ title: on ? 'Mark this hand-over as a trial?' : 'Make this a real hand-over?', ok: on ? 'Mark as trial' : 'Remove trial mark',
+      html: on ? 'A trial runs normally, but it never goes to ClickUp and its record PDF is stamped TRIAL. It stays a trial once handed over.' : 'It will go to ClickUp when it is handed over.' });
+    if (ok) await act('handoff_set_trial', { p_on: on }, on ? 'Marked as a trial' : 'Trial mark removed');
+  }
+  async function pmRespond(accept) {
+    const v = await ask(accept
+      ? { title: 'Accept this hand-over?', ok: 'Accept', html: 'You confirm you have received the pack and take over the programme. The documents are marked reviewed.',
+          fields: [{ k: 'note', label: 'Note (optional)', type: 'text' }] }
+      : { title: 'Raise a query', ok: 'Send query', html: 'The Programme Initiator and the Head of Operations are told straight away.',
+          fields: [{ k: 'note', label: 'What needs clarifying or is missing?', type: 'textarea', required: true }] });
+    if (v) await act('handoff_pm_respond', { p_accept: accept, p_note: v.note || '' }, accept ? 'Hand-over accepted' : 'Query sent');
+  }
+  async function verifyTodo() {
+    const list = (s.g.gates || []).filter(x => x.applicable && x.state === 'ready');
+    if (!list.length) return;
+    const ok = await ask({ title: `Verify ${list.length} gate${list.length === 1 ? '' : 's'}?`, ok: 'Verify all of these',
+      html: `You confirm you checked each of these against its evidence and deadlines:<ul style="margin:6px 0 0 18px;padding:0;max-height:220px;overflow:auto">${list.map(x => `<li><b>${esc(x.id.toUpperCase())}</b> ${esc(x.text)}${x.changed ? ' <i>(changed)</i>' : ''}</li>`).join('')}</ul>` });
+    if (!ok) return;
+    for (const x of list) { const g = await act('handoff_verify', { p_gate: x.id, p_on: true }, null); if (!g || g.error) return; }
+    showToast('success', list.length + ' gates verified');
+  }
+  function toggleTodo() { s.todo = !s.todo; render(); }
   async function verify(id, on) { await act('handoff_verify', { p_gate: id, p_on: on }, on ? id.toUpperCase() + ' verified' : 'Verification withdrawn'); }
   async function sign(step) {
     const att = document.getElementById('ho-att-' + step), nm = document.getElementById('ho-name-' + step);
@@ -507,9 +618,13 @@ window.HO = (() => {
     }
   }
   async function unlock() {
-    const why = prompt('What needs to change? Every signature is cleared and kept in the history.');
-    if (!why) return;
-    await act('handoff_unlock', { p_reason: why }, 'Unlocked for editing');
+    const list = signedList(s.g);
+    const v = await ask({ title: 'Unlock this hand-over for changes?', danger: true, ok: 'Unlock and clear signatures',
+      html: `${list.length ? `These signatures will be cleared (kept in the history), and each person must sign again:<ul style="margin:6px 0 0 18px;padding:0">${list.join('')}</ul>` : 'Nothing has been signed yet.'}
+        <p style="margin:10px 0 0">The Programme Initiator is told, with your reason.</p>`,
+      fields: [{ k: 'why', label: 'What needs to change?', type: 'textarea', required: true }] });
+    if (!v) return;
+    await act('handoff_unlock', { p_reason: v.why }, 'Unlocked for editing');
   }
   async function addRisk() {
     const root = document.getElementById('ho-risk-form'); if (!root) return;
@@ -520,7 +635,7 @@ window.HO = (() => {
   async function closeRisk(id) { await act('handoff_risk_save', { p_risk: { id, status: 'mitigated' } }, 'Risk marked mitigated'); }
   async function ack(id) { await act('handoff_risk_ack', { p_risk_id: id }, 'Risk acknowledged'); }
 
-  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
+  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, deputy, setTrial, pmRespond, verifyTodo, toggleTodo, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
 })();
 
 ROUTES.handover = ['Sign-off & hand-over', 'Delivery']; PARENT.handover = 'programmes';

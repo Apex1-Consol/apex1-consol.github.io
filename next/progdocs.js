@@ -41,9 +41,12 @@
       if (!window.JSZip) await new Promise((ok, no) => { const sc = document.createElement('script'); sc.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js'; sc.onload = ok; sc.onerror = () => no(new Error('zip library did not load')); document.head.appendChild(sc); });
       const { data: rows, error } = await sb.from('programme_documents').select('doc_type,file_path,file_name').eq('programme_id', pid).order('id');
       if (error) throw error;
-      const { data: urls, error: e2 } = await sb.storage.from('programme-documents').createSignedUrls(rows.map(r => r.file_path), 300);
+      const { data: urls, error: e2 } = rows.length ? await sb.storage.from('programme-documents').createSignedUrls(rows.map(r => r.file_path), 300) : { data: [], error: null };
       if (e2) throw e2;
       const zip = new JSZip(), used = {};
+      const rq = await sb.from('handoff_records').select('record_no,version,storage_path').eq('programme_id', pid).not('storage_path', 'is', null).order('version', { ascending: false }).limit(1).maybeSingle();
+      if (rq.data) { const su = await sb.storage.from('handoff-records').createSignedUrl(rq.data.storage_path, 300);
+        if (su.data) zip.file(`00 - Signed hand-over record ${rq.data.record_no} v${rq.data.version}.pdf`, await (await fetch(su.data.signedUrl)).blob()); }
       for (let i = 0; i < rows.length; i++) {
         const r = rows[i], u = urls[i] && urls[i].signedUrl; if (!u) continue;
         const pre = /^gate_/.test(r.doc_type) ? r.doc_type.slice(5).toUpperCase() + ' - ' : '';
@@ -56,6 +59,11 @@
       a.href = URL.createObjectURL(blob); a.download = base + '.zip'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     } catch (e) { say('Download failed: ' + e.message); }
     if (btn) { btn.disabled = false; btn.textContent = 'Download all'; }
+  };
+  window.apxRecOpen = async path => {
+    const { data, error } = await sb.storage.from('handoff-records').createSignedUrl(path, 120);
+    if (error) return say('Cannot open: ' + error.message);
+    window.open(data.signedUrl, '_blank', 'noopener');
   };
   window.apxDocOpen = async path => {
     const { data, error } = await sb.storage.from('programme-documents').createSignedUrl(path, 120);
@@ -80,7 +88,9 @@
     // The old PI checklist is replaced by the verified gates once a programme has a sign-off record.
     const ho = await sb.from('handoff_signoffs').select('status,trial_note').eq('programme_id', pid).maybeSingle();
     const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
-    if (!rows.length && !out.length && !p.intake_source_id) { el.hidden = true; return; }
+    const rq = await sb.from('handoff_records').select('record_no,version,storage_path,pdf_bytes').eq('programme_id', pid).not('storage_path', 'is', null).order('version', { ascending: false }).limit(1).maybeSingle();
+    const rec = rq.data;
+    if (!rows.length && !out.length && !rec && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
     // The programme list may not be loaded yet on first paint, so ask the database who the PM is when it is missing.
     let pmEmail = p.handed_over_to_email || '';
@@ -122,12 +132,16 @@
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <h3 style="margin:0;font-size:15px">Hand-over pack <span class="sub">(${rows.length} file${rows.length === 1 ? '' : 's'})</span></h3>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          ${rows.length ? `<button class="btn sm" id="pdzip-${pid}" onclick="apxDocsZip(${pid})">Download all</button>` : ''}
+          ${rows.length || rec ? `<button class="btn sm" id="pdzip-${pid}" onclick="apxDocsZip(${pid})">Download all</button>` : ''}
           ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}
         </div>
       </div>
       ${ho.data && ho.data.trial_note ? `<p class="sub" style="margin:8px 0 0;padding:8px 10px;border-radius:8px;background:#EEF1FF;color:var(--ink)"><b>Trial hand-over:</b> these are demo documents, not a real pack.</p>` : ''}
       ${error ? `<p class="sub">Documents could not be loaded: ${esc(error.message)}</p>` : ''}
+      ${rec ? `<div class="pdl" style="margin-top:12px;border-top:0;background:var(--ground,#f4f5f7);border-radius:10px;padding:10px 12px">
+          <span class="c">&#9998;</span><span class="t"><b>Signed hand-over record</b></span>
+          <span class="f">&#128196; ${esc(rec.record_no)} v${esc(rec.version)} · ${esc(kb(rec.pdf_bytes))}</span><span class="s"></span>
+          <a href="javascript:void 0" class="o" onclick="apxRecOpen('${esc(rec.storage_path).replace(/'/g, '&#39;')}')">Open</a></div>` : ''}
       ${rows.length ? `<div class="pdsecs">${order.map(k => `<div class="pdsec"><h4>${esc(k)} <span style="font-weight:400">· ${rowsBy[k].length} file${rowsBy[k].length === 1 ? '' : 's'}</span>${allOk(rowsBy[k]) ? ' <span class="pdok">· &#10003; all verified</span>' : ''}</h4>${rowsBy[k].map(line).join('')}</div>`).join('')}</div>`
         : '<p class="sub" style="margin:8px 0 0">No documents were uploaded.</p>'}
       ${out.length ? `<div style="margin-top:12px"><div class="sub" style="font-weight:600;color:var(--warn)">Still outstanding at hand-over</div><ul style="margin:4px 0 0 18px;padding:0">${out.map(([k, l]) =>
