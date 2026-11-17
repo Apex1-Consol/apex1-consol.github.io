@@ -8,11 +8,13 @@
     const rows = ROW(el).filter(r => r.classList.contains('pgh') || r.style.display !== 'none');
     const host = el.tagName === 'TBODY' ? el.closest('table') : el;
     let bar = host && host.nextElementSibling && host.nextElementSibling.classList.contains('pgbar') ? host.nextElementSibling : null;
-    if (rows.length <= SIZE) { rows.forEach(r => r.classList.remove('pgh')); if (bar) bar.remove(); return; }
-    const pages = Math.ceil(rows.length / SIZE); el._pg = Math.min(Math.max(1, el._pg || 1), pages);
-    rows.forEach((r, i) => r.classList.toggle('pgh', Math.floor(i / SIZE) + 1 !== el._pg));
+    if (!el._sz) { const vis = rows.filter(r => !r.classList.contains('pgh') && r.offsetHeight).slice(0, 20); if (vis.length >= 3) { const avg = vis.reduce((t, r) => t + r.offsetHeight, 0) / vis.length; el._sz = Math.max(5, Math.min(20, Math.floor(Math.max(560, innerHeight * 0.8) / avg))); } }
+    const PS = el._sz || SIZE;
+    if (rows.length <= PS) { rows.forEach(r => r.classList.remove('pgh')); if (bar) bar.remove(); return; }
+    const pages = Math.ceil(rows.length / PS); el._pg = Math.min(Math.max(1, el._pg || 1), pages);
+    rows.forEach((r, i) => r.classList.toggle('pgh', Math.floor(i / PS) + 1 !== el._pg));
     if (!bar) { bar = document.createElement('div'); bar.className = 'pgbar'; host.after(bar); }
-    const a = (el._pg - 1) * SIZE + 1, b = Math.min(el._pg * SIZE, rows.length);
+    const a = (el._pg - 1) * PS + 1, b = Math.min(el._pg * PS, rows.length);
     bar.innerHTML = `<span>${a}–${b} of ${rows.length}</span><button type="button" data-d="-1"${el._pg === 1 ? ' disabled' : ''}>‹ Prev</button><span>Page ${el._pg} of ${pages}</span><button type="button" data-d="1"${el._pg === pages ? ' disabled' : ''}>Next ›</button>`;
     bar.onclick = e => { const d = +(e.target.dataset && e.target.dataset.d); if (!d) return; el._pg += d; run(); host.scrollIntoView({ block: 'nearest' }); };
   }
