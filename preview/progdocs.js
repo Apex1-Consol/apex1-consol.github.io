@@ -52,7 +52,9 @@
     const p = progs().find(x => x.id === pid) || {};
     const { data, error } = await sb.from('programme_documents').select('doc_type,doc_label,file_path,file_name,file_size,created_at,reviewed_at,reviewed_by').eq('programme_id', pid).order('id');
     const rows = error ? [] : (data || []), f = p.fields || {};
-    const out = DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
+    // The old PI checklist is replaced by the verified gates once a programme has a sign-off record.
+    const ho = await sb.from('handoff_signoffs').select('status').eq('programme_id', pid).maybeSingle();
+    const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
     if (!rows.length && !out.length && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
     const groups = {}; rows.forEach(r => (groups[r.doc_type] = groups[r.doc_type] || []).push(r));
