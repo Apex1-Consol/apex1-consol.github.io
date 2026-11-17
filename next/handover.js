@@ -439,7 +439,7 @@ window.HO = (() => {
       : (cur ? `<span class="ph-pill" style="${cur.verdict === 'ok' ? 'background:var(--okbg);color:var(--ok)' : 'background:var(--warnbg);color:var(--warn)'}" title="Automatic check (${esc(cur.method)}), ${esc(String(cur.checked_at).slice(0, 16).replace('T', ' '))}. Advice only: Compliance still verifies.">${cur.verdict === 'ok' ? '&#10003; ' + esc(cur.reason) : '&#9888; Check: ' + esc(cur.reason)}</span> ` : '')
         + `<a href="javascript:void 0" class="ho-muted" onclick="HO.docCheck('${x.id}')">${cur ? 'Re-check' : 'Check document'}</a>`
         + (cur ? ` <a href="javascript:void 0" class="ho-muted" title="Sends only a skeleton of allow-listed document words (no names, numbers except dates, emails or phones) to the free AI." onclick="HO.docCheck('${x.id}', false, true)">Second opinion (free AI)</a>` : '');
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${badge}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB</span>' : '')}</div>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${badge}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB' + (DCG.test(x.id) ? ' · checked automatically (<a href="privacy.html#checks" target="_blank" rel="noopener">privacy</a>)' : '') + '</span>' : '')}</div>`;
   }
 
   function risksHtml(g) {
