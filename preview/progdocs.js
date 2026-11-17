@@ -66,9 +66,9 @@
         ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}
       </div>
       ${error ? `<p class="sub">Documents could not be loaded: ${esc(error.message)}</p>` : ''}
-      ${Object.keys(groups).length ? `<div style="display:grid;gap:8px;margin-top:10px">${Object.entries(groups).map(([k, list]) => `<div>
+      ${Object.keys(groups).length ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:10px 24px;margin-top:10px">${Object.entries(groups).map(([k, list]) => `<div style="min-width:0">
           <div class="sub" style="font-weight:600">${esc(LAB[k] || list[0].doc_label || k)}</div>
-          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${list.map(r => `<button class="btn sm" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')" title="${esc(kb(r.file_size))}">${esc(r.file_name)}</button>`).join('')}</div></div>`).join('')}</div>`
+          <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">${list.map(r => `<button class="btn sm" style="max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')" title="${esc(kb(r.file_size))}">${esc(r.file_name)}</button>`).join('')}</div></div>`).join('')}</div>`
         : '<p class="sub" style="margin:8px 0 0">No documents were uploaded in Programme Initiation.</p>'}
       ${out.length ? `<div style="margin-top:12px"><div class="sub" style="font-weight:600;color:var(--warn)">Still outstanding at hand-over</div><ul style="margin:4px 0 0 18px;padding:0">${out.map(([k, l]) =>
         `<li>${esc(l)}${f[k + 'Due'] ? ` · expected ${esc(f[k + 'Due'])}` : ''}${f[k + 'Note'] ? ` · ${esc(f[k + 'Note'])}` : ''}</li>`).join('')}</ul></div>` : ''}`;
