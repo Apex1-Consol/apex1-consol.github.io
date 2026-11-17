@@ -82,8 +82,11 @@
     const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
     if (!rows.length && !out.length && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
+    // The programme list may not be loaded yet on first paint, so ask the database who the PM is when it is missing.
+    let pmEmail = p.handed_over_to_email || '';
+    if (!pmEmail) { const q = await sb.from('programmes').select('handed_over_to_email').eq('id', pid).maybeSingle(); pmEmail = (q.data && q.data.handed_over_to_email) || ''; }
     const kb = n => n ? (n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB') : '';
-    const unrev = rows.filter(r => !r.reviewed_at).length, isPM = (p.handed_over_to_email || '').toLowerCase() === me();
+    const unrev = rows.filter(r => !r.reviewed_at).length, isPM = pmEmail.toLowerCase() === me() && !!me();
     const rev = rows.find(r => r.reviewed_at);
     // Gate state from the sign-off page when it is open for this programme (✓ verified / N/A).
     const hg = window.HO && HO._s && String(HO._s.pid) === String(pid) && HO._s.g, gst = {};
