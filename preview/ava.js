@@ -334,7 +334,7 @@
   window.avaToggle = open => {
     S.open = open == null ? !S.open : open; const b = document.getElementById('avapanel'); if (!b) return;
     b.classList.toggle('on', S.open); document.getElementById('avafab').setAttribute('aria-expanded', S.open);
-    if (S.open) { render(true); usage(); setTimeout(() => document.getElementById('avain').focus(), 50); }
+    if (S.open) { window.toggleRP && toggleRP(false); render(true); usage(); setTimeout(() => document.getElementById('avain').focus(), 50); }
   };
   function mount() {
     if (document.getElementById('avafab') || !document.body) return;
@@ -362,7 +362,7 @@
 @media print{#avafab,#avapanel{display:none}}</style>`);
     document.body.insertAdjacentHTML('beforeend', `<button id="avafab" type="button" aria-controls="avapanel" aria-expanded="false" onclick="avaToggle()" title="Ask Ava (Ctrl+K: tell Ava what to do)"><span class="st">✦</span>Ava<kbd>Ctrl K</kbd></button>
 <aside id="avapanel" role="dialog" aria-label="Ava assistant"><header><span class="st">✦</span><b>Ava</b><span class="sub">ApexOne assistant</span><button type="button" onclick="avaClear()">New chat</button><button type="button" onclick="avaToggle(false)" aria-label="Close">✕</button></header>
-<div id="avatabs" role="tablist"><button type="button" role="tab" data-t="chat" onclick="avaTab('chat')">Chat</button><button type="button" role="tab" data-t="how" onclick="avaTab('how')">How to</button></div><div id="avause" class="avsm" style="padding:6px 14px 0"></div><div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
+<div id="avatabs" role="tablist"><button type="button" role="tab" data-t="chat" onclick="avaTab('chat')">Chat</button><button type="button" role="tab" data-t="how" onclick="avaTab('how')">How to</button><button type="button" style="margin-left:auto" title="Learn and practise ApexOne" onclick="avaLearn&&avaLearn(true)">Start here</button></div><div id="avause" class="avsm" style="padding:6px 14px 0"></div><div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
 <form onsubmit="event.preventDefault();const i=document.getElementById('avain');const v=i.value;i.value='';avaAsk(v)"><textarea id="avain" rows="1" maxlength="800" placeholder="Ask Ava… (no ID numbers or personal details)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea><button class="btn y" id="avasend">Send</button></form></aside>`);
     document.addEventListener('keydown', ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); window.avaCmd ? avaCmd() : avaToggle(); } else if (ev.key === 'Escape' && S.open) avaToggle(false); });
     window.addEventListener('hashchange', () => S.open && render());

@@ -37,7 +37,7 @@
     if (S.open) renderRP();
   }
   const onFam = () => location.hash.slice(1).split('/')[0] === 'fam';
-  window.toggleRP = f => { S.open = f === undefined ? !S.open : !!f; if (S.open) S.tab = 'Today'; ls.set('rp', S.open); applyRP(); };
+  window.toggleRP = f => { S.open = f === undefined ? !S.open : !!f; if (S.open) { S.tab = 'Today'; window.avaToggle && avaToggle(false); } ls.set('rp', S.open); applyRP(); };
   window.shOpen = (pid, lid) => {
     if (!pid) { const e = (D().enrol || []).find(x => x.learner_id === lid); pid = e ? e.programme_id : null; }
     Object.assign(S, { pid, lid, tab: 'Details', act: null, open: true }); ls.set('rp', true); applyRP();
