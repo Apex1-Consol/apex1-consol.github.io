@@ -29,7 +29,7 @@
   }, done: () => !!tile(label) && tile(label).classList.contains('on') });
   const tileOn = l => !!tile(l) && tile(l).classList.contains('on');
   const tFilter = (label, set) => ({ t: `Filter to "${label}"`, run: async () => {
-    if (!await until(() => tile(label), 6000)) throw new Error(`"${label}" tile not found`);
+    if (!await until(() => tile(label), 6000)) { if (Q(`#view-${route()} .famk`)) { C.empty = true; return 'None right now. Nothing to do here.'; } throw new Error(`"${label}" tile not found`); }
     if (!tileOn(label)) set(); await until(() => tileOn(label), 3000);
     const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} item${n === 1 ? '' : 's'}.`;
   }, done: () => tileOn(label) });
@@ -47,10 +47,10 @@
   const soShow = (k, l) => ({ t: `Show "${l}" items`, run: async () => {
     if (!window.adSoS) throw new Error('Sign-off queue not available');
     await until(() => Q('#sofilter button'), 6000); adSoS(k); await sleep(250);
-    const b = [...document.querySelectorAll('#sofilter button')].find(x => txt(x).startsWith(l)), n = b ? parseInt((txt(b).match(/(\d+)\s*$/) || [])[1], 10) : NaN;
+    const b = [...document.querySelectorAll('#sofilter button')].find(x => txt(x).startsWith(l)), n = b ? parseInt((txt(b).match(/(\d+)\D*$/) || [])[1], 10) : NaN;
     C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : isNaN(n) ? '' : `${n} item${n === 1 ? '' : 's'}.`;
   }, done: () => true });
-  const point = (t, el) => ({ t, run: async () => { const e = el(); if (e) pulse(e); return e ? '' : 'Nothing to point at.'; }, done: () => true });
+  const point = (t, el, none) => ({ t, run: async () => { const e = el(); if (e) pulse(e); else if (none) C.empty = true; return e ? '' : none || 'Nothing to point at.'; }, done: () => true });
 
   const PLAYBOOKS = [
     { k: 'attention', t: 'What needs my attention (PM Tracker)', roles: ['pm', 'admin', 'qa'], words: 'attention today priorities overdue urgent what next todo to do focus',
@@ -103,7 +103,7 @@
       steps: [go('synchealth', 'Data & Sync Health'), needs('synchealth', 'Health checks')],
       after: 'Anything above zero needs a look. Hover a tile for what it means.' },
     { k: 'helpgap', t: 'Review help gaps (Ava feedback)', roles: ['admin'], words: 'help gaps feedback ava questions unanswered thumbs',
-      steps: [go('synchealth', 'Data & Sync Health'), point('Point at Ava feedback', () => { const b = [...document.querySelectorAll('#view-synchealth b')].find(x => txt(x).startsWith('Ava fe')); return b && b.parentElement; })],
+      steps: [go('synchealth', 'Data & Sync Health'), point('Point at Ava feedback', () => { const b = [...document.querySelectorAll('#view-synchealth b')].find(x => txt(x).startsWith('Ava fe')); return b && b.parentElement; }, 'No Ava feedback yet. Nothing to review.')],
       after: 'Thumbs-down and unanswered questions show where a How to guide is missing.' },
     { k: 'onboard', t: 'Onboarding status: who never signed in', roles: ['admin'], words: 'onboarding onboard users never signed sign staff accounts',
       steps: [go('users', 'User management'), tFilter('Never signed in', () => adUF('r', 'never'))],
