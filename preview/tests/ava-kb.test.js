@@ -4,7 +4,7 @@ const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 let fail = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
 const dom = new JSDOM('<body></body>', { runScripts: 'outside-only', url: 'https://x.test/#pmtracker' }), w = dom.window;
 w.toast = () => {}; w.__sb = { rpc: async () => ({ data: [] }), from: () => ({ insert: () => Promise.resolve() }), auth: { getSession: async () => ({ data: {} }) } };
-w.eval(rd('ava-kb.js')); w.eval(rd('ava.js')); w.eval(rd('ava-cmd.js')); w.eval(rd('ava-coach.js'));
+w.eval(rd('ava-kb.js')); w.eval(rd('ava.js')); w.eval(rd('ava-cmd.js')); w.eval(rd('ava-coach.js')); w.eval(rd('ava-night.js'));
 const KB = w.AVAKB, html = rd('index.html');
 // every route in the menu and ROUTES has a kb page
 const nav = [...(html.match(/const NAV=(.*)/) || ['', ''])[1].matchAll(/\['[^']+','([a-z]+)'\]/g)].map(m => m[1]);
@@ -56,4 +56,12 @@ ok([['hand over programme', 'pihand'], ['check client details', 'clients'], ['fa
   d.getElementById('svb').click(); ok(saved === 1, 'saves work again after practice');
 }
 
+(async () => { // Phase 4
+  ok(typeof w.avaPrep === 'function' && typeof w.avaCmdPb === 'function' && w.AVANIGHT, 'night shift globals');
+  ok(w.avaCmdPb('closeout') === true && w.avaCmdPb('nope') === false, 'avaCmdPb opens a playbook plan by key');
+  w.avaCmd(false); w.AVANIGHT.N.items = [{ id: 1, kind: 'gaps', label: '2 gaps', n: 2, route: 'pmtracker', pb: 'gaps' }]; w.AVANIGHT.N.loaded = true;
+  await w.avaPrep(true); const pb = w.document.getElementById('avaprep'); ok(pb && !pb.hidden && /2 gaps/.test(pb.textContent), 'prepared card lists items');
+  w.avaPrepDone(1); ok(!/2 gaps/.test(pb.textContent) && /All clear/.test(pb.textContent), 'done removes item'); w.avaPrep(false);
+
 console.log(fail ? fail + ' failed' : 'all passed'); process.exit(fail ? 1 : 0);
+})();

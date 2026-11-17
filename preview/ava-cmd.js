@@ -120,7 +120,7 @@
       if (hit === p.k) s += 10; if (s && mineR(p)) s += 1; return { kind: 'pb', p, s };
     }).filter(x => !w.length || x.s).sort((a, b) => b.s - a.s);
     const gs = w.length && window.AVAKB ? AVAKB.search(q).slice(0, 3).map(g => ({ kind: 'guide', g })) : [];
-    const out = [...pbs, ...gs]; const lr = window.avaLearn && (!w.length || /start|learn|practi|train|skill|coach|ready|lesson/.test(String(q).toLowerCase())); if (lr && !w.length) out.unshift({ kind: 'learn' }); else if (lr) out.push({ kind: 'learn' }); if (String(q).trim()) out.push({ kind: 'ask' }); return out;
+    const out = [...pbs, ...gs]; const lr = window.avaLearn && (!w.length || /start|learn|practi|train|skill|coach|ready|lesson/.test(String(q).toLowerCase())); if (lr && !w.length) out.unshift({ kind: 'learn' }); else if (lr) out.push({ kind: 'learn' }); const pn = window.AVANIGHT && AVANIGHT.N.items.length; if (pn && (!w.length || /prepar|today|morning|night|waiting/.test(String(q).toLowerCase()))) out.unshift({ kind: 'prep', n: pn }); if (String(q).trim()) out.push({ kind: 'ask' }); return out;
   }
   const log = (p, ok, note) => { const j = ls('avaJobs') || []; j.unshift({ k: p.k, at: new Date().toISOString(), role: role(), ok, note: note || '' }); ls('avaJobs', j.slice(0, 30)); };
 
@@ -129,7 +129,7 @@
     if (C.view === 'list') {
       const r = results(C.q); C.sel = Math.min(C.sel, Math.max(0, r.length - 1)); C.res = r;
       box.innerHTML = `<input id="avacmdin" type="text" autocomplete="off" placeholder="What do you want to do? (e.g. visits due, close-out, gaps)" value="${esc(C.q)}" aria-label="Ava command">
-<div class="avcl" role="listbox">${r.map((x, i) => `<div class="avci${i === C.sel ? ' on' : ''}" role="option" aria-selected="${i === C.sel}" onmousemove="avaCmdSel(${i})" onclick="avaCmdPick(${i})">${x.kind === 'pb' ? `<b>▶ ${esc(x.p.t)}</b><span>Ava does it with you · ${x.p.steps.length} steps</span>` : x.kind === 'learn' ? `<b>★ Start here: learn and practise</b><span>Your path${window.AVACOACH ? ` · ${AVACOACH.progress(role()).n}/${AVACOACH.progress(role()).of} done` : ''} · nothing is saved in practice</span>` : x.kind === 'guide' ? `<b>? ${esc(x.g.g.t)}</b><span>Guide on ${esc(x.g.page)}</span>` : `<b>✦ Ask Ava: "${esc(C.q)}"</b><span>Opens the chat</span>`}</div>`).join('') || '<div class="avsm" style="padding:10px">No match. Type a few words.</div>'}</div>
+<div class="avcl" role="listbox">${r.map((x, i) => `<div class="avci${i === C.sel ? ' on' : ''}" role="option" aria-selected="${i === C.sel}" onmousemove="avaCmdSel(${i})" onclick="avaCmdPick(${i})">${x.kind === 'pb' ? `<b>▶ ${esc(x.p.t)}</b><span>Ava does it with you · ${x.p.steps.length} steps</span>` : x.kind === 'prep' ? `<b>☀ Prepared for you (${x.n})</b><span>Ava checked overnight</span>` : x.kind === 'learn' ? `<b>★ Start here: learn and practise</b><span>Your path${window.AVACOACH ? ` · ${AVACOACH.progress(role()).n}/${AVACOACH.progress(role()).of} done` : ''} · nothing is saved in practice</span>` : x.kind === 'guide' ? `<b>? ${esc(x.g.g.t)}</b><span>Guide on ${esc(x.g.page)}</span>` : `<b>✦ Ask Ava: "${esc(C.q)}"</b><span>Opens the chat</span>`}</div>`).join('') || '<div class="avsm" style="padding:10px">No match. Type a few words.</div>'}</div>
 <div class="avsm avcf">↑↓ choose · Enter pick · Esc close</div>`;
       const i = Q('#avacmdin'); i.oninput = e => { C.q = e.target.value; C.sel = 0; paint(); }; i.focus(); i.setSelectionRange(C.q.length, C.q.length);
     } else {
@@ -151,10 +151,12 @@ ${done && C.empty ? '<p class="avsm" style="margin:6px 0"><b>Nothing to do on th
   };
   window.avaCmdSel = i => { if (C.sel !== i) { C.sel = i; document.querySelectorAll('.avci').forEach((e, j) => e.classList.toggle('on', j === i)); } };
   window.avaCmdBack = () => { C.view = 'list'; paint(); };
+  window.avaCmdPb = k => { const p = PLAYBOOKS.find(x => x.k === k); if (!p) return false; avaCmd(true); C.pb = p; C.st = []; C.view = 'plan'; paint(); return true; };
   window.avaCmdPick = i => {
     const x = (C.res || [])[i]; if (!x) return;
     if (x.kind === 'pb') { const q = C.q.trim().toLowerCase(); if (q) { const c = ls('avaIntent') || {}; c[q] = x.p.k; ls('avaIntent', c); } C.pb = x.p; C.st = []; C.view = 'plan'; paint(); }
     else if (x.kind === 'learn') { avaCmd(false); avaLearn(true); }
+    else if (x.kind === 'prep') { avaCmd(false); avaPrep(true); }
     else if (x.kind === 'guide') { avaCmd(false); window.avaGuide && avaGuide(x.g.r, x.g.k); }
     else { const q = C.q; avaCmd(false); if (window.avaToggle) avaToggle(true); window.avaAsk && avaAsk(q); }
   };
