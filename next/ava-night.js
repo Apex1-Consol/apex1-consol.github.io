@@ -25,13 +25,17 @@
     const box = Q('#avaprep'); if (!box) return; const o = open === undefined ? box.hidden : !!open;
     if (!o) { box.hidden = true; return; } if (!N.loaded) await load(); box.hidden = false; paint();
   };
+  window.apxPrepInline = async () => {
+    const h = document.getElementById('mwprep'); if (!h) return; if (!N.loaded) await load(); const adm = role() === 'admin';
+    h.innerHTML = N.items.length ? `<section class="card" style="margin-bottom:12px"><div class="cuh"><h2 style="font-size:16px;margin:0">☀ Prepared for you</h2><span class="sub">Ava checked overnight · ${N.items.length}</span></div>` + N.items.slice(0, 6).map(x => `<div class="cur"><span class="cux"><b>${esc(x.label)}</b>${adm ? `<span class="sub">for ${esc(x.owner_email || WHO[x.owner_role] || x.owner_role || '')}</span>` : ''}</span><button type="button" class="btn sm y" onclick="avaPrepOpen(${x.id})">Open</button><button type="button" class="btn sm" onclick="avaPrepDone(${x.id})">Done</button></div>`).join('') + (N.items.length > 6 ? `<div class="sub" style="padding-top:8px"><button type="button" class="btn sm" onclick="avaPrep(true)">See all ${N.items.length}</button></div>` : '') + '</section>' : '';
+  };
   window.avaPrepOpen = id => {
     const x = N.items.find(i => i.id === id); if (!x) return; avaPrep(false);
     if (x.route) location.hash = x.route;
     if (x.pb && window.avaCmdPb) setTimeout(() => avaCmdPb(x.pb), 400);
   };
   window.avaPrepDone = async id => {
-    N.items = N.items.filter(i => i.id !== id); paint();
+    N.items = N.items.filter(i => i.id !== id); paint(); if (window.apxPrepInline) apxPrepInline();
     try { await __sb.from('ava_prepared').update({ done_at: new Date().toISOString(), done_by: role() }).eq('id', id); } catch (_) {}
   };
   window.AVANIGHT = { N, load, today };

@@ -160,6 +160,13 @@
     if (st === 'handed_over' && pm) btns.push(`<button class="btn y" onclick="dvStage(${p.id},'activate_programme','Mark this programme as Active? This confirms you are taking it on.')">Activate</button>`);
     if (st === 'active' && pm) btns.push(`<button class="btn ghost" onclick="dvStage(${p.id},'close_programme','Mark this programme as Closed? This is the final stage.')">Close</button>`);
     box.innerHTML = btns.join('');
+    { const L = ['Initiated', 'Signed off & handed over', 'Active', 'Moderation', 'EISA', 'Closed'], O = ['PI / compliance', 'PM', 'PM', 'QA', 'PM', 'PM'];
+      let i = { initiated: 0, handed_over: 1, active: 2, closed: 6, completed: 6 }[st]; if (i == null) i = 2;
+      if (i === 2 && (D().mods || []).some(m => m.programme_id === p.id && m.stage && m.stage !== 'Submitted to PM')) i = 3;
+      if (i >= 2 && i < 6 && (D().tracker || []).some(x => x.programme_id === p.id && x.eisa_date)) i = 4;
+      const ms = modsOf(p.id) || [], tr = ms.filter(m => m.trained).length;
+      let sp = $('pstep'); if (!sp) { hd.insertAdjacentHTML('afterend', '<div id="pstep" class="card" style="padding:12px 16px;display:flex;flex-direction:column;gap:8px"></div>'); sp = $('pstep'); }
+      sp.innerHTML = `<ol class="steps">${L.map((s, k) => `<li class="${k < i ? 'done' : k === i ? 'cur' : ''}"><span>${k < i ? '✓' : k + 1}</span>${s}</li>`).join('')}</ol><div class="sub">${i < 6 ? `Now: <b>${L[i]}</b> · owner ${O[i]}` : 'All stages done'}${ms.length ? ` · Modules trained: <b>${tr} of ${ms.length}</b>` : ' · No modules set up yet'}</div>`; }
     if (window.apxProgDocs && pTab !== 'Form 3') apxProgDocs(p.id, 'pdocs'); else if ($('pdocs')) $('pdocs').hidden = true;
     const sp = hd.querySelectorAll('span'); if (sp[0]) sp[0].textContent = `${{ initiated: 'Initiated · awaiting sign-off', handed_over: 'Handed over · awaiting activation', active: 'Active', closed: 'Closed' }[st] || st} · ${p.programme_type || p.qualification_type || 'Programme'}${p.display_id ? ' · ' + p.display_id : ''}`;
   };

@@ -204,6 +204,8 @@
     if (!$('mwtasks')) return;
     const mine = roleOf(); if (!mwRole || (mine !== 'admin' && mwRole !== mine)) mwRole = mine;
     if ($('mwov')) $('mwov').innerHTML = window.apxOverview ? apxOverview(mwRole) : '';
+    if ($('mwcu')) $('mwcu').innerHTML = window.apxComingUp ? apxComingUp() : '';
+    if (window.apxPrepInline) apxPrepInline();
     const now = new Date(), h = now.getHours(), who = ((P.user && P.user.email) || '').split(/[@+.]/)[0];
     $('mwgreet').textContent = (h < 12 ? 'Good morning' : h < 18 ? 'Good afternoon' : 'Good evening') + (who ? ', ' + who[0].toUpperCase() + who.slice(1) : '');
     const all = tasks(mwRole), hidden = hid(), list = all.filter(t => mwShowHidden || !hidden.includes(t.id)), nHid = all.length - all.filter(t => !hidden.includes(t.id)).length;
