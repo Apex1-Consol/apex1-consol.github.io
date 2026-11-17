@@ -21,7 +21,7 @@ const openEditProgramme = id => { location.hash = 'programmes'; setTimeout(() =>
 // those RPCs with the signed-in user's Supabase session. Nothing here decides
 // whether something is allowed; a refused call comes back with the reason.
 window.HO = (() => {
-  const s = { pid: null, tab: 'overview', g: null, busy: false, cat: null, assignable: {}, err: null, open: new Set() };
+  const s = { pid: null, tab: 'overview', g: null, busy: false, cat: null, assignable: {}, err: null, open: new Set(), docs: [] };
 
   const STEP = {
     pi:         { n: 'Step 1', t: 'Programme Initiator', verb: 'Pack prepared',       attest: 'I prepared this handover pack and the evidence is filed as described.' },
@@ -101,12 +101,17 @@ window.HO = (() => {
       const [g] = await Promise.all([rpc('handoff_get', { p_programme_id: Number(pid) }), catalogue()]);
       if (pid !== s.pid) return;
       s.g = g; s.err = null;
+      await loadDocs();
       if (g && g.me && g.me.can_assign) loadAssignable();
     } catch (e) {
       if (pid !== s.pid) return;
       s.err = e.code === '42501' ? 'You can\'t open the sign-off for this programme.' : e.message;
     }
     render();
+  }
+  async function loadDocs() {
+    const { data, error } = await sb.from('programme_documents').select('id,doc_type,file_path,file_name,file_size').eq('programme_id', Number(s.pid)).like('doc_type', 'gate\\_%').order('id');
+    s.docs = error ? [] : (data || []);
   }
   async function loadAssignable() {
     for (const step of ['pi', 'compliance', 'ops']) {
@@ -321,6 +326,7 @@ window.HO = (() => {
     const edit = decl ? `<div class="ho-muted">Declared not applicable: “${esc(decl.why)}” · ${esc(decl.by || '')}</div>`
       : `<div class="row">${facts}
           <div style="grid-column:span 2;min-width:0;"><label>Evidence (document name or link in the evidence folder)</label><input data-he="ref" value="${esc(evi.ref || '')}" ${ed ? '' : 'disabled'} placeholder="e.g. Drive › Client › Signed agreements.pdf"></div>
+          <div style="grid-column:1/-1;min-width:0;">${gateFiles(x, ed)}</div>
           ${x.deadline ? `<div><label>Date submitted (if already sent)</label><input data-he="date" type="date" value="${esc(evi.date || '')}" ${ed ? '' : 'disabled'}></div>` : ''}
         </div>`;
     const btns = [];
@@ -335,6 +341,17 @@ window.HO = (() => {
     const dl = x.deadline && x.deadline.due ? `<span class="ho-muted">Deadline ${day(x.deadline.due)} · ${esc(x.deadline.rule)}</span>` : '';
     return `<div class="ho-gate" id="ho-t-gate-${esc(x.id)}" data-gate="${esc(x.id)}">${head}${reasons}${notes}${changed}${edit}
       <div class="acts">${btns.join('')}${ver}${dl}${src ? `<span class="ho-src">Source: ${src}</span>` : ''}</div></div>`;
+  }
+
+  function gateFiles(x, ed) {
+    const list = s.docs.filter(d => d.doc_type === 'gate_' + x.id);
+    const kb = n => n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round((n || 0) / 1024)) + ' KB';
+    const chips = list.map(d => `<span class="ph-pill grey" style="display:inline-flex;gap:6px;align-items:center;">
+        <a href="javascript:void 0" onclick="apxDocOpen('${esc(d.file_path).replace(/'/g, '&#39;')}')" title="${esc(kb(d.file_size))}">&#128206; ${esc(d.file_name)}</a>
+        ${ed ? `<a href="javascript:void 0" onclick="HO.removeFile(${d.id})" title="Remove" aria-label="Remove ${esc(d.file_name)}">&times;</a>` : ''}</span>`).join(' ');
+    const add = ed ? `<label class="btn btn-sm" style="cursor:pointer;">Attach file<input type="file" hidden onchange="HO.attach('${x.id}', this)"></label>` : '';
+    if (!list.length && !add) return '';
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB</span>' : '')}</div>`;
   }
 
   function risksHtml(g) {
@@ -425,6 +442,41 @@ window.HO = (() => {
     if (!Object.keys(patch).length) { showToast('info', 'Nothing changed'); return; }
     await act('handoff_save', { p_patch: patch, p_version: ver() }, id.toUpperCase() + ' saved');
   }
+  // Attach a file to a gate: stored privately, listed for the PM, and named in the gate's evidence so the signed record covers it.
+  async function attach(id, input) {
+    const f = input.files && input.files[0]; input.value = '';
+    if (!f || s.busy) return;
+    if (f.size > 10485760) { showToast('error', 'Files must be 10 MB or smaller'); return; }
+    const x = ((s.g && s.g.gates) || []).find(z => z.id === id) || {};
+    const path = `${P.tenant}/${Number(s.pid)}/${id}/${Date.now()}-${f.name.replace(/[^\w.\-]+/g, '_')}`;
+    s.busy = true; render(); showToast('Uploading ' + f.name + '…');
+    let row = null;
+    try {
+      const up = await sb.storage.from('programme-documents').upload(path, f, { contentType: f.type || 'application/octet-stream' });
+      if (up.error) throw up.error;
+      const ins = await sb.from('programme_documents').insert({ programme_id: Number(s.pid), doc_type: 'gate_' + id, doc_label: id.toUpperCase() + ' · ' + (x.text || ''),
+        file_path: path, file_name: f.name, file_size: f.size }).select('id').single();
+      if (ins.error) { await sb.storage.from('programme-documents').remove([path]); throw ins.error; }
+      row = ins.data;
+    } catch (e) { s.busy = false; render(); showToast('error', 'Not attached: ' + e.message); return; }
+    s.busy = false;
+    const old = (s.g.record.evidence || {})[id] || {}, tag = '\u{1F4CE} ' + f.name;
+    const ref = old.ref ? (old.ref.includes(tag) ? old.ref : old.ref + ' · ' + tag) : tag;
+    await loadDocs();
+    const g = await act('handoff_save', { p_patch: { evidence: { [id]: { ref, date: old.date || null } } }, p_version: ver() }, f.name + ' attached to ' + id.toUpperCase());
+    if (!g || g.error) { await sb.from('programme_documents').delete().eq('id', row.id); await sb.storage.from('programme-documents').remove([path]); await loadDocs(); render(); }
+  }
+  async function removeFile(docId) {
+    const d = s.docs.find(z => z.id === docId); if (!d || s.busy) return;
+    if (!confirm(`Remove ${d.file_name}?`)) return;
+    const del = await sb.from('programme_documents').delete().eq('id', docId).select('id');
+    if (del.error || !(del.data || []).length) { showToast('error', 'Not removed: ' + (del.error ? del.error.message : 'the pack is locked')); return; }
+    await sb.storage.from('programme-documents').remove([d.file_path]);
+    const id = d.doc_type.slice(5), old = (s.g.record.evidence || {})[id] || {}, tag = '\u{1F4CE} ' + d.file_name;
+    const ref = (old.ref || '').split(' · ').filter(z => z !== tag).join(' · ');
+    await loadDocs();
+    await act('handoff_save', { p_patch: { evidence: { [id]: ref ? { ref, date: old.date || null } : null } }, p_version: ver() }, d.file_name + ' removed');
+  }
   async function declareNA(id) {
     const why = prompt(`Why doesn't ${id.toUpperCase()} apply to this programme? Compliance will confirm it.`);
     if (!why) return;
@@ -461,7 +513,7 @@ window.HO = (() => {
   async function closeRisk(id) { await act('handoff_risk_save', { p_risk: { id, status: 'mitigated' } }, 'Risk marked mitigated'); }
   async function ack(id) { await act('handoff_risk_ack', { p_risk_id: id }, 'Risk acknowledged'); }
 
-  return { open, load, render, setTab, remember, go, savePack, saveGate, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
+  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
 })();
 
 ROUTES.handover = ['Sign-off & hand-over', 'Delivery']; PARENT.handover = 'programmes';
