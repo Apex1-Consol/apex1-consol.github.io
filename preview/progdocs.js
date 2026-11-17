@@ -117,7 +117,7 @@
         @media (max-width:600px){.pdl{grid-template-columns:30px minmax(0,1fr) auto}.pdl .f,.pdl .s{display:none}}
       </style>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <h3 style="margin:0;font-size:15px">Hand-over documents <span class="sub">(${rows.length} file${rows.length === 1 ? '' : 's'})</span></h3>
+        <h3 style="margin:0;font-size:15px">Hand-over pack <span class="sub">(${rows.length} file${rows.length === 1 ? '' : 's'})</span></h3>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           ${rows.length ? `<button class="btn sm" id="pdzip-${pid}" onclick="apxDocsZip(${pid})">Download all</button>` : ''}
           ${unrev && isPM ? `<button class="btn sm y" onclick="apxDocsReviewed(${pid})">Mark reviewed</button>` : (rows.length && !unrev && rev ? `<span class="sub">Reviewed by ${esc(rev.reviewed_by || '')} ${esc(String(rev.reviewed_at).slice(0, 10))}</span>` : '')}

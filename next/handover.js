@@ -198,14 +198,18 @@ window.HO = (() => {
       <div class="ho-steps" id="ho-t-ho-approvals">${['pi', 'compliance', 'ops'].map(st => stepCard(g, st)).join('')}</div>
       ${work(g)}
       ${deadlines(g)}
-      ${g.audit === false ? DOCS_CARD() : ''}
-      ${packForm(g)}
-      ${g.audit === false ? '' : DOCS_CARD()}
+      ${g.stage === 'complete' ? `${DOCS_CARD()}${checklistFold(g)}` : `${packForm(g)}
       <h3 style="font-size:14px;margin:18px 0 8px;">Evidence review</h3>
-      ${gatesHtml(g)}
+      ${gatesHtml(g)}`}
       ${g.audit === false ? `<div style="margin-top:14px;">${risksHtml(g)}</div>` : `<div class="ho-two" style="margin-top:14px;">${risksHtml(g)}${trail(g)}</div>`}`;
   }
 
+  // After hand-over the pack (files by section) is the main view; the working checklist folds away underneath.
+  function checklistFold(g) {
+    const ap = (g.gates || []).filter(x => x.applicable), ok = ap.filter(x => x.state === 'verified' || x.state === 'na_confirmed').length;
+    return `<details class="ho-group" style="margin-top:4px;"><summary>Checklist details <span class="c">${ok} of ${ap.length} gates verified · show</span></summary>
+      <div style="padding:12px 14px;">${packForm(g)}<h3 style="font-size:14px;margin:14px 0 8px;">Evidence review</h3>${gatesHtml(g)}</div></details>`;
+  }
   const DOCS_CARD = () => `<section class="card" id="hoDocs" style="margin:14px 0"></section>${(setTimeout(() => window.apxProgDocs && apxProgDocs(s.pid, 'hoDocs')), '')}`;
   function readiness(g) {
     return `<div class="ho-card ho-ready ${esc(g.tone)}">
