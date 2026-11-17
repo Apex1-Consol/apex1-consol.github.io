@@ -10,7 +10,7 @@
     let bar = host && host.nextElementSibling && host.nextElementSibling.classList.contains('pgbar') ? host.nextElementSibling : null;
     if (!el._sz) { const vis = rows.filter(r => !r.classList.contains('pgh') && r.offsetHeight).slice(0, 20); if (vis.length >= 3) { const avg = vis.reduce((t, r) => t + r.offsetHeight, 0) / vis.length; el._sz = Math.max(5, Math.min(20, Math.floor(Math.max(560, innerHeight * 0.8) / avg))); } }
     const PS = el._sz || SIZE;
-    if (rows.length <= PS) { rows.forEach(r => r.classList.remove('pgh')); if (bar) bar.remove(); return; }
+    if (rows.length <= Math.max(PS + 3, 8)) { rows.forEach(r => r.classList.remove('pgh')); if (bar) bar.remove(); return; }
     const pages = Math.ceil(rows.length / PS); el._pg = Math.min(Math.max(1, el._pg || 1), pages);
     rows.forEach((r, i) => r.classList.toggle('pgh', Math.floor(i / PS) + 1 !== el._pg));
     if (!bar) { bar = document.createElement('div'); bar.className = 'pgbar'; host.after(bar); }
