@@ -522,10 +522,10 @@
     const t = new Date().toISOString().slice(0, 10), d60 = new Date(Date.now() + 60 * 864e5).toISOString().slice(0, 10), iso = x => /^\d{4}-\d{2}-\d{2}$/.test(x || '');
     const R = [...(m.facilitation || []).map(x => ['Facilitating', x[0], x[1], x[2], '']), ...(m.assessments || []).map(x => ['Assessing', x[0], x[1], x[2], x[3] == null ? '' : x[3]])]
       .sort((x, y) => (iso(x[3]) ? x[3] : '9') < (iso(y[3]) ? y[3] : '9') ? -1 : 1);
-    const live = R.filter(r => !iso(r[3]) || r[3] >= t), soon = live.filter(r => iso(r[3]) && r[3] <= d60).length, wk = {};
+    const live = R.filter(r => !iso(r[3]) || r[3] >= t), ln = live.reduce((n, r) => n + (+r[4] || 0), 0), soon = live.filter(r => iso(r[3]) && r[3] <= d60).length, wk = {};
     live.forEach(r => { if (iso(r[3])) { const k = r[3].slice(0, 8) + String(Math.floor((+r[3].slice(8) - 1) / 7)); wk[k] = (wk[k] || 0) + 1; } });
-    const flags = [m.learners > 100 ? `${m.learners} learners being assessed` : '', Object.values(wk).some(n => n >= 3) ? '3 or more programmes end in the same week' : ''].filter(Boolean);
-    return `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Current load</h2><p class="sub" style="margin:2px 0 8px">From the SME Allocation sheet (13 Nov 2026) · ${live.length} open of ${R.length} · ${m.learners || 0} learners · ${soon} ending in 60 days</p>
+    const flags = [ln > 100 ? `${ln} learners being assessed` : '', Object.values(wk).some(n => n >= 3) ? '3 or more programmes end in the same week' : ''].filter(Boolean);
+    return `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Current load</h2><p class="sub" style="margin:2px 0 8px">From the SME Allocation sheet (13 Nov 2026) · ${live.length} open of ${R.length} · ${ln} learners in open work · ${soon} ending in 60 days</p>
       ${flags.length ? `<div class="badge b-warn" style="margin-bottom:8px">⚠ ${e(flags.join(' · '))}</div>` : ''}
       ${R.length ? `<table style="width:100%"><thead><tr><th>Work</th><th>Client</th><th>Qualification</th><th>Ends</th><th>Learners</th></tr></thead><tbody>${R.map(r => `<tr${iso(r[3]) && r[3] < t ? ' style="opacity:.55"' : ''}><td>${r[0]}</td><td>${e(r[1] || '')}</td><td>${e(r[2] || '—')}</td><td>${iso(r[3]) ? fmt(r[3]) : e(r[3] || '—')}</td><td>${e(String(r[4]))}</td></tr>`).join('')}</tbody></table>` : '<div class="sub">No current work on the sheet.</div>'}</div>`;
   }
