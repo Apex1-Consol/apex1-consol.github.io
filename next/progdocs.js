@@ -83,13 +83,16 @@
     if (!el && elId === 'pdocs') { const su = $('psuit'); if (!su) return; su.insertAdjacentHTML('afterend', '<section class="card" id="pdocs" style="margin-top:16px"></section>'); el = $('pdocs'); }
     if (!el) return;
     const p = progs().find(x => x.id === pid) || {};
-    const { data, error } = await sb.from('programme_documents').select('doc_type,doc_label,file_path,file_name,file_size,created_at,reviewed_at,reviewed_by').eq('programme_id', pid).order('id');
+    const { data, error } = await sb.from('programme_documents').select('id,doc_type,doc_label,file_path,file_name,file_size,created_at,reviewed_at,reviewed_by').eq('programme_id', pid).order('id');
     const rows = error ? [] : (data || []), f = p.fields || {};
     // The old PI checklist is replaced by the verified gates once a programme has a sign-off record.
     const ho = await sb.from('handoff_signoffs').select('status,trial_note').eq('programme_id', pid).maybeSingle();
     const out = ho.data ? [] : DOCS.filter(([k]) => k !== 'otherDocs' && f[k] === 'No');
     const rq = await sb.from('handoff_records').select('record_no,version,storage_path,pdf_bytes').eq('programme_id', pid).not('storage_path', 'is', null).order('version', { ascending: false }).limit(1).maybeSingle();
     const rec = rq.data;
+    // Latest automatic check per file (verdict/reason only), shown read-only next to each gate file.
+    const dq = await sb.from('handoff_doc_checks').select('document_id,verdict,reason,method,checked_at').eq('programme_id', pid).order('checked_at', { ascending: false });
+    const dck = {}; (dq.data || []).forEach(x => { if (!dck[x.document_id]) dck[x.document_id] = x; });
     if (!rows.length && !out.length && !rec && !p.intake_source_id) { el.hidden = true; return; }
     el.hidden = false;
     // The programme list may not be loaded yet on first paint, so ask the database who the PM is when it is missing.
@@ -116,7 +119,7 @@
         <span class="c">${gate ? esc(gate.toUpperCase()) : '·'}</span>
         <span class="t" title="${esc(title)}">${esc(title)}</span>
         <span class="f" title="${esc(r.file_name)} · ${esc(kb(r.file_size))}">&#128196; ${esc(r.file_name)} · ${esc(kb(r.file_size))}</span>
-        <span class="s">${st && !ok ? '<span class="pdno">not verified</span>' : ''}</span>
+        <span class="s">${st && !ok ? '<span class="pdno">not verified</span> ' : ''}${(() => { const k = gate && dck[r.id]; return k ? `<span class="${k.verdict === 'ok' ? 'pdck' : 'pdno'}" title="Automatic check (${esc(k.method)}), ${esc(String(k.checked_at).slice(0, 16).replace('T', ' '))}: ${esc(k.reason)}. Advice only: Compliance still verifies.">${k.verdict === 'ok' ? '&#10003; check ok' : '&#9888; check'}</span>` : ''; })()}</span>
         <a href="javascript:void 0" class="o" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')">Open</a></div>`;
     };
     el.innerHTML = `<style>
@@ -126,7 +129,7 @@
         .pdl .c{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700}
         .pdl .t,.pdl .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .pdl .f{font-size:12px;color:var(--muted)} .pdl .o{font-weight:600}
-        .pdok{font-weight:400;color:var(--ok,#1a7f52);text-transform:none;letter-spacing:0}.pdno{font-size:11.5px;color:#8A5100;white-space:nowrap}
+        .pdok{font-weight:400;color:var(--ok,#1a7f52);text-transform:none;letter-spacing:0}.pdno{font-size:11.5px;color:#8A5100;white-space:nowrap}.pdck{font-size:11.5px;color:var(--ok,#1a7f52);white-space:nowrap}
         @media (max-width:600px){.pdl{grid-template-columns:30px minmax(0,1fr) auto}.pdl .f,.pdl .s{display:none}}
       </style>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
