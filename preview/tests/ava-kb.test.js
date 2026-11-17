@@ -42,4 +42,5 @@ w.avaCmd(true); ok(w.document.getElementById('avacmd').style.display === 'flex' 
 w.document.getElementById('avacmdin').value = 'visits'; w.document.getElementById('avacmdin').dispatchEvent(new w.Event('input')); w.avaCmdPick(0);
 ok(/Ava will:/.test(w.document.getElementById('avacmdbox').innerHTML) && /avacmdrun/.test(w.document.getElementById('avacmdbox').innerHTML), 'picking a playbook shows the plan with Run');
 w.avaCmd(false);
+ok(['modprep', 'verify', 'poe'].every(k => CM.PLAYBOOKS.some(p => p.k === k)) && CM.results('prepare moderation')[0].p.k === 'modprep' && CM.results('verify batch')[0].p.k === 'verify' && CM.results('chase poe gaps')[0].p.k === 'poe', 'QA playbooks defined and matched');
 console.log(fail ? fail + ' failed' : 'all passed'); process.exit(fail ? 1 : 0);

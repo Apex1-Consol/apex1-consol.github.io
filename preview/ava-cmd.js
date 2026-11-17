@@ -27,6 +27,23 @@
     adPM(k, v); await until(() => tile(label) && tile(label).classList.contains('on'), 3000);
     const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} programme${n === 1 ? '' : 's'}.`;
   }, done: () => !!tile(label) && tile(label).classList.contains('on') });
+  const tileOn = l => !!tile(l) && tile(l).classList.contains('on');
+  const tFilter = (label, set) => ({ t: `Filter to "${label}"`, run: async () => {
+    if (!await until(() => tile(label), 6000)) throw new Error(`"${label}" tile not found`);
+    if (!tileOn(label)) set(); await until(() => tileOn(label), 3000);
+    const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} item${n === 1 ? '' : 's'}.`;
+  }, done: () => tileOn(label) });
+  const needs = r => ({ t: 'Count every "Needs attention" tile', run: async () => {
+    await until(() => Q(`#view-${r} .famk`), 6000);
+    const ts = [...document.querySelectorAll(`#view-${r} .famgrp[aria-label^="Needs attention"] .famk`)].filter(vis).map(b => [txt(b.querySelector('.l')), parseInt(txt(b.querySelector('.v')), 10) || 0]).filter(x => x[1]);
+    return ts.length ? ts.map(x => `${x[0]}: ${x[1]}`).join(' · ') + '.' : 'Nothing needs attention here.';
+  }, done: () => true });
+  const mvTab = t => ({ t: `Open the "${t}" tab`, run: async () => {
+    if (typeof renderM !== 'function') throw new Error('Moderation screen not available');
+    mTab = t; renderM(); if (!await until(() => txt(Q('#mtabs .on')) === t, 3000)) throw new Error(`"${t}" tab did not open`);
+  }, done: () => txt(Q('#mtabs .on')) === t });
+  const mvOpen = go('modver', 'Moderation & Verification');
+  const mvRow = () => [...document.querySelectorAll('#mtable tbody tr')].find(vis);
   const point = (t, el) => ({ t, run: async () => { const e = el(); if (e) pulse(e); return e ? '' : 'Nothing to point at.'; }, done: () => true });
 
   const PLAYBOOKS = [
@@ -48,7 +65,16 @@
       after: 'Fix them one by one with the live guide. Then do the same with the "No SAQA" tile.', next: ['Do it with me', "avaGuide('pmtracker','dates')"] },
     { k: 'register', t: 'Programmes with no register in 14 days', roles: ['pm', 'admin'], words: 'register attendance capture register missing 14 days',
       steps: [pmOpen, pmClear, pmFilter('a', 'reg', 'No register in 14 days'), point('Point at the first programme', firstRow)],
-      after: 'Capture the missing registers in Attendance & PoE.', next: ['Open Attendance & PoE', "location.hash='attendance'"] }
+      after: 'Capture the missing registers in Attendance & PoE.', next: ['Open Attendance & PoE', "location.hash='attendance'"] },
+    { k: 'modprep', t: 'Prepare moderation: items not linked or on hold', roles: ['qa', 'et', 'admin'], words: 'moderation moderate prepare prep external link linked unlinked hold',
+      steps: [mvOpen, mvTab('External moderation'), needs('modver'), tFilter('Not linked', () => qaMF('nl')), point('Point at the first item', mvRow)],
+      after: 'Link each item to its programme. Then check the "On hold" tile.', next: ['Do it with me', "avaGuide('modver','link')"] },
+    { k: 'verify', t: 'Verify batch: exit verifications awaiting SoRs', roles: ['qa', 'et', 'admin'], words: 'verify verification exit batch sors sor statement results awaiting',
+      steps: [mvOpen, mvTab('Exit verification stats'), needs('modver'), tFilter('Awaiting SoRs or report', () => qaMF('aw')), point('Point at the first item', mvRow)],
+      after: 'Start with any "Verification date past, not done" (red). Move each to SoRs received as they arrive.' },
+    { k: 'poe', t: 'Chase PoE gaps: documents not captured', roles: ['qa', 'et', 'pm', 'admin'], words: 'poe portfolio evidence documents document chase gaps files',
+      steps: [go('attendance', 'Attendance & PoE'), needs('attendance'), tFilter('Documents not captured', () => dvAttF('docs'))],
+      after: 'Pick each programme, open the Documents tab and mark what is in. Then do the same with "No modules set up".' }
   ];
 
   const C = { open: false, q: '', sel: 0, view: 'list', pb: null, st: [], undo: null };
@@ -108,7 +134,7 @@ ${done && C.empty ? '<p class="avsm" style="margin:6px 0"><b>Nothing to do on th
     }
     C.view = 'done'; paint(); log(p, true);
   };
-  window.avaCmdUndo = () => { const u = C.undo; if (route() === 'pmtracker' && window.adPM) adPM(); if (u && location.hash !== u.hash) location.hash = u.hash; C.undo = null; C.view = 'list'; avaCmd(false); window.toast && toast('Undone: back where you were.'); };
+  window.avaCmdUndo = () => { const u = C.undo; const r = route(); if (r === 'pmtracker' && window.adPM) adPM(); else { const on = Q(`#view-${r} .famk.on`); if (on) on.click(); } if (u && location.hash !== u.hash) location.hash = u.hash; C.undo = null; C.view = 'list'; avaCmd(false); window.toast && toast('Undone: back where you were.'); };
   window.AVACMD = { PLAYBOOKS, results };
 
   function mount() {
