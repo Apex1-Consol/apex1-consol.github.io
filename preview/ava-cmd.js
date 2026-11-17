@@ -81,6 +81,25 @@
     { k: 'poe', t: 'Chase PoE gaps: documents not captured', roles: ['qa', 'et', 'pm', 'admin'], words: 'poe portfolio evidence documents document chase gaps files',
       steps: [go('attendance', 'Attendance & PoE'), needs('attendance'), tFilter('Documents not captured', () => dvAttF('docs'))],
       after: 'Pick each programme, open the Documents tab and mark what is in. Then do the same with "No modules set up".' },
+    { k: 'horeadyp', t: 'Get this hand-over ready to sign', roles: ['pi', 'qa', 'admin'], words: 'hand handover over ready sign signing blockers stands way gates evidence pack',
+      steps: [{ t: 'Open the hand-over', run: async () => {
+        if (location.hash.split('/')[0] === '#handover' && location.hash.split('/')[1]) return '';
+        if (!window.__sb) throw new Error('Not signed in');
+        const me = String(((await __sb.auth.getUser()).data.user || {}).email || '').toLowerCase();
+        const { data, error } = await __sb.rpc('handoff_pipeline'); if (error) throw new Error('Open a hand-over first');
+        const r = (data || []).find(x => x.status !== 'handed_over' && String(x.turn_email || '').toLowerCase() === me) || (data || []).find(x => x.status !== 'handed_over');
+        if (!r) { C.empty = true; return 'No hand-over in progress. Nothing to do here.'; }
+        location.hash = 'handover/' + r.programme_id; await until(() => Q('#view-handover .ho-steps'), 8000); return r.programme;
+      }, done: () => true },
+      { t: 'Point at each item under "What stands in the way", in order', run: async () => {
+        if (C.empty) return '';
+        await until(() => Q('#view-handover .ho-steps'), 8000);
+        const h = [...document.querySelectorAll('#view-handover .ho-card h3')].find(x => txt(x).startsWith('What stands')), its = h ? [...h.parentElement.querySelectorAll('.ho-item')].filter(vis) : [];
+        if (!its.length) return 'Nothing stands in the way. You can sign.';
+        for (const e of its) { e.scrollIntoView({ block: 'center', behavior: 'smooth' }); pulse(e); await sleep(1600); }
+        return `${its.length} item${its.length === 1 ? '' : 's'}. Click each one to go to its fix.`;
+      }, done: () => true }],
+      after: 'Fix each item with its own button, top to bottom. When the list is empty, sign your step.', next: ['Show me how', "avaGuide('handover','prepare')"] },
     { k: 'pihand', t: 'Hand over a new programme to delivery', roles: ['pi', 'admin'], words: 'hand handover over initiation programme new start delivery pm',
       steps: [go('pi', 'Programme Initiation'), point('Point at the initiation form', () => Q('#piFrame'))],
       after: 'Fill in the initiation form, then submit it so the programme appears in PM Tracker for the PM.', next: ['Show me how', "avaGuide('pi','new')"] },
