@@ -25,7 +25,7 @@
   const pmFilter = (k, v, label) => ({ t: `Filter to "${label}"`, run: async () => {
     if (!window.adPM) throw new Error('PM Tracker filters not available');
     adPM(k, v); await until(() => tile(label) && tile(label).classList.contains('on'), 3000);
-    const n = count(label); return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} programme${n === 1 ? '' : 's'}.`;
+    const n = count(label); C.empty = n === 0; return n === 0 ? 'None right now. Nothing to do here.' : n == null ? '' : `${n} programme${n === 1 ? '' : 's'}.`;
   }, done: () => !!tile(label) && tile(label).classList.contains('on') });
   const point = (t, el) => ({ t, run: async () => { const e = el(); if (e) pulse(e); return e ? '' : 'Nothing to point at.'; }, done: () => true });
 
@@ -55,9 +55,10 @@
   const words = q => String(q || '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').split(/\s+/).filter(x => x.length > 2);
   function results(q) {
     const w = words(q), cache = ls('avaIntent') || {}, hit = cache[String(q).trim().toLowerCase()];
-    const pbs = PLAYBOOKS.filter(p => !p.roles || p.roles.includes(role()) || role() === 'admin').map(p => {
+    const mineR = p => !p.roles || p.roles.includes(role()) || role() === 'admin';
+    const pbs = PLAYBOOKS.filter(p => w.length || mineR(p)).map(p => {
       const hay = (p.t + ' ' + p.words).toLowerCase(); let s = w.reduce((n, x) => n + (p.t.toLowerCase().includes(x) ? 3 : hay.includes(x) ? 2 : 0), 0);
-      if (hit === p.k) s += 10; return { kind: 'pb', p, s };
+      if (hit === p.k) s += 10; if (s && mineR(p)) s += 1; return { kind: 'pb', p, s };
     }).filter(x => !w.length || x.s).sort((a, b) => b.s - a.s);
     const gs = w.length && window.AVAKB ? AVAKB.search(q).slice(0, 3).map(g => ({ kind: 'guide', g })) : [];
     const out = [...pbs, ...gs]; if (String(q).trim()) out.push({ kind: 'ask' }); return out;
@@ -76,9 +77,9 @@
       const p = C.pb, run = C.view === 'run', done = C.view === 'done';
       box.innerHTML = `<div class="avch"><b>${esc(p.t)}</b><span class="avsm">${run ? 'Running as you…' : done ? 'Done' : 'Ava will:'}</span></div>
 <ol class="avcs">${p.steps.map((s, i) => { const st = C.st[i] || {}; return `<li class="${st.s || ''}"><span class="ic">${st.s === 'ok' ? '✓' : st.s === 'bad' ? '✗' : st.s === 'go' ? '…' : i + 1}</span><span>${esc(s.t)}${st.m ? `<br><span class="avsm">${esc(st.m)}</span>` : ''}</span></li>`; }).join('')}</ol>
-${done && p.after ? `<p class="avsm" style="margin:6px 0">${esc(p.after)}</p>` : ''}
+${done && C.empty ? '<p class="avsm" style="margin:6px 0"><b>Nothing to do on this list right now.</b></p>' : ''}${done && p.after && !C.empty ? `<p class="avsm" style="margin:6px 0">${esc(p.after)}</p>` : ''}
 <p class="avsm" style="margin:6px 0">${done ? '' : 'Runs on your login. Only filters, opens screens and points; you save anything yourself.'}</p>
-<div class="avcb">${done ? `${p.next ? `<button class="btn y" type="button" onclick="avaCmd(false);${esc(p.next[1])}">${esc(p.next[0])}</button>` : ''}<button class="btn" type="button" onclick="avaCmdUndo()">Undo</button><button class="btn" type="button" onclick="avaCmd(false)">Close</button>`
+<div class="avcb">${done ? `${p.next && !C.empty ? `<button class="btn y" type="button" onclick="avaCmd(false);${esc(p.next[1])}">${esc(p.next[0])}</button>` : ''}<button class="btn" type="button" onclick="avaCmdUndo()">Undo</button><button class="btn" type="button" onclick="avaCmd(false)">Close</button>`
         : run ? '' : `<button class="btn y" type="button" id="avacmdrun" onclick="avaCmdRun()">Run</button><button class="btn" type="button" onclick="avaCmdBack()">Back</button>`}</div>`;
       const b = Q('#avacmdrun') || box.querySelector('.btn.y'); if (b) b.focus();
     }
@@ -98,7 +99,7 @@ ${done && p.after ? `<p class="avsm" style="margin:6px 0">${esc(p.after)}</p>` :
     else { const q = C.q; avaCmd(false); if (window.avaToggle) avaToggle(true); window.avaAsk && avaAsk(q); }
   };
   window.avaCmdRun = async () => {
-    const p = C.pb; C.undo = { hash: location.hash || '#mywork' }; C.view = 'run'; C.st = []; paint();
+    const p = C.pb; C.undo = { hash: location.hash || '#mywork' }; C.view = 'run'; C.st = []; C.empty = false; paint();
     for (let i = 0; i < p.steps.length; i++) {
       C.st[i] = { s: 'go' }; paint();
       try { const m = await p.steps[i].run(); C.st[i] = { s: 'ok', m: m || '' }; }

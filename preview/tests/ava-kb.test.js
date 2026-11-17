@@ -36,6 +36,7 @@ ok(KB.search('how do I capture a register')[0].k === 'register', 'help search fi
 const CM = w.AVACMD; w.apxRole = () => 'pm';
 ok(['attention', 'closeout', 'visits', 'gaps', 'register'].every(k => CM.PLAYBOOKS.some(p => p.k === k && p.steps.length && p.steps.every(s => s.t && typeof s.run === 'function'))), 'PM playbooks defined with runnable steps');
 ok(CM.results('visits due')[0].p.k === 'visits' && CM.results('close out')[0].p.k === 'closeout' && CM.results('missing saqa')[0].p.k === 'gaps', 'command bar matches intent to the right playbook');
+w.apxRole = () => 'qa'; ok(CM.results('visits due')[0].p.k === 'visits', 'other roles still find PM playbooks by typing'); w.apxRole = () => 'pm';
 ok(CM.results('zzqq').slice(-1)[0].kind === 'ask', 'unmatched text offers Ask Ava');
 w.avaCmd(true); ok(w.document.getElementById('avacmd').style.display === 'flex' && /What do you want to do/.test(w.document.getElementById('avacmdbox').innerHTML), 'Ctrl+K command bar opens');
 w.document.getElementById('avacmdin').value = 'visits'; w.document.getElementById('avacmdin').dispatchEvent(new w.Event('input')); w.avaCmdPick(0);
