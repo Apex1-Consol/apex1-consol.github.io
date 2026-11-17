@@ -112,6 +112,19 @@ window.HO = (() => {
   async function loadDocs() {
     const { data, error } = await sb.from('programme_documents').select('id,doc_type,file_path,file_name,file_size').eq('programme_id', Number(s.pid)).like('doc_type', 'gate\\_%').order('id');
     s.docs = error ? [] : (data || []);
+    const c = await sb.from('handoff_doc_checks').select('gate,document_id,verdict,reason,method,checked_at').eq('programme_id', Number(s.pid)).order('checked_at', { ascending: false });
+    s.checks = {}; (c.data || []).forEach(r => { if (!s.checks[r.gate]) s.checks[r.gate] = r; });
+  }
+  /* Automatic document check (rules only, no AI). Organisational gates only; never learner, facilitator or mentor documents. */
+  const DCG = /^(c[123]|q[1-4]|w[124]|d[1345]|s[146])$/;
+  async function docCheck(id, quiet) {
+    if (!DCG.test(id)) return; s.checking = id; render();
+    try {
+      const { data } = await sb.auth.getSession(), tok = data.session && data.session.access_token;
+      const res = await fetch(sb.supabaseUrl + '/functions/v1/doc-check', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ programme_id: Number(s.pid), gate: id }) });
+      const j = await res.json().catch(() => ({})); if (!res.ok || !j.ok) throw new Error(j.error || res.statusText);
+    } catch (e) { if (!quiet) showToast('error', 'Check not run: ' + e.message); }
+    s.checking = null; await loadDocs(); render();
   }
   async function loadAssignable() {
     for (const step of ['pi', 'compliance', 'ops']) {
@@ -420,7 +433,11 @@ window.HO = (() => {
         ${ed ? `<a href="javascript:void 0" onclick="HO.removeFile(${d.id})" title="Remove" aria-label="Remove ${esc(d.file_name)}">&times;</a>` : ''}</span>`).join(' ');
     const add = ed ? `<label class="btn btn-sm" style="cursor:pointer;">Attach file<input type="file" hidden onchange="HO.attach('${x.id}', this)"></label>` : '';
     if (!list.length && !add) return '';
-    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB</span>' : '')}</div>`;
+    const ck = (s.checks || {})[x.id], cur = ck && list.some(d => d.id === ck.document_id) ? ck : null;
+    const badge = !list.length || !DCG.test(x.id) ? '' : s.checking === x.id ? '<span class="ho-muted">Checking…</span>'
+      : (cur ? `<span class="ph-pill" style="${cur.verdict === 'ok' ? 'background:var(--okbg);color:var(--ok)' : 'background:var(--warnbg);color:var(--warn)'}" title="Automatic check (${esc(cur.method)}), ${esc(String(cur.checked_at).slice(0, 16).replace('T', ' '))}. Advice only: Compliance still verifies.">${cur.verdict === 'ok' ? '&#10003; ' + esc(cur.reason) : '&#9888; Check: ' + esc(cur.reason)}</span> ` : '')
+        + `<a href="javascript:void 0" class="ho-muted" onclick="HO.docCheck('${x.id}')">${cur ? 'Re-check' : 'Check document'}</a>`;
+    return `<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px;">${add}${badge}${chips || (ed ? '<span class="ho-muted">No file attached · max 10 MB</span>' : '')}</div>`;
   }
 
   function risksHtml(g) {
@@ -534,6 +551,7 @@ window.HO = (() => {
     await loadDocs();
     const g = await act('handoff_save', { p_patch: { evidence: { [id]: { ref, date: old.date || null } } }, p_version: ver() }, f.name + ' attached to ' + id.toUpperCase());
     if (!g || g.error) { await sb.from('programme_documents').delete().eq('id', row.id); await sb.storage.from('programme-documents').remove([path]); await loadDocs(); render(); }
+    else if (DCG.test(id)) docCheck(id, true);
   }
   async function removeFile(docId) {
     const d = s.docs.find(z => z.id === docId); if (!d || s.busy) return;
@@ -653,7 +671,7 @@ window.HO = (() => {
       `Still standing in the way: ${(g.blockers || []).length}.`];
     avaHoBrief(L.join('\n'));
   }
-  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, deputy, setTrial, pmRespond, brief, verifyTodo, toggleTodo, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
+  return { open, load, render, setTab, remember, go, savePack, saveGate, attach, removeFile, deputy, setTrial, pmRespond, brief, docCheck, verifyTodo, toggleTodo, declareNA, undeclareNA, assign, verify, sign, unlock, addRisk, closeRisk, ack, _s: s };
 })();
 
 ROUTES.handover = ['Sign-off & hand-over', 'Delivery']; PARENT.handover = 'programmes';
