@@ -4,7 +4,7 @@ const rd = f => fs.readFileSync(path.join(__dirname, '..', f), 'utf8');
 let fail = 0; const ok = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) fail++; };
 const dom = new JSDOM('<body></body>', { runScripts: 'outside-only', url: 'https://x.test/#pmtracker' }), w = dom.window;
 w.toast = () => {}; w.__sb = { rpc: async () => ({ data: [] }), from: () => ({ insert: () => Promise.resolve() }), auth: { getSession: async () => ({ data: {} }) } };
-w.eval(rd('ava-kb.js')); w.eval(rd('ava.js')); w.eval(rd('ava-cmd.js'));
+w.eval(rd('ava-kb.js')); w.eval(rd('ava.js')); w.eval(rd('ava-cmd.js')); w.eval(rd('ava-coach.js'));
 const KB = w.AVAKB, html = rd('index.html');
 // every route in the menu and ROUTES has a kb page
 const nav = [...(html.match(/const NAV=(.*)/) || ['', ''])[1].matchAll(/\['[^']+','([a-z]+)'\]/g)].map(m => m[1]);
@@ -44,4 +44,16 @@ ok(/Ava will:/.test(w.document.getElementById('avacmdbox').innerHTML) && /avacmd
 w.avaCmd(false);
 ok(['modprep', 'verify', 'poe'].every(k => CM.PLAYBOOKS.some(p => p.k === k)) && CM.results('prepare moderation')[0].p.k === 'modprep' && CM.results('verify batch')[0].p.k === 'verify' && CM.results('chase poe gaps')[0].p.k === 'poe', 'QA playbooks defined and matched');
 ok([['hand over programme', 'pihand'], ['check client details', 'clients'], ['fam compliance check', 'famcheck'], ['renewals due', 'renew'], ['review sign-off queue', 'soreview'], ['what is blocking', 'soblock'], ['data health', 'health'], ['help gaps', 'helpgap'], ['onboarding status', 'onboard']].every(([q, k]) => (CM.results(q)[0] || {}).p && CM.results(q)[0].p.k === k), 'PI, OHS, sign-off and admin playbooks matched');
+// Phase 3: Start here paths, practice blocks saves, skill recorded
+{ const AC = w.AVACOACH; w.apxRole = () => 'pm';
+  ok(['pm', 'qa', 'pi', 'admin'].every(r => AC.lessons(r).length === AC.PATHS[r].length && AC.lessons(r).length >= 5), 'every role path resolves to KB guides');
+  ok(CM.results('')[0].kind === 'learn' && CM.results('practice')[0] && CM.results('practice').some(x => x.kind === 'learn') && !CM.results('visits due').some(x => x.kind === 'learn'), 'Start here in command bar');
+  const d = w.document; d.body.insertAdjacentHTML('beforeend', '<div id="view-x"><button id="svb" type="button">Save</button></div>');
+  let saved = 0; d.getElementById('svb').addEventListener('click', () => saved++);
+  w.avaLearn(true); ok(/Start here/.test(d.getElementById('avacoach').innerHTML) && /0\/10/.test(d.getElementById('avacoach').innerHTML), 'Start here card shows PM path');
+  w.avaPractise('mywork.start'); d.getElementById('svb').click(); ok(saved === 0, 'practice blocks save buttons');
+  w.avaPSkip(); w.avaPSkip(); w.avaPSkip(); ok(AC.P.view === 'pass' && JSON.parse(w.localStorage.getItem('avaSkills'))['mywork.start'].score >= 1, 'practice passes and records skill');
+  d.getElementById('svb').click(); ok(saved === 1, 'saves work again after practice');
+}
+
 console.log(fail ? fail + ' failed' : 'all passed'); process.exit(fail ? 1 : 0);
