@@ -32,3 +32,6 @@ create policy programme_docs_delete on storage.objects for delete to authenticat
     and (storage.foldername(name))[1] = public.auth_tenant_id()
     and (public.auth_is_admin() or public.auth_has_role('pi_specialist'))
     and not exists (select 1 from public.programme_documents d where d.file_path = objects.name));
+
+-- The lock check runs inside the policies above as the signed-in user.
+grant execute on function public.handoff_is_locked(bigint) to authenticated;
