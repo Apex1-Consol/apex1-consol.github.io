@@ -94,6 +94,8 @@
       (rowsBy[sec] = rowsBy[sec] || []).push({ r, gate });
     });
     const order = [...Object.values(SEC), 'Other', 'Programme Initiation uploads'].filter(k => rowsBy[k]);
+    const okSt = x => x === 'verified' || x === 'na_confirmed';
+    const allOk = list => list.every(z => z.gate && okSt(gst[z.gate]));
     const line = ({ r, gate }) => {
       const title = gate ? String(r.doc_label || '').replace(/^\s*\w+\s*[·\-]\s*/, '') : (LAB[r.doc_type] || r.doc_label || r.doc_type);
       const st = gate && gst[gate], ok = st === 'verified' || st === 'na_confirmed';
@@ -101,17 +103,17 @@
         <span class="c">${gate ? esc(gate.toUpperCase()) : '·'}</span>
         <span class="t" title="${esc(title)}">${esc(title)}</span>
         <span class="f" title="${esc(r.file_name)} · ${esc(kb(r.file_size))}">&#128196; ${esc(r.file_name)} · ${esc(kb(r.file_size))}</span>
-        <span class="s">${ok ? '<span class="pdok">&#10003; verified</span>' : ''}</span>
+        <span class="s">${st && !ok ? '<span class="pdno">not verified</span>' : ''}</span>
         <a href="javascript:void 0" class="o" onclick="apxDocOpen('${esc(r.file_path).replace(/'/g, '&#39;')}')">Open</a></div>`;
     };
     el.innerHTML = `<style>
-        .pdsecs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,400px),1fr));gap:14px 28px;margin-top:12px}
+        .pdsecs{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,620px),1fr));gap:14px 28px;margin-top:12px}
         .pdsec h4{margin:0 0 4px;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
         .pdl{display:grid;grid-template-columns:30px minmax(0,1.2fr) minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line2,#eee);font-size:13px}
         .pdl .c{font-family:var(--font-mono,monospace);font-size:12px;font-weight:700}
         .pdl .t,.pdl .f{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
         .pdl .f{font-size:12px;color:var(--muted)} .pdl .o{font-weight:600}
-        .pdok{font-size:11.5px;color:var(--ok,#1a7f52);white-space:nowrap}
+        .pdok{font-weight:400;color:var(--ok,#1a7f52);text-transform:none;letter-spacing:0}.pdno{font-size:11.5px;color:#8A5100;white-space:nowrap}
         @media (max-width:600px){.pdl{grid-template-columns:30px minmax(0,1fr) auto}.pdl .f,.pdl .s{display:none}}
       </style>
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
@@ -122,7 +124,7 @@
         </div>
       </div>
       ${error ? `<p class="sub">Documents could not be loaded: ${esc(error.message)}</p>` : ''}
-      ${rows.length ? `<div class="pdsecs">${order.map(k => `<div class="pdsec"><h4>${esc(k)} <span style="font-weight:400">· ${rowsBy[k].length}</span></h4>${rowsBy[k].map(line).join('')}</div>`).join('')}</div>`
+      ${rows.length ? `<div class="pdsecs">${order.map(k => `<div class="pdsec"><h4>${esc(k)} <span style="font-weight:400">· ${rowsBy[k].length} file${rowsBy[k].length === 1 ? '' : 's'}</span>${allOk(rowsBy[k]) ? ' <span class="pdok">· &#10003; all verified</span>' : ''}</h4>${rowsBy[k].map(line).join('')}</div>`).join('')}</div>`
         : '<p class="sub" style="margin:8px 0 0">No documents were uploaded.</p>'}
       ${out.length ? `<div style="margin-top:12px"><div class="sub" style="font-weight:600;color:var(--warn)">Still outstanding at hand-over</div><ul style="margin:4px 0 0 18px;padding:0">${out.map(([k, l]) =>
         `<li>${esc(l)}${f[k + 'Due'] ? ` · expected ${esc(f[k + 'Due'])}` : ''}${f[k + 'Note'] ? ` · ${esc(f[k + 'Note'])}` : ''}</li>`).join('')}</ul></div>` : ''}`;
