@@ -334,7 +334,7 @@ ${F.ref ? `<div class="flrefb">Showing items linked to <b>${e(F.refl || F.ref)}<
     if (L.length < 2) L = clean(ans).split(/(?<=[.!])\s+(?=[A-Z])/).filter(x => x.length > 12 && !/^(to |here|this |you can|i can|note)/i.test(x));
     L = L.map(x => x.replace(/[:.]$/, '')).filter(x => x.length > 3 && x.length < 220).slice(0, 12);
     if (!L.length) { toast('Nothing to turn into steps in this answer.'); return; }
-    const items = L.map(t => { const r = parse(t, c, null), ak = t.match(/\b(?:ask|tell|get|remind|email|call|let)\s+@?([A-Z][\w.'-]+)/), ap = ak && people(ak[1])[0], o = r.how.owner === 'named' ? r.owner : ap ? String(ap.email).toLowerCase() : null; return { t, on: true, owner: o, due: r.due, prio: r.prio }; });
+    const items = L.map(t => { const r = parse(t, c, null), ak = t.match(/\b(?:ask|tell|get|remind|email|call|let)\s+@?([A-Za-z][\w.'-]+)/i), ap = ak && people(ak[1])[0], o = r.how.owner === 'named' ? r.owner : ap ? String(ap.email).toLowerCase() : null; return { t, on: true, owner: o, due: r.due, prio: r.prio }; });
     const qt = clean(q).replace(/^(please\s+)?(how (do|can|should) (i|we)|what (do|should) (i|we)( do)?( to)?|can you( help me)?|help me( with| to)?|i want to|i need to|show me how to|tell me how to)\s+/i, '').replace(/[?.!]+$/, '');
     const title0 = qt.length > 4 && !/^help me with what is on my screen/i.test(qt) ? qt.charAt(0).toUpperCase() + qt.slice(1, 160) : 'Next steps on ' + c.page;
     const tpl0 = (KW.find(([re]) => re.test(q + ' ' + ans)) || [])[1] || RT[c.r] || 'custom';
