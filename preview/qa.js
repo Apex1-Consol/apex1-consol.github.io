@@ -427,8 +427,8 @@
   /* =====================================================================
      ACCREDITATION  (+ legacy qualification check)
      ===================================================================== */
-  const ASTAT = ['Desktop application to be submitted', 'Desktop application successful', 'Site visit scheduled', 'Site visit done', 'Accreditation granted', 'Desktop application unsuccessful', 'Withdrawn'];
-  const ABADGE = { 'Accreditation granted': 'b-ok', 'Desktop application successful': 'b-n', 'Site visit scheduled': 'b-warn', 'Site visit done': 'b-n', 'Desktop application to be submitted': 'b-bad', 'Desktop application unsuccessful': 'b-bad', 'Withdrawn': 'b-n' };
+  const ASTAT = ['Desktop application to be submitted', 'Desktop application submitted', 'Desktop application successful', 'Site visit scheduled', 'Site visit done', 'Accreditation granted', 'Desktop application unsuccessful', 'Withdrawn'];
+  const ABADGE = { 'Accreditation granted': 'b-ok', 'Desktop application successful': 'b-n', 'Site visit scheduled': 'b-warn', 'Site visit done': 'b-n', 'Desktop application to be submitted': 'b-bad', 'Desktop application unsuccessful': 'b-bad', 'Withdrawn': 'b-n', 'Desktop application submitted': 'b-n' };
   // Feedback is written the way the Accreditation sheet writes it, from the dates
   function accFeedback(a) {
     const f = s => fmtD(day(s));
@@ -439,6 +439,7 @@
       case 'Desktop application successful': return 'Desktop Application Successful' + (a.desktop_date ? ' - ' + f(a.desktop_date) : '');
       case 'Desktop application unsuccessful': return 'Desktop Application Unsuccessful' + (a.desktop_date ? ' - ' + f(a.desktop_date) : '');
       case 'Withdrawn': return 'Withdrawn';
+      case 'Desktop application submitted': return 'Desktop Application Submitted';
       default: return 'Desktop/Accreditation Application to be submitted';
     }
   }
@@ -446,7 +447,7 @@
   const monthsLeft = a => a.status === 'Accreditation granted' && a.accreditation_to ? Math.floor((new Date(day(a.accreditation_to)) - TODAY) / (864e5 * 30.44)) : null;
   window.qaA = async function (id, col, v) {
     const a = (D().accs || []).find(x => x.id === id); if (!a) return;
-    const before = { ...a }; a[col] = v === '' ? null : v; const fbk = accFeedback(a); a.feedback = fbk; renderA();
+    const before = { ...a }; a[col] = v === '' ? null : v; const fbk = (!before.feedback || /^(Accreditation Granted|Site Visit|Site visit to be scheduled|Desktop Application|Desktop\/Accreditation|Withdrawn)/.test(before.feedback)) ? accFeedback(a) : before.feedback; a.feedback = fbk; renderA();
     try { await write('Accreditation', () => sb.from('accreditation_items').update({ [col]: a[col], feedback: fbk }).eq('id', id)); }
     catch (e) { Object.assign(a, before); renderA(); }
   };
@@ -457,7 +458,7 @@
     const isLeg = a => /legacy/i.test(a.qual_type || '') || !!(typeof LEG === 'object' && LEG && LEG[String(a.saqa_id || '').trim()]);
     const tm = a => aT === 'All types' || isLeg(a) === LGO, AT = A.filter(tm), c = s => AT.filter(a => a.status === s).length;
     const exp = AT.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
-    $('akpis').innerHTML = ASTAT.slice(0, 5).reverse().concat(['Desktop application unsuccessful']).map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Desktop application unsuccessful' ? 'Resubmit' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
+    $('akpis').innerHTML = ASTAT.slice(0, 6).reverse().concat(['Desktop application unsuccessful']).map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Desktop application unsuccessful' ? 'Resubmit' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
       + `<div class="kpi"><span class="l">Expiring within 12 months</span><span class="v" style="color:${exp ? 'var(--bad)' : 'var(--ink)'}">${exp}</span><span class="n" style="color:var(--muted)">plan re-accreditation</span></div>`;
     const nk = x => String(x || '').trim().replace(/^SP:\s*/i, ''), cap = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '', pcnt = {}; let actAll = [];
     { // Programme checks: expiring / not accredited (client-side from programmes + accreditation_items)
