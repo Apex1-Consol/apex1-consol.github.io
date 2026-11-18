@@ -83,7 +83,7 @@
   /* ---------- Action in Flow (any page) ---------- */
   function ctx() { const r = route(), v = $('view-' + r); let lab = '';
     if (v) { const h = v.querySelector('h1,h2,.title,.ptitle'); lab = h ? h.textContent.trim().replace(/\s+/g, ' ').slice(0, 120) : ''; }
-    const page = (window.ROUTES && ROUTES[r] && ROUTES[r][0]) || r;
+    let page = r; try { page = (ROUTES[r] && ROUTES[r][0]) || r; } catch (_) {}
     return { r, page, lab, hash: location.hash || '#' + r }; }
   async function openNew(pre) { if (!F.staff) { try { const r = await sb().rpc('apx_staff'); F.staff = (r.data || []).sort((a, b) => String(a.name).localeCompare(b.name)); } catch (_) { F.staff = []; } }
     const c = pre || ctx(), g = grp(), tk = (c.r === 'flow' ? GD[g] : RT[c.r]) || GD[g] || 'custom';
