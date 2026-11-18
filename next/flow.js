@@ -165,8 +165,8 @@ ${x.status === 'waiting' ? `<div class="row"><input type="text" id="fl-w" placeh
     F.nav = count || 0; nav(); } catch (_) {} }
   const wrapDot = () => { const f = window.apxNavDot; if (!f || f.__flow) return; const g = r => { if (r !== 'flow') return f(r); const n = F.nav || 0;
     return n ? `<span class="navcnt r" aria-label="${n} flow items due or overdue">${n}</span>` : ''; }; g.__flow = 1; window.apxNavDot = g; };
-  (function wait0(n) { if (window.apxRole && window.__sb) { try { window.NAVR = window.NAVR || {}; NAVR.flow = () => !!roles().length; } catch (_) {}
-    wrapDot(); nav(); btn(); if (route() === 'flow') { try { window.route && window.route(); } catch (_) {} go(); }
+  (function wait0(n) { if (window.apxRole && window.__sb) { try { window.NAVR = window.NAVR || {}; NAVR.flow = () => true; } catch (_) {}
+    wrapDot(); nav(); btn(); if (route() === 'flow') go();
     (function wr(k) { if (roles().length) { wrapDot(); nav(); btn(); navCount(); if (route() === 'flow') go(); } else if (k < 60) setTimeout(() => wr(k + 1), 500); })(0);
     try { __sb.auth.onAuthStateChange(() => setTimeout(() => { F.user = null; F.staff = null; F.st = 'idle'; btn(); navCount(); }, 400)); } catch (_) {} } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.apxFlowAdd = openNew;
