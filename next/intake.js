@@ -195,8 +195,10 @@
     if (ids.length) { const [{ data: E }, { data: Q }] = await Promise.all([sb().from('enrolments').select('programme_id,status').in('programme_id', ids), sb().from('intake_placements').select('programme_id').eq('status', 'placed').in('programme_id', ids)]);
       (E || []).forEach(x => { if ((x.status || 'active') === 'active') c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1); }); (Q || []).forEach(x => c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1)); }
     I.navN = L.filter(p => p.group_size > (c.get(p.id) || 0)).length; nav(); } catch (_) {} }
-  try { NC.intake = () => I.st === 'ok' ? I.PR.filter(needs).length : (I.navN || 0); } catch (_) {}
-  (function wait0(n) { if (window.apxRole && window.__sb) { try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} nav(); navCount();
+  const navN = () => I.st === 'ok' ? I.PR.filter(needs).length : (I.navN || 0);
+  const wrapDot = () => { const f = window.apxNavDot; if (!f || f.__intk) return; const g = r => { if (r !== 'intake') return f(r); const n = navN();
+    return n ? `<span class="navcnt r" aria-label="${n} programmes start within 30 days with places open">${n}</span>` : ''; }; g.__intk = 1; window.apxNavDot = g; };
+  (function wait0(n) { if (window.apxRole && window.__sb) { try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} wrapDot(); nav(); navCount();
     if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.intkSummary = () => I.st === 'ok' ? { ready: I.C.filter(ready).length, wait30: I.C.filter(c => ready(c) && wait(c) > 30).length, need: I.PR.filter(needs).length } : null;
 })();
