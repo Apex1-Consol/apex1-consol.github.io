@@ -5,7 +5,7 @@
    enrolment in ApexOne (relay action 'enrol', which only reads the candidate task). Eligibility is fixed rules, no AI. */
 (function () {
   if (window.__intake) return; window.__intake = 1;
-  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, q: '', need: false } };
+  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false } };
   const $ = id => document.getElementById(id);
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -22,16 +22,22 @@
   /* ---------- rules ---------- */
   const DEMX = /unsuitable|exited|archived/i, RECR = /^recruited/i;
   const active = c => !DEMX.test(c.status || '');
-  const tertOK = c => { const t = String(c.tertiary || '').trim(); return t.length > 2 && !/^(n\/?a|none|no|nil|nothing|not applicable|null|-+|0|no tertiary.*)\.?$/i.test(t); };
-  const level = c => tertOK(c) ? 'tert' : /matric|senior certificate/i.test(c.school || '') ? 'matric' : /grade 1[01]/i.test(c.school || '') ? 'g1011' : '';
+  /* highest qualification from the free-text Tertiary + "Highest Qualification - Specify" fields; anything unclear = Unknown */
+  const hqOf = c => { if (c._hq !== undefined) return c._hq; const s = `${c.hq || ''} ${c.tertiary || ''}`.toLowerCase();
+    return (c._hq = /\b(phd|doctor|master|honours|hons|postgrad|post-grad|bachelor|degree|llb|mba|b\.?\s?(com|sc|a|ed|tech|admin|soc sc)\b)/.test(s) ? 'Degree'
+      : /diploma|advanced cert/.test(s) ? 'Diploma' : /higher cert/.test(s) ? 'Higher Certificate' : /\bn\s?[4-6]\b|\bncv\b|nated/.test(s) ? 'N4–N6 / NCV' : ''); };
+  const NQF_HQ = { 'Degree': 7, 'Diploma': 6, 'Higher Certificate': 5, 'N4–N6 / NCV': 4 };
+  const tertOK = c => ['Degree', 'Diploma', 'Higher Certificate'].includes(hqOf(c));
+  const level = c => tertOK(c) ? 'tert' : hqOf(c) ? 'n46' : /matric|senior certificate/i.test(c.school || '') ? 'matric' : /grade 1[01]/i.test(c.school || '') ? 'g1011' : '';
   const placedTask = id => (I.P || []).some(p => p.task_id === id);
   const ready = c => active(c) && !RECR.test(c.status || '') && !c.onP && !placedTask(c.id);
   const wait = c => c.created ? days(c.created, today()) : 0;
   const nqfN = p => { const m = String(p.nqf_level || '').match(/\d+/); return m ? +m[0] : null; };
   const pwdProg = p => /\bpwd\b|disab/i.test([p.programme_name, p.group_name, p.qualification_name, JSON.stringify((p.fields || {}).demographics || ''), (p.fields || {}).type || ''].join(' '));
   const progProv = p => { const f = p.fields || {}, c = I.CL.get(p.client_id); return provOf([f.facilitationVenue, f.inductionVenue, f.workplaceVenue, f.delivery].join(' ')) || provOf(c ? JSON.stringify(c.fields || {}) : ''); };
-  const fitsLevel = (c, n) => { const l = level(c); return n == null ? true : n >= 5 ? l === 'tert' : n === 4 ? (l === 'matric' || l === 'tert') : !!l; };
-  const candF = c => (!I.f.pwd || c.pwd) && (!I.f.prov || provOf(c.province) === I.f.prov) && (!I.f.q || I.tab !== 'cand' || String(c.name).toLowerCase().includes(I.f.q.toLowerCase()));
+  const fitsLevel = (c, n) => { const l = level(c); return n == null ? true : n >= 5 ? l === 'tert' : n === 4 ? (l === 'matric' || l === 'n46' || l === 'tert') : !!l; };
+  const bpwd = c => c.pwd && c.race === 'Black';
+  const candF = c => (!I.f.pwd || c.pwd) && (!I.f.bpwd || bpwd(c)) && (!I.f.prov || provOf(c.province) === I.f.prov) && (!I.f.q || I.tab !== 'cand' || String(c.name).toLowerCase().includes(I.f.q.toLowerCase()));
   const eligible = p => { const n = nqfN(p), pw = pwdProg(p), pp = progProv(p);
     return I.C.filter(c => ready(c) && candF(c) && fitsLevel(c, n) && (!pw || c.pwd))
       .sort((a, b) => (pp ? (provOf(b.province) === pp) - (provOf(a.province) === pp) : 0) || wait(b) - wait(a)); };
@@ -67,7 +73,7 @@
     else if (k === 'wk') I.wk = +v; else if (k === 'move') I.from = addD(I.from, v * 7); else if (k === 'today') I.from = monday(today());
     else if (k === 'pool') { I.pool = I.pool === v ? '' : v; I.more = 0; } else if (k === 'more') I.more++;
     else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; } else if (k === 'refresh') { load(true); return; }
-    else if (k in I.f) { I.f[k] = k === 'pwd' ? !!v : v; I.more = 0; }
+    else if (k in I.f) { I.f[k] = k === 'pwd' || k === 'bpwd' ? !!v : v; I.more = 0; }
     paint();
   };
   window.intkPlace = async (tid, pid) => { const c = I.C.find(x => x.id === tid);
@@ -88,13 +94,13 @@
   const chip = (lbl, n, on, js, cls) => `<button type="button" class="intchip${on ? ' on' : ''}${cls ? ' ' + cls : ''}" onclick="${js}"><b>${n}</b><span>${lbl}</span></button>`;
   const sel = (k, opts, cur, lbl) => `<select aria-label="${lbl}" class="intsel" onchange="intk('${k}',this.value)"><option value="">${lbl}</option>${opts.map(([v, l]) => `<option value="${e(v)}"${String(cur) === String(v) ? ' selected' : ''}>${e(l)}</option>`).join('')}</select>`;
   const badge = (cls, t, tip) => `<span class="badge ${cls}"${tip ? ` title="${e(tip)}"` : ''}>${e(t)}</span>`;
-  const lvlTxt = c => { const l = level(c); return l === 'tert' ? 'Tertiary: ' + c.tertiary : l === 'matric' ? 'Matric' : l === 'g1011' ? c.school : 'Not stated'; };
+  const lvlTxt = c => { const l = level(c); return l === 'tert' || l === 'n46' ? hqOf(c) : l === 'matric' ? 'Matric' : l === 'g1011' ? c.school : 'Unknown'; };
   const flags = c => (c.onP ? badge('b-bad', 'On a programme', 'Already enrolled on a running ApexOne programme') : c.isL ? badge('b-warn', 'Already a learner', 'Has an ApexOne learner record from an earlier programme') : '')
     + (RECR.test(c.status || '') ? badge('b-n', 'Recruited in ClickUp') : '') + (placedTask(c.id) ? badge('b-n', 'Placed') : '');
   const cuLink = c => /^https:\/\/app\.clickup\.com\//.test(c.url || '') ? `<a href="${e(c.url)}" target="_blank" rel="noopener">ClickUp</a>` : '';
   const pct = (a, b) => b ? Math.round(a / b * 100) + '%' : '—';
-  const mix = L => { const n = L.length, y = L.filter(c => c.age && c.age >= 18 && c.age <= 35).length;
-    return `<div class="intmix"><span><b>${pct(L.filter(c => c.pwd).length, n)}</b> PwD</span><span><b>${pct(L.filter(c => c.gender === 'F').length, n)}</b> women</span><span><b>${pct(y, n)}</b> youth (18–35)</span><span><b>${pct(L.filter(c => wait(c) > 30).length, n)}</b> waiting 30+ days</span></div>`; };
+  const mix = L => { const n = L.length, k = fn => { const x = L.filter(fn).length; return `<b>${x}</b> (${pct(x, n)})`; }, bl = c => c.race === 'Black';
+    return `<div class="intmix" title="B-BBEE Skills Development groups (no client targets are stored, so these are counts in the pool)"><span>${k(bl)} Black</span><span>${k(c => bl(c) && c.gender === 'F')} Black women</span><span>${k(bpwd)} Black PwD</span><span>${k(c => c.pwd)} PwD</span><span>${k(c => c.age && c.age >= 18 && c.age <= 35)} youth 18–35</span><span>${k(c => wait(c) > 30)} waiting 30+ days</span></div>`; };
 
   function progRows() {
     const q = I.f.q.toLowerCase();
@@ -133,14 +139,14 @@
       <div class="sub" style="margin-top:10px">Place records the choice in ApexOne only. Enrol creates the learner and enrolment in ApexOne. Recruitment Candidates in ClickUp is never changed.</div></aside>`;
   }
   function candidates() {
-    const R = I.C.filter(c => ready(c) && candF(c)), POOLS = [['pwd', 'People with disabilities', 'Disability learnerships', c => c.pwd], ['matric', 'Matric', 'NQF 4 learnerships', c => level(c) === 'matric' || level(c) === 'tert'],
-      ['g1011', 'Grade 10–11', 'NQF 2–3', c => level(c) === 'g1011'], ['tert', 'Tertiary qualification', 'NQF 5+', c => level(c) === 'tert'], ['none', 'Education not stated', 'Ask recruitment to complete', c => !level(c)]];
+    const R = I.C.filter(c => ready(c) && candF(c)), POOLS = [['pwd', 'People with disabilities', 'Disability learnerships', c => c.pwd], ['matric', 'Matric or higher', 'NQF 4 learnerships', c => ['matric', 'n46', 'tert'].includes(level(c))],
+      ['g1011', 'Grade 10–11', 'NQF 2–3', c => level(c) === 'g1011'], ['tert', 'Higher Certificate or above', 'NQF 5+', c => level(c) === 'tert'], ['bpwd', 'Black people with disabilities', 'B-BBEE priority group', bpwd], ['none', 'Education unknown', 'Ask recruitment to complete', c => !level(c)]];
     const cards = POOLS.map(([k, t, s, fn]) => { const L = R.filter(fn); return `<button type="button" class="card intpool${I.pool === k ? ' on' : ''}" onclick="intk('pool','${k}')"><b style="font-size:24px">${L.length}</b><div><b>${t}</b></div><div class="sub">${s}</div><div class="sub">${L.filter(c => wait(c) > 30).length} waiting 30+ days</div></button>`; }).join('');
     const pool = POOLS.find(x => x[0] === I.pool), L = (pool ? R.filter(pool[3]) : R).sort((a, b) => wait(b) - wait(a)), shown = L.slice(0, 50 + I.more * 50);
-    const act = I.C.filter(active), provF = act.filter(c => provOf(c.province)).length, terF = act.filter(c => String(c.tertiary || '').trim()).length;
+    const act = I.C.filter(active), provF = act.filter(c => provOf(c.province)).length, provA = act.filter(c => c.provFromAddr).length, terF = act.filter(c => hqOf(c)).length;
     return `<div class="intpools">${cards}</div><div class="sub" style="margin:8px 0 12px">Pools overlap (one person can be in several). Ready to place = active in ClickUp, not marked recruited, not already on a running programme and not placed here. ${mix(R)}</div>
-      <div class="sub" style="margin-bottom:10px">Data gaps in ClickUp: province on ${pct(provF, act.length)} and tertiary education on ${pct(terF, act.length)} of active candidates, so province matching and the NQF 5+ pool are understated.</div>
-      <div class="card" style="padding:0"><div class="tw"><table class="dense"><thead><tr><th>Candidate</th><th>Education</th><th>PwD</th><th>Province</th><th>Gender · age</th><th>Waiting</th><th></th></tr></thead><tbody>
+      <div class="sub" style="margin-bottom:10px">Province known for ${pct(provF, act.length)} of active candidates (${provA} worked out from the home address). A post-school qualification could be identified for ${pct(terF, act.length)}; the rest count by their school result or as Unknown. Programmes have no province until PMs add the venue in PM Tracker, so same-province ranking applies only where a venue is set.</div>
+      <div class="card" style="padding:0"><div class="tw"><table class="dense"><thead><tr><th>Candidate</th><th>Highest qualification</th><th>PwD</th><th>Province</th><th>Gender · age</th><th>Waiting</th><th></th></tr></thead><tbody>
       ${shown.map(c => `<tr><td><b>${e(c.name)}</b> ${flags(c)}</td><td>${e(lvlTxt(c))}</td><td>${c.pwd ? 'Yes' : '—'}</td><td>${e(c.province || '—')}</td><td>${e([c.gender, c.age].filter(Boolean).join(' · ') || '—')}</td><td>${wait(c)} days</td><td>${cuLink(c)}</td></tr>`).join('') || '<tr><td colspan="7" class="sub">No candidates for these filters.</td></tr>'}
       </tbody></table></div></div>${L.length > shown.length ? `<button class="btn sm" style="margin-top:8px" onclick="intk('more')">Show more (${L.length - shown.length} left)</button>` : ''}`;
   }
@@ -154,7 +160,7 @@
     const cls = [...new Map(I.PR.filter(p => p.client_id).map(p => [String(p.client_id), (I.CL.get(p.client_id) || {}).client_name || 'Client ' + p.client_id])).entries()].sort((a, b) => a[1].localeCompare(b[1]));
     const nq = [...new Set(I.PR.map(nqfN).filter(x => x != null))].sort((a, b) => a - b).map(n => [n, 'NQF ' + n]);
     const filt = `<div class="intfilt">${I.tab === 'time' ? sel('client', cls, I.f.client, 'All clients') + sel('nqf', nq, I.f.nqf, 'All NQF levels') : ''}${sel('prov', PROV.map(p => [p[0], p[0]]), I.f.prov, 'All provinces')}
-      <label class="intchk"><input type="checkbox"${I.f.pwd ? ' checked' : ''} onchange="intk('pwd',this.checked)"> PwD only</label><input type="search" class="intsel" style="flex:1 1 200px" placeholder="${I.tab === 'time' ? 'Search programmes' : 'Search candidates'}" value="${e(I.f.q)}" onchange="intk('q',this.value)"></div>`;
+      <label class="intchk"><input type="checkbox"${I.f.pwd ? ' checked' : ''} onchange="intk('pwd',this.checked)"> PwD only</label><label class="intchk"><input type="checkbox"${I.f.bpwd ? ' checked' : ''} onchange="intk('bpwd',this.checked)"> Black PwD only</label><input type="search" class="intsel" style="flex:1 1 200px" placeholder="${I.tab === 'time' ? 'Search programmes' : 'Search candidates'}" value="${e(I.f.q)}" onchange="intk('q',this.value)"></div>`;
     const tabs = `<div class="intabs" role="tablist"><button role="tab" aria-selected="${I.tab === 'time'}" class="${I.tab === 'time' ? 'on' : ''}" onclick="intk('tab','time')">Programmes</button><button role="tab" aria-selected="${I.tab === 'cand'}" class="${I.tab === 'cand' ? 'on' : ''}" onclick="intk('tab','cand')">Candidates</button></div>`;
     const body = I.tab === 'time' ? `<div class="intwrap"><div class="card intcal">${timeline()}</div>${panel()}</div>` : candidates();
     m.innerHTML = head + chips + tabs + filt + body;
