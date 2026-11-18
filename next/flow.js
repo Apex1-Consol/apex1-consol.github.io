@@ -338,8 +338,8 @@ ${F.ref ? `<div class="flrefb">Showing items linked to <b>${e(F.refl || F.ref)}<
     const qt = clean(q).replace(/^(please\s+)?(how (do|can|should) (i|we)|what (do|should) (i|we)( do)?( to)?|can you( help me)?|help me( with| to)?|i want to|i need to|show me how to|tell me how to)\s+/i, '').replace(/[?.!]+$/, '');
     const title0 = qt.length > 4 && !/^help me with what is on my screen/i.test(qt) ? qt.charAt(0).toUpperCase() + qt.slice(1, 160) : 'Next steps on ' + c.page;
     const tpl0 = (KW.find(([re]) => re.test(q + ' ' + ans)) || [])[1] || RT[c.r] || 'custom';
-    const people = () => [...new Set(items.filter(i => i.on && i.owner).map(i => i.owner))];
-    let split = people().length >= 1 && people().some(o => o !== me()) && items.some(i => i.on && i.owner);
+    const named = () => [...new Set(items.filter(i => i.on && i.owner).map(i => i.owner))];
+    let split = named().length >= 1 && named().some(o => o !== me()) && items.some(i => i.on && i.owner);
     const ov = document.createElement('div'); ov.className = 'flov';
     ov.innerHTML = `<div class="flm" role="dialog" aria-label="Action in Flow from Ava"><h2 style="margin:0 0 4px;font-size:18px">Action in Flow</h2><div style="font-size:12px;opacity:.7">From Ava's answer · ${e(c.page)}. Untick anything you don't need.</div>
 <label for="fa-t">What needs to happen</label><input id="fa-t" type="text" maxlength="200" value="${e(title0)}">
