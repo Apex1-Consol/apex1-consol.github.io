@@ -67,11 +67,13 @@
   }
   /* ---------- screen: what the user sees, as text, personal data removed ---------- */
   function screenFacts() {
-    const r = route(), root = document.getElementById('view-' + r) || document.querySelector('main:not([hidden])'), out = [], seen = new Set();
+    const r = route(), root = document.getElementById('view-' + r) || document.querySelector('main:not([hidden])'), out = [], seen = new Set(), lists = new Set();
     const roots = [root, ...document.querySelectorAll('[role=dialog]:not(#avapanel),.modal,.ov,#toast,.toast')].filter(x => x && x.offsetParent !== null || x === root);
     const add = (k, t) => { t = String(t || '').replace(/\s+/g, ' ').trim(); if (!t || t.length > 140 || seen.has(k + t)) return; seen.add(k + t); out.push(k + ': ' + t); };
     roots.forEach(R => { if (!R) return; R.querySelectorAll('h1,h2,h3,h4,legend,label,th,button,[role=tab],.chip,.badge,.err,.error,.warn,.empty,.toast,.note,.hint,select,input[placeholder],textarea[placeholder]').forEach(el => {
       if (el.closest('#avapanel,td,tbody') || el.offsetParent === null) return; const tg = el.tagName;
+      for (let x = el; x && x !== R; x = x.parentElement) { const P = x.parentElement; if (!P) break; const sib = [...P.children].filter(c => c.tagName === x.tagName && c.className === x.className).length;
+        if (sib >= 6 && tg !== 'SELECT') { if (!lists.has(P)) { lists.add(P); out.push('List on screen: ' + sib + ' items (contents not sent)'); } return; } }
       if (tg === 'SELECT') add('Dropdown' + (el.selectedOptions[0] ? ' set to' : ''), el.selectedOptions[0] && el.selectedOptions[0].text);
       else if (tg === 'INPUT' || tg === 'TEXTAREA') add('Field', el.placeholder);
       else add(/^H\d|LEGEND/.test(tg) ? 'Heading' : tg === 'BUTTON' || el.getAttribute('role') === 'tab' ? 'Button' : tg === 'LABEL' || tg === 'TH' ? 'Label' : 'Message', el.innerText); }); });
