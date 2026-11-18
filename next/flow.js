@@ -52,7 +52,7 @@
   /* ---------- styles ---------- */
   const css = document.createElement('style');
   css.textContent = `.flb{position:fixed;left:280px;bottom:16px;z-index:60;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);border-radius:20px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
-.flb:hover{border-color:var(--accent2)}.flov{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
+.flbt{white-space:nowrap;font-weight:600;cursor:pointer;flex:0 0 auto}.flb:hover{border-color:var(--accent2)}.flov{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
 .flm{background:var(--card,#fff);color:var(--ink);border-radius:10px;padding:18px;width:min(460px,100%);max-height:90vh;overflow:auto}.flm label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px}
 .flm input,.flm select,.flm textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card,#fff);color:var(--ink)}
 .flbar{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px}.flbar .btn.on{outline:2px solid var(--accent2)}
@@ -110,7 +110,8 @@
   function toast(t) { const d = document.createElement('div'); d.textContent = t; d.style.cssText = 'position:fixed;left:16px;bottom:60px;z-index:80;background:#107c10;color:#fff;padding:8px 14px;border-radius:6px;font-size:13px';
     document.body.appendChild(d); setTimeout(() => d.remove(), 2500); }
   function btn() { let b = $('fl-btn'); const on = !!roles().length && !['login', 'privacy', ''].includes(route()) && route() !== 'flow';
-    if (!b) { b = document.createElement('button'); b.id = 'fl-btn'; b.className = 'flb'; b.textContent = '+ Action in Flow'; b.title = 'Send this page into a flow item'; b.onclick = () => openNew(); document.body.appendChild(b); }
+    if (!b) { b = document.createElement('button'); b.id = 'fl-btn'; b.className = 'flb'; b.textContent = '+ Action in Flow'; b.title = 'Send this page into a flow item'; b.onclick = () => openNew(); const top = document.querySelector('header.top'), at = top && top.querySelector('.sw.s');
+      if (at) { b.className = 'pill flbt'; at.parentNode.insertBefore(b, at); } else document.body.appendChild(b); }
     b.hidden = !on; }
 
   /* ---------- Flow page ---------- */
