@@ -229,6 +229,10 @@
     if (!lock.on) { lock.on = 1; addEventListener('hashchange', () => { const r = location.hash.slice(1).split('/')[0]; if (r && !OKR.includes(r) && recOnly()) location.hash = 'intake'; }); }
     const r = location.hash.slice(1).split('/')[0]; if (!OKR.includes(r)) location.hash = 'intake'; }
   (function wait0(n) { if (window.apxRole && window.__sb) { if (isRec() && apxRole() !== 'admin' && ['', 'mywork', 'pmtracker', 'desk'].includes(location.hash.slice(1).split('/')[0])) location.hash = 'intake'; try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} lock(); wrapDot(); nav(); navCount();
-    if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
+    if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); }
+    /* roles arrive after sign-in: re-apply the recruitment lock once they do (and on every auth change) */
+    const relock = () => { if (!recOnly()) return; lock(); nav(); if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } };
+    (function wr(k) { if ((window.__preview || {}).roles) relock(); else if (k < 60) setTimeout(() => wr(k + 1), 500); })(0);
+    try { __sb.auth.onAuthStateChange(() => setTimeout(relock, 400)); } catch (_) {} } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.intkSummary = () => I.st === 'ok' ? { ready: I.C.filter(ready).length, wait30: I.C.filter(c => ready(c) && wait(c) > 30).length, need: I.PR.filter(needs).length } : null;
 })();
