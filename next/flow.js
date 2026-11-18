@@ -51,7 +51,7 @@
 
   /* ---------- styles ---------- */
   const css = document.createElement('style');
-  css.textContent = `.flb{position:fixed;left:16px;bottom:16px;z-index:60;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);border-radius:20px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
+  css.textContent = `.flb{position:fixed;left:280px;bottom:16px;z-index:60;border:1px solid var(--line);background:var(--card,#fff);color:var(--ink);border-radius:20px;padding:7px 14px;font:inherit;font-size:13px;font-weight:600;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.12)}
 .flb:hover{border-color:var(--accent2)}.flov{position:fixed;inset:0;z-index:70;background:rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;padding:16px}
 .flm{background:var(--card,#fff);color:var(--ink);border-radius:10px;padding:18px;width:min(460px,100%);max-height:90vh;overflow:auto}.flm label{display:block;font-size:12px;font-weight:600;margin:10px 0 4px}
 .flm input,.flm select,.flm textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:var(--card,#fff);color:var(--ink)}
