@@ -1,4 +1,4 @@
-/* Learner intake (#intake, admin only). Built 18 Nov 2026.
+/* Learner intake (#intake, admin + recruitment; recruitment-only users see only this). Built 18 Nov 2026.
    Rows = upcoming/running ApexOne programmes on a timeline (like the FAM Calendar); click one to fill it from the
    ClickUp Recruitment Candidates pool. Candidates are READ-ONLY from ClickUp via the clickup-relay function: nothing is
    written to ClickUp. "Place" records a placement in ApexOne (intake_placements); "Enrol" creates the learner +
@@ -223,7 +223,12 @@
   const navN = () => I.st === 'ok' ? I.PR.filter(needs).length : (I.navN || 0);
   const wrapDot = () => { const f = window.apxNavDot; if (!f || f.__intk) return; const g = r => { if (r !== 'intake') return f(r); const n = navN();
     return n ? `<span class="navcnt r" aria-label="${n} programmes start within 30 days with places open">${n}</span>` : ''; }; g.__intk = 1; window.apxNavDot = g; };
-  (function wait0(n) { if (window.apxRole && window.__sb) { if (isRec() && apxRole() !== 'admin' && ['', 'mywork', 'pmtracker', 'desk'].includes(location.hash.slice(1).split('/')[0])) location.hash = 'intake'; try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} wrapDot(); nav(); navCount();
+  /* recruitment-only users (not admin): menu = Learner intake only; every other app route sends them back to #intake */
+  const recOnly = () => isRec() && apxRole() !== 'admin', OKR = ['intake', 'login', 'privacy'];
+  function lock() { if (!recOnly()) return; try { Object.keys(ROUTES).forEach(r => { if (!OKR.includes(r)) NAVR[r] = () => false; }); } catch (_) {}
+    if (!lock.on) { lock.on = 1; addEventListener('hashchange', () => { const r = location.hash.slice(1).split('/')[0]; if (r && !OKR.includes(r) && recOnly()) location.hash = 'intake'; }); }
+    const r = location.hash.slice(1).split('/')[0]; if (!OKR.includes(r)) location.hash = 'intake'; }
+  (function wait0(n) { if (window.apxRole && window.__sb) { if (isRec() && apxRole() !== 'admin' && ['', 'mywork', 'pmtracker', 'desk'].includes(location.hash.slice(1).split('/')[0])) location.hash = 'intake'; try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} lock(); wrapDot(); nav(); navCount();
     if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.intkSummary = () => I.st === 'ok' ? { ready: I.C.filter(ready).length, wait30: I.C.filter(c => ready(c) && wait(c) > 30).length, need: I.PR.filter(needs).length } : null;
 })();
