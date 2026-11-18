@@ -256,7 +256,7 @@
     const body = NAV.map(([g, its]) => [g, its.filter(([, r]) => by.has(r) && ok(r) && (!f || f.includes(g) || f.includes(r)))]).filter(([, its]) => its.length)
       .map(([g, its]) => `<div class="ovg">${esc(g)}</div>` + its.map(([l, r]) => { const xs = by.get(r), lv = lev(xs); if (lv === 'r') nr++; else if (lv === 'a') na++; return { l, r, xs, lv }; })
         .map(row).join('')).join('');
-    return body ? `<section class="card ov"><div class="ovh"><b>Overview</b><span class="sub">${nr} urgent · ${na} to check · click a row to see who actions it</span></div>${body}</section>` : ''; };
+    return body ? `<details class="card ov"><summary class="ovh" style="cursor:pointer"><b>Overview ▸</b><span class="sub">${nr} urgent · ${na} to check · click to open, then click a row to see who actions it</span></summary>${body}</details>` : ''; };
 
   window.apxToday = scr => {
     if (!D().progs) return '<div class="empty"><b>Loading…</b></div>';

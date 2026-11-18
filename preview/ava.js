@@ -237,7 +237,7 @@
   const wkKey = () => { const d = new Date(), k = new Date(d); k.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return 'week:' + me() + ':' + iso(k); };
   async function weekly(force) {
     const host = document.getElementById('view-mywork'); if (!host || host.hidden || !['admin', 'qa'].includes(role()) || !D().progs) return;
-    let c = document.getElementById('avawk'); if (!c) { const anchor = document.getElementById('mwov') || host.firstElementChild; anchor.insertAdjacentHTML('beforebegin', '<details class="card" id="avawk" open style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700"><span style="color:#d9a400">✦</span> Ava\'s weekly brief</summary><div id="avawkb" style="margin-top:8px;font-size:14px;line-height:1.45"></div></details>'); c = document.getElementById('avawk'); }
+    let c = document.getElementById('avawk'); if (!c) { const anchor = document.getElementById('mwov') || host.firstElementChild; anchor.insertAdjacentHTML('beforebegin', '<details class="card" id="avawk" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700"><span style="color:#d9a400">✦</span> Ava\'s weekly brief</summary><div id="avawkb" style="margin-top:8px;font-size:14px;line-height:1.45"></div></details>'); c = document.getElementById('avawk'); }
     const b = document.getElementById('avawkb'), k = wkKey(), hit = cache.get(k);
     if (hit && !force) { b.innerHTML = fmt(hit.t) + `<div class="avsm">Written ${e(hit.at)} for this week. ${btn('Refresh', 'avaWeekly(1)')}</div>`; return; }
     if (weekly.busy) return; weekly.busy = 1; b.innerHTML = '<span class="avsm">Ava is writing this week\'s brief…</span>';
