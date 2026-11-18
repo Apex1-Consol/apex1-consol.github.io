@@ -107,7 +107,7 @@
     hd.hidden = false;
     const sp = hd.querySelectorAll('span');
     sp[0].textContent = `${p.status === 'active' ? 'Active' : p.status} · ${p.programme_type || p.qualification_type || 'Programme'}`;
-    hd.querySelector('h1').textContent = p.programme_name;
+    hd.querySelector('h1').textContent = p.programme_name; hd.querySelector('h1').title = p.programme_name || '';
     sp[1].textContent = `${client(p)?.client_name || 'No client'} · SAQA ${p.saqa_id || '—'} · NQF ${p.nqf_level || '—'} · ${fmtD(day(p.start_date)) || '—'} → ${fmtD(day(p.end_date)) || '—'}`;
     hd.querySelectorAll('button').forEach(b => { b.hidden = true; });   // buttons are rebuilt below (Edit, stage, AI summary)
     const tabs = [['Overview', `pTab='Overview';renderProg()`], ['Form 3', `pTab='Form 3';renderProg()`], ['Learners ›', `location.hash='learners'`],
