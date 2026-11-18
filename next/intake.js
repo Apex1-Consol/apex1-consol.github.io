@@ -62,9 +62,9 @@
       I.EN = new Map(); (en.data || []).forEach(x => { if ((x.status || 'active') === 'active') I.EN.set(x.programme_id, (I.EN.get(x.programme_id) || 0) + 1); });
       I.CL = new Map((cl.data || []).map(c => [c.id, c])); I.P = pl.data || []; I.st = 'ok';
     } catch (_) { I.st = 'err'; }
-    paint();
+    paint(); try { renderNav(curNav); } catch (_) {}
   }
-  async function reloadP() { try { const { data } = await sb().from('intake_placements').select('*').order('placed_at'); I.P = data || []; } catch (_) {} paint(); }
+  async function reloadP() { try { const { data } = await sb().from('intake_placements').select('*').order('placed_at'); I.P = data || []; } catch (_) {} paint(); try { renderNav(curNav); } catch (_) {} }
 
   /* ---------- actions ---------- */
   const say = m => { try { (window.toast || window.say || alert)(m); } catch (_) { alert(m); } };
@@ -187,6 +187,16 @@
   try { ROUTES.intake = ['Learner intake', 'Learners']; const g = NAV.find(x => x[0] === 'Learners'); if (g && !g[1].some(x => x[1] === 'intake')) g[1].push(['Learner intake', 'intake']); } catch (_) {}
   const go = () => { if (location.hash.slice(1).split('/')[0] === 'intake') setTimeout(paint, 60); };
   addEventListener('hashchange', go);
-  (function wait0(n) { if (window.apxRole && window.__sb) { if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
+  /* menu count = programmes starting within 30 days with places open (same rule as the chip); menu item hidden for non-admins */
+  const nav = () => { try { renderNav(curNav); } catch (_) {} };
+  async function navCount() { if (!isAdmin()) return; try { const t = today();
+    const { data: P } = await sb().from('programmes').select('id,group_size,status').is('deleted_at', null).gte('start_date', t).lte('start_date', addD(t, 30)).gt('group_size', 0);
+    const L = (P || []).filter(p => String(p.status || '') !== 'closed'), ids = L.map(p => p.id), c = new Map();
+    if (ids.length) { const [{ data: E }, { data: Q }] = await Promise.all([sb().from('enrolments').select('programme_id,status').in('programme_id', ids), sb().from('intake_placements').select('programme_id').eq('status', 'placed').in('programme_id', ids)]);
+      (E || []).forEach(x => { if ((x.status || 'active') === 'active') c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1); }); (Q || []).forEach(x => c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1)); }
+    I.navN = L.filter(p => p.group_size > (c.get(p.id) || 0)).length; nav(); } catch (_) {} }
+  try { NC.intake = () => I.st === 'ok' ? I.PR.filter(needs).length : (I.navN || 0); } catch (_) {}
+  (function wait0(n) { if (window.apxRole && window.__sb) { try { window.NAVR = window.NAVR || {}; NAVR.intake = isAdmin; } catch (_) {} nav(); navCount();
+    if (location.hash.slice(1).split('/')[0] === 'intake') { try { route(); } catch (_) {} go(); } } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.intkSummary = () => I.st === 'ok' ? { ready: I.C.filter(ready).length, wait30: I.C.filter(c => ready(c) && wait(c) > 30).length, need: I.PR.filter(needs).length } : null;
 })();
