@@ -124,6 +124,13 @@
     assessors: PG('Assessors & Moderators', 'Registration status of assessors and moderators.', {}),
     synchealth: PG('Data & Sync Health', 'Health checks and the ClickUp sync queue (admin).', {}),
     audit: PG('Audit log', 'Who changed what and when (admin).', {}),
+    flow: PG('My Flow', 'Your action board. Anything in ApexOne can be sent here with "+ Action in Flow" (top bar). Each item has steps from a role template, a status (To do, Doing, Waiting on someone, Done), a due date, an owner, notes and a link back to its page. Overdue items count in the menu. Stuck = overdue or no change in 5+ days.', {
+      add: { t: 'Add something to my Flow', steps: [{ t: 'Open the page with the thing that needs action, then click "+ Action in Flow" in the top bar.', sel: '#fl-btn' }, { t: 'Check what needs to happen, pick the flow template, owner and due date, then click Add to Flow.', sel: '.flm' }] },
+      new: { t: 'Start a flow item from scratch', steps: [open('flow', 'Open My Flow'), { t: 'Click New flow item, fill it in and pick Custom to write your own steps.', sel: 'btn:New flow item' }] },
+      work: { t: 'Work a flow item (steps and status)', steps: [open('flow', 'Open My Flow'), { t: 'Click the item to open it.', sel: '.flcard' }, { t: 'Tick steps as you finish them (the first tick moves it to Doing). Add your own steps if needed.', sel: '.fldet .stp' }, { t: 'Move it with To do, Doing, Waiting on someone or Done. When waiting, say on whom.', sel: '.fldet .row' }] },
+      hand: { t: 'Hand a flow item to someone else', steps: [open('flow', 'Open My Flow'), { t: 'Click the item to open it.', sel: '.flcard' }, { t: 'Pick the person under Hand to and confirm. It moves to their Flow and the history records it.', sel: '#fl-h' }] },
+      due: { t: 'Set or change a due date', steps: [open('flow', 'Open My Flow'), { t: 'Click the item, then set Due. Overdue items turn red and count in the menu.', sel: '#fl-due' }] },
+      stuck: { t: 'See stuck items across the team', roles: ['admin'], steps: [open('flow', 'Open My Flow'), { t: 'Click Everyone, then Stuck only.', sel: 'btn:Everyone' }] } }),
     users: PG('User management', 'Staff accounts and roles (admin).', {}),
   };
   const ROLEMAP = { project_manager: 'pm', qa_specialist: 'qa', pi_specialist: 'pi' };

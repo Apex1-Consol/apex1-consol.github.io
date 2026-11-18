@@ -171,4 +171,6 @@ ${x.status === 'waiting' ? `<div class="row"><input type="text" id="fl-w" placeh
     (function wr(k) { if (roles().length) { wrapDot(); nav(); btn(); navCount(); if (route() === 'flow') go(); } else if (k < 60) setTimeout(() => wr(k + 1), 500); })(0);
     try { __sb.auth.onAuthStateChange(() => setTimeout(() => { F.user = null; F.staff = null; F.st = 'idle'; btn(); navCount(); }, 400)); } catch (_) {} } else if (n < 60) setTimeout(() => wait0(n + 1), 500); })(0);
   window.apxFlowAdd = openNew;
+  window.apxFlowStats = () => { if (F.st !== 'ok') return null; const o = F.items.filter(x => x.status !== 'done'); return { open: o.length, late: o.filter(late).length, stuck: o.filter(stuck).length, waiting: o.filter(x => x.status === 'waiting').length, all: !!F.all }; };
+  window.apxFlowView = (all, stk) => { F.all = !!all && isAdmin(); F.stuck = !!stk; F.open = null; F.st = 'idle'; paint(); };
 })();
