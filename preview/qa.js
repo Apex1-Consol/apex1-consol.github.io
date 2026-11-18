@@ -427,8 +427,8 @@
   /* =====================================================================
      ACCREDITATION  (+ legacy qualification check)
      ===================================================================== */
-  const ASTAT = ['Desktop application to be submitted', 'Desktop application successful', 'Site visit scheduled', 'Site visit done', 'Accreditation granted'];
-  const ABADGE = { 'Accreditation granted': 'b-ok', 'Desktop application successful': 'b-n', 'Site visit scheduled': 'b-warn', 'Site visit done': 'b-n', 'Desktop application to be submitted': 'b-bad' };
+  const ASTAT = ['Desktop application to be submitted', 'Desktop application successful', 'Site visit scheduled', 'Site visit done', 'Accreditation granted', 'Desktop application unsuccessful', 'Withdrawn'];
+  const ABADGE = { 'Accreditation granted': 'b-ok', 'Desktop application successful': 'b-n', 'Site visit scheduled': 'b-warn', 'Site visit done': 'b-n', 'Desktop application to be submitted': 'b-bad', 'Desktop application unsuccessful': 'b-bad', 'Withdrawn': 'b-n' };
   // Feedback is written the way the Accreditation sheet writes it, from the dates
   function accFeedback(a) {
     const f = s => fmtD(day(s));
@@ -437,6 +437,8 @@
       case 'Site visit scheduled': return a.site_visit_date ? 'Site Visit - ' + f(a.site_visit_date) : 'Site visit to be scheduled';
       case 'Site visit done': return 'Site Visit - ' + (a.site_visit_date ? f(a.site_visit_date) + ' - ' : '') + 'DONE';
       case 'Desktop application successful': return 'Desktop Application Successful' + (a.desktop_date ? ' - ' + f(a.desktop_date) : '');
+      case 'Desktop application unsuccessful': return 'Desktop Application Unsuccessful' + (a.desktop_date ? ' - ' + f(a.desktop_date) : '');
+      case 'Withdrawn': return 'Withdrawn';
       default: return 'Desktop/Accreditation Application to be submitted';
     }
   }
@@ -455,7 +457,7 @@
     const isLeg = a => /legacy/i.test(a.qual_type || '') || !!(typeof LEG === 'object' && LEG && LEG[String(a.saqa_id || '').trim()]);
     const tm = a => aT === 'All types' || isLeg(a) === LGO, AT = A.filter(tm), c = s => AT.filter(a => a.status === s).length;
     const exp = AT.filter(a => { const m = monthsLeft(a); return m != null && m < 12; }).length;
-    $('akpis').innerHTML = ASTAT.slice().reverse().map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
+    $('akpis').innerHTML = ASTAT.slice(0, 5).reverse().concat(['Desktop application unsuccessful']).map(s => `<div class="kpi"><span class="l">${s}</span><span class="v">${c(s)}</span><span class="n"><span class="badge ${ABADGE[s]}">${s === 'Desktop application to be submitted' ? 'Action needed' : s === 'Desktop application unsuccessful' ? 'Resubmit' : s === 'Site visit scheduled' ? 'Prepare' : 'Status'}</span></span></div>`).join('')
       + `<div class="kpi"><span class="l">Expiring within 12 months</span><span class="v" style="color:${exp ? 'var(--bad)' : 'var(--ink)'}">${exp}</span><span class="n" style="color:var(--muted)">plan re-accreditation</span></div>`;
     const nk = x => String(x || '').trim().replace(/^SP:\s*/i, ''), cap = s => s ? String(s).charAt(0).toUpperCase() + String(s).slice(1) : '', pcnt = {}; let actAll = [];
     { // Programme checks: expiring / not accredited (client-side from programmes + accreditation_items)
@@ -486,7 +488,7 @@
     $('asort').textContent = window.aS ? 'Sorted by expiry' : 'Sort by expiry';
     const qs = String(window.aQ || '').trim().toLowerCase(), sm = a => !qs || (String(a.saqa_id || '') + ' ' + (a.title || '')).toLowerCase().includes(qs);
     const rows = () => { const r = AT.filter(a => m(a) && sm(a)); return window.aS ? r.slice().sort((x, y) => String(x.accreditation_to || '9999').localeCompare(String(y.accreditation_to || '9999'))) : r; };
-    const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? a.status === 'Desktop application to be submitted' : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted'].includes(a.status));
+    const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? ['Desktop application to be submitted', 'Desktop application unsuccessful'].includes(a.status) : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted', 'Desktop application unsuccessful', 'Withdrawn'].includes(a.status));
     const sel = a => QA() ? `<select class="cellsel ${ABADGE[a.status] || ''}" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
     { // Cards view (default) with overview panel; table kept as second view
       let aV = window.aV; try { aV = aV || localStorage.getItem('apxAccView'); } catch (e) { } aV = aV === 'table' ? 'table' : 'cards';
@@ -499,7 +501,9 @@
         const td0 = new Date().toISOString().slice(0, 10), d10 = v => v ? String(v).slice(0, 10) : '';
         const flag = a => { const ml = monthsLeft(a), L = typeof LEG === 'object' && LEG ? LEG[nk(a.saqa_id)] : null;
           if (a.status === 'Accreditation granted' && a.accreditation_to && d10(a.accreditation_to) < td0) return [0, 'b-bad', 'Expired ' + d10(a.accreditation_to)];
+          if (a.status === 'Withdrawn') return [3, 'b-n', 'Withdrawn'];
           if (a.status === 'Desktop application to be submitted') return [0, 'b-bad', 'Application to submit'];
+          if (a.status === 'Desktop application unsuccessful') return [0, 'b-bad', 'Application unsuccessful'];
           if (L && L[2] !== 'Yes') return [0, 'b-bad', 'Legacy · not extended'];
           if (ml != null && ml < 6) return [0, 'b-bad', 'Expires in ' + Math.max(ml, 0) + ' months'];
           if (ml != null && ml < 12) return [1, 'b-warn', 'Expires in ' + ml + ' months'];
