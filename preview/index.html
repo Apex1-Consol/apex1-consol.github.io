@@ -799,7 +799,7 @@ function route(){
   if(!isLogin&&famOnly()&&r!=='fam'){location.replace('#fam');return;}
   $('view-login').hidden=!isLogin;$('shell').hidden=isLogin;
   document.querySelectorAll('main[id^=view-]').forEach(m=>m.hidden=m.id!=='view-'+r);
-  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=crumbOf(r);renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261116c'}}
+  if(!isLogin){$('heading').textContent=ROUTES[r][0];$('crumb').textContent=crumbOf(r);renderNav(PARENT[r]||r);window.scrollTo(0,0);closePops();if(r==='learners')loadLearners();if(r==='dq')renderDQ();if(r==='signoff')renderSO();if(r==='pi'){const f=$('piFrame');if(f&&!f.src)f.src='../programme-initiation.html?embed=1&v=20261119b'}}
 }
 addEventListener('hashchange',route);
 
@@ -1265,7 +1265,7 @@ function learnerRules(){return `<div class="row">
 <script src="qa.js?v=20261118o"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261118s"></script>
-<script src="intake.js?v=20261119a"></script>
+<script src="intake.js?v=20261119b"></script>
 <script src="delivery.js?v=20261118p"></script>
 <script src="handover.js?v=20261117ho7"></script>
 <script src="inbox.js?v=20261117c"></script>

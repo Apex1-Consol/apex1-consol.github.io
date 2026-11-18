@@ -803,7 +803,7 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
           {id:'qualificationSETA', label:'Qualification SETA', type:'text', required:false},
           {id:'funding', label:'Un/Funded', type:'select', options:['','Funded','Unfunded'], required:false},
           {id:'fundingOrganisation', label:'Funding Organisation', type:'text', required:false, showIf:d=>d.funding==='Funded'},
-          {id:'numLearners', label:'No. of Learners', type:'number', required:false},
+          {id:'numLearners', label:'No. of Learners', type:'number', required:true},
           {id:'numGroups', label:'No. of Groups', type:'number', required:false},
           {id:'companyRegNumber', label:'Company Registration Number', type:'text', required:false},
           {id:'clientSETA', label:'Client SETA', type:'text', required:false},
@@ -3425,5 +3425,38 @@ supabaseClient.auth.onAuthStateChange((event, session)=>{
        ========================================================================== */
     document.getElementById('logoutBtn').addEventListener('click', doLogout);
   </script>
+<script>
+/* Learner intake supply check (18 Nov 2026): for Unemployed / Both programmes, shows how many ClickUp Recruitment Candidates are eligible.
+   Counts only (clickup-relay action 'supply'); no names or personal data reach this page. ClickUp is read-only. */
+(function () {
+  var t = null, last = '';
+  function val(id) { var el = document.querySelector('[data-id="' + id + '"]'); return el ? String(el.value || '').trim() : ''; }
+  function box() {
+    var a = document.querySelector('[data-id="employment"]'); if (!a) return null;
+    var w = a.closest('.field') || a.parentElement, b = document.getElementById('pisupply');
+    if (!b) { b = document.createElement('div'); b.id = 'pisupply'; b.style.cssText = 'grid-column:1/-1;margin:4px 0 12px;padding:10px 12px;border:1px solid #c9d6ef;border-radius:8px;background:#f4f7fd;font-size:13px;line-height:1.45'; w.parentElement.insertBefore(b, w.nextSibling); }
+    return b;
+  }
+  async function run() {
+    var b = box(); if (!b) return;
+    if (!/unemploy|both/i.test(val('employment'))) { b.style.display = 'none'; return; }
+    b.style.display = '';
+    var lv = (val('level').match(/\d+/) || [''])[0], venue = val('facilitationVenue') || val('premises'), n = +val('numLearners') || 0, key = [lv, venue, n].join('|');
+    if (key === last && b.getAttribute('data-done')) return; last = key;
+    b.innerHTML = '<b>Candidate supply</b> · checking Recruitment Candidates…';
+    try {
+      var r = await supabaseClient.functions.invoke('clickup-relay', { body: { action: 'supply', nqf: lv || null, venue: venue } }), d = r.data;
+      if (r.error || !d || !d.ok) throw 0;
+      var enough = n ? (d.eligible >= n ? '<span style="color:#107c10;font-weight:600">enough for ' + n + ' places</span>' : '<span style="color:#c50f1f;font-weight:600">only ' + d.eligible + ' for ' + n + ' places: more recruiting needed</span>') : 'add No. of Learners to compare';
+      b.innerHTML = '<b>Candidate supply</b> for NQF ' + (lv || 'any level') + ': <b>' + d.eligible + '</b> eligible (' + enough + ') · ' + d.blackPwd + ' Black PwD · ' + d.blackWomen + ' Black women · ' + d.pwd + ' PwD · '
+        + (d.province ? d.inProvince + ' in ' + d.province : 'add the facilitation venue to see how many live in that province')
+        + '<div style="color:#666;font-size:12px;margin-top:2px">Counts only, from ClickUp › Recruitment Candidates (read-only). At hand-over, Unemployed and Both programmes go to Recruitment as well as the PM.</div>';
+      b.setAttribute('data-done', '1');
+    } catch (_) { b.innerHTML = '<b>Candidate supply</b> · could not check right now.'; }
+  }
+  document.addEventListener('change', function (e) { if (e.target && e.target.closest && e.target.closest('[data-id]')) { clearTimeout(t); t = setTimeout(run, 600); } }, true);
+  new MutationObserver(function () { if (!document.getElementById('pisupply') && document.querySelector('[data-id="employment"]')) { clearTimeout(t); t = setTimeout(function () { last = ''; run(); }, 400); } }).observe(document.body, { childList: true, subtree: true });
+})();
+</script>
 </body>
 </html>
