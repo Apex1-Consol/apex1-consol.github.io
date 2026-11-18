@@ -174,6 +174,7 @@ label.f textarea{border:1px solid var(--border2);border-radius:10px;padding:10px
 .famas b{color:var(--ink)}
 table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px}
 .cellsel,.fsel{max-width:100%;min-width:0;font-family:inherit;text-overflow:ellipsis;height:34px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;padding:0 6px;background:var(--surface);color:var(--ink)}
+.cellsel.accsel{background:var(--surface);color:var(--ink);border-left:5px solid var(--muted);font-weight:600}.cellsel.accsel.b-ok{border-left-color:var(--ok)}.cellsel.accsel.b-warn{border-left-color:var(--warn)}.cellsel.accsel.b-bad{border-left-color:var(--bad)}.cellsel.accsel option{background:var(--surface);color:var(--ink)}.cellsel.accsel:focus{outline:2px solid var(--accent2);outline-offset:1px}
 .cellsel.b-n{background:var(--nbg,var(--surface))}.cellsel.b-ok{background:var(--okbg);color:var(--ok)}.cellsel.b-warn{background:var(--warnbg);color:var(--warn)}.cellsel.b-bad{background:var(--badbg);color:var(--bad)}
 .kv>span:last-child{margin-left:auto;text-align:right;min-width:0;overflow-wrap:anywhere}
 #form3,#leisa,#eisaready{display:flex;flex-direction:column;gap:16px}
@@ -1261,7 +1262,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js?v=20261118a"></script>
-<script src="qa.js?v=20261118m"></script>
+<script src="qa.js?v=20261118n"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261118i"></script>
 <script src="delivery.js?v=20261118d"></script>

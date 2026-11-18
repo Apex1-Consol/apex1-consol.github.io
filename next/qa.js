@@ -489,7 +489,7 @@
     const qs = String(window.aQ || '').trim().toLowerCase(), sm = a => !qs || (String(a.saqa_id || '') + ' ' + (a.title || '')).toLowerCase().includes(qs);
     const rows = () => { const r = AT.filter(a => m(a) && sm(a)); return window.aS ? r.slice().sort((x, y) => String(x.accreditation_to || '9999').localeCompare(String(y.accreditation_to || '9999'))) : r; };
     const m = a => aF === 'All' || (aF === 'Granted' ? a.status === 'Accreditation granted' : aF === 'To submit' ? ['Desktop application to be submitted', 'Desktop application unsuccessful'].includes(a.status) : aF === 'Expiring' ? (monthsLeft(a) ?? 99) < 12 : !['Accreditation granted', 'Desktop application to be submitted', 'Desktop application unsuccessful', 'Withdrawn'].includes(a.status));
-    const sel = a => QA() ? `<select class="cellsel ${ABADGE[a.status] || ''}" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
+    const sel = a => QA() ? `<select class="cellsel accsel ${ABADGE[a.status] || ''}" aria-label="Status" onchange="qaA(${a.id},'status',this.value)">${ASTAT.map(s => `<option${s === a.status ? ' selected' : ''}>${s}</option>`).join('')}</select>` : `<span class="badge ${ABADGE[a.status]}">${esc(a.status)}</span>`;
     { // Cards view (default) with overview panel; table kept as second view
       let aV = window.aV; try { aV = aV || localStorage.getItem('apxAccView'); } catch (e) { } aV = aV === 'table' ? 'table' : 'cards';
       if (!$('aview')) $('atools').insertAdjacentHTML('beforeend', '<span class="seg" id="aview" style="flex:0 0 auto"></span>');
