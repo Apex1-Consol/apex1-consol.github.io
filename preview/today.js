@@ -238,7 +238,16 @@
   const marks = xs => { const grp = f => { const g = new Map(); xs.forEach(x => { const k = f(x); if (!g.has(k)) g.set(k, { k, n: 0, w: 0 }); const o = g.get(k); o.n++; if (x.warn) o.w++; }); return [...g.values()]; };
     const r = grp(why); return (r.length > 8 ? grp(x => x.hh) : r).sort((a, b) => b.w - a.w || b.n - a.n); };
   window.apxNavDot = r => { if (!D().progs) return ''; const xs = ovData().get(r); if (!xs || !xs.length) return ''; const l = lev(xs);
-    return `<span class="navdot ${l}" aria-label="${l === 'r' ? 'Urgent items' : 'Items to check'}"></span>`; };
+    return `<span class="navcnt ${l}" aria-label="${xs.length} ${l === 'r' ? 'items, some urgent' : 'items to check'}">${xs.length}</span>`; };
+  window.apxComingUp = () => { if (!D().progs) return ''; const by = ovData(), xs = [];
+    [['recs', 'Recommendation'], ['visits', 'Monitoring visit'], ['eisa', 'EISA'], ['pmtracker', 'Programme date'], ['accred', 'Accreditation']].forEach(([k, l]) => (by.get(k) || []).forEach(x => xs.push(Object.assign({ kind: l }, x))));
+    if (!xs.length) return '';
+    const late = xs.filter(x => x.warn), soon = xs.filter(x => !x.warn), rows = late.concat(soon).slice(0, 12);
+    const tile = (n, l, s, c) => `<div class="cut ${c}"><b>${n}</b><span>${l}</span><small>${s}</small></div>`;
+    return `<section class="card cu"><div class="cuh"><h2 style="font-size:16px;margin:0">Coming up</h2><span class="sub">Late = overdue or urgent · Soon = due in the next few weeks</span></div>`
+      + `<div class="cutiles">${tile(late.length, 'Late', 'Act now', late.length ? 'r' : '')}${tile(soon.length, 'Soon', 'Plan this week', soon.length ? 'a' : '')}</div>`
+      + rows.map(x => `<div class="cur"><span class="badge ${x.warn ? 'b-bad' : 'b-warn'}">${x.warn ? 'Late' : 'Soon'}</span><span class="cux"><b>${x.t}</b><span class="sub">${esc(x.kind)} · ${esc(plain(x.s))}</span></span><button type="button" class="btn sm" onclick="${x.go}">Open</button></div>`).join('')
+      + (xs.length > rows.length ? `<div class="sub" style="padding-top:8px">+${xs.length - rows.length} more in the menu counts</div>` : '') + '</section>'; };
   window.ovTog = r => { OV.open = OV.open === r ? null : r; window.previewShell && previewShell(); };
   window.apxOverview = role => { if (!D().progs || typeof NAV === 'undefined') return ''; const by = ovData(), f = OVR[role]; let nr = 0, na = 0;
     const row = o => { const on = OV.open === o.r, w = new Map(); o.xs.forEach(x => w.set(x.w.n, (w.get(x.w.n) || 0) + 1));

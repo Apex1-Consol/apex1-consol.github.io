@@ -65,7 +65,28 @@
       `Open recommendations: ${recs.length} (${od.length} overdue); monitoring visits recorded: ${(d.visits || []).length}`,
       attentionFacts()].join('\n');
   }
+  /* ---------- screen: what the user sees, as text, personal data removed ---------- */
+  function screenFacts() {
+    const r = route(), root = document.getElementById('view-' + r) || document.querySelector('main:not([hidden])'), out = [], seen = new Set(), lists = new Set();
+    const roots = [root, ...document.querySelectorAll('[role=dialog]:not(#avapanel),.modal,.ov,#toast,.toast')].filter(x => x && x.offsetParent !== null || x === root);
+    const add = (k, t) => { t = String(t || '').replace(/\s+/g, ' ').trim(); if (!t || t.length > 140 || seen.has(k + t)) return; seen.add(k + t); out.push(k + ': ' + t); };
+    roots.forEach(R => { if (!R) return; R.querySelectorAll('h1,h2,h3,h4,legend,label,th,button,[role=tab],.chip,.badge,.err,.error,.warn,.empty,.toast,.note,.hint,select,input[placeholder],textarea[placeholder]').forEach(el => {
+      if (el.closest('#avapanel,td,tbody') || el.offsetParent === null) return; const tg = el.tagName;
+      for (let x = el; x && x !== R; x = x.parentElement) { const P = x.parentElement; if (!P) break; const sib = [...P.children].filter(c => c.tagName === x.tagName && c.className === x.className).length;
+        if (sib >= 6 && tg !== 'SELECT') { if (!lists.has(P)) { lists.add(P); out.push('List on screen: ' + sib + ' items (contents not sent)'); } return; } }
+      if (tg === 'SELECT') add('Dropdown' + (el.selectedOptions[0] ? ' set to' : ''), el.selectedOptions[0] && el.selectedOptions[0].text);
+      else if (tg === 'INPUT' || tg === 'TEXTAREA') add('Field', el.placeholder);
+      else add(/^H\d|LEGEND/.test(tg) ? 'Heading' : tg === 'BUTTON' || el.getAttribute('role') === 'tab' ? 'Button' : tg === 'LABEL' || tg === 'TH' ? 'Label' : 'Message', el.innerText); }); });
+    const rows = root ? root.querySelectorAll('tbody tr').length : 0; if (rows) out.push('Table rows shown: ' + rows);
+    let s = `Screen the user is looking at (labels only, no record contents): page ${pageName(r)} {{${r}}}\n` + out.slice(0, 160).join('\n');
+    const names = new Set(); try { (D().learners || []).forEach(l => Object.keys(l || {}).forEach(k => { if (/name|surname/i.test(k) && typeof l[k] === 'string') l[k].split(/\s+/).forEach(w => w.length > 2 && names.add(w)); })); } catch (_) {}
+    names.forEach(w => { s = s.split(new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'g')).join('[name]'); });
+    return s.replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[email]').replace(/(\+27|\b0)\d{9}\b/g, '[phone]').replace(/\b\d{6,}\b/g, '[number]').slice(0, 5000);
+  }
+  window.avaScreenFacts = screenFacts;
   function context(mode) {
+    if (mode === 'screen') { const P = KB() && KB().PAGES[route()], G = P ? Object.values(P.guides || {}).map(g => '- ' + g.t + ': ' + (g.steps || []).map(s => s.t).join(' ')).join('\n') : '';
+      return `Signed-in role: ${role()}.\n` + (P ? `Page purpose: ${P.purpose}\nHow-to guides for this page (use these exact button names):\n${G}\n` : '') + screenFacts(); }
     const r = route(), L = [`Signed-in role: ${role()}. Current page: ${pageName(r)} {{${r}}}.`];
     const cp = r === 'programmes' && A() && A().cur ? progAll().find(p => p.id === A().cur()) : null;
     if (cp) L.push(progFacts(cp));
@@ -237,7 +258,7 @@
   const wkKey = () => { const d = new Date(), k = new Date(d); k.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return 'week:' + me() + ':' + iso(k); };
   async function weekly(force) {
     const host = document.getElementById('view-mywork'); if (!host || host.hidden || !['admin', 'qa'].includes(role()) || !D().progs) return;
-    let c = document.getElementById('avawk'); if (!c) { const anchor = document.getElementById('mwov') || host.firstElementChild; anchor.insertAdjacentHTML('beforebegin', '<details class="card" id="avawk" style="margin-bottom:12px"><summary style="cursor:pointer;font-weight:700"><span style="color:#d9a400">✦</span> Ava\'s weekly brief</summary><div id="avawkb" style="margin-top:8px;font-size:14px;line-height:1.45"></div></details>'); c = document.getElementById('avawk'); }
+    let c = document.getElementById('avawk'); if (!c) { const anchor = document.getElementById('mwov') || host.firstElementChild; host.insertAdjacentHTML('beforeend', '<details class="card" id="avawk" style="margin-top:12px"><summary style="cursor:pointer;font-weight:700"><span style="color:#d9a400">✦</span> Ava\'s weekly brief</summary><div id="avawkb" style="margin-top:8px;font-size:14px;line-height:1.45"></div></details>'); c = document.getElementById('avawk'); }
     const b = document.getElementById('avawkb'), k = wkKey(), hit = cache.get(k);
     if (hit && !force) { b.innerHTML = fmt(hit.t) + `<div class="avsm">Written ${e(hit.at)} for this week. ${btn('Refresh', 'avaWeekly(1)')}</div>`; return; }
     if (weekly.busy) return; weekly.busy = 1; b.innerHTML = '<span class="avsm">Ava is writing this week\'s brief…</span>';
@@ -250,7 +271,7 @@
     const j = await call({ type: 'ava', mode: 'fill', question: `Write the text for the "${label}" field of this record, ready to paste into the form. Use only the facts in the context; where a fact is missing, leave a [placeholder] instead of guessing. Plain professional text, no greeting, no headings, no page links, under 150 words.${current && current.trim() ? ' Improve and complete this draft: ' + current.slice(0, 1500) : ''}`, page: pageName(route()), facts: String(facts || '').slice(0, 6000), history: [] });
     usage(); return String(j.answer || '').replace(/\{\{\w+\}\}/g, '').trim();
   };
-  const PMODE = { attention: 'What needs my attention?', brief: 'Give me a brief of where things stand', page: 'Explain this page', draft: 'Draft a follow-up message about what needs attention' };
+  const PMODE = { attention: 'What needs my attention?', brief: 'Give me a brief of where things stand', page: 'Explain this page', draft: 'Draft a follow-up message about what needs attention', screen: 'Help me with what is on my screen: what can I do here and what is my next step?' };
   async function ask(text, mode = 'ask', refresh) {
     if (S.busy) return; const q = String(text || '').trim(); if (!q && mode === 'ask') return;
     if (mode === 'ask') { const lf = faq(q); if (lf) { S.msgs.push({ r: 'u', t: q }); S.msgs.push({ r: 'a', t: lf, local: 1 }); save(); render(true); return; }
@@ -262,7 +283,7 @@
     S.busy = true; S.msgs.push({ r: 'u', t: q || PMODE[mode] }); render(true);
     try {
       const hist = S.msgs.slice(-7, -1).map(m => ({ r: m.r, t: String(m.t).slice(0, 1200) }));
-      const j = await call({ type: 'ava', mode, question: q || PMODE[mode], page: pageName(route()), facts: context(mode), history: hist });
+      const j = await call({ type: 'ava', mode: mode === 'screen' ? 'ask' : mode, question: q || PMODE[mode], page: pageName(route()), facts: context(mode), history: hist });
       const m = { r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers }; S.msgs.push(m);
       if (ck && j.answer) { const at = new Date().toTimeString().slice(0, 5); cache.set(ck, { t: m.t, un: m.un, at }); m.cached = ck; m.at = at; m.fresh = 1; }
     } catch (err) { S.msgs.push({ r: 'a', html: fallback(q || PMODE[mode], mode, err.message), local: 1 }); log(q || PMODE[mode], 'AI failed: ' + String(err.message).slice(0, 200)); }
@@ -299,7 +320,7 @@
     return ids.length ? `<div class="avact">${ids.map(p => btn(`What's missing on ${pid(p)}?`, `avaMissing(${p.id})`)).join(' ')}</div>` : ''; };
   window.avaGoP = id => { location.hash = 'programmes'; setTimeout(() => { A() && A().setProg(id); window.dvProg && dvProg(id); }, 60); };
   function chips() {
-    const r = route(), c = [['What needs my attention?', "avaMode('attention')"], ['Explain this page', "avaMode('page')"]];
+    const r = route(), c = [['What needs my attention?', "avaMode('attention')"], ['Explain this page', "avaMode('page')"], ['Ask about this screen', "avaScreen()"]];
     if (role() === 'admin' || role() === 'qa') c.push(['Brief me', "avaMode('brief')"]);
     const cp = r === 'programmes' && A() && A().cur ? progAll().find(p => p.id === A().cur()) : null;
     if (cp) { const n = pid(cp), id = cp.id; c.push([`Summarise ${n}`, `avaTool('Summarise ${n}',{type:'programme_summary',programme_id:${id}},'narrative')`], [`Attendance ${n}`, `avaTool('Attendance analysis ${n}',{type:'attendance_analysis',programme_id:${id}},'narrative')`]);
@@ -320,15 +341,17 @@
     const m = box.querySelector('#avamsgs');
     if (how) { m.innerHTML = howHtml(); box.querySelector('#avasend').disabled = S.busy; if (scroll) m.scrollTop = 0; return; }
     m.innerHTML = (S.msgs.length ? '' : `<div class="avhi"><b>Hi, I'm Ava.</b><p>Open <b>How to</b> for step-by-step help on this page (I tick each step as you do it), or click any amber or red flag to see why it shows.</p><p>Ask me how to do something in ApexOne, what needs your attention, or what a page or flag means. On a programme page I can summarise it and check attendance, EISA readiness and PoE gaps.</p><p class="avsm">I use the free AI tier, so I never send learner names, ID numbers, emails or phone numbers. Please don't type them. I can make mistakes: check before you act.</p></div>`)
-      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.shared ? `<div class="avsm">Answer other staff marked helpful (${x.shared} 👍, no AI used).</div>` : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button>${x.html || x.local ? '' : x.rated ? `<span class="avsm"> · ${x.rated > 0 ? '👍' : '👎'} thanks</span>` : ` <button type="button" title="Helpful" onclick="avaRate(${i},1)">👍</button> <button type="button" title="Wrong or not helpful" onclick="avaRate(${i},-1)">👎</button>`}</div>` : ''}</div>`).join('')
+      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.shared ? `<div class="avsm">Answer other staff marked helpful (${x.shared} 👍, no AI used).</div>` : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button>${window.apxFlowFromAva && !x.html && !x.err ? ` <button type="button" title="Turn this answer into Flow steps you can tick off" onclick="avaToFlow(${i})">+ Action in Flow</button>` : ''}${x.html || x.local ? '' : x.rated ? `<span class="avsm"> · ${x.rated > 0 ? '👍' : '👎'} thanks</span>` : ` <button type="button" title="Helpful" onclick="avaRate(${i},1)">👍</button> <button type="button" title="Wrong or not helpful" onclick="avaRate(${i},-1)">👎</button>`}</div>` : ''}</div>`).join('')
       + (S.busy ? '<div class="avm a avdots"><span></span><span></span><span></span></div>' : '');
     box.querySelector('#avasend').disabled = S.busy;
     if (scroll) m.scrollTop = m.scrollHeight;
   }
   window.avaMode = m => { S.tab = 'chat'; ask('', m); };
   window.avaRefresh = m => ask('', m, true);
+  window.avaScreen = () => { const i = document.getElementById('avain'), v = i ? i.value.trim() : ''; if (i) i.value = ''; S.tab = 'chat'; return ask(v, 'screen'); };
   window.avaTool = (...a) => { S.tab = 'chat'; return tool(...a); };
   window.avaHow = () => { const i = document.getElementById('avain'); i.value = 'How do I '; i.focus(); };
+  window.avaToFlow = i => { const m = S.msgs[i]; if (!m || !window.apxFlowFromAva) return; let q = ''; for (let k = i - 1; k >= 0; k--) if (S.msgs[k].r === 'u') { q = S.msgs[k].t; break; } apxFlowFromAva(q, m.t); };
   window.avaCopy = i => { const t = (S.msgs[i] || {}).t || ''; navigator.clipboard.writeText(t).then(() => window.toast && toast('Copied'), () => {}); };
   window.avaClear = () => { S.msgs = []; save(); render(); };
   window.avaToggle = open => {

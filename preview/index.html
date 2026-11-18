@@ -9,7 +9,28 @@ var c=navigator.clipboard,o=c&&c.writeText&&c.writeText.bind(c);
 var fb=function(t){var x=document.createElement('textarea');x.value=t;x.style.cssText='position:fixed;opacity:0';document.body.appendChild(x);x.select();var k=false;try{k=document.execCommand('copy')}catch(e){}x.remove();return k?Promise.resolve():Promise.reject(new Error('copy blocked'))};
 try{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:function(t){return o?o(t).catch(function(){return fb(t)}):fb(t)},readText:c&&c.readText&&c.readText.bind(c)}})}catch(e){}
 })();</script>
-<style>html.embed .side{display:none!important}#plist .pick{padding:7px 10px;gap:2px}#plist .pick b{font-size:14px;line-height:1.3}#plist .pickgh{margin-top:4px}</style>
+<style>html.embed .side{display:none!important}#plist .pick{padding:7px 10px;gap:2px}#plist .pick b{font-size:14px;line-height:1.3}#plist .pickgh{margin-top:4px}
+/* Features shared with /next/: count badges, Coming up, step tracker */
+.navcnt{margin-left:auto;font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px;min-width:20px;text-align:center}
+.navcnt.r{background:var(--badbg);color:var(--bad)}.navcnt.a{background:var(--warnbg);color:var(--warn)}
+.app.rail .navcnt{display:none}
+#ptabs .navcnt{margin-left:4px}
+#pstep{flex:1 1 100%;width:100%;min-width:0}
+#pstep .psteps li{white-space:nowrap}
+.ptsep{width:1px;align-self:stretch;background:var(--line);margin:6px 8px;flex-shrink:0}
+.cuh{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:baseline;gap:8px;margin-bottom:8px}
+.cutiles{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:6px}
+.cut{flex:1 1 140px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;display:flex;flex-direction:column;gap:2px}
+.cut b{font-size:24px;line-height:1.1}.cut span{font-weight:600;font-size:13px}.cut small{font-size:12px;color:var(--muted)}
+.cut.r b{color:var(--bad)}.cut.a b{color:var(--warn)}
+.cur{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 0;border-top:1px solid var(--line2)}
+.cux{flex:1 1 240px;min-width:0;display:flex;flex-direction:column;gap:2px}
+.psteps{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:6px}
+.psteps li{display:flex;gap:6px;align-items:center;font-size:12.5px;font-weight:600;color:var(--muted);background:var(--line2);border-radius:999px;padding:3px 10px 3px 4px}
+.psteps li span{width:20px;height:20px;border-radius:50%;display:grid;place-items:center;background:var(--surface);font-size:11px}
+.psteps li.done{color:var(--ok);background:var(--okbg)}
+.psteps li.cur{background:var(--navy);color:#fff}.psteps li.cur span{background:var(--yellow);color:var(--navy)}
+</style>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>ApexOne</title>
@@ -432,6 +453,8 @@ tr[onclick]{cursor:pointer}tr[onclick]:hover td,tr.famtr:hover td{background:var
         <div id="mwroles" class="seg" role="group" aria-label="View as role"></div>
       </div>
       <div id="mwbanner"></div>
+      <div id="mwprep"></div>
+      <div id="mwcu"></div>
       <div id="mwov"></div>
       <div class="row" style="align-items:flex-start">
         <section class="card" style="flex:2 1 480px;padding:0;overflow:hidden"><div class="mwhead" id="mwhead"></div><div id="mwtasks"></div></section>
@@ -1266,21 +1289,22 @@ function learnerRules(){return `<div class="row">
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261118s"></script>
 <script src="intake.js?v=20261119g"></script>
-<script src="delivery.js?v=20261118p"></script>
+<script src="flow.js?v=20261119s"></script>
+<script src="delivery.js?v=20261119s"></script>
 <script src="handover.js?v=20261117ho7"></script>
 <script src="inbox.js?v=20261117c"></script>
-<script src="shell.js?v=20261117z"></script>
-<script src="today.js?v=20261118j"></script>
+<script src="shell.js?v=20261119s"></script>
+<script src="today.js?v=20261119s"></script>
 <script src="desk.js?v=20261116b"></script>
 <script src="progdocs.js?v=20261117ho5"></script>
 <script src="admin.js?v=20261117z"></script>
 <script src="reports.js?v=20261116a"></script>
 <script src="pager.js?v=20261118q"></script>
-<script src="ava-kb.js?v=20261117ho1"></script>
-<script src="ava.js?v=20261118j"></script>
-<script src="ava-cmd.js?v=20261117ho1"></script>
+<script src="ava-kb.js?v=20261119s"></script>
+<script src="ava.js?v=20261119s"></script>
+<script src="ava-cmd.js?v=20261119s"></script>
 <script src="ava-coach.js?v=20261117z"></script>
-<script src="ava-night.js?v=20261117a"></script>
+<script src="ava-night.js?v=20261119s"></script>
 <script src="autofill.js?v=20261116f"></script>
 </body>
 </html>
