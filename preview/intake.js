@@ -5,7 +5,7 @@
    enrolment in ApexOne (relay action 'enrol', which only reads the candidate task). Eligibility is fixed rules, no AI. */
 (function () {
   if (window.__intake) return; window.__intake = 1;
-  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false, all: false }, rows: 25 };
+  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false, all: false, emp: false }, rows: 25 };
   const $ = id => document.getElementById(id);
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -41,8 +41,11 @@
   const eligible = p => { const n = nqfN(p), pw = pwdProg(p), pp = progProv(p);
     return I.C.filter(c => ready(c) && candF(c) && fitsLevel(c, n) && (!pw || c.pwd))
       .sort((a, b) => (pp ? (provOf(b.province) === pp) - (provOf(a.province) === pp) : 0) || wait(b) - wait(a)); };
-  const places = p => { const tg = +p.group_size || 0, en = I.EN.get(p.id) || 0, pl = (I.P || []).filter(x => x.programme_id === p.id && x.status === 'placed').length; return { tg, en, pl, open: Math.max(0, tg - en - pl) }; };
-  const needs = p => { const s = places(p); return s.tg > 0 && s.open > 0 && p.start_date >= today() && p.start_date <= addD(today(), 30); };
+  /* employment status from the PM masterlist: unemployed and mixed cohorts are filled from candidates; employed cohorts are the client's own staff (top-up only, hidden by default) */
+  const empK = p => { const v = String((p.fields || {}).employment || '').toLowerCase(); return !v ? '' : /un\s*\/\s*em|&|\band\b|mix|\d.*employ.*\d/.test(v) || (/unemploy/.test(v) && /(^|[^n])employ/.test(v.replace(/unemploy/g, ''))) ? 'mixed' : /unemp|unempl/.test(v) ? 'unemp' : /empl|emply/.test(v) ? 'emp' : ''; };
+  const notLoaded = p => /^done$/i.test(String((p.fields || {}).learnersEnrolled || '').trim()) && !(I.EN.get(p.id) || 0);
+  const places = p => { const tg = +p.group_size || 0, en = I.EN.get(p.id) || 0, pl = (I.P || []).filter(x => x.programme_id === p.id && x.status === 'placed').length, nl = notLoaded(p); return { tg, en, pl, nl, open: nl ? 0 : Math.max(0, tg - en - pl) }; };
+  const needs = p => { const s = places(p); return empK(p) !== 'emp' && s.tg > 0 && s.open > 0 && p.start_date >= today() && p.start_date <= addD(today(), 30); };
 
   /* ---------- data ---------- */
   async function load(force) {
@@ -72,7 +75,7 @@
     if (k === 'tab') { I.tab = v; I.more = 0; } else if (k === 'sel') { I.sel = I.sel === v ? null : v; I.more = 0; }
     else if (k === 'wk') I.wk = +v; else if (k === 'move') I.from = addD(I.from, v * 7); else if (k === 'today') I.from = monday(today());
     else if (k === 'pool') { I.pool = I.pool === v ? '' : v; I.more = 0; } else if (k === 'more') I.more++;
-    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; I.rows = 25; } else if (k === 'all') { I.f.all = !I.f.all; I.rows = 25; } else if (k === 'rows') I.rows += 25; else if (k === 'refresh') { load(true); return; }
+    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; I.rows = 25; } else if (k === 'all') { I.f.all = !I.f.all; I.rows = 25; } else if (k === 'emp') { I.f.emp = !I.f.emp; I.rows = 25; } else if (k === 'rows') I.rows += 25; else if (k === 'refresh') { load(true); return; }
     else if (k in I.f) { I.f[k] = k === 'pwd' || k === 'bpwd' ? !!v : v; I.more = 0; }
     paint();
   };
@@ -104,7 +107,7 @@
 
   function progRows() {
     const q = I.f.q.toLowerCase();
-    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p)) && (I.f.all || I.f.need || (places(p).tg > 0 && places(p).open > 0))
+    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p)) && (I.f.emp || empK(p) !== 'emp') && (I.f.all || I.f.need || (places(p).tg > 0 && places(p).open > 0))
       && (!q || I.tab !== 'time' || `${p.programme_name} ${p.display_id || ''} ${p.group_name || ''} ${(I.CL.get(p.client_id) || {}).client_name || ''}`.toLowerCase().includes(q)));
   }
   function timeline() {
@@ -114,16 +117,16 @@
     const PW = P.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)), nAll = I.PR.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)).length;
     const rows = PW.slice(0, I.rows).map(p => {
       const s = places(p), l = x(p.start_date > from ? p.start_date : from), r = p.end_date ? x(p.end_date < to ? p.end_date : to) : 100;
-      const cls = !s.tg ? 'n' : !s.open ? 'ok' : needs(p) ? 'bad' : 'warn', cl = (I.CL.get(p.client_id) || {}).client_name || '';
-      const lab = s.tg ? `${s.en + s.pl} / ${s.tg}${s.open ? ` · ${s.open} open` : ' · full'}` : `${s.en} enrolled · no target`;
-      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e([p.programme_name, p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}">${e(p.programme_name)} <span class="sub">${e([cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}</span></button>`
+      const cls = !s.tg || s.nl ? 'n' : !s.open ? 'ok' : needs(p) ? 'bad' : 'warn', ek = empK(p), cl = (I.CL.get(p.client_id) || {}).client_name || '';
+      const lab = s.nl ? 'Enrolled per PM Tracker – list not loaded' : s.tg ? `${s.en + s.pl} / ${s.tg}${s.open ? ` · ${s.open} open` : ' · full'}` : `${s.en} enrolled · no target`;
+      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e([p.programme_name, p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}">${e(p.programme_name)} <span class="sub">${e([cl, nqfN(p) ? 'NQF ' + nqfN(p) : '', ek === 'mixed' ? 'Mixed' : ek === 'emp' ? 'Employed (top-up)' : ek ? '' : 'Status not set'].filter(Boolean).join(' · '))}</span></button>`
         + `<div class="inttrack">${tp != null ? `<i class="inttoday" style="left:${tp}%"></i>` : ''}<button type="button" class="intbar ${cls}" style="left:${l}%;width:${Math.max(r - l, 2)}%" onclick="intk('sel',${p.id})" title="${e(`${p.programme_name}\n${fmt(p.start_date)} – ${fmt(p.end_date)}\n${lab}`)}">${e(lab)}</button></div></div>`;
     }).join('');
     return `<div class="intnav"><button class="btn sm" onclick="intk('move',-${step})">‹</button><button class="btn sm" onclick="intk('today')">Today</button><button class="btn sm" onclick="intk('move',${step})">›</button>
       <span class="sub" style="flex-grow:1">${fmt(from)} – ${fmt(addD(to, -1))}</span>${[4, 13, 26].map(w => `<button class="btn sm${I.wk === w ? ' on' : ''}" onclick="intk('wk',${w})">${w} wk</button>`).join('')}</div>
       <div class="introw inthead"><div class="intname"></div><div class="inttrack">${wks.map((w, i) => i % step ? '' : `<span style="left:${x(w)}%">${fmt(w).replace(/ \d{4}$/, '')}</span>`).join('')}</div></div>
       ${rows || '<div class="sub" style="padding:18px">No programmes in this window for these filters.</div>'}
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">${PW.length > I.rows ? `<button class="btn sm" onclick="intk('rows')">Show ${Math.min(25, PW.length - I.rows)} more (${PW.length - I.rows} left)</button>` : ''}<button class="btn sm" onclick="intk('all')">${I.f.all ? 'Show only programmes needing learners' : `Show all ${nAll} programmes`}</button><span class="sub">${I.f.all ? 'Showing every programme in this window.' : I.f.need ? 'Showing programmes starting within 30 days with places open.' : 'Showing programmes with learner places open.'}</span></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">${PW.length > I.rows ? `<button class="btn sm" onclick="intk('rows')">Show ${Math.min(25, PW.length - I.rows)} more (${PW.length - I.rows} left)</button>` : ''}<button class="btn sm" onclick="intk('emp')">${I.f.emp ? 'Hide employed cohorts' : 'Include employed cohorts (top-up)'}</button><button class="btn sm" onclick="intk('all')">${I.f.all ? 'Show only programmes needing learners' : `Show all ${nAll} programmes`}</button><span class="sub">${I.f.all ? 'Showing every programme in this window.' : I.f.need ? 'Showing programmes starting within 30 days with places open.' : 'Showing unemployed and mixed cohorts with learner places open.'}</span></div>
       <div class="sub" style="margin-top:8px">Bars: <b>enrolled + placed / target</b> (programme group size). Red = starts within 30 days with places open, amber = places open, green = full, grey = no target set.</div>`;
   }
   function panel() {
@@ -192,11 +195,11 @@
   /* menu count = programmes starting within 30 days with places open (same rule as the chip); menu item hidden for non-admins */
   const nav = () => { try { renderNav(curNav); } catch (_) {} };
   async function navCount() { if (!isAdmin()) return; try { const t = today();
-    const { data: P } = await sb().from('programmes').select('id,group_size,status').is('deleted_at', null).gte('start_date', t).lte('start_date', addD(t, 30)).gt('group_size', 0);
-    const L = (P || []).filter(p => String(p.status || '') !== 'closed'), ids = L.map(p => p.id), c = new Map();
+    const { data: P } = await sb().from('programmes').select('id,group_size,status,fields').is('deleted_at', null).gte('start_date', t).lte('start_date', addD(t, 30)).gt('group_size', 0);
+    const L = (P || []).filter(p => String(p.status || '') !== 'closed' && empK(p) !== 'emp'), ids = L.map(p => p.id), c = new Map();
     if (ids.length) { const [{ data: E }, { data: Q }] = await Promise.all([sb().from('enrolments').select('programme_id,status').in('programme_id', ids), sb().from('intake_placements').select('programme_id').eq('status', 'placed').in('programme_id', ids)]);
       (E || []).forEach(x => { if ((x.status || 'active') === 'active') c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1); }); (Q || []).forEach(x => c.set(x.programme_id, (c.get(x.programme_id) || 0) + 1)); }
-    I.navN = L.filter(p => p.group_size > (c.get(p.id) || 0)).length; nav(); } catch (_) {} }
+    I.navN = L.filter(p => !(/^done$/i.test(String((p.fields || {}).learnersEnrolled || '').trim()) && !(c.get(p.id) || 0)) && p.group_size > (c.get(p.id) || 0)).length; nav(); } catch (_) {} }
   const navN = () => I.st === 'ok' ? I.PR.filter(needs).length : (I.navN || 0);
   const wrapDot = () => { const f = window.apxNavDot; if (!f || f.__intk) return; const g = r => { if (r !== 'intake') return f(r); const n = navN();
     return n ? `<span class="navcnt r" aria-label="${n} programmes start within 30 days with places open">${n}</span>` : ''; }; g.__intk = 1; window.apxNavDot = g; };
