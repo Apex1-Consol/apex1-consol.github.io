@@ -994,7 +994,7 @@
   const loadDem = () => { if (S.DEM) return; S.DEM = { st: 'loading' };
     (async () => { try { const { data, error } = await sb.functions.invoke(RELAY, { body: {} });
       S.DEM = error ? { st: 'err' } : data?.ok ? { st: 'ok', at: data.at, C: data.candidates || [] } : { st: data?.reason === 'not_connected' ? 'off' : 'err' };
-    } catch (_) { S.DEM = { st: 'err' }; } renderCov(); if (TD && typeof renderToday === 'function') renderToday(); })(); };
+    } catch (_) { S.DEM = { st: 'err' }; } renderCov(); recPaint(); if (TD && typeof renderToday === 'function') renderToday(); })(); };
   const demRows = () => { if (S.DEM?.st !== 'ok') return []; const g = new Map(), t = today();
     S.DEM.C.filter(c => !DEMX.test(c.status)).forEach(c => { const k = (c.programme || '').trim(); if (!g.has(k)) g.set(k, []); g.get(k).push(c); });
     return [...g].map(([k, L]) => { const rec = L.filter(c => DEMR.test(c.status)).length, st = L.map(c => c.start).filter(Boolean).sort();
@@ -1020,8 +1020,26 @@
     const L = demRows().filter(r => r.k && r.start && r.start >= t && r.start <= t30 && (!r.matched || r.n <= 1));
     return L.length ? `<section class="card" style="padding:12px 14px"><h3>Learner demand <span class="badge">${L.length}</span></h3>${L.map(r => `<div class="tdi"><div><b>${e(r.k)}</b> <span class="sub">· starts ${fmt(r.start)} · ${r.L.length} learner${r.L.length === 1 ? '' : 's'}</span> ${demRisk(r)}</div></div>`).join('')}</section>` : ''; };
   window.famDemT = o => { S.demOpen = o; };
-  window.famDemL = i => { S.demL = S.demL === i ? null : i; S.demOpen = true; renderCov(); };
-  window.famDemR = () => { S.DEM = null; S.demOpen = true; renderCov(); };
+  window.famDemL = i => { S.demL = S.demL === i ? null : i; S.demOpen = true; recPaint(); };
+  window.famDemR = () => { S.DEM = null; S.demOpen = true; recPaint(); };
+  /* Recruitment pipeline card on My work (admin only), moved from FAM 18 Nov: candidates are not assigned learners, so no cover columns. */
+  function recPaint() {
+    const host = document.getElementById('view-mywork'); if (!host || host.hidden || !window.apxRole || apxRole() !== 'admin') return;
+    let c = document.getElementById('recpipe');
+    if (!c) { const a = document.getElementById('mwov') || host.firstElementChild; if (!a) return; a.insertAdjacentHTML('beforebegin', '<div id="recpipe"></div>'); c = document.getElementById('recpipe'); }
+    loadDem(); const D = S.DEM, head = sub => `<details class="card" style="margin-bottom:12px"${S.demOpen ? ' open' : ''} ontoggle="famDemT(this.open)"><summary style="cursor:pointer"><b>Recruitment pipeline</b> <span class="sub">${sub}</span></summary>`;
+    if (D.st === 'loading') { c.innerHTML = head('Loading from ClickUp…') + '</details>'; return; }
+    if (D.st === 'off') { c.innerHTML = head('ClickUp not connected') + '</details>'; return; }
+    if (D.st !== 'ok') { c.innerHTML = head('Could not load from ClickUp') + '<div style="margin-top:8px"><button class="btn sm" onclick="famDemR()">Try again</button></div></details>'; return; }
+    const R = demRows(), tot = R.reduce((t, r) => t + r.L.length, 0), rec = R.reduce((t, r) => t + r.rec, 0), none = R.filter(r => !r.k).reduce((t, r) => t + r.L.length, 0);
+    const row = (r, i) => `<tr><td>${r.k ? e(r.k) : '<span class="sub">No programme yet</span>'}</td><td>${r.rec}</td><td>${r.pipe}</td><td>${r.start ? fmt(r.start) : '—'}</td><td><button class="btn sm" onclick="famDemL(${i})">${S.demL === i ? 'Hide' : 'People'}</button></td></tr>`
+      + (S.demL === i ? `<tr><td colspan="5"><div class="tw"><table class="dense"><thead><tr><th>Name</th><th>Status</th><th>Client</th><th>Province</th><th>Start</th><th></th></tr></thead><tbody>${r.L.map(x => `<tr><td>${e(x.name)}</td><td>${e(x.status)}</td><td>${e(x.client || '—')}</td><td>${e(x.province || '—')}</td><td>${x.start ? fmt(x.start) : '—'}</td><td>${/^https:\/\/app\.clickup\.com\//.test(x.url) ? `<a href="${e(x.url)}" target="_blank" rel="noopener">View in ClickUp</a>` : ''}</td></tr>`).join('')}</tbody></table></div></td></tr>` : '');
+    c.innerHTML = head(`${tot} active candidate${tot === 1 ? '' : 's'} · ${rec} recruited${none ? ` · ${none} without a programme` : ''}`)
+      + `<div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>Programme (ClickUp)</th><th>Recruited</th><th>In pipeline</th><th>Earliest start</th><th></th></tr></thead><tbody>${R.map(row).join('') || '<tr><td colspan="5" class="sub">No active candidates.</td></tr>'}</tbody></table></div>
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famDemR()">Refresh</button><span class="sub">Read-only from ClickUp › Recruitment Candidates${D.at ? ' · ' + fmt(D.at.slice(0, 10)) + ' ' + D.at.slice(11, 16) + ' UTC' : ''}. Unsuitable, exited and archived candidates are not counted. Candidates are not yet assigned learners.</span></div></details>`;
+  }
+  window.addEventListener('hashchange', () => setTimeout(recPaint, 450));
+  (function recWait(n) { if (window.apxRole && document.getElementById('mwtasks')) setTimeout(recPaint, 450); else if (n < 60) setTimeout(() => recWait(n + 1), 1000); })(0);
   function renderCov() {
     const box = $('famcov'); if (!box) return;
     const t = today(), in90 = new Date(Date.now() + 90 * 864e5).toISOString().slice(0, 10), R = visR(), rows = [];
@@ -1034,7 +1052,7 @@
     const flag = (n, l) => l === 0 ? '<span class="badge b-bad">No cover</span>' : l === 1 ? '<span class="badge b-warn">Single person</span>' : n > l ? '<span class="badge b-warn">Dropping</span>' : '<span class="badge b-ok">Covered</span>';
     box.innerHTML = `<details class="card" style="padding:14px 18px"${S.covOpen ? ' open' : ''} ontoggle="famCovT(this.open)"><summary style="cursor:pointer"><b>Coverage forecast</b> <span class="sub">${risky.length ? `${risky.length} SETA + role combination${risky.length === 1 ? '' : 's'} will have 0–1 registered people in 90 days` : 'Every SETA + role has at least 2 registered people in 90 days'}</span></summary>
       <div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>SETA</th><th>Role</th><th>Registered now</th><th>In 90 days</th><th>Risk</th></tr></thead><tbody>${show.map(([st, r, n, l]) => `<tr><td>${e(st)}</td><td>${r}</td><td>${n}</td><td>${l}</td><td>${flag(n, l)}</td></tr>`).join('') || '<tr><td colspan="5" class="sub">Nothing at risk.</td></tr>'}</tbody></table></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>${spofHtml()}${demHtml()}`;
+      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famCovAll()">${S.covAll ? 'Show only at risk' : `Show all ${rows.length}`}</button><span class="sub">Counts active registrations with an expiry date; ones without an expiry date are not counted.</span></div></details>${spofHtml()}`;
   }
   window.famCovT = o => { S.covOpen = o; };
   window.famCovAll = () => { S.covAll = !S.covAll; S.covOpen = true; renderCov(); };
@@ -1681,7 +1699,7 @@
     el.innerHTML = `<div style="display:flex;align-items:center;gap:8px"><h2>Today</h2>${canWrite() ? `<button class="btn sm y" onclick="TDadd()"${TD.add ? ' aria-pressed="true"' : ''}>+ Add follow-up</button>` : ''}<button class="btn sm" onclick="toggleRP(false)" aria-label="Close">✕</button></div>
       <div class="sub" style="margin-top:-8px">${fmt(t)} · ${live.length} to act on</div><div class="tdchips">${chips}</div>${form}
       ${body || `<div class="card" style="padding:18px;text-align:center">${cf || TD.snz ? 'Nothing here.' : 'Nothing due. ✓'}</div>`}
-      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${demToday()}${done}`;
+      ${nIss && !cf && !TD.snz ? `<button class="btn" style="justify-content:flex-start" onclick="famTodayCover('','issues')">${nIss} data issue${nIss === 1 ? '' : 's'} → Duplicates and data issues</button>` : ''}${done}`;
     if (TD.add) el.querySelector('form select')?.focus();
   }
   window.TDf = k => { TD.snz = false; TD.f = TD.f === k ? null : k; renderToday(); };
