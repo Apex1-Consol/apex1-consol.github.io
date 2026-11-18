@@ -1027,16 +1027,10 @@
     const host = document.getElementById('view-mywork'); if (!host || host.hidden || !window.apxRole || apxRole() !== 'admin') return;
     let c = document.getElementById('recpipe');
     if (!c) { const a = document.getElementById('mwov') || host.firstElementChild; if (!a) return; a.insertAdjacentHTML('beforebegin', '<div id="recpipe"></div>'); c = document.getElementById('recpipe'); }
-    loadDem(); const D = S.DEM, head = sub => `<details class="card" style="margin-bottom:12px"${S.demOpen ? ' open' : ''} ontoggle="famDemT(this.open)"><summary style="cursor:pointer"><b>Recruitment pipeline</b> <span class="sub">${sub}</span></summary>`;
-    if (D.st === 'loading') { c.innerHTML = head('Loading from ClickUp…') + '</details>'; return; }
-    if (D.st === 'off') { c.innerHTML = head('ClickUp not connected') + '</details>'; return; }
-    if (D.st !== 'ok') { c.innerHTML = head('Could not load from ClickUp') + '<div style="margin-top:8px"><button class="btn sm" onclick="famDemR()">Try again</button></div></details>'; return; }
-    const R = demRows(), tot = R.reduce((t, r) => t + r.L.length, 0), rec = R.reduce((t, r) => t + r.rec, 0), none = R.filter(r => !r.k).reduce((t, r) => t + r.L.length, 0);
-    const row = (r, i) => `<tr><td>${r.k ? e(r.k) : '<span class="sub">No programme yet</span>'}</td><td>${r.rec}</td><td>${r.pipe}</td><td>${r.start ? fmt(r.start) : '—'}</td><td><button class="btn sm" onclick="famDemL(${i})">${S.demL === i ? 'Hide' : 'People'}</button></td></tr>`
-      + (S.demL === i ? `<tr><td colspan="5"><div class="tw"><table class="dense"><thead><tr><th>Name</th><th>Status</th><th>Client</th><th>Province</th><th>Start</th><th></th></tr></thead><tbody>${r.L.map(x => `<tr><td>${e(x.name)}</td><td>${e(x.status)}</td><td>${e(x.client || '—')}</td><td>${e(x.province || '—')}</td><td>${x.start ? fmt(x.start) : '—'}</td><td>${/^https:\/\/app\.clickup\.com\//.test(x.url) ? `<a href="${e(x.url)}" target="_blank" rel="noopener">View in ClickUp</a>` : ''}</td></tr>`).join('')}</tbody></table></div></td></tr>` : '');
-    c.innerHTML = head(`${tot} active candidate${tot === 1 ? '' : 's'} · ${rec} recruited${none ? ` · ${none} without a programme` : ''}`)
-      + `<div class="tw" style="margin-top:10px"><table class="dense"><thead><tr><th>Programme (ClickUp)</th><th>Recruited</th><th>In pipeline</th><th>Earliest start</th><th></th></tr></thead><tbody>${R.map(row).join('') || '<tr><td colspan="5" class="sub">No active candidates.</td></tr>'}</tbody></table></div>
-      <div style="display:flex;gap:10px;align-items:center;margin-top:8px"><button class="btn sm" onclick="famDemR()">Refresh</button><span class="sub">Read-only from ClickUp › Recruitment Candidates${D.at ? ' · ' + fmt(D.at.slice(0, 10)) + ' ' + D.at.slice(11, 16) + ' UTC' : ''}. Unsuitable, exited and archived candidates are not counted. Candidates are not yet assigned learners.</span></div></details>`;
+    loadDem(); const D = S.DEM, t = today();
+    const L = D.st === 'ok' ? D.C.filter(x => !DEMX.test(x.status) && !DEMR.test(x.status) && !x.onP) : [], w30 = L.filter(x => x.created && (new Date(t) - new Date(x.created)) / 864e5 > 30).length;
+    const sub = D.st === 'loading' ? 'Loading from ClickUp…' : D.st !== 'ok' ? 'Could not load from ClickUp' : `${L.length} candidates available · ${w30} waiting 30+ days`;
+    c.innerHTML = `<a class="card" href="#intake" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding:12px 18px;margin-bottom:12px;text-decoration:none;color:inherit"><b>Recruitment pipeline</b> <span class="sub" style="flex-grow:1">${sub}</span><span>Open Learner intake →</span></a>`;
   }
   window.addEventListener('hashchange', () => setTimeout(recPaint, 450));
   (function recWait(n) { if (window.apxRole && document.getElementById('mwtasks')) setTimeout(recPaint, 450); else if (n < 60) setTimeout(() => recWait(n + 1), 1000); })(0);
