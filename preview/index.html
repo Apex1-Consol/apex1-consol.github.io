@@ -173,8 +173,8 @@ label.f textarea{border:1px solid var(--border2);border-radius:10px;padding:10px
 .famas{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--muted);background:var(--ground);border:1px dashed var(--line);border-radius:999px;padding:4px 10px;align-self:flex-start}
 .famas b{color:var(--ink)}
 table.dense th,table.dense td{white-space:nowrap;font-size:13px;padding:8px 10px}
-.cellsel,.fsel{height:34px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;padding:0 6px;background:var(--surface);color:var(--ink)}
-.cellsel.b-ok{background:var(--okbg);color:var(--ok)}.cellsel.b-warn{background:var(--warnbg);color:var(--warn)}.cellsel.b-bad{background:var(--badbg);color:var(--bad)}
+.cellsel,.fsel{max-width:100%;min-width:0;font-family:inherit;text-overflow:ellipsis;height:34px;border:1px solid var(--line);border-radius:8px;font-size:13px;font-weight:600;padding:0 6px;background:var(--surface);color:var(--ink)}
+.cellsel.b-n{background:var(--nbg,var(--surface))}.cellsel.b-ok{background:var(--okbg);color:var(--ok)}.cellsel.b-warn{background:var(--warnbg);color:var(--warn)}.cellsel.b-bad{background:var(--badbg);color:var(--bad)}
 .kv>span:last-child{margin-left:auto;text-align:right;min-width:0;overflow-wrap:anywhere}
 #form3,#leisa,#eisaready{display:flex;flex-direction:column;gap:16px}
 /* ---- brand shell (2026-10-22) ---- */
@@ -1261,7 +1261,7 @@ function learnerRules(){return `<div class="row">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="live.js?v=20261118a"></script>
-<script src="qa.js?v=20261118b"></script>
+<script src="qa.js?v=20261118k"></script>
 <script src="famcu.js?v=d2727e3"></script>
 <script src="fam.js?v=20261118i"></script>
 <script src="delivery.js?v=20261118d"></script>
