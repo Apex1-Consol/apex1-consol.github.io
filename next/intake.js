@@ -224,7 +224,7 @@
   const wrapDot = () => { const f = window.apxNavDot; if (!f || f.__intk) return; const g = r => { if (r !== 'intake') return f(r); const n = navN();
     return n ? `<span class="navcnt r" aria-label="${n} programmes start within 30 days with places open">${n}</span>` : ''; }; g.__intk = 1; window.apxNavDot = g; };
   /* recruitment-only users (not admin): menu = Learner intake only; every other app route sends them back to #intake */
-  const recOnly = () => isRec() && apxRole() !== 'admin', OKR = ['intake', 'login', 'privacy'];
+  const recOnly = () => isRec() && apxRole() !== 'admin', OKR = ['intake', 'flow', 'login', 'privacy'];
   function lock() { if (!recOnly()) return; try { Object.keys(ROUTES).forEach(r => { if (!OKR.includes(r)) NAVR[r] = () => false; }); } catch (_) {}
     if (!lock.on) { lock.on = 1; addEventListener('hashchange', () => { const r = location.hash.slice(1).split('/')[0]; if (r && !OKR.includes(r) && recOnly()) location.hash = 'intake'; }); }
     const r = location.hash.slice(1).split('/')[0]; if (!OKR.includes(r)) location.hash = 'intake'; }
