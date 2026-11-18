@@ -85,7 +85,8 @@
   }
   window.avaScreenFacts = screenFacts;
   function context(mode) {
-    if (mode === 'screen') return `Signed-in role: ${role()}.\n` + screenFacts();
+    if (mode === 'screen') { const P = KB() && KB().PAGES[route()], G = P ? Object.values(P.guides || {}).map(g => '- ' + g.t + ': ' + (g.steps || []).map(s => s.t).join(' ')).join('\n') : '';
+      return `Signed-in role: ${role()}.\n` + (P ? `Page purpose: ${P.purpose}\nHow-to guides for this page (use these exact button names):\n${G}\n` : '') + screenFacts(); }
     const r = route(), L = [`Signed-in role: ${role()}. Current page: ${pageName(r)} {{${r}}}.`];
     const cp = r === 'programmes' && A() && A().cur ? progAll().find(p => p.id === A().cur()) : null;
     if (cp) L.push(progFacts(cp));
@@ -340,7 +341,7 @@
     const m = box.querySelector('#avamsgs');
     if (how) { m.innerHTML = howHtml(); box.querySelector('#avasend').disabled = S.busy; if (scroll) m.scrollTop = 0; return; }
     m.innerHTML = (S.msgs.length ? '' : `<div class="avhi"><b>Hi, I'm Ava.</b><p>Open <b>How to</b> for step-by-step help on this page (I tick each step as you do it), or click any amber or red flag to see why it shows.</p><p>Ask me how to do something in ApexOne, what needs your attention, or what a page or flag means. On a programme page I can summarise it and check attendance, EISA readiness and PoE gaps.</p><p class="avsm">I use the free AI tier, so I never send learner names, ID numbers, emails or phone numbers. Please don't type them. I can make mistakes: check before you act.</p></div>`)
-      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.shared ? `<div class="avsm">Answer other staff marked helpful (${x.shared} 👍, no AI used).</div>` : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button>${x.html || x.local ? '' : x.rated ? `<span class="avsm"> · ${x.rated > 0 ? '👍' : '👎'} thanks</span>` : ` <button type="button" title="Helpful" onclick="avaRate(${i},1)">👍</button> <button type="button" title="Wrong or not helpful" onclick="avaRate(${i},-1)">👎</button>`}</div>` : ''}</div>`).join('')
+      + S.msgs.map((x, i) => `<div class="avm ${x.r}${x.err ? ' er' : ''}">${x.r === 'u' ? e(x.t) : x.html || fmt(x.t)}${x.local ? '<div class="avsm">Answered from ApexOne, no AI used.</div>' : ''}${x.shared ? `<div class="avsm">Answer other staff marked helpful (${x.shared} 👍, no AI used).</div>` : ''}${x.cached && !x.fresh ? `<div class="avsm">Saved answer from ${e(x.at || 'earlier')} (no AI used). ${btn('Refresh', `avaRefresh('${x.cached.startsWith('page') ? 'page' : 'brief'}')`)}</div>` : ''}${x.r === 'a' && !x.err && !x.html ? fixBtns(x.t) : ''}${x.un && x.un.length ? `<div class="avw">⚠ Check these numbers, I could not match them to ApexOne data: ${e(x.un.join(', '))}</div>` : ''}${x.r === 'a' && !x.err ? `<div class="avact"><button type="button" onclick="avaCopy(${i})">Copy</button>${window.apxFlowFromAva && !x.html && !x.err ? ` <button type="button" title="Turn this answer into Flow steps you can tick off" onclick="avaToFlow(${i})">+ Action in Flow</button>` : ''}${x.html || x.local ? '' : x.rated ? `<span class="avsm"> · ${x.rated > 0 ? '👍' : '👎'} thanks</span>` : ` <button type="button" title="Helpful" onclick="avaRate(${i},1)">👍</button> <button type="button" title="Wrong or not helpful" onclick="avaRate(${i},-1)">👎</button>`}</div>` : ''}</div>`).join('')
       + (S.busy ? '<div class="avm a avdots"><span></span><span></span><span></span></div>' : '');
     box.querySelector('#avasend').disabled = S.busy;
     if (scroll) m.scrollTop = m.scrollHeight;
@@ -350,6 +351,7 @@
   window.avaScreen = () => { const i = document.getElementById('avain'), v = i ? i.value.trim() : ''; if (i) i.value = ''; S.tab = 'chat'; return ask(v, 'screen'); };
   window.avaTool = (...a) => { S.tab = 'chat'; return tool(...a); };
   window.avaHow = () => { const i = document.getElementById('avain'); i.value = 'How do I '; i.focus(); };
+  window.avaToFlow = i => { const m = S.msgs[i]; if (!m || !window.apxFlowFromAva) return; let q = ''; for (let k = i - 1; k >= 0; k--) if (S.msgs[k].r === 'u') { q = S.msgs[k].t; break; } apxFlowFromAva(q, m.t); };
   window.avaCopy = i => { const t = (S.msgs[i] || {}).t || ''; navigator.clipboard.writeText(t).then(() => window.toast && toast('Copied'), () => {}); };
   window.avaClear = () => { S.msgs = []; save(); render(); };
   window.avaToggle = open => {

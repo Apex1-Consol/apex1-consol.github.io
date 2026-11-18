@@ -326,6 +326,55 @@ ${F.ref ? `<div class="flrefb">Showing items linked to <b>${e(F.refl || F.ref)}<
       d.innerHTML = `<b>My Flow</b><span>${s.open} open</span>${s.fresh ? `<span class="flnew">${s.fresh} new</span>` : ''}${s.urgent ? `<span style="color:#d13438;font-weight:600">${s.urgent} urgent</span>` : ''}${s.late ? `<span style="color:#d13438;font-weight:600">${s.late} overdue</span>` : ''}${s.today ? `<span>${s.today} due today</span>` : ''}${s.waiting ? `<span>${s.waiting} waiting on someone</span>` : ''}<span style="margin-left:auto;opacity:.7">Open →</span>`;
       d.onclick = () => { location.hash = 'flow'; }; v.insertBefore(d, v.firstChild); };
     put(); sumT = setInterval(put, 3000); }
+  /* ---------- Ava answer -> Flow: review list, one card with steps by default, one card per person when people are named ---------- */
+  async function fromAva(q, ans) { await staff();
+    if (!F.mine) { try { const x = await sb().from('flow_items').select('id,title,steps,history,status,owner_email').eq('owner_email', me()).neq('status', 'done').limit(400); F.mine = x.data || []; } catch (_) { F.mine = []; } }
+    const c = ctx(), clean = t => String(t).replace(/\{\{\w+\}\}/g, '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim();
+    let L = String(ans || '').split(/\n+/).map(x => x.trim()).filter(x => /^(?:[-*•]|\d+[.)])\s+/.test(x)).map(x => clean(x.replace(/^(?:[-*•]|\d+[.)])\s+/, '')));
+    if (L.length < 2) L = clean(ans).split(/(?<=[.!])\s+(?=[A-Z])/).filter(x => x.length > 12 && !/^(to |here|this |you can|i can|note)/i.test(x));
+    L = L.map(x => x.replace(/[:.]$/, '')).filter(x => x.length > 3 && x.length < 220).slice(0, 12);
+    if (!L.length) { toast('Nothing to turn into steps in this answer.'); return; }
+    const items = L.map(t => { const r = parse(t, c, null), ak = t.match(/\b(?:ask|tell|get|remind|email|call|let)\s+@?([A-Z][\w.'-]+)/), ap = ak && people(ak[1])[0], o = r.how.owner === 'named' ? r.owner : ap ? String(ap.email).toLowerCase() : null; return { t, on: true, owner: o, due: r.due, prio: r.prio }; });
+    const qt = clean(q).replace(/^(please\s+)?(how (do|can|should) (i|we)|what (do|should) (i|we)( do)?( to)?|can you( help me)?|help me( with| to)?|i want to|i need to|show me how to|tell me how to)\s+/i, '').replace(/[?.!]+$/, '');
+    const title0 = qt.length > 4 && !/^help me with what is on my screen/i.test(qt) ? qt.charAt(0).toUpperCase() + qt.slice(1, 160) : 'Next steps on ' + c.page;
+    const tpl0 = (KW.find(([re]) => re.test(q + ' ' + ans)) || [])[1] || RT[c.r] || 'custom';
+    const people = () => [...new Set(items.filter(i => i.on && i.owner).map(i => i.owner))];
+    let split = people().length >= 1 && people().some(o => o !== me()) && items.some(i => i.on && i.owner);
+    const ov = document.createElement('div'); ov.className = 'flov';
+    ov.innerHTML = `<div class="flm" role="dialog" aria-label="Action in Flow from Ava"><h2 style="margin:0 0 4px;font-size:18px">Action in Flow</h2><div style="font-size:12px;opacity:.7">From Ava's answer · ${e(c.page)}. Untick anything you don't need.</div>
+<label for="fa-t">What needs to happen</label><input id="fa-t" type="text" maxlength="200" value="${e(title0)}">
+<div id="fa-l" style="margin-top:8px"></div>
+<div id="fa-m" style="display:flex;gap:6px;margin-top:10px;flex-wrap:wrap"></div>
+<div style="display:flex;gap:10px"><div style="flex:1"><label for="fa-d">Due</label><input id="fa-d" type="date"></div><div style="flex:1;display:flex;align-items:flex-end"><label style="display:flex;gap:6px;align-items:center;font-weight:600"><input type="checkbox" id="fa-p" style="width:auto"> Urgent</label></div></div>
+<div id="fa-dup"></div><div id="fa-err" style="color:#d13438;font-size:13px;margin-top:6px"></div>
+<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px"><button class="btn" id="fa-x" type="button">Cancel</button><button class="btn primary" id="fa-s" type="button">Add to Flow</button></div></div>`;
+    document.body.appendChild(ov); const close = () => ov.remove(); ov.onclick = ev => { if (ev.target === ov) close(); }; $('fa-x').onclick = close;
+    const d0 = items.map(i => i.due).filter(Boolean).sort().pop(); if (d0) $('fa-d').value = d0; if (items.some(i => i.prio)) $('fa-p').checked = true;
+    const opt = sel => `<option value="">Me</option>${(F.staff || []).filter(s => String(s.email).toLowerCase() !== me()).map(s => { const m = String(s.email).toLowerCase(); return `<option value="${e(m)}"${m === sel ? ' selected' : ''}>${e(s.name)}</option>`; }).join('')}`;
+    const groups = () => { const on = items.filter(i => i.on); if (!split) return [{ owner: me(), list: on }]; const m = new Map(); on.forEach(i => { const k = i.owner || me(); if (!m.has(k)) m.set(k, []); m.get(k).push(i); }); return [...m].map(([owner, list]) => ({ owner, list })); };
+    function paintL() {
+      $('fa-l').innerHTML = items.map((i, k) => `<div class="flmini" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-k="${k}"${i.on ? ' checked' : ''} style="width:auto;margin-top:3px" aria-label="Include step"><span style="flex:1${i.on ? '' : ';opacity:.45;text-decoration:line-through'}">${e(i.t)}</span>${split ? `<select data-o="${k}" style="width:auto;max-width:140px;font-size:12px" aria-label="Owner">${opt(i.owner)}</select>` : ''}</div>`).join('');
+      $('fa-l').querySelectorAll('[data-k]').forEach(x => x.onchange = () => { items[+x.dataset.k].on = x.checked; paintL(); });
+      $('fa-l').querySelectorAll('[data-o]').forEach(x => x.onchange = () => { items[+x.dataset.o].owner = x.value || null; paintL(); });
+      const G = groups(), n = items.filter(i => i.on).length;
+      $('fa-m').innerHTML = `<button type="button" class="btn${split ? '' : ' primary'}" id="fa-one">One card, ${n} steps</button><button type="button" class="btn${split ? ' primary' : ''}" id="fa-sp">One card per person</button>` + (split ? `<span style="font-size:12px;opacity:.7;align-self:center">${G.length} card${G.length > 1 ? 's' : ''}: ${G.map(g => e(g.owner === me() ? 'Me' : nameOf(g.owner))).join(', ')}</span>` : '');
+      $('fa-one').onclick = () => { split = false; paintL(); }; $('fa-sp').onclick = () => { split = true; paintL(); };
+      $('fa-s').textContent = G.length > 1 ? 'Add ' + G.length + ' cards' : 'Add to Flow';
+      const t = $('fa-t').value, dup = !split && t.length > 5 && (F.mine || []).map(x => [x, sim(t, x.title)]).filter(([, v]) => v >= 0.5).sort((a, b) => b[1] - a[1])[0];
+      $('fa-dup').innerHTML = dup ? `<div class="fldup">Looks like an open item: <b>${e(dup[0].title)}</b> <button class="btn" type="button" id="fa-dupb">Add as steps there instead</button></div>` : '';
+      if (dup) $('fa-dupb').onclick = async () => { const x = dup[0], add = items.filter(i => i.on).map(i => ({ t: i.t, d: false }));
+        const { error } = await sb().from('flow_items').update({ steps: [...(x.steps || []), ...add], history: hist(x, 'Steps added from Ava: ' + add.length) }).eq('id', x.id); if (error) { $('fa-err').textContent = 'Not saved: ' + error.message; return; }
+        close(); toast('Added to "' + x.title.slice(0, 40) + '"'); F.mine = null; if (route() === 'flow') { await load(); paint(); } navCount(); chip2(); }; }
+    paintL(); $('fa-t').oninput = () => { clearTimeout(ov.tm); ov.tm = setTimeout(paintL, 200); };
+    $('fa-s').onclick = async () => { const t = $('fa-t').value.trim(), G = groups().filter(g => g.list.length), due = $('fa-d').value || null, prio = $('fa-p').checked;
+      if (!t) { $('fa-err').textContent = 'Enter what needs to happen first.'; return; } if (!G.length) { $('fa-err').textContent = 'Tick at least one step.'; return; }
+      const rows = G.map(g => ({ title: t.slice(0, 200), template: tpl0, owner_email: g.owner, due, repeat: null, prio, steps: sched(g.list.map(i => i.t), due), status: 'todo', waiting_on: null,
+        unread: g.owner !== me(), from_email: g.owner !== me() ? me() : null, ref_route: c.r === 'flow' ? null : c.hash, ref_label: c.r === 'flow' ? null : c.page + (c.lab && c.lab !== c.page ? ' · ' + c.lab : ''),
+        history: [{ at: new Date().toISOString(), by: me(), t: (g.owner === me() ? 'Created' : 'Created for ' + nameOf(g.owner)) + ' from an Ava answer' }] }));
+      const b = $('fa-s'); b.disabled = true; const { error } = await sb().from('flow_items').insert(rows); if (error) { b.disabled = false; $('fa-err').textContent = 'Not saved: ' + error.message; return; }
+      close(); F.mine = null; F.hist = null; F.sc = null; toast(rows.length > 1 ? rows.length + ' cards added' : rows[0].owner_email === me() ? 'Added to your Flow' : 'Added to ' + nameOf(rows[0].owner_email) + "'s Flow", () => { location.hash = 'flow'; });
+      if (route() === 'flow') { await load(); paint(); } navCount(); chip2(); }; }
+  window.apxFlowFromAva = fromAva;
   window.apxFlowAdd = openNew;
   window.apxFlowStats = () => { if (F.st !== 'ok') return null; const o = F.items.filter(x => x.status !== 'done'); return { open: o.length, late: o.filter(late).length, stuck: o.filter(stuck).length, waiting: o.filter(x => x.status === 'waiting').length, all: !!F.all }; };
   window.apxFlowView = (all, stk) => { F.all = !!all && isAdmin(); F.stuck = !!stk; F.open = null; F.st = 'idle'; paint(); };
