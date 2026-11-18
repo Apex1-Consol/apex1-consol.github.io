@@ -5,7 +5,7 @@
    enrolment in ApexOne (relay action 'enrol', which only reads the candidate task). Eligibility is fixed rules, no AI. */
 (function () {
   if (window.__intake) return; window.__intake = 1;
-  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false } };
+  const I = { st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false, all: false }, rows: 25 };
   const $ = id => document.getElementById(id);
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -72,7 +72,7 @@
     if (k === 'tab') { I.tab = v; I.more = 0; } else if (k === 'sel') { I.sel = I.sel === v ? null : v; I.more = 0; }
     else if (k === 'wk') I.wk = +v; else if (k === 'move') I.from = addD(I.from, v * 7); else if (k === 'today') I.from = monday(today());
     else if (k === 'pool') { I.pool = I.pool === v ? '' : v; I.more = 0; } else if (k === 'more') I.more++;
-    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; } else if (k === 'refresh') { load(true); return; }
+    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; I.rows = 25; } else if (k === 'all') { I.f.all = !I.f.all; I.rows = 25; } else if (k === 'rows') I.rows += 25; else if (k === 'refresh') { load(true); return; }
     else if (k in I.f) { I.f[k] = k === 'pwd' || k === 'bpwd' ? !!v : v; I.more = 0; }
     paint();
   };
@@ -104,24 +104,26 @@
 
   function progRows() {
     const q = I.f.q.toLowerCase();
-    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p))
+    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p)) && (I.f.all || I.f.need || (places(p).tg > 0 && places(p).open > 0))
       && (!q || I.tab !== 'time' || `${p.programme_name} ${p.display_id || ''} ${p.group_name || ''} ${(I.CL.get(p.client_id) || {}).client_name || ''}`.toLowerCase().includes(q)));
   }
   function timeline() {
     const from = I.from || (I.from = monday(today())), span = I.wk * 7, to = addD(from, span), P = progRows();
     const x = d => Math.max(0, Math.min(100, days(from, d) / span * 100)), tp = today() >= from && today() < to ? x(today()) : null;
     const wks = [...Array(I.wk)].map((_, i) => addD(from, i * 7)), step = I.wk > 13 ? 4 : I.wk > 4 ? 2 : 1;
-    const rows = P.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)).map(p => {
+    const PW = P.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)), nAll = I.PR.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)).length;
+    const rows = PW.slice(0, I.rows).map(p => {
       const s = places(p), l = x(p.start_date > from ? p.start_date : from), r = p.end_date ? x(p.end_date < to ? p.end_date : to) : 100;
       const cls = !s.tg ? 'n' : !s.open ? 'ok' : needs(p) ? 'bad' : 'warn', cl = (I.CL.get(p.client_id) || {}).client_name || '';
       const lab = s.tg ? `${s.en + s.pl} / ${s.tg}${s.open ? ` · ${s.open} open` : ' · full'}` : `${s.en} enrolled · no target`;
-      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e(p.programme_name)}">${e(p.programme_name)}<span class="sub">${e([p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}</span></button>`
+      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e([p.programme_name, p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}">${e(p.programme_name)} <span class="sub">${e([cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}</span></button>`
         + `<div class="inttrack">${tp != null ? `<i class="inttoday" style="left:${tp}%"></i>` : ''}<button type="button" class="intbar ${cls}" style="left:${l}%;width:${Math.max(r - l, 2)}%" onclick="intk('sel',${p.id})" title="${e(`${p.programme_name}\n${fmt(p.start_date)} – ${fmt(p.end_date)}\n${lab}`)}">${e(lab)}</button></div></div>`;
     }).join('');
     return `<div class="intnav"><button class="btn sm" onclick="intk('move',-${step})">‹</button><button class="btn sm" onclick="intk('today')">Today</button><button class="btn sm" onclick="intk('move',${step})">›</button>
       <span class="sub" style="flex-grow:1">${fmt(from)} – ${fmt(addD(to, -1))}</span>${[4, 13, 26].map(w => `<button class="btn sm${I.wk === w ? ' on' : ''}" onclick="intk('wk',${w})">${w} wk</button>`).join('')}</div>
       <div class="introw inthead"><div class="intname"></div><div class="inttrack">${wks.map((w, i) => i % step ? '' : `<span style="left:${x(w)}%">${fmt(w).replace(/ \d{4}$/, '')}</span>`).join('')}</div></div>
       ${rows || '<div class="sub" style="padding:18px">No programmes in this window for these filters.</div>'}
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">${PW.length > I.rows ? `<button class="btn sm" onclick="intk('rows')">Show ${Math.min(25, PW.length - I.rows)} more (${PW.length - I.rows} left)</button>` : ''}<button class="btn sm" onclick="intk('all')">${I.f.all ? 'Show only programmes needing learners' : `Show all ${nAll} programmes`}</button><span class="sub">${I.f.all ? 'Showing every programme in this window.' : I.f.need ? 'Showing programmes starting within 30 days with places open.' : 'Showing programmes with learner places open.'}</span></div>
       <div class="sub" style="margin-top:8px">Bars: <b>enrolled + placed / target</b> (programme group size). Red = starts within 30 days with places open, amber = places open, green = full, grey = no target set.</div>`;
   }
   function panel() {
@@ -163,20 +165,20 @@
       <label class="intchk"><input type="checkbox"${I.f.pwd ? ' checked' : ''} onchange="intk('pwd',this.checked)"> PwD only</label><label class="intchk"><input type="checkbox"${I.f.bpwd ? ' checked' : ''} onchange="intk('bpwd',this.checked)"> Black PwD only</label><input type="search" class="intsel" style="flex:1 1 200px" placeholder="${I.tab === 'time' ? 'Search programmes' : 'Search candidates'}" value="${e(I.f.q)}" onchange="intk('q',this.value)"></div>`;
     const tabs = `<div class="intabs" role="tablist"><button role="tab" aria-selected="${I.tab === 'time'}" class="${I.tab === 'time' ? 'on' : ''}" onclick="intk('tab','time')">Programmes</button><button role="tab" aria-selected="${I.tab === 'cand'}" class="${I.tab === 'cand' ? 'on' : ''}" onclick="intk('tab','cand')">Candidates</button></div>`;
     const body = I.tab === 'time' ? `<div class="intwrap"><div class="card intcal">${timeline()}</div>${panel()}</div>` : candidates();
-    m.innerHTML = head + chips + tabs + filt + body;
+    m.innerHTML = head + chips + `<div class="inttop">${tabs}${filt}</div>` + body;
   }
 
   /* ---------- styles, route, nav ---------- */
   const css = document.createElement('style');
-  css.textContent = `.intchips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.intchip{display:flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:8px 12px;font:inherit;cursor:pointer;text-align:left}.intchip b{font-size:18px}.intchip span{font-size:13px}.intchip.on{outline:2px solid var(--accent2)}.intchip.warn b{color:#b45309}.intchip.bad b{color:#b91c1c}
-.intabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:10px}.intabs button{border:0;background:none;font:inherit;font-weight:600;padding:8px 14px;cursor:pointer;color:var(--ink);border-bottom:3px solid transparent}.intabs button.on{border-bottom-color:var(--accent2)}
+  css.textContent = `.intchips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.intchip{display:flex;gap:6px;align-items:baseline;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:10px;padding:5px 10px;font:inherit;cursor:pointer;text-align:left}.intchip b{font-size:18px}.intchip span{font-size:13px}.intchip.on{outline:2px solid var(--accent2)}.intchip.warn b{color:#b45309}.intchip.bad b{color:#b91c1c}
+.inttop{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;margin-bottom:10px}.inttop .intfilt{margin:0;flex:1 1 480px}.intabs{display:flex;gap:4px;border-bottom:1px solid var(--line)}.intabs button{border:0;background:none;font:inherit;font-weight:600;padding:8px 14px;cursor:pointer;color:var(--ink);border-bottom:3px solid transparent}.intabs button.on{border-bottom-color:var(--accent2)}
 .intfilt{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.intsel{height:38px;max-width:100%;border:1px solid var(--line);border-radius:10px;padding:0 10px;background:var(--surface);color:var(--ink);font:inherit}.intchk{display:flex;gap:6px;align-items:center;font-size:14px}
-.intwrap{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.intcal{flex:1 1 560px;min-width:0;padding:12px 14px}.intpanel{flex:0 1 400px;min-width:280px;padding:14px 16px;max-height:calc(100vh - 140px);overflow:auto;position:sticky;top:90px}
+.intwrap{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.intcal{flex:1 1 560px;min-width:0;padding:12px 14px;overflow:visible}.intpanel{flex:0 1 400px;min-width:280px;padding:14px 16px;max-height:calc(100vh - 140px);overflow:auto;position:sticky;top:90px}
 .intnav{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:8px}.intnav .btn.on{outline:2px solid var(--accent2)}
-.introw{display:flex;align-items:stretch;border-bottom:1px solid var(--line2,var(--line));min-height:40px}.introw.on{background:rgba(0,120,212,.06)}.inthead{min-height:22px;border-bottom:1px solid var(--line)}.inthead span{position:absolute;top:2px;font-size:11px;color:var(--muted,#666);white-space:nowrap}
-.intname{flex:0 0 240px;max-width:40%;border:0;background:none;text-align:left;font:inherit;font-size:13px;font-weight:600;padding:6px 8px 6px 0;cursor:pointer;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.intname .sub{display:block;font-weight:400;font-size:12px;overflow:hidden;text-overflow:ellipsis}
+.introw{display:flex;align-items:stretch;border-bottom:1px solid var(--line2,var(--line));min-height:32px}.introw.on{background:rgba(0,120,212,.06)}.inthead{min-height:22px;border-bottom:1px solid var(--line);position:sticky;top:80px;z-index:2;background:var(--surface,#fff)}.inthead span{position:absolute;top:2px;font-size:11px;color:var(--muted,#666);white-space:nowrap}
+.intname{flex:0 0 240px;max-width:40%;border:0;background:none;text-align:left;font:inherit;font-size:13px;font-weight:600;padding:6px 8px 6px 0;cursor:pointer;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.intname .sub{font-weight:400;font-size:12px}
 .inttrack{position:relative;flex:1 1 auto;min-width:0}.inttoday{position:absolute;top:0;bottom:0;width:2px;background:#d13438;opacity:.6}
-.intbar{position:absolute;top:8px;height:24px;border:0;border-radius:6px;font:inherit;font-size:12px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left;color:#fff}.intbar.ok{background:#107c10}.intbar.warn{background:#c27c0e}.intbar.bad{background:#c50f1f}.intbar.n{background:#8a8886}
+.intbar{position:absolute;top:4px;height:24px;border:0;border-radius:6px;font:inherit;font-size:12px;font-weight:600;padding:0 6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;text-align:left;color:#fff}.intbar.ok{background:#107c10}.intbar.warn{background:#c27c0e}.intbar.bad{background:#c50f1f}.intbar.n{background:#8a8886}
 .intmix{display:flex;flex-wrap:wrap;gap:6px 14px;margin:6px 0;font-size:13px}.intcand{display:flex;gap:6px;align-items:center;padding:8px 0;border-top:1px solid var(--line2,var(--line))}.intcand .badge{font-size:11px;padding:2px 6px}
 .intpools{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}.intpool{text-align:left;padding:12px 14px;cursor:pointer;font:inherit;color:var(--ink);border:1px solid var(--line)}.intpool.on{outline:2px solid var(--accent2)}
 @media(max-width:700px){.intname{flex-basis:130px}.intpanel{position:static;max-height:none;flex-basis:100%}}`;
