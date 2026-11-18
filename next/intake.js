@@ -5,7 +5,7 @@
    enrolment in ApexOne (relay action 'enrol', which only reads the candidate task). Eligibility is fixed rules, no AI. */
 (function () {
   if (window.__intake) return; window.__intake = 1;
-  const I = { skip: {}, restOpen: false, st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false, all: false, emp: false }, rows: 25 };
+  const I = { skip: {}, restOpen: false, st: 'idle', tab: 'time', wk: 13, from: null, sel: null, pool: '', more: 0, f: { client: '', nqf: '', prov: '', pwd: false, bpwd: false, q: '', need: false, all: false, emp: false, ns: false }, rows: 25 };
   const $ = id => document.getElementById(id);
   const e = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ymd = d => { const x = new Date(d); return x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'); };
@@ -42,7 +42,7 @@
   const eligible = p => { const n = nqfN(p), pw = pwdProg(p), pp = progProv(p);
     return I.C.filter(c => ready(c) && candF(c) && fitsLevel(c, n) && (!pw || c.pwd))
       
-      .sort((a, b) => (pp ? (provOf(b.province) === pp) - (provOf(a.province) === pp) : 0) || fit(b, n) - fit(a, n) || wait(b) - wait(a)); };
+      .sort((a, b) => (pp ? (provOf(b.province) === pp) - (provOf(a.province) === pp) : 0) || (wait(b) > 60) - (wait(a) > 60) || fit(b, n) - fit(a, n) || wait(b) - wait(a)); };
   /* education fit: the closest level to the programme ranks first (avoids using up degree holders on NQF 2-4 programmes) */
   const fit = (c, n) => { const l = level(c); return n == null ? 0 : n >= 5 ? (l === 'tert' ? 1 : 0) : n === 4 ? (l === 'matric' || l === 'n46' ? 2 : l === 'tert' ? 1 : 0) : (l === 'g1011' || l === 'matric' ? 2 : 1); };
   /* employment status from the PM masterlist: unemployed and mixed cohorts are filled from candidates; employed cohorts are the client's own staff (top-up only, hidden by default) */
@@ -79,7 +79,7 @@
     if (k === 'tab') { I.tab = v; I.more = 0; } else if (k === 'sel') { I.sel = I.sel === v ? null : v; I.more = 0; }
     else if (k === 'wk') I.wk = +v; else if (k === 'move') I.from = addD(I.from, v * 7); else if (k === 'today') I.from = monday(today());
     else if (k === 'pool') { I.pool = I.pool === v ? '' : v; I.more = 0; } else if (k === 'more') I.more++;
-    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; I.rows = 25; } else if (k === 'all') { I.f.all = !I.f.all; I.rows = 25; } else if (k === 'emp') { I.f.emp = !I.f.emp; I.rows = 25; } else if (k === 'req') { I.f.req = !I.f.req; I.tab = 'time'; I.rows = 25; } else if (k === 'rows') I.rows += 25; else if (k === 'refresh') { load(true); return; }
+    else if (k === 'need') { I.f.need = !I.f.need; I.tab = 'time'; I.rows = 25; } else if (k === 'all') { I.f.all = !I.f.all; I.rows = 25; } else if (k === 'emp') { I.f.emp = !I.f.emp; I.rows = 25; } else if (k === 'req') { I.f.req = !I.f.req; I.tab = 'time'; I.rows = 25; } else if (k === 'ns') { I.f.ns = !I.f.ns; I.rows = 25; } else if (k === 'rows') I.rows += 25; else if (k === 'refresh') { load(true); return; }
     else if (k in I.f) { I.f[k] = k === 'pwd' || k === 'bpwd' ? !!v : v; I.more = 0; }
     paint();
   };
@@ -117,33 +117,33 @@
 
   function progRows() {
     const q = I.f.q.toLowerCase();
-    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p)) && (!I.f.req || (I.RQ || []).some(r => r.programme_id === p.id)) && (I.f.emp || I.f.req || empK(p) !== 'emp') && (I.f.all || I.f.need || I.f.req || (places(p).tg > 0 && places(p).open > 0))
+    return I.PR.filter(p => (!I.f.client || String(p.client_id) === I.f.client) && (!I.f.nqf || String(nqfN(p)) === I.f.nqf) && (!I.f.need || needs(p)) && (!I.f.req || (I.RQ || []).some(r => r.programme_id === p.id)) && (I.f.emp || I.f.req || empK(p) !== 'emp') && (I.f.ns || I.f.all || I.f.need || I.f.req || empK(p) !== '') && (I.f.all || I.f.need || I.f.req || (places(p).tg > 0 && places(p).open > 0))
       && (!q || I.tab !== 'time' || `${p.programme_name} ${p.display_id || ''} ${p.group_name || ''} ${(I.CL.get(p.client_id) || {}).client_name || ''}`.toLowerCase().includes(q)));
   }
   function timeline() {
     const from = I.from || (I.from = monday(today())), span = I.wk * 7, to = addD(from, span), P = progRows();
     const x = d => Math.max(0, Math.min(100, days(from, d) / span * 100)), tp = today() >= from && today() < to ? x(today()) : null;
     const wks = [...Array(I.wk)].map((_, i) => addD(from, i * 7)), step = I.wk > 13 ? 4 : I.wk > 4 ? 2 : 1;
-    const PW = P.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)), nAll = I.PR.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)).length;
+    const PW = P.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)), nAll = I.PR.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from)).length, nNs = I.PR.filter(p => p.start_date < to && (!p.end_date || p.end_date >= from) && !empK(p) && places(p).tg > 0 && places(p).open > 0).length, nNp = PW.filter(p => !progProv(p)).length;
     const rows = PW.slice(0, I.rows).map(p => {
       const s = places(p), l = x(p.start_date > from ? p.start_date : from), r = p.end_date ? x(p.end_date < to ? p.end_date : to) : 100;
       const cls = !s.tg || s.nl ? 'n' : !s.open ? 'ok' : needs(p) ? 'bad' : 'warn', ek = empK(p), cl = (I.CL.get(p.client_id) || {}).client_name || '';
-      const lab = s.nl ? 'Enrolled per PM Tracker – list not loaded' : s.tg ? `${s.en + s.pl} / ${s.tg}${s.open ? ` · ${s.open} open` : ' · full'}` : `${s.en} enrolled · no target`;
-      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e([p.programme_name, p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}">${e(p.programme_name)} <span class="sub">${e([cl, nqfN(p) ? 'NQF ' + nqfN(p) : '', (I.RQ || []).some(r => r.programme_id === p.id) ? 'Request' : '', ek === 'mixed' ? 'Mixed' : ek === 'emp' ? 'Employed (top-up)' : ek ? '' : 'Status not set'].filter(Boolean).join(' · '))}</span></button>`
+      const lab = s.nl ? 'Enrolled per PM Tracker – list not loaded' : s.tg ? `${s.en + s.pl} / ${s.tg}${s.open ? ` · ${s.open} open` + ((I.C || []).length ? (q => ` · ${q} eligible${q < s.open ? ' – short' : ''}`)(eligible(p).length) : '') : ' · full'}` : `${s.en} enrolled · no target`;
+      return `<div class="introw${I.sel === p.id ? ' on' : ''}"><button type="button" class="intname" onclick="intk('sel',${p.id})" title="${e([p.programme_name, p.display_id, cl, nqfN(p) ? 'NQF ' + nqfN(p) : ''].filter(Boolean).join(' · '))}">${e(p.programme_name)} <span class="sub">${e([cl, p.group_name && !String(p.programme_name || '').includes(p.group_name) ? p.group_name : '', 'starts ' + fmt(p.start_date), nqfN(p) ? 'NQF ' + nqfN(p) : '', (I.RQ || []).some(r => r.programme_id === p.id) ? 'Request' : '', ek === 'mixed' ? 'Mixed' : ek === 'emp' ? 'Employed (top-up)' : ek ? '' : 'Status not set'].filter(Boolean).join(' · '))}</span></button>`
         + `<div class="inttrack">${tp != null ? `<i class="inttoday" style="left:${tp}%"></i>` : ''}<button type="button" class="intbar ${cls}" style="left:${l}%;width:${Math.max(r - l, 2)}%" onclick="intk('sel',${p.id})" title="${e(`${p.programme_name}\n${fmt(p.start_date)} – ${fmt(p.end_date)}\n${lab}`)}">${e(lab)}</button></div></div>`;
     }).join('');
     return `<div class="intnav"><button class="btn sm" onclick="intk('move',-${step})">‹</button><button class="btn sm" onclick="intk('today')">Today</button><button class="btn sm" onclick="intk('move',${step})">›</button>
       <span class="sub" style="flex-grow:1">${fmt(from)} – ${fmt(addD(to, -1))}</span>${[4, 13, 26].map(w => `<button class="btn sm${I.wk === w ? ' on' : ''}" onclick="intk('wk',${w})">${w} wk</button>`).join('')}</div>
       <div class="introw inthead"><div class="intname"></div><div class="inttrack">${wks.map((w, i) => i % step ? '' : `<span style="left:${x(w)}%">${fmt(w).replace(/ \d{4}$/, '')}</span>`).join('')}</div></div>
       ${rows || '<div class="sub" style="padding:18px">No programmes in this window for these filters.</div>'}
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">${PW.length > I.rows ? `<button class="btn sm" onclick="intk('rows')">Show ${Math.min(25, PW.length - I.rows)} more (${PW.length - I.rows} left)</button>` : ''}<button class="btn sm" onclick="intk('emp')">${I.f.emp ? 'Hide employed cohorts' : 'Include employed cohorts (top-up)'}</button><button class="btn sm" onclick="intk('all')">${I.f.all ? 'Show only programmes needing learners' : `Show all ${nAll} programmes`}</button><span class="sub">${I.f.all ? 'Showing every programme in this window.' : I.f.need ? 'Showing programmes starting within 30 days with places open.' : 'Showing unemployed and mixed cohorts with learner places open.'}</span></div>
-      <div class="sub" style="margin-top:8px">Bars: <b>enrolled + placed / target</b> (programme group size). Red = starts within 30 days with places open, amber = places open, green = full, grey = no target set.</div>`;
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:8px">${PW.length > I.rows ? `<button class="btn sm" onclick="intk('rows')">Show ${Math.min(25, PW.length - I.rows)} more (${PW.length - I.rows} left)</button>` : ''}<button class="btn sm" onclick="intk('emp')">${I.f.emp ? 'Hide employed cohorts' : 'Include employed cohorts (top-up)'}</button>${nNs && !I.f.all ? `<button class="btn sm" onclick="intk('ns')">${I.f.ns ? 'Hide' : 'Show'} employment status not set (${nNs})</button>` : ''}<button class="btn sm" onclick="intk('all')">${I.f.all ? 'Show only programmes needing learners' : `Show all ${nAll} programmes`}</button><span class="sub">${I.f.all ? 'Showing every programme in this window.' : I.f.need ? 'Showing programmes starting within 30 days with places open.' : 'Showing unemployed and mixed cohorts with learner places open.'}</span></div>
+      <div class="sub" style="margin-top:8px">Bars: <b>enrolled + placed / target</b> (programme group size). Red = starts within 30 days with places open, amber = places open, green = full, grey = no target set.${nNp ? ` Province not set on ${nNp} of ${PW.length} programmes here (PMs add the facilitation venue in PM Tracker), so same-province ranking can't apply to them.` : ''}</div>`;
   }
   function panel() {
     const p = I.PR.find(x => x.id === I.sel); if (!p) return '';
     const s = places(p), L = eligible(p), pp = progProv(p), n = nqfN(p), PL = (I.P || []).filter(x => x.programme_id === p.id), sk = I.skip[p.id] || [];
     const SL = s.open ? L.filter(c => !sk.includes(c.id)).slice(0, s.open) : [], rest = L.filter(c => !SL.includes(c)), shown = rest.slice(0, 25 + I.more * 25);
-    const rule = [n == null ? 'any education level' : n >= 5 ? 'Higher Certificate or above (NQF ' + n + ')' : n === 4 ? 'matric or higher (NQF 4)' : 'Grade 10 or higher (NQF ' + n + ')', pwdProg(p) ? 'people with disabilities only' : '', pp ? 'same province (' + pp + ') first' : ''].filter(Boolean).join(' · ');
+    const rule = [n == null ? 'any education level' : n >= 5 ? 'Higher Certificate or above (NQF ' + n + ')' : n === 4 ? 'matric or higher (NQF 4)' : 'Grade 10 or higher (NQF ' + n + ')', pwdProg(p) ? 'people with disabilities only' : '', pp ? 'same province (' + pp + ') first' : '', 'then candidates waiting 60+ days'].filter(Boolean).join(' · ');
     const why = c => [pp && provOf(c.province) === pp ? 'Same province' : '', c.pwd ? 'PwD' : '', lvlTxt(c), 'Waiting ' + wait(c) + ' days'].filter(Boolean).map(t => `<span class="inttag">${e(t)}</span>`).join('');
     const line = c => e([lvlTxt(c), c.pwd ? 'PwD' : '', c.province, c.age ? c.age + ' yrs' : '', wait(c) + ' days'].filter(Boolean).join(' · '));
     const cu = c => /^https:\/\/app\.clickup\.com\//.test(c.url || '') ? ` <a href="${e(c.url)}" target="_blank" rel="noopener" title="Open in ClickUp (read-only)" class="intcu">↗</a>` : '';
