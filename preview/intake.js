@@ -183,6 +183,7 @@
   document.head.appendChild(css);
   const anchor = document.querySelector('main[id^="view-"]');
   if (anchor && !$('view-intake')) { const m = document.createElement('main'); m.id = 'view-intake'; m.hidden = true; anchor.parentNode.appendChild(m); }
+  try { ICO.intake = 'M15 19a6 6 0 0 0-12 0M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM19 8v6M16 11h6'; } catch (_) {}
   try { ROUTES.intake = ['Learner intake', 'Learners']; const g = NAV.find(x => x[0] === 'Learners'); if (g && !g[1].some(x => x[1] === 'intake')) g[1].push(['Learner intake', 'intake']); } catch (_) {}
   const go = () => { if (location.hash.slice(1).split('/')[0] === 'intake') setTimeout(paint, 60); };
   addEventListener('hashchange', go);
