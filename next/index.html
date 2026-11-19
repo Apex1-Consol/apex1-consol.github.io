@@ -16,6 +16,10 @@ try{Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeT
 <title>ApexOne</title>
 <meta name="robots" content="noindex,nofollow">
 <link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%2230%2065%20330%20312%22%3E%3Cpath%20d%3D%22M55%20215a140%20140%200%201%200%20280%200a140%20140%200%201%200%20-280%200Z%20M93%20215a102%20102%200%201%200%20204%200a102%20102%200%201%200%20-204%200Z%22%20fill%3D%22%23FBDC00%22%20fill-rule%3D%22evenodd%22/%3E%3Cpath%20d%3D%22M45.0%20362.5%20L136.7%20363.5%20L155.8%20331.0%20L249.5%20331.0%20L195.0%20235.5%20L149.1%20313.8%20L146.3%20316.7%20L127.2%20315.7%20L191.2%20203.9%20L195.0%20200.1%20L289.6%20362.5%20L344.0%20363.5%20L195.0%20105.5%20L193.1%20106.5Z%20M194.0%20265.1%20L196.9%20267.0%20L224.6%20315.7%20L223.7%20316.7%20L164.4%20315.7Z%20M69.8%20348.2%20L194.0%20134.2%20L196.0%20135.2%20L319.2%20348.2%20L299.1%20349.2%20L195.0%20170.5%20L102.3%20330.1%20L136.7%20331.0%20L137.7%20332.9%20L129.1%20348.2Z%22%20fill%3D%22%23FFFFFF%22%20fill-rule%3D%22evenodd%22/%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#25247B">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="apple-touch-icon" href="assets/icon-180.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@700;800&family=Poppins:wght@500;600;700&family=Open+Sans:wght@400;600&display=swap">
 <style>
@@ -426,7 +430,28 @@ h1,.card h2{color:var(--accent2)}
 .psteps li.done{color:var(--ok);background:var(--okbg)}
 .psteps li.cur{background:var(--navy);color:#fff}.psteps li.cur span{background:var(--yellow);color:var(--navy)}
 </style>
-<style>#plist{gap:2px!important}#plist .pick{padding:6px 10px!important;gap:1px!important;flex:none!important}#plist .pick b{font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}#plist .pick .sub{font-size:12px}#plist .pickgh{margin-top:6px}</style><style>@media (min-width:1000px){#view-programmes>.row{flex-wrap:nowrap!important}#view-programmes>.row>*{min-width:0}}@media (max-width:999px){#view-programmes>.row>section.card:first-child{position:static!important;flex-basis:100%!important}}</style></head>
+<style>#plist{gap:2px!important}#plist .pick{padding:6px 10px!important;gap:1px!important;flex:none!important}#plist .pick b{font-size:14px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block}#plist .pick .sub{font-size:12px}#plist .pickgh{margin-top:6px}</style><style>@media (min-width:1000px){#view-programmes>.row{flex-wrap:nowrap!important}#view-programmes>.row>*{min-width:0}}@media (max-width:999px){#view-programmes>.row>section.card:first-child{position:static!important;flex-basis:100%!important}}</style><style id="phonecss">
+@media (max-width:900px){
+html:not(.embed) #shell .side{position:fixed;top:0;left:0;bottom:0;width:min(300px,86vw);max-width:none;flex:none;z-index:70;overflow-y:auto;transform:translateX(-105%);transition:transform .2s;flex-direction:column;flex-wrap:nowrap;align-items:stretch;padding-bottom:24px}
+html.drawer #shell .side{transform:none;box-shadow:0 0 40px rgba(0,0,0,.35)}
+#shell .mbd{display:none}html.drawer #shell .mbd{display:block;position:fixed;inset:0;background:rgba(15,14,51,.45);z-index:65}
+#shell .content{width:100%;min-width:0;flex:1 1 100%}
+html:not(.embed) #shell main{padding-bottom:96px}
+#mbar{position:fixed;left:0;right:0;bottom:0;z-index:45;display:flex;background:var(--surface);border-top:1px solid var(--line);padding:4px 4px calc(4px + env(safe-area-inset-bottom))}
+#mbar button{flex:1;min-height:56px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;background:none;border:0;color:var(--ink);font:600 11px Poppins,sans-serif;border-radius:10px}
+#mbar button.on{color:var(--navy);background:rgba(37,36,123,.08)}
+html.embed #mbar{display:none}
+html:not(.embed) #avafab{display:none!important}
+#avacoach{bottom:calc(76px + env(safe-area-inset-bottom))!important}
+main table{display:block;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch}
+main table td:first-child,main table th:first-child{position:sticky;left:0;z-index:1;background:var(--surface)}
+button,.btn,.iconbtn,.pill,#nav a,select{min-height:44px}
+.iconbtn{min-width:44px}
+input,select,textarea{font-size:16px!important}
+}
+@media (min-width:901px){#mbar,#shell .mbd{display:none}}
+</style>
+</head>
 <body>
 
 <!-- LOGIN -->
@@ -1332,6 +1357,7 @@ function learnerRules(){return `<div class="row">
 <script src="ava-night.js?v=20261117n1"></script>
 <script src="autofill.js?v=20261116f"></script>
 <script src="lifecycle.js?v=20261119x"></script>
+<script src="mobile.js?v=20261120b"></script>
 <script src="next-gate.js?v=20261117a"></script>
 </body>
 </html>
