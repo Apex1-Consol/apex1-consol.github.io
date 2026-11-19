@@ -283,16 +283,17 @@
   }
   function learnerBody(l) {
     const f = l ? lf(l) : {}, i = (n, lab, v, t = 'text', ex = '') => `<label>${lab}<input name="${n}" type="${t}" value="${esc(v || '')}" ${ex}></label>`;
-    return `<div class="qagrid">${i('fn', 'First name *', l ? (l.first_name || f['First Name']) : '', 'text', 'required')}${i('ln', 'Last name *', l ? (l.last_name || f['Last Name']) : '', 'text', 'required')}${i('nid', 'SA ID number', l ? lIdn(l) : '', 'text', 'inputmode="numeric" maxlength="13"')}${i('dob', 'Date of birth', f.DOB, 'date')}
+    return `<div class="qagrid">${i('fn', 'First name *', l ? (l.first_name || f['First Name']) : '', 'text', 'required')}${i('ln', 'Last name *', l ? (l.last_name || f['Last Name']) : '', 'text', 'required')}${i('nid', 'SA ID number', l ? lIdn(l) : '', 'text', 'inputmode="numeric" maxlength="13"')}${i('pp', 'Passport number (if no SA ID)', f.Passport, 'text', 'maxlength="20"')}${i('dob', 'Date of birth', f.DOB, 'date')}
       <label>Gender<select name="gender">${opt(LG, f.Gender)}</select></label><label>Province<select name="prov">${opt(LPROV, f.Province)}</select></label>${i('email', 'Email', l ? (l.email || f.Email) : '', 'email')}${i('phone', 'Phone', l ? (l.phone || f.Phone) : '', 'tel')}
       <label>Employment<select name="emp">${opt(LEMP, f.Employment)}</select></label></div>`;
   }
   async function learnerVals(el, l) {
-    const v = n => el[n].value.trim(), nid = v('nid');
+    const v = n => el[n].value.trim(), nid = v('nid'), pp = v('pp');
+    if (!l && !nid && !pp) throw new Error('Add an SA ID number or a passport number.');
     if (nid) { if (!said(nid)) throw new Error('That SA ID number is not valid (13 digits, check digit).');
       const dup = P.data.learners.find(x => x.id !== l?.id && lIdn(x) === nid); if (dup) throw new Error(`${lName(dup)} already has this ID number.`);
       try { const { data } = await sb.rpc('check_learner_duplicate', { p_tenant_id: P.tenant, p_id_number: nid }); const d = (data || []).find(x => x.learner_id !== l?.id); if (d) throw new Error(`${d.first_name} ${d.last_name} already has this ID number.`); } catch (e) { if (/already has/.test(e.message)) throw e; } }
-    const fields = { ...(l ? lf(l) : {}), 'First Name': v('fn'), 'Last Name': v('ln'), 'National ID': nid, DOB: v('dob'), Gender: v('gender'), Province: v('prov'), Email: v('email'), Phone: v('phone'), Employment: v('emp') };
+    const fields = { ...(l ? lf(l) : {}), 'First Name': v('fn'), 'Last Name': v('ln'), 'National ID': nid, Passport: pp, DOB: v('dob'), Gender: v('gender'), Province: v('prov'), Email: v('email'), Phone: v('phone'), Employment: v('emp') };
     Object.keys(fields).forEach(k => { if (fields[k] === '' && !(l && k in lf(l))) delete fields[k]; });
     return { first_name: v('fn'), last_name: v('ln'), id_number: nid || null, email: v('email') || null, phone: v('phone') || null, fields };
   }

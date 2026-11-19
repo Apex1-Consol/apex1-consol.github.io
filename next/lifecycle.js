@@ -5,7 +5,7 @@
   const P = () => window.__preview || {}, D = () => P().data || {}, sb = () => window.__sb;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.toISOString().slice(0, 10), t0 = iso(new Date()), in30 = iso(new Date(Date.now() + 30 * 864e5));
-  const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], LJ: [], BK: [], FQ: [], AS: [], open: {} };
+  const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], LJ: [], BK: [], FQ: [], AS: [], FR: [], open: {} };
   const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm', learners: 'lrn', fam: 'fam' };
   const adm = () => ((P().roles || []).includes('admin'));
 
@@ -14,7 +14,7 @@
     L.busy = true;
     const q = async p => { try { const r = await p; return r.data || []; } catch (_) { return []; } };
     const s = sb(); if (!s) { L.busy = false; return; }
-    [L.HS, L.SG, L.RQ, L.PL, L.LJ, L.BK, L.FQ, L.AS] = await Promise.all([
+    [L.HS, L.SG, L.RQ, L.PL, L.LJ, L.BK, L.FQ, L.AS, L.FR] = await Promise.all([
       q(s.from('handoff_signoffs').select('programme_id,status')),
       q(s.from('handoff_signatures').select('programme_id,role').is('invalidated_at', null)),
       q(s.from('intake_requests').select('programme_id')),
@@ -22,7 +22,8 @@
       q(s.from('v_learner_journey').select('learner_id,programme_id,att_pct,att_rows,mods_outstanding,journey_status')),
       q(s.from('fam_bookings').select('id,assessor_id,role,title,client_name,start_date,end_date,status').neq('status', 'Cancelled')),
       q(s.from('fam_quality').select('assessor_id,created_at')),
-      q(s.from('assessors').select('id,full_name'))]);
+      q(s.from('assessors').select('id,full_name')),
+      q(s.from('v_fam_learner_results').select('*'))]);
     window.apxLJ = L.LJ; window.apxFamDue = L.BK.filter(b => b.end_date && b.end_date < t0 && !L.FQ.some(q => q.assessor_id === b.assessor_id && String(q.created_at).slice(0, 10) >= String(b.end_date))); window.shRefresh && shRefresh();
     L.at = Date.now(); L.busy = false;
   }
@@ -81,13 +82,15 @@
     if (kind === 'adm') { // admin: the whole chain, initiation to close, from the data ApexOne already holds
       const en = new Map(); (D().enrol || []).forEach(e => { if ((e.status || 'active') === 'active') en.set(e.programme_id, (en.get(e.programme_id) || 0) + 1); });
       const ended = p => p.end_date && p.end_date < t0, sz = p => +p.group_size || 0, short = p => sz(p) && (en.get(p.id) || 0) < sz(p);
-      const lrn = p => [progLink(p), (en.get(p.id) || 0) + ' of ' + (sz(p) || '?') + ' learners · ' + when(p)];
+      const J = new Map(); L.LJ.forEach(x => { const o = J.get(x.programme_id) || { r: 0, a: 0, n: 0 }; if (x.journey_status === 'At risk') o.r++; if (x.journey_status === 'Left') o.a++; if (x.journey_status === 'No data') o.n++; J.set(x.programme_id, o); });
+      const lj = p => { const o = J.get(p.id); return o ? [o.r && o.r + ' at risk', o.a && o.a + ' left', o.n && o.n + ' no data'].filter(Boolean).join(' · ') : ''; };
+      const lrn = p => [progLink(p), [(en.get(p.id) || 0) + ' of ' + (sz(p) || '?') + ' learners', lj(p), when(p)].filter(Boolean).join(' · ')];
       return [
         ['Initiation', 'PI working, no hand-over pack', PR.filter(p => st(p) === 'initiated' && !pack.has(p.id)), p => [link(p), when(p)]],
         ['Hand-over', 'Pack being prepared or signed', PR.filter(p => st(p) === 'initiated' && pack.has(p.id)), p => [link(p), (sigs.get(p.id) || 0) + ' of 3 signed · ' + when(p)]],
         ['Learners', 'Handed over or live, places not filled', PR.filter(p => (st(p) === 'handed_over' || st(p) === 'active') && !ended(p) && short(p)), lrn],
         ['Delivery', 'Live with learners', PR.filter(p => (st(p) === 'handed_over' || st(p) === 'active') && !ended(p) && !short(p)), lrn],
-        ['Close-out', 'End date passed, not closed', PR.filter(p => st(p) !== 'closed' && st(p) !== 'initiated' && ended(p)), p => [progLink(p), 'ended ' + p.end_date]],
+        ['Close-out', 'End date passed, not closed', PR.filter(p => st(p) !== 'closed' && st(p) !== 'initiated' && ended(p)), p => [progLink(p), ['ended ' + p.end_date, lj(p)].filter(Boolean).join(' · ')]],
         ['Closed', 'Finished', PR.filter(p => st(p) === 'closed'), p => [progLink(p), p.end_date ? 'ended ' + p.end_date : '']]];
     }
     // recruitment: programmes with an intake request or placements
@@ -182,5 +185,9 @@
   } catch (e) { console.warn('lifecycle nav', e); }
   addEventListener('hashchange', () => { if (cur() === 'handovers' && L.open.handovers == null) L.open.handovers = 0; });
   if (cur() === 'handovers') L.open.handovers = 0;
+  // FAM profile: learner results on the programmes this person is booked on (from the report generator, via v_learner_journey)
+  window.apxFamRes = id => { const r = L.FR.filter(x => x.assessor_id === id); if (!r.length) return '';
+    return `<div class="card" style="grid-column:1/-1"><h2 style="font-size:15px">Learner results</h2><p class="sub" style="margin:2px 0 8px">From attendance and results captured in the report generator, on programmes this person is booked on.</p>` +
+      r.map(x => { const n = +x.learners_with_results || 0; return `<div><b>${esc(x.role || '')}</b> · ${x.programmes} programme${x.programmes == 1 ? '' : 's'} · ${n ? `${x.learners_competent} of ${n} learners competent (${Math.round(100 * x.learners_competent / n)}%) · ${x.learners_outstanding} with NYC/NS/RW` : 'no results captured yet'}</div>`; }).join('') + '</div>'; };
   window.apxLifecycle = { run, stages };
 })();
