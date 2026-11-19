@@ -2,9 +2,6 @@
 (function () {
   const mq = matchMedia('(max-width:900px)'), H = document.documentElement, $ = id => document.getElementById(id);
   const sh = () => $('shell'), phone = () => mq.matches && !H.classList.contains('embed');
-  const DESK = H.classList.contains('deskapp');
-  if (DESK) { if (location.hash !== '#login') history.replaceState(null, '', location.search + '#desk');
-    addEventListener('hashchange', () => { if (!/^#(desk|login)$/.test(location.hash)) location.replace('#desk'); }); return; }
   /* phones / home-screen app: if a newer /next/ version is online, load it (GitHub caches the page ~10 min) */
   async function fresh() {
     if (!mq.matches) return;
@@ -15,6 +12,9 @@
         const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); } } catch (e) {}
   }
   setTimeout(fresh, 3000); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fresh(); });
+  const DESK = H.classList.contains('deskapp');
+  if (DESK) { if (location.hash !== '#login') history.replaceState(null, '', location.search + '#desk');
+    addEventListener('hashchange', () => { if (!/^#(desk|login)$/.test(location.hash)) location.replace('#desk'); }); return; }
   const close = () => H.classList.remove('drawer');
   window.apxDrawer = f => H.classList.toggle('drawer', f === undefined ? !H.classList.contains('drawer') : !!f);
   const tr = window.toggleRail;
