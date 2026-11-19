@@ -69,7 +69,10 @@
     const f = $('dkform').elements; let t = '';
     try { t = await navigator.clipboard.readText(); } catch (e) { say('Allow clipboard access, or long-press the notes box and tap Paste.'); f.body.focus(); return; }
     if (!t.trim()) { say('Nothing copied yet. In Gallery tap T, then Copy all.'); return; }
-    f.body.value = (f.body.value.trim() ? f.body.value.trim() + '\n' : '') + t.trim(); apxDeskAddFill();
+    const prev = f.body.value.trim();
+    if (prev && prev.endsWith(t.trim())) { say('That page is already pasted. Copy the next page, then tap Paste page again.'); return; }
+    f.body.value = (prev ? prev + '\n\n' : '') + t.trim(); window.__dkPages = (prev ? (window.__dkPages || 1) : 0) + 1;
+    say(`Page ${window.__dkPages} pasted. Copy the next page and tap Paste page again, or tap ✨ Fill with Ava when done.`);
   };
   /* new note: save it, then open Edit and run Fill with Ava there */
   window.apxDeskAddFill = async () => {
@@ -136,7 +139,7 @@
       </div>
       ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><label class="btn sm" style="cursor:pointer">📷 Scan page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label></div>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskPaste()">📋 Paste &amp; fill with Ava</button><button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskPaste()">📋 Paste page</button><button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
   }
   function actionsOf(n) {
     const a = ROWS.filter(r => r.parent_id === n.id);
