@@ -154,6 +154,8 @@
     enrol(m) { const T = new Set((D().tracker || []).map(t => String(t.enrolment_id))), g = new Map();
       (D().enrol || []).forEach(e => { const p = m.get(String(e.programme_id)); if (p && live(p) && !T.has(String(e.id))) g.set(p.id, (g.get(p.id) || 0) + 1); });
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
+    stale(m) { const g = new Map(); [...m.values()].filter(p => p.status === 'initiated' && (dd(p.start_date) ?? 1) < 0).forEach(p => { const k = p.owner_email || p.project_manager_name || 'pm'; if (!g.has(k)) g.set(k, []); g.get(k).push(p); });
+      return { h: 'Past start, still Initiated', link: 'pmtracker', items: [...g].sort((a, b) => b[1].length - a[1].length).map(([k, ps]) => it(`${ps.length} programme${ps.length > 1 ? 's' : ''} past start date, status not moved on`, 'Hand over, mark active or close each one · oldest ' + fmt(ps.map(p => p.start_date).sort()[0]), goH('pmtracker'), true, k === 'pm' ? 'pm' : k, k === 'pm' ? ps[0].id : null)) }; },
     pi(m) { const r = byN([...m.values()].filter(p => p.status === 'initiated' && rstate(p) === 'Planned').map(p => ({ p, n: dd(p.start_date) })));
       return { h: 'Programme Initiation', link: 'pi', items: r.map(o => it(pname(o.p), 'Not handed over yet' + (o.n != null ? ` · starts ${fmt(o.p.start_date)} · ${when(o.n)}` : ' · no start date'), goH('pi'), o.n != null && o.n <= 7, 'pi', o.p.id)) }; },
     dq() { return { h: 'Data quality', link: 'dq', items: (D().dq || []).filter(x => !x.decision).map(x => it(esc(((x.first_name || '') + ' ' + (x.last_name || '')).trim() || 'Learner'), esc(String(x.issue || 'Possible issue').replace(/_/g, ' ')), goH('dq'), false, 'qa')) }; },
@@ -180,10 +182,10 @@
 
   /* ---------- which blocks each screen shows (first = most relevant) ---------- */
   const SCREENS = {
-    mywork: ['signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
+    mywork: ['stale', 'signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
     dashboard: ['dates', 'recs', 'visits', 'eisa', 'mods', 'reports'],
-    hoo: ['signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'poe', 'enrol', 'sync'],
-    reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['dates', 'recs', 'visits', 'reports'],
+    hoo: ['stale', 'signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'poe', 'enrol', 'sync'],
+    reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['stale', 'dates', 'recs', 'visits', 'reports'],
     programmes: ['dates', 'gaps', 'recs'], pi: ['pi', 'gaps', 'dates'], learners: ['learners', 'att'], dq: ['dq', 'learners', 'enrol'],
     enrolments: ['enrol', 'learners'], eisa: ['eisa', 'qcto'], qcto: ['eisa', 'qcto', 'enrol'], attendance: ['att', 'poe'],
     visits: ['visits', 'recs'], recs: ['recs', 'visits'], modver: ['mods', 'eisa'], accred: ['accs'], signoff: ['signoffs', 'recs'],

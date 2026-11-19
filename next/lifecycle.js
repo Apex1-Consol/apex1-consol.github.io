@@ -6,7 +6,8 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.toISOString().slice(0, 10), t0 = iso(new Date()), in30 = iso(new Date(Date.now() + 30 * 864e5));
   const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], open: {} };
-  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec' };
+  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm' };
+  const adm = () => ((P().roles || []).includes('admin'));
 
   async function load() {
     if (L.busy || Date.now() - L.at < 60000) return;
@@ -49,6 +50,18 @@
         ['Handed over', 'All signed, waiting to go live', packs.filter(p => pack.get(p.id) === 'handed_over' && st(p) !== 'active' && st(p) !== 'closed'), p => [link(p), when(p)]],
         ['Activated', 'Live after hand-over', packs.filter(p => st(p) === 'active'), p => [progLink(p), when(p)]]];
     }
+    if (kind === 'adm') { // admin: the whole chain, initiation to close, from the data ApexOne already holds
+      const en = new Map(); (D().enrol || []).forEach(e => { if ((e.status || 'active') === 'active') en.set(e.programme_id, (en.get(e.programme_id) || 0) + 1); });
+      const ended = p => p.end_date && p.end_date < t0, sz = p => +p.group_size || 0, short = p => sz(p) && (en.get(p.id) || 0) < sz(p);
+      const lrn = p => [progLink(p), (en.get(p.id) || 0) + ' of ' + (sz(p) || '?') + ' learners · ' + when(p)];
+      return [
+        ['Initiation', 'PI working, no hand-over pack', PR.filter(p => st(p) === 'initiated' && !pack.has(p.id)), p => [link(p), when(p)]],
+        ['Hand-over', 'Pack being prepared or signed', PR.filter(p => st(p) === 'initiated' && pack.has(p.id)), p => [link(p), (sigs.get(p.id) || 0) + ' of 3 signed · ' + when(p)]],
+        ['Learners', 'Handed over or live, places not filled', PR.filter(p => (st(p) === 'handed_over' || st(p) === 'active') && !ended(p) && short(p)), lrn],
+        ['Delivery', 'Live with learners', PR.filter(p => (st(p) === 'handed_over' || st(p) === 'active') && !ended(p) && !short(p)), lrn],
+        ['Close-out', 'End date passed, not closed', PR.filter(p => st(p) !== 'closed' && st(p) !== 'initiated' && ended(p)), p => [progLink(p), 'ended ' + p.end_date]],
+        ['Closed', 'Finished', PR.filter(p => st(p) === 'closed'), p => [progLink(p), p.end_date ? 'ended ' + p.end_date : '']]];
+    }
     // recruitment: programmes with an intake request or placements
     const req = new Set(L.RQ.map(r => r.programme_id)), pl = new Map();
     L.PL.forEach(x => { const o = pl.get(x.programme_id) || { placed: 0, enrolled: 0 }; o[x.status === 'enrolled' ? 'enrolled' : 'placed']++; pl.set(x.programme_id, o); });
@@ -80,7 +93,7 @@
   }
 
   // upcoming first (soonest on top); programmes still open past their start date go in their own group
-  const stale = (kind, i, p) => p.start_date && p.start_date < t0 && ((kind === 'pm' && i < 2) || (kind === 'so' && i < 3) || kind === 'rec');
+  const stale = (kind, i, p) => p.start_date && p.start_date < t0 && (((kind === 'pm' || kind === 'adm') && i < 2) || (kind === 'so' && i < 3) || kind === 'rec');
   function list(s, kind, i) {
     const row = p => { const [a, b] = s[3](p); return `<div>${a}<span>${esc(b)}</span></div>`; };
     const cap = (arr, n) => arr.slice(0, n).map(row).join('') + (arr.length > n ? `<div><span>+ ${arr.length - n} more</span></div>` : '');
@@ -92,14 +105,14 @@
   }
 
   function draw(r) {
-    const kind = PAGES[r], v = document.getElementById('view-' + r); if (!kind || !v) return;
+    const kind = PAGES[r], v = document.getElementById('view-' + r); if (!kind || !v || (kind === 'adm' && !adm())) return;
     css();
     let box = document.getElementById('lc-' + r);
     if (!box) { box = document.createElement('div'); box.id = 'lc-' + r; box.className = 'lc'; v.prepend(box); }
     const g = stages(kind), o = L.open[r];
-    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle' }[kind];
+    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle', adm: 'ApexOne overview: initiation to close' }[kind];
     box.innerHTML = `<p class="lct"><b>${title}</b> · click a stage to see its programmes${L.at ? '' : ' · loading…'}</p><div class="lcs">` +
-      g.map((s, i) => { const risk = kind !== 'so' || i < 3 ? s[2].filter(p => p.start_date && soon(p)).length : 0;
+      g.map((s, i) => { const risk = kind !== 'so' && kind !== 'adm' || (kind === 'so' ? i < 3 : i < 2) ? s[2].filter(p => p.start_date && soon(p)).length : 0;
         return `<button class="lcb${o === i ? ' on' : ''}" data-i="${i}" aria-expanded="${o === i}"><span class="k">${esc(s[0])}</span><span class="n">${s[2].length}</span><span class="h">${esc(s[1])}</span>${risk && i < 3 ? `<span class="r">${risk} start within 30 days</span>` : ''}${(n => n ? `<span class="h">${n} past start date</span>` : '')(s[2].filter(p => stale(kind, i, p)).length)}</button>`; }).join('') + '</div>' +
       (o != null && g[o] ? `<div class="lcl">${list(g[o], kind, o)}</div>` : '');
     box.querySelectorAll('.lcb').forEach(b => b.onclick = () => { const i = +b.dataset.i; L.open[r] = L.open[r] === i ? null : i; draw(r); });
