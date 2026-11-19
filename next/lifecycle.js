@@ -6,7 +6,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.toISOString().slice(0, 10), t0 = iso(new Date()), in30 = iso(new Date(Date.now() + 30 * 864e5));
   const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], LJ: [], BK: [], FQ: [], AS: [], FR: [], open: {} };
-  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm', learners: 'lrn', fam: 'fam' };
+  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm', learners: 'lrn', fam: 'fam', pi: 'pi' };
   const adm = () => ((P().roles || []).includes('admin'));
 
   async function load() {
@@ -55,6 +55,17 @@
         ['Signing', '1 or 2 of 3 signatures', packs.filter(p => pack.get(p.id) !== 'handed_over' && sigs.get(p.id)), p => [link(p), sigs.get(p.id) + ' of 3 signed · ' + when(p)]],
         ['Handed over', 'All signed, waiting to go live', packs.filter(p => pack.get(p.id) === 'handed_over' && st(p) !== 'active' && st(p) !== 'closed'), p => [link(p), when(p)]],
         ['Activated', 'Live after hand-over', packs.filter(p => st(p) === 'active'), p => [progLink(p), when(p)]]];
+    }
+    if (kind === 'pi') { // Programme Initiation: initiated programmes, from details to hand-over
+      const F = (p, k) => String((p.fields || {})[k] || '').trim();
+      const miss = p => [!p.saqa_id && 'SAQA ID', !(p.start_date && p.end_date) && 'dates', !p.project_manager_name && 'PM', !p.client_id && 'client'].filter(Boolean);
+      const ppl = p => [!F(p, 'facilitator') && 'facilitator', !F(p, 'assessor') && 'assessor'].filter(Boolean);
+      const ini = PR.filter(p => st(p) === 'initiated');
+      return [
+        ['Details missing', 'SAQA ID, dates, PM or client', ini.filter(p => !pack.has(p.id) && miss(p).length), p => [link(p, '#pi'), 'missing ' + miss(p).join(', ') + ' · ' + when(p)]],
+        ['People missing', 'No facilitator or assessor', ini.filter(p => !pack.has(p.id) && !miss(p).length && ppl(p).length), p => [link(p, '#pi'), 'missing ' + ppl(p).join(' and ') + ' · ' + when(p)]],
+        ['Ready', 'Complete, no hand-over pack yet', ini.filter(p => !pack.has(p.id) && !miss(p).length && !ppl(p).length), p => [link(p), when(p)]],
+        ['Hand-over', 'Pack being prepared or signed', ini.filter(p => pack.has(p.id)), p => [link(p), (sigs.get(p.id) || 0) + ' of 3 signed · ' + when(p)]]];
     }
     if (kind === 'lrn') { // learner journey from the report generator's attendance and results (view v_learner_journey)
       const LN = new Map((D().learners || []).map(l => [l.id, l])), nm = l => esc(((l?.first_name || '') + ' ' + (l?.last_name || '')).trim() || 'Learner');
@@ -124,7 +135,7 @@
   }
 
   // upcoming first (soonest on top); programmes still open past their start date go in their own group
-  const stale = (kind, i, p) => p.start_date && p.start_date < t0 && (((kind === 'pm' || kind === 'adm') && i < 2) || (kind === 'so' && i < 3) || kind === 'rec');
+  const stale = (kind, i, p) => p.start_date && p.start_date < t0 && (((kind === 'pm' || kind === 'adm') && i < 2) || kind === 'pi' || (kind === 'so' && i < 3) || kind === 'rec');
   function list(s, kind, i) {
     const row = p => { const [a, b] = s[3](p); return `<div>${a}<span>${esc(b)}</span></div>`; };
     const cap = (arr, n) => arr.slice(0, n).map(row).join('') + (arr.length > n ? `<div><span>+ ${arr.length - n} more</span></div>` : '');
@@ -141,7 +152,7 @@
     let box = document.getElementById('lc-' + r);
     if (!box) { box = document.createElement('div'); box.id = 'lc-' + r; box.className = 'lc'; v.prepend(box); }
     const g = stages(kind), o = L.open[r];
-    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle', lrn: 'Learner journey (from the report generator)', fam: 'Bookings lifecycle', adm: 'ApexOne overview: initiation to close' }[kind];
+    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle', lrn: 'Learner journey (from the report generator)', pi: 'Programme Initiation lifecycle', fam: 'Bookings lifecycle', adm: 'ApexOne overview: initiation to close' }[kind];
     box.innerHTML = `<p class="lct"><b>${title}</b> · click a stage to see its programmes${L.at ? '' : ' · loading…'}</p><div class="lcs">` +
       g.map((s, i) => { const risk = kind !== 'so' && kind !== 'adm' && kind !== 'lrn' && kind !== 'fam' || (kind === 'so' ? i < 3 : i < 2) ? s[2].filter(p => p.start_date && soon(p)).length : 0;
         return `<button class="lcb${o === i ? ' on' : ''}" data-i="${i}" aria-expanded="${o === i}"><span class="k">${esc(s[0])}</span><span class="n">${s[2].length}</span><span class="h">${esc(s[1])}</span>${risk && i < 3 ? `<span class="r">${risk} start within 30 days</span>` : ''}${(n => n ? `<span class="h">${n} past start date</span>` : '')(s[2].filter(p => stale(kind, i, p)).length)}</button>`; }).join('') + '</div>' +
