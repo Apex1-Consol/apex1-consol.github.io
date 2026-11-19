@@ -46,15 +46,19 @@
     for (const f of files) { try { S.pages.push(await load(f)); } catch (e) { say(e.message); } }
     S.cur = S.pages.length - 1; say(''); draw(); strip();
   }
-  window.apxScan = () => pick(async files => {
-    if (!files.length) return; css();
+  /* tapped directly on a real <input type=file> (most reliable on Android) */
+  window.apxScanFiles = inp => { const f = [...(inp.files || [])]; inp.value = ''; if (!f.length) return; if (S && document.getElementById('scanpad')) add(f); else start(f); };
+  window.apxScan = () => pick(start);
+  async function start(files) {
+    if (!files.length) return;
+    css();
     const f = document.getElementById('dkform'), t = f && f.elements.title ? f.elements.title.value.trim() : '';
     S = { pages: [], cur: 0 };
     const d = document.createElement('div'); d.id = 'scanpad';
     d.innerHTML = `<div class="sb"><input id="sct" placeholder="Title (optional)" value="${esc(t)}">
       <button class="btn sm" type="button" onclick="apxScanRot()">⟳ Rotate</button>
       <button class="btn sm" type="button" id="sclook" onclick="apxScanLook()">Scan look: on</button>
-      <button class="btn sm" type="button" onclick="apxScanMore()">+ Page</button>
+      <label class="btn sm" style="cursor:pointer">+ Page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label>
       <button class="btn sm" type="button" onclick="apxScanClose()">Cancel</button>
       <button class="btn sm y" type="button" id="scsave" onclick="apxScanSave()">Save</button>
       <div class="msg" id="scmsg">Drag the corners to the edges of the page.</div></div>
@@ -64,7 +68,7 @@
     cv.addEventListener('pointerdown', down); cv.addEventListener('pointermove', move); cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
     addEventListener('resize', draw);
     await add(files);
-  });
+  }
   window.apxScanClose = (force) => {
     if (!force && S && S.pages.length && !confirm('Discard these scanned pages?')) return;
     const d = document.getElementById('scanpad'); if (d) d.remove(); document.documentElement.style.overflow = ''; removeEventListener('resize', draw); S = null;

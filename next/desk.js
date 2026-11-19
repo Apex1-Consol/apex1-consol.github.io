@@ -50,7 +50,7 @@
         ${inp('prog', 'Programme (optional)', 'list="dkprogs"')}
         ${TAB === 'escalation' || TAB === 'watch' ? inp('owner', 'Owner email', `list="dkowners" value="${esc(me())}"`) + `<input name="due" type="date" class="cellin" style="height:36px">` : ''}
       </div>
-      ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><button type="button" class="btn sm" onclick="apxScan()">📷 Scan page</button></div>` : ''}
+      ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><label class="btn sm" style="cursor:pointer">📷 Scan page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label></div>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
       <div><button class="btn y" type="submit">Save</button></div></form>`;
   }
