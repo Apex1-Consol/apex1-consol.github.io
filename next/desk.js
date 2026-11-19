@@ -148,11 +148,14 @@
       if (o.summary) { f.dataset.orig = f.dataset.orig || f.b.value; f.b.value = String(o.summary); }
       const its = (Array.isArray(o.items) ? o.items : Array.isArray(o.actions) ? o.actions : []).filter(x => x && x.what).slice(0, 20);
       const box = f.querySelector('.dkacts'); box.innerHTML = its.length ? '<b style="font-size:13px">Proposed (tick to add; change type, owner or date):</b>' : '';
+      const wds = t => new Set(String(t || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length > 3));
+      const have = ROWS.filter(z => z.parent_id === Number(f.dataset.id) || (z.kind !== 'action' && z.kind !== 'note' && z.kind !== 'meeting')).map(z => wds(z.title));
+      const dup = t => { const a = wds(t); return a.size && have.some(b => { let n = 0; a.forEach(w => { if (b.has(w)) n++; }); return n / Math.min(a.size, b.size || 1) >= 0.6; }); };
       its.forEach(x => { const ty = /decision/i.test(x.type || '') ? 'decision' : /watch/i.test(x.type || '') ? 'watch' : 'action', dd = /^\d{4}-\d{2}-\d{2}$/.test(x.due || '') ? x.due : '';
         const row = document.createElement('div'); row.className = 'dkprop'; row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:14px;padding:6px 0;border-top:1px solid var(--line)';
-        row.innerHTML = `<input type="checkbox" checked style="width:20px;height:20px;flex:none"><input class="cellin pt" value="${esc(String(x.what).slice(0, 300))}" style="height:34px;flex:3 1 220px">
+        const dp = dup(x.what); row.innerHTML = `<input type="checkbox"${dp ? '' : ' checked'} style="width:20px;height:20px;flex:none" title="${dp ? 'Looks like it is already saved' : ''}"><input class="cellin pt" value="${esc(String(x.what).slice(0, 300))}" style="height:34px;flex:3 1 220px">
           <select class="cellin py" style="height:34px"><option value="action"${ty === 'action' ? ' selected' : ''}>Action</option><option value="decision"${ty === 'decision' ? ' selected' : ''}>Decision</option><option value="watch"${ty === 'watch' ? ' selected' : ''}>Watch item</option></select>
-          <input class="cellin po" list="dkowners" placeholder="Owner email${x.who ? ' (' + esc(x.who) + ')' : ''}" value="${esc(ownerOf(x.who))}" style="height:34px;flex:1 1 170px"><input class="cellin pd" type="date" value="${dd}" style="height:34px">`;
+          <input class="cellin po" list="dkowners" placeholder="Owner email${x.who ? ' (' + esc(x.who) + ')' : ''}" value="${esc(ownerOf(x.who))}" style="height:34px;flex:1 1 170px"><input class="cellin pd" type="date" value="${dd}" style="height:34px">${dp ? '<span class="famas">already saved?</span>' : ''}`;
         box.appendChild(row); });
       carry(f);
       msg.innerHTML = 'Check the fields, then Save.' + (f.dataset.orig ? ' <a href="#" onclick="event.preventDefault();const f=this.closest(\'form\');f.b.value=f.dataset.orig">Undo text</a>' : '');
