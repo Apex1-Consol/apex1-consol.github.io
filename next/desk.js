@@ -21,6 +21,7 @@
     if (location.hash.slice(1) === 'desk') render();
     if (window.previewShell) try { window.previewShell(); } catch (e) {}
   }
+  window.apxDeskReload = () => load();
   async function run(fn, ok) { const { error } = await fn(); if (error) { say('Not saved: ' + error.message); return false; } if (ok) say(ok); await load(); return true; }
 
   // ---------- My work hook ----------
@@ -49,6 +50,7 @@
         ${inp('prog', 'Programme (optional)', 'list="dkprogs"')}
         ${TAB === 'escalation' || TAB === 'watch' ? inp('owner', 'Owner email', `list="dkowners" value="${esc(me())}"`) + `<input name="due" type="date" class="cellin" style="height:36px">` : ''}
       </div>
+      ${TAB === 'note' ? `<button type="button" class="btn sm" onclick="apxInk()" style="align-self:flex-start">✎ Ink note (S Pen)</button>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
       <div><button class="btn y" type="submit">Save</button></div></form>`;
   }
@@ -75,6 +77,7 @@
         ${r.kind !== 'decision' ? `<button class="btn sm" onclick="apxDeskSet(${r.id},${r.status === 'open'})">${r.status === 'open' ? ({ escalation: 'Resolve', watch: 'Done' }[r.kind] || 'Close') : 'Reopen'}</button>` : ''}
         <button class="btn sm" onclick="apxDeskDel(${r.id})" aria-label="Delete">Delete</button></div>
       <span class="famas">${esc(meta)}</span>
+      ${r.ink && window.apxInkSvg ? apxInkSvg(r.ink) : ''}
       ${r.body ? `<div style="white-space:pre-wrap;font-size:14px">${esc(r.body)}</div>` : ''}
       ${TAB === 'note' ? actionsOf(r) : ''}</div>`;
   }
