@@ -6,7 +6,7 @@
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.toISOString().slice(0, 10), t0 = iso(new Date()), in30 = iso(new Date(Date.now() + 30 * 864e5));
   const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], open: {} };
-  const PAGES = { pmtracker: 'pm', signoff: 'so', intake: 'rec' };
+  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec' };
 
   async function load() {
     if (L.busy || Date.now() - L.at < 60000) return;
@@ -116,5 +116,24 @@
   mo.observe(document.body, { childList: true, subtree: true });
   addEventListener('hashchange', () => setTimeout(run, 50));
   let tries = 0; const boot = setInterval(() => { if ((D().progs || []).length || ++tries > 60) { clearInterval(boot); run(); } }, 1000);
+  // Menu in lifecycle order + a Hand-over page (/next/ only)
+  try {
+    const main = document.getElementById('view-signoff');
+    if (main && !document.getElementById('view-handovers')) { const m = document.createElement('main'); m.id = 'view-handovers'; m.hidden = true;
+      m.innerHTML = '<p class="sub" style="margin:0 0 12px">Every programme between initiation and go-live. Initiator prepares and signs, Compliance verifies, Head of Ops signs, then the PM accepts. Click a programme to open its pack.</p>';
+      main.after(m); }
+    ROUTES.handovers = ['Hand-over', 'Set-up']; PARENT.handover = 'handovers'; ROUTES.handover[1] = 'Set-up';
+    const G = n => (NAV.find(g => g[0] === n) || [])[1], pick = (g, rs) => { const all = G(g); if (!all) return; const by = new Map(all.map(x => [x[1], x]));
+      const out = rs.map(r => by.get(r) || (r === 'handovers' ? ['Hand-over', 'handovers'] : null)).filter(Boolean); all.forEach(x => { if (!rs.includes(x[1])) out.push(x); }); all.length = 0; all.push(...out); };
+    const prog = G('Set-up') && G('Set-up').find(x => x[1] === 'programmes');
+    if (prog) { G('Set-up').splice(G('Set-up').indexOf(prog), 1); const d = G('Delivery'); if (d && !d.some(x => x[1] === 'programmes')) d.unshift(prog); }
+    pick('Set-up', ['clients', 'accred', 'fam', 'pi', 'handovers']);
+    pick('Learners', ['intake', 'enrolments', 'learners', 'dq']);
+    if (ROUTES.programmes) ROUTES.programmes[1] = 'Delivery';
+    if (typeof renderNav === 'function') renderNav(typeof curNav !== 'undefined' ? curNav : null);
+    if (cur() === 'handovers') window.route();
+  } catch (e) { console.warn('lifecycle nav', e); }
+  addEventListener('hashchange', () => { if (cur() === 'handovers' && L.open.handovers == null) L.open.handovers = 0; });
+  if (cur() === 'handovers') L.open.handovers = 0;
   window.apxLifecycle = { run, stages };
 })();
