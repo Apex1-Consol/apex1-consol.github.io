@@ -114,7 +114,14 @@
   const mo = new MutationObserver(() => { const r = cur(); if (PAGES[r] && document.getElementById('view-' + r) && !document.getElementById('lc-' + r) && L.at) draw(r); });
   mo.observe(document.body, { childList: true, subtree: true });
   addEventListener('hashchange', () => setTimeout(run, 50));
-  let tries = 0; const boot = setInterval(() => { if ((D().progs || []).length || ++tries > 60) { clearInterval(boot); run(); } }, 1000);
+  // Hand-over menu: icon + count (packs not yet handed over; red if any start within 30 days)
+  try { ICO.handovers = 'M14 3H6v18h12V7zM14 3v4h4M9 14l2 2 4-4'; } catch (_) {}
+  const hoN = () => { const by = new Map((D().progs || []).map(p => [p.id, p])); const xs = L.HS.filter(h => h.status !== 'handed_over').map(h => by.get(h.programme_id)).filter(p => p && p.status !== 'closed');
+    return { n: xs.length, r: xs.some(soon) }; };
+  const wrapDot = () => { const f = window.apxNavDot; if (f && f.__ho) return; const g = r => { if (r !== 'handovers') return f ? f(r) : ''; const { n, r: red } = hoN();
+    return n ? `<span class="navcnt ${red ? 'r' : 'a'}" aria-label="${n} hand-over packs in progress${red ? ', some start within 30 days' : ''}">${n}</span>` : ''; }; g.__ho = 1; if (f) { g.__flow = f.__flow; g.__intk = f.__intk; } window.apxNavDot = g; };
+  const nav = () => { try { wrapDot(); renderNav(curNav); } catch (_) {} };
+  let tries = 0; const boot = setInterval(async () => { if ((D().progs || []).length || ++tries > 60) { clearInterval(boot); run(); await load(); nav(); } }, 1000);
   // Menu in lifecycle order + a Hand-over page (/next/ only)
   try {
     const main = document.getElementById('view-signoff');
