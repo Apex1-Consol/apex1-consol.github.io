@@ -5,8 +5,8 @@
   const P = () => window.__preview || {}, D = () => P().data || {}, sb = () => window.__sb;
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const iso = d => d.toISOString().slice(0, 10), t0 = iso(new Date()), in30 = iso(new Date(Date.now() + 30 * 864e5));
-  const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], open: {} };
-  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm' };
+  const L = { at: 0, busy: false, HS: [], SG: [], RQ: [], PL: [], LJ: [], BK: [], FQ: [], AS: [], open: {} };
+  const PAGES = { pmtracker: 'pm', handovers: 'so', intake: 'rec', mywork: 'adm', learners: 'lrn', fam: 'fam' };
   const adm = () => ((P().roles || []).includes('admin'));
 
   async function load() {
@@ -14,11 +14,16 @@
     L.busy = true;
     const q = async p => { try { const r = await p; return r.data || []; } catch (_) { return []; } };
     const s = sb(); if (!s) { L.busy = false; return; }
-    [L.HS, L.SG, L.RQ, L.PL] = await Promise.all([
+    [L.HS, L.SG, L.RQ, L.PL, L.LJ, L.BK, L.FQ, L.AS] = await Promise.all([
       q(s.from('handoff_signoffs').select('programme_id,status')),
       q(s.from('handoff_signatures').select('programme_id,role').is('invalidated_at', null)),
       q(s.from('intake_requests').select('programme_id')),
-      q(s.from('intake_placements').select('programme_id,status'))]);
+      q(s.from('intake_placements').select('programme_id,status')),
+      q(s.from('v_learner_journey').select('learner_id,programme_id,att_pct,att_rows,mods_outstanding,journey_status')),
+      q(s.from('fam_bookings').select('id,assessor_id,role,title,client_name,start_date,end_date,status').neq('status', 'Cancelled')),
+      q(s.from('fam_quality').select('assessor_id,created_at')),
+      q(s.from('assessors').select('id,full_name'))]);
+    window.apxLJ = L.LJ; window.shRefresh && shRefresh();
     L.at = Date.now(); L.busy = false;
   }
 
@@ -49,6 +54,29 @@
         ['Signing', '1 or 2 of 3 signatures', packs.filter(p => pack.get(p.id) !== 'handed_over' && sigs.get(p.id)), p => [link(p), sigs.get(p.id) + ' of 3 signed · ' + when(p)]],
         ['Handed over', 'All signed, waiting to go live', packs.filter(p => pack.get(p.id) === 'handed_over' && st(p) !== 'active' && st(p) !== 'closed'), p => [link(p), when(p)]],
         ['Activated', 'Live after hand-over', packs.filter(p => st(p) === 'active'), p => [progLink(p), when(p)]]];
+    }
+    if (kind === 'lrn') { // learner journey from the report generator's attendance and results (view v_learner_journey)
+      const LN = new Map((D().learners || []).map(l => [l.id, l])), nm = l => esc(((l?.first_name || '') + ' ' + (l?.last_name || '')).trim() || 'Learner');
+      const row = x => [`<a href="#learners" onclick="try{shOpen(${+x.programme_id},${+x.learner_id})}catch(_){}">${nm(LN.get(x.learner_id))}</a>`, name(by.get(x.programme_id) || { id: x.programme_id }) + (x.att_pct != null ? ' · attendance ' + x.att_pct + '%' : '') + (x.mods_outstanding ? ' · ' + x.mods_outstanding + ' module' + (x.mods_outstanding > 1 ? 's' : '') + ' NYC/NS/RW' : '')];
+      const J = k => L.LJ.filter(x => x.journey_status === k);
+      return [
+        ['No data', 'No attendance or results in the report generator', J('No data'), row],
+        ['Active', 'Attending, no results outstanding', J('Active'), row],
+        ['At risk', 'Attendance under 80% or NYC/NS/RW', J('At risk'), row],
+        ['Left', 'Terminated or resigned', J('Left'), row],
+        ['Completed', 'Competent', J('Completed, competent'), row],
+        ['Not yet competent', 'Programme ended, results outstanding', J('Completed, not yet competent'), row],
+        ['No results', 'Programme ended, no results captured', J('Completed, no results'), row]];
+    }
+    if (kind === 'fam') { // FAM bookings: reviewed = a quality review for that person on or after the booking ended
+      const AN = new Map(L.AS.map(a => [a.id, a.full_name])), rv = b => L.FQ.some(q => q.assessor_id === b.assessor_id && String(q.created_at).slice(0, 10) >= String(b.end_date));
+      const row = b => [`<a href="#fam/calendar">${esc(AN.get(b.assessor_id) || 'Person')}</a>`, [b.role, b.title || b.client_name, (b.start_date || '?') + ' to ' + (b.end_date || '?')].filter(Boolean).join(' · ')];
+      const ended = b => b.end_date && b.end_date < t0;
+      return [
+        ['Booked', 'Not started yet', L.BK.filter(b => b.start_date && b.start_date > t0), row],
+        ['Running', 'On now', L.BK.filter(b => !(b.start_date > t0) && !ended(b)), row],
+        ['Review due', 'Ended, no moderation review', L.BK.filter(b => ended(b) && !rv(b)), row],
+        ['Reviewed', 'Ended and reviewed', L.BK.filter(b => ended(b) && rv(b)), row]];
     }
     if (kind === 'adm') { // admin: the whole chain, initiation to close, from the data ApexOne already holds
       const en = new Map(); (D().enrol || []).forEach(e => { if ((e.status || 'active') === 'active') en.set(e.programme_id, (en.get(e.programme_id) || 0) + 1); });
@@ -110,9 +138,9 @@
     let box = document.getElementById('lc-' + r);
     if (!box) { box = document.createElement('div'); box.id = 'lc-' + r; box.className = 'lc'; v.prepend(box); }
     const g = stages(kind), o = L.open[r];
-    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle', adm: 'ApexOne overview: initiation to close' }[kind];
+    const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle', lrn: 'Learner journey (from the report generator)', fam: 'Bookings lifecycle', adm: 'ApexOne overview: initiation to close' }[kind];
     box.innerHTML = `<p class="lct"><b>${title}</b> · click a stage to see its programmes${L.at ? '' : ' · loading…'}</p><div class="lcs">` +
-      g.map((s, i) => { const risk = kind !== 'so' && kind !== 'adm' || (kind === 'so' ? i < 3 : i < 2) ? s[2].filter(p => p.start_date && soon(p)).length : 0;
+      g.map((s, i) => { const risk = kind !== 'so' && kind !== 'adm' && kind !== 'lrn' && kind !== 'fam' || (kind === 'so' ? i < 3 : i < 2) ? s[2].filter(p => p.start_date && soon(p)).length : 0;
         return `<button class="lcb${o === i ? ' on' : ''}" data-i="${i}" aria-expanded="${o === i}"><span class="k">${esc(s[0])}</span><span class="n">${s[2].length}</span><span class="h">${esc(s[1])}</span>${risk && i < 3 ? `<span class="r">${risk} start within 30 days</span>` : ''}${(n => n ? `<span class="h">${n} past start date</span>` : '')(s[2].filter(p => stale(kind, i, p)).length)}</button>`; }).join('') + '</div>' +
       (o != null && g[o] ? `<div class="lcl">${list(g[o], kind, o)}</div>` : '');
     box.querySelectorAll('.lcb').forEach(b => b.onclick = () => { const i = +b.dataset.i; L.open[r] = L.open[r] === i ? null : i; draw(r); });
