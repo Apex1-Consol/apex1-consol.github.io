@@ -104,7 +104,7 @@
     box.innerHTML = open.length ? `<div class="card" style="padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px"><span style="flex:1">${open.length} action${open.length > 1 ? 's' : ''} still open from <b>${esc(prev.title)}</b> (${esc(String(prev.created_at).slice(0, 10))}).</span><button type="button" class="btn sm">Carry over</button></div>` : '';
     const b = box.querySelector('button'); if (b) b.onclick = () => run(() => sb.from('desk_notes').update({ parent_id: r.id, updated_at: new Date().toISOString() }).in('id', open.map(a => a.id)), `${open.length} action${open.length > 1 ? 's' : ''} carried over`);
   }
-  window.__desk = { rows: () => ROWS, staff: () => STAFF, series, pn, progs, sname, me, isAdmin, reload: () => load(), say, esc, iso };
+  window.__desk = { rows: () => ROWS, staff: () => STAFF, series, pn, progs, sname: e => sname(e), me, isAdmin, reload: () => load(), say, esc, iso };
   window.apxDeskHist = id => {
     const r = ROWS.find(x => x.id === id); if (!r) return;
     const all = [r].concat(series(r)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
