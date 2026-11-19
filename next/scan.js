@@ -27,8 +27,12 @@
 
   /* ---------- open: pick photos (Android offers camera or gallery) ---------- */
   function pick(cb) {
-    const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.multiple = true;
-    i.onchange = () => cb([...i.files]); i.click();
+    /* kept in the page until picked: Chrome on Android can drop a detached input and never fire change */
+    const o = document.getElementById('scfile'); if (o) o.remove();
+    const i = document.createElement('input'); i.type = 'file'; i.accept = 'image/*'; i.multiple = true; i.id = 'scfile';
+    i.style.cssText = 'position:fixed;left:-9999px;opacity:0'; document.body.appendChild(i);
+    let fired = 0; const go = () => { if (fired++) return; const f = [...i.files]; i.remove(); if (f.length) cb(f); };
+    i.addEventListener('change', go); i.addEventListener('input', go, { once: true }); i.click();
   }
   function load(f) {
     return new Promise((ok, no) => { const u = URL.createObjectURL(f), im = new Image();
