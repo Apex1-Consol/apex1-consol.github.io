@@ -301,12 +301,12 @@
     async el => { const row = await learnerVals(el, null); const r = await write('Learner', () => sb.from('learners').insert({ tenant_id: P.tenant, ...row }).select('id'));
       const lid = r?.[0]?.id; if (lid && el.prog.value) await enrolInsert(+el.prog.value, [lid], { Status: 'Active' }); if (lid) setTimeout(() => { location.hash = 'learner/' + lid; }, 0); });
   /* Learner import from Excel (replaces the old app's Smart Import for learners). Step 1 reads and checks the file; step 2 saves. */
-  const IMAP = { fn: /^(first ?names?|name|given ?names?)$/, ln: /^(last ?name|surname|family ?name)$/, nid: /^(national ?id|sa ?id( ?number)?|id ?(number|no\.?)?|identity ?number)$/, dob: /^(dob|date ?of ?birth|birth ?date)$/,
+  const IMAP = { fn: /^(first ?names?|name|given ?names?)$/, ln: /^(last ?name|surname|family ?name)$/, nid: /^(national ?id|sa ?id( ?number)?|id ?(number|no\.?)?|identity ?number)$/, pp: /^(passport( ?(number|no\.?))?)$/, dob: /^(dob|date ?of ?birth|birth ?date)$/,
     gender: /^(gender|sex)$/, prov: /^province$/, email: /^(e-?mail( ?address)?)$/, phone: /^(phone|cell(phone)?|mobile|contact ?(number|no\.?)?|tel(ephone)?)$/, emp: /^(employment( ?status)?|employed)$/ };
   let IMP = null;
   window.previewImpReset = () => { IMP = null; const b = $('limpfsave'); if (b) b.textContent = 'Check file'; const m = $('limpsum'); if (m) m.textContent = ''; };
   window.previewLearnerImport = () => { IMP = null; const progs = P.data.progs.slice().sort((a, b) => (a.programme_name || '').localeCompare(b.programme_name || ''));
-    dlg('limpf', 'Import learners from Excel', `<p class="sub">First sheet, one learner per row. Columns are matched by heading: First name, Last name, ID number, Date of birth, Gender, Province, Email, Phone, Employment. Rows with an invalid or already-used ID number are skipped.</p>
+    dlg('limpf', 'Import learners from Excel', `<p class="sub">First sheet, one learner per row. Columns are matched by heading: First name, Last name, ID number, Passport number, Date of birth, Gender, Province, Email, Phone, Employment. Rows with no valid SA ID or passport number, or an already-used ID number, are skipped.</p>
       <input type="file" name="file" accept=".xlsx,.xls,.csv" required onchange="previewImpReset()">
       <label style="font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px">Enrol everyone on (optional)<select name="prog" style="height:36px;border:1px solid var(--line);border-radius:8px;padding:0 8px;font:inherit;background:transparent;color:inherit"><option value="">No enrolment</option>${progs.map(p => `<option value="${p.id}">${esc(p.programme_name || 'Programme ' + p.id)}</option>`).join('')}</select></label>
       <div id="limpsum" class="sub"></div>`, async el => {
@@ -324,13 +324,14 @@
     if (!col.fn || !col.ln) throw new Error('Need a "First name" and a "Last name" column. Found: ' + heads.join(', '));
     const seen = new Set(P.data.learners.map(lIdn).filter(Boolean)), ok = [], skip = [];
     for (const [i, r] of rows.entries()) {
-      const g = k => col[k] ? String(r[col[k]] ?? '').trim() : '', fn = g('fn'), ln = g('ln'), nid = g('nid').replace(/\s/g, ''), line = i + 2;
+      const g = k => col[k] ? String(r[col[k]] ?? '').trim() : '', fn = g('fn'), ln = g('ln'), nid = g('nid').replace(/\s/g, ''), pp = g('pp'), line = i + 2;
       if (!fn && !ln) continue;
       if (!fn || !ln) { skip.push(`Row ${line}: name missing`); continue; }
+      if (!nid && !pp) { skip.push(`Row ${line} ${fn} ${ln}: no SA ID or passport number`); continue; }
       if (nid && !said(nid)) { skip.push(`Row ${line} ${fn} ${ln}: invalid ID number`); continue; }
       if (nid && seen.has(nid)) { skip.push(`Row ${line} ${fn} ${ln}: ID number already on record`); continue; }
       if (nid) { try { const { data } = await sb.rpc('check_learner_duplicate', { p_tenant_id: P.tenant, p_id_number: nid }); if ((data || []).length) { skip.push(`Row ${line} ${fn} ${ln}: ID number already on record`); continue; } } catch (e) {} seen.add(nid); }
-      const fields = { 'First Name': fn, 'Last Name': ln, 'National ID': nid, DOB: g('dob'), Gender: g('gender'), Province: g('prov'), Email: g('email'), Phone: g('phone'), Employment: g('emp') };
+      const fields = { 'First Name': fn, 'Last Name': ln, 'National ID': nid, Passport: pp, DOB: g('dob'), Gender: g('gender'), Province: g('prov'), Email: g('email'), Phone: g('phone'), Employment: g('emp') };
       Object.keys(fields).forEach(k => { if (!fields[k]) delete fields[k]; });
       ok.push({ first_name: fn, last_name: ln, id_number: nid || null, email: g('email') || null, phone: g('phone') || null, fields });
     }
