@@ -22,11 +22,12 @@
     if (window.previewShell) try { window.previewShell(); } catch (e) {}
   }
   window.apxDeskReload = () => load();
-  let EXTRA = []; (async () => { try { const { data } = await sb.from('handoff_default_signers').select('email'); EXTRA = (data || []).map(x => String(x.email || '').toLowerCase()).filter(Boolean); } catch (e) {} })();
+  let EXTRA = [], STAFF = []; (async () => { try { const { data } = await sb.rpc('apx_staff'); STAFF = (data || []).filter(x => x.email).map(x => ({ n: String(x.name || '').toLowerCase(), e: String(x.email).toLowerCase() })); EXTRA = STAFF.map(x => x.e); } catch (e) {} })();
   const known = () => [...new Set(ROWS.map(r => (r.owner_email || '').toLowerCase()).filter(Boolean).concat(EXTRA, me()))];
   /* name from Ava ("Kathleen") -> staff email, matched on this device only (emails never go to Ava) */
   const ownerOf = who => { const ws = String(who || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 3 && !['pms', 'all', 'team', 'the', 'and', 'staff', 'admin', 'everyone'].includes(w)); if (!ws.length) return '';
-    for (const w of ws) { const h = known().filter(e => e.split('@')[0].split(/[^a-z]+/).some(p => p === w || (w.length >= 4 && p.startsWith(w)))); if (h.length === 1) return h[0]; } return ''; };
+    const nm = e => ((STAFF.find(s => s.e === e) || {}).n || '') + ' ' + e.split('@')[0];
+    for (const w of ws) { const h = known().filter(e => nm(e).split(/[^a-z]+/).some(p => p === w || (w.length >= 4 && p.startsWith(w)))); if (h.length === 1) return h[0]; } return ''; };
   async function run(fn, ok) { const { error } = await fn(); if (error) { say('Not saved: ' + error.message); return false; } if (ok) say(ok); await load(); return true; }
 
   // ---------- My work hook ----------
@@ -103,7 +104,7 @@
   const TABS = [['note', 'Notes & meetings'], ['escalation', 'Escalations'], ['decision', 'Decisions'], ['watch', 'Watch items'], ['comp', 'Compliance watch']];
   const inKind = r => TAB === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === TAB;
   const progOpts = () => `<datalist id="dkprogs">${progs().filter(p => !p.deleted_at).map(p => `<option value="#${p.id} ${esc(p.programme_name || '')}">`).join('')}</datalist>`;
-  const ownerOpts = () => `<datalist id="dkowners">${known().map(e => `<option value="${esc(e)}">`).join('')}</datalist>`;
+  const ownerOpts = () => `<datalist id="dkowners">${known().map(e => `<option value="${esc(e)}">${esc((STAFF.find(s => s.e === e) || {}).n || '')}</option>`).join('')}</datalist>`;
   const pid = v => { const m = String(v || '').match(/^#(\d+)/); return m ? Number(m[1]) : null; };
   const inp = (n, ph, extra = '') => `<input name="${n}" class="cellin" placeholder="${ph}" style="height:36px;flex:1 1 180px" ${extra}>`;
 
