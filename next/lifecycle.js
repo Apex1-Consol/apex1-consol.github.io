@@ -80,6 +80,18 @@
     document.head.appendChild(s);
   }
 
+  // upcoming first (soonest on top); programmes still open past their start date go in their own group
+  const stale = (kind, i, p) => p.start_date && p.start_date < t0 && ((kind === 'pm' && i < 2) || (kind === 'so' && i < 3) || kind === 'rec');
+  function list(s, kind, i) {
+    const row = p => { const [a, b] = s[3](p); return `<div>${a}<span>${esc(b)}</span></div>`; };
+    const cap = (arr, n) => arr.slice(0, n).map(row).join('') + (arr.length > n ? `<div><span>+ ${arr.length - n} more</span></div>` : '');
+    const old = s[2].filter(p => stale(kind, i, p)).sort((a, b) => String(b.start_date).localeCompare(String(a.start_date)));
+    const up = s[2].filter(p => !stale(kind, i, p)).sort((a, b) => String(a.start_date || '9').localeCompare(String(b.start_date || '9')));
+    if (!s[2].length) return '<div><span>Nothing at this stage.</span></div>';
+    return (up.length ? cap(up, 40) : '<div><span>Nothing upcoming at this stage.</span></div>') +
+      (old.length ? `<p class="lct" style="margin:10px 0 2px;color:var(--bad,#b42318)"><b>Past start date (${old.length})</b> · status not moved on. The PM should update or close these.</p>` + cap(old, 40) : '');
+  }
+
   function draw(r) {
     const kind = PAGES[r], v = document.getElementById('view-' + r); if (!kind || !v) return;
     css();
@@ -89,8 +101,8 @@
     const title = { pm: 'Programme lifecycle', so: 'Hand-over signing', rec: 'Recruitment lifecycle' }[kind];
     box.innerHTML = `<p class="lct"><b>${title}</b> · click a stage to see its programmes${L.at ? '' : ' · loading…'}</p><div class="lcs">` +
       g.map((s, i) => { const risk = kind !== 'so' || i < 3 ? s[2].filter(p => p.start_date && soon(p)).length : 0;
-        return `<button class="lcb${o === i ? ' on' : ''}" data-i="${i}" aria-expanded="${o === i}"><span class="k">${esc(s[0])}</span><span class="n">${s[2].length}</span><span class="h">${esc(s[1])}</span>${risk && i < 3 ? `<span class="r">${risk} start within 30 days</span>` : ''}</button>`; }).join('') + '</div>' +
-      (o != null && g[o] ? `<div class="lcl">${g[o][2].length ? g[o][2].slice().sort((a, b) => String(a.start_date || '9').localeCompare(String(b.start_date || '9'))).slice(0, 40).map(p => { const [a, b] = g[o][3](p); return `<div>${a}<span>${esc(b)}</span></div>`; }).join('') + (g[o][2].length > 40 ? `<div><span>+ ${g[o][2].length - 40} more</span></div>` : '') : '<div><span>Nothing at this stage.</span></div>'}</div>` : '');
+        return `<button class="lcb${o === i ? ' on' : ''}" data-i="${i}" aria-expanded="${o === i}"><span class="k">${esc(s[0])}</span><span class="n">${s[2].length}</span><span class="h">${esc(s[1])}</span>${risk && i < 3 ? `<span class="r">${risk} start within 30 days</span>` : ''}${(n => n ? `<span class="h">${n} past start date</span>` : '')(s[2].filter(p => stale(kind, i, p)).length)}</button>`; }).join('') + '</div>' +
+      (o != null && g[o] ? `<div class="lcl">${list(g[o], kind, o)}</div>` : '');
     box.querySelectorAll('.lcb').forEach(b => b.onclick = () => { const i = +b.dataset.i; L.open[r] = L.open[r] === i ? null : i; draw(r); });
   }
 
