@@ -32,14 +32,50 @@
   window.apxDeskEdit = (id, b) => {
     const r = ROWS.find(x => x.id === id), c = b.closest('.card'); if (!r || !c || c.querySelector('.dkedit')) return;
     const f = document.createElement('form'); f.className = 'dkedit'; f.style.cssText = 'display:flex;flex-direction:column;gap:6px';
-    f.innerHTML = `<input name="t" class="cellin" style="height:36px" value="${esc(r.title)}" required>
-      <textarea name="b" class="cellin" rows="6" style="padding:8px;font:inherit" placeholder="Typed notes / summary (Ava can tidy this)">${esc(r.body || '')}</textarea>
-      <div style="display:flex;gap:8px"><button class="btn y sm" type="submit">Save</button><button class="btn sm" type="button">Cancel</button></div>`;
-    f.querySelector('button[type=button]').onclick = () => f.remove();
-    f.onsubmit = e => { e.preventDefault(); const t = f.t.value.trim(); if (!t) return;
-      run(() => sb.from('desk_notes').update({ title: t, body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), 'Saved'); };
+    f.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:6px"><select name="k" class="cellin" style="height:36px"><option value="meeting"${r.kind === 'meeting' ? ' selected' : ''}>Meeting</option><option value="note"${r.kind === 'note' ? ' selected' : ''}>Note</option></select>
+      <input name="t" class="cellin" style="height:36px;flex:2;min-width:180px" value="${esc(r.title)}" placeholder="Title" required>
+      <input name="p" class="cellin" style="height:36px;flex:1;min-width:150px" value="${esc(r.person || '')}" placeholder="Attendees / person">
+      <input name="g" class="cellin" style="height:36px;flex:1;min-width:150px" list="dkprogs" value="${esc(pn(r.programme_id))}" placeholder="Programme (optional)"></div>
+      <textarea name="b" class="cellin" rows="8" style="padding:8px;font:inherit" placeholder="Paste the text from your scan here (Gallery → T Extract text → Copy all), then tap Fill with Ava">${esc(r.body || '')}</textarea>
+      <div class="dkacts" style="display:flex;flex-direction:column;gap:4px"></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn y sm" type="submit">Save</button><button class="btn sm" type="button" data-x="fill">✨ Fill with Ava</button><button class="btn sm" type="button" data-x="cancel">Cancel</button><span class="dkmsg" style="font-size:12px"></span></div>`;
+    f.querySelector('[data-x=cancel]').onclick = () => f.remove();
+    f.querySelector('[data-x=fill]').onclick = () => fillAva(f);
+    f.onsubmit = async e => { e.preventDefault(); const t = f.t.value.trim(); if (!t) return;
+      const acts = [...f.querySelectorAll('.dkacts input:checked')].map(x => JSON.parse(x.value));
+      if (acts.length) { const { error } = await sb.from('desk_notes').insert(acts.map(a => ({ kind: 'action', parent_id: id, title: a.t, due_date: a.d || null, programme_id: pid(f.g.value) || r.programme_id || null, person: t }))); if (error) { say('Actions not saved: ' + error.message); return; } }
+      run(() => sb.from('desk_notes').update({ kind: f.k.value, title: t, person: f.p.value.trim() || null, programme_id: pid(f.g.value), body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), acts.length ? `Saved with ${acts.length} action${acts.length > 1 ? 's' : ''}` : 'Saved'); };
     c.querySelector('.famas').after(f); f.b.focus();
   };
+  /* Fill with Ava: typed/pasted text only (never the scan image), emails/phones/ID numbers removed. Ava proposes; you check and Save. */
+  const scrubT = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/\b\d{13}\b/g, '[ID number]').replace(/(\+?\d[\d ()-]{7,}\d)/g, '[number]').slice(0, 4000);
+  async function fillAva(f) {
+    const msg = f.querySelector('.dkmsg'), txt = scrubT(f.b.value);
+    if (!txt.trim()) { msg.textContent = 'Paste or type the note text first.'; return; }
+    if (!confirm('Ava gets only this text (never the photo), with emails, phone and ID numbers removed. Names in the text will still be sent. Continue?')) return;
+    msg.textContent = 'Ava is reading…';
+    try {
+      const { data } = await sb.auth.getSession(), tok = data.session && data.session.access_token; if (!tok) throw new Error('Please sign in again.');
+      const q = 'Turn the NOTES in the facts into structured meeting notes. Reply with ONLY one JSON object, no other text: {"title":"short title","kind":"meeting or note","attendees":"comma separated names or empty","programme":"programme or client name if mentioned, else empty","summary":"well structured notes in plain text: short headings and - bullet points, keep every fact, fix spelling, do not invent anything","actions":[{"what":"action, include who if known","due":"YYYY-MM-DD or empty"}]}. Today is ' + iso() + '.';
+      const res = await fetch(sb.supabaseUrl + '/functions/v1/ava', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ type: 'ava', mode: 'ask', question: q, page: 'My desk', facts: 'NOTES:\n' + txt, history: [] }) });
+      const j = await res.json().catch(() => null);
+      if (res.status === 429) throw new Error('Ava is busy (free AI limit). Try again in a minute.');
+      if (!res.ok || !j || j.ok === false) throw new Error((j && j.error) || 'Request failed');
+      const a = String(j.answer || ''), m = a.match(/\{[\s\S]*\}/); if (!m) throw new Error('Ava did not return notes. Try again.');
+      const o = JSON.parse(m[0]);
+      if (o.title) f.t.value = String(o.title).slice(0, 140);
+      if (/meeting|note/.test(o.kind || '')) f.k.value = /meeting/.test(o.kind) ? 'meeting' : 'note';
+      if (o.attendees && !f.p.value.trim()) f.p.value = String(o.attendees).slice(0, 200);
+      if (o.programme && !pid(f.g.value)) { const g = String(o.programme).toLowerCase(), n = (g.match(/#?(\d{2,5})/) || [])[1];
+        const hit = progs().filter(p => !p.deleted_at && (n ? String(p.id) === n : (p.programme_name || '').toLowerCase().includes(g)));
+        if (hit.length === 1) f.g.value = `#${hit[0].id} ${hit[0].programme_name || ''}`; }
+      if (o.summary) { f.dataset.orig = f.dataset.orig || f.b.value; f.b.value = String(o.summary); }
+      const acts = (Array.isArray(o.actions) ? o.actions : []).filter(x => x && x.what).slice(0, 15);
+      f.querySelector('.dkacts').innerHTML = acts.length ? '<b style="font-size:13px">Proposed actions (tick to add):</b>' + acts.map(x => { const d = /^\d{4}-\d{2}-\d{2}$/.test(x.due || '') ? x.due : '';
+        return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px"><input type="checkbox" checked value="${esc(JSON.stringify({ t: String(x.what).slice(0, 300), d }))}" style="width:20px;height:20px;flex:none"><span>${esc(x.what)}${d ? ' · due ' + d : ''}</span></label>`; }).join('') : '';
+      msg.innerHTML = 'Check the fields, then Save.' + (f.dataset.orig ? ' <a href="#" onclick="event.preventDefault();const f=this.closest(\'form\');f.b.value=f.dataset.orig">Undo text</a>' : '');
+    } catch (e) { msg.textContent = 'Sorry: ' + e.message; }
+  }
   window.apxDeskDone = id => run(() => sb.from('desk_notes').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', id), 'Marked done');
 
   // ---------- page ----------
