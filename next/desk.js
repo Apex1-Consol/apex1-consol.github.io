@@ -64,6 +64,13 @@
     f.onsubmit = e => { e.preventDefault(); run(() => sb.from('desk_notes').update({ owner_email: f.o.value.trim().toLowerCase() || null, due_date: f.d.value || null, updated_at: new Date().toISOString() }).eq('id', id), 'Saved'); };
     b.parentElement.style.flexWrap = 'wrap'; b.after(f); f.o.focus();
   };
+  /* one tap after "Copy all" in Gallery T / Live Text: paste clipboard into a new note, then Fill with Ava */
+  window.apxDeskPaste = async () => {
+    const f = $('dkform').elements; let t = '';
+    try { t = await navigator.clipboard.readText(); } catch (e) { say('Allow clipboard access, or long-press the notes box and tap Paste.'); f.body.focus(); return; }
+    if (!t.trim()) { say('Nothing copied yet. In Gallery tap T, then Copy all.'); return; }
+    f.body.value = (f.body.value.trim() ? f.body.value.trim() + '\n' : '') + t.trim(); apxDeskAddFill();
+  };
   /* new note: save it, then open Edit and run Fill with Ava there */
   window.apxDeskAddFill = async () => {
     const f = $('dkform').elements, b = f.body.value.trim(); if (!b) { say('Paste or type the note text first.'); return; }
@@ -129,7 +136,7 @@
       </div>
       ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><label class="btn sm" style="cursor:pointer">📷 Scan page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label></div>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskPaste()">📋 Paste &amp; fill with Ava</button><button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
   }
   function actionsOf(n) {
     const a = ROWS.filter(r => r.parent_id === n.id);
