@@ -3,7 +3,7 @@
 // Every page in the menu must have an entry (checked by preview/tests/ava-handbook.test.js).
 // Ava gets: OVERVIEW always + the current page's entry + up to 3 best-matching page entries + the full glossary.
 
-export const OVERVIEW = `ABOUT APEXONE: ApexOne is ApexU's (Apex Academy's) own web app for running occupational training programmes from first sale to close-out, as a QCTO-accredited Skills Development Provider (SDP) that also runs legacy SETA programmes. It replaces scattered spreadsheets: one place where every programme, learner, register, result, monitoring visit, FAM practitioner and sign-off lives, with each person seeing their own to-do list (My work) built from live data. Data sits in a secure Supabase database; changes to linked records are also sent to ClickUp automatically. Ava (this assistant) explains pages and drafts text; she never changes data or carries out tasks.
+export const OVERVIEW = `ABOUT APEXONE: ApexOne is ApexU's (Apex Academy's) own web app for running occupational training programmes from first sale to close-out, as a QCTO-accredited Skills Development Provider (SDP) that also runs legacy SETA programmes. It replaces scattered spreadsheets: one place where every programme, learner, register, result, monitoring visit, FAM practitioner and sign-off lives, with each person seeing their own to-do list (My work) built from live data. Data sits in a secure Supabase database; changes to programmes, learners, attendance, results, FAM records and other records that have a matching ClickUp task are also sent to that task automatically. Ava (this assistant) explains pages and drafts text; she never changes data or carries out tasks.
 LIFECYCLE: Client and accreditation check > Programme Initiation (PI specialist) > hand-over sign-off (Compliance, Head of Ops) > PM accepts > learners enrolled > delivery: registers, PoE, modules, monitoring visits, recommendations > results and QCTO tracker (SoR > EISA booking > EISA outcome) > moderation and exit verification > monthly client reports > close-out.
 ROLES: Project manager (PM) runs programmes; QA / ETQA specialist runs moderation, verification and quality reviews; Programme Initiation (PI) specialist sets up new programmes; FAM / OHS specialist keeps the FAM Registry; Recruitment fills places (Learner intake); Operations / Head of Ops oversees and signs off; Admin manages users and system health. Admins can "View as" another role on My work.
 VERSIONS: /preview/ is the live ApexOne all staff use. /next/ is an admin-only copy with a new design and newer features (lifecycle strips, My desk capture/minutes/ink/scan, phone layout) that will be promoted later.`;
@@ -92,4 +92,15 @@ export function handbookFor(question: string, pageName: string): string {
   pages.forEach((p) => L.push("RELATED PAGE {{" + p.k + "}}: " + p.text));
   L.push("GLOSSARY:\n" + Object.entries(GLOSSARY).map(([t, d]) => t + " = " + d).join("\n"));
   return L.join("\n\n");
+}
+
+/* Direct answer for "what is X" / "what does X mean" when X is exactly a glossary term or page name: no AI call, no quota. */
+export function handbookDirect(question: string): string | null {
+  const m = String(question || "").toLowerCase().trim().replace(/[?.!\s]+$/, "").match(/^(?:what(?:'s| is| are| does)|define|meaning of)\s+(?:an?\s+|the\s+)?(.+?)(?:\s+page)?(?:\s+mean|\s+stand for)?$/);
+  if (!m) return null;
+  const t = m[1].trim();
+  const g = Object.keys(GLOSSARY).find((k) => k.toLowerCase() === t);
+  if (g) return g + ": " + GLOSSARY[g];
+  const p = PAGES.find((x) => x.k === t || x.names.some((n) => n.toLowerCase() === t));
+  return p ? p.text : null;
 }

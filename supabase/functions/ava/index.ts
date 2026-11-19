@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import { handbookFor } from "./handbook.ts";
+import { handbookFor, handbookDirect } from "./handbook.ts";
 
 // Ava: the ApexOne assistant. Signed-in users only (checked below). Free Gemini tier, so no
 // personal data: the browser sends programme numbers, counts and flag labels,
@@ -119,6 +119,8 @@ Deno.serve(async (req: Request) => {
   if (!user) return j({ ok: false, error: "Unauthorized" }, 401);
   try {
     const body = await req.json();
+    const direct = (!body.mode || body.mode === "ask") ? handbookDirect(avaClean(body.question, 800)) : null;
+    if (direct) return j({ ok: true, type: "ava", answer: direct, handbook: true });
     const cap = await checkAndLogUsage(user.id, String(body.facts || "").length + String(body.question || "").length);
     if (cap) return j({ ok: false, error: cap }, 429);
     const { answer, unverified } = await generateAva(body);

@@ -156,6 +156,7 @@
       return { h: 'Enrolments with no QCTO row', link: 'enrolments', items: [...g].sort((a, b) => b[1] - a[1]).map(([id, c]) => it(pname(m.get(String(id))), `${c} enrolment${c > 1 ? 's' : ''} not on the QCTO tracker`, goH('qcto'), false, 'qa', id)) }; },
     stale(m) { const g = new Map(); [...m.values()].filter(p => p.status === 'initiated' && (dd(p.start_date) ?? 1) < 0).forEach(p => { const k = p.owner_email || p.project_manager_name || 'pm'; if (!g.has(k)) g.set(k, []); g.get(k).push(p); });
       return { h: 'Past start, still Initiated', link: 'pmtracker', items: [...g].sort((a, b) => b[1].length - a[1].length).map(([k, ps]) => it(`${ps.length} programme${ps.length > 1 ? 's' : ''} past start date, status not moved on`, 'Hand over, mark active or close each one · oldest ' + fmt(ps.map(p => p.start_date).sort()[0]), goH('pmtracker'), true, k === 'pm' ? 'pm' : k, k === 'pm' ? ps[0].id : null)) }; },
+    avagap() { const x = window.apxAvaGaps || []; if (!x.length) return { h: 'Ava gaps', link: 'synchealth', items: [] }; const dn = x.filter(r => r.rating < 0).length, nk = x.filter(r => r.rating === 0 && /did not know/.test(r.answer || '')).length; return { h: 'Ava gaps', link: 'synchealth', items: [it(`${x.length} Ava answer${x.length > 1 ? 's' : ''} to improve (14 days)`, `${dn} 👎 · ${nk} not known · ${x.length - dn - nk} AI failures · latest: "${esc(String(x[0].question || '').slice(0, 60))}"`, "location.hash='synchealth'", true)] }; },
     famrev() { const x = window.apxFamDue || []; return { h: 'FAM reviews', link: 'fam', items: x.length ? [it(`${x.length} booking${x.length > 1 ? 's' : ''} ended without a moderation review`, 'Add a review on each person\'s profile (outcome, learners, competent) · oldest ended ' + fmt(x.map(b => b.end_date).sort()[0]), "location.hash='fam/calendar'", true, 'kathleen@apexu.co.za')] : [] }; },
     lrn(m) { const LJ = window.apxLJ, E = new Map(); (D().enrol || []).forEach(e => E.set(e.programme_id, (E.get(e.programme_id) || 0) + 1));
       const run = [...m.values()].filter(p => (real(p) || live(p)) && !(p.end_date && dd(p.end_date) < 0)), g = new Map(), add = (p, k) => { const o = p.owner_email || p.project_manager_name || 'pm', key = o + '|' + k; if (!g.has(key)) g.set(key, { o, k, ps: [] }); g.get(key).ps.push(p); };
@@ -190,7 +191,7 @@
 
   /* ---------- which blocks each screen shows (first = most relevant) ---------- */
   const SCREENS = {
-    mywork: ['stale', 'lrn', 'famrev', 'signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
+    mywork: ['stale', 'lrn', 'famrev', 'avagap', 'signoffs', 'recs', 'visits', 'eisa', 'reports', 'dates', 'mods', 'accs'],
     dashboard: ['dates', 'recs', 'visits', 'eisa', 'mods', 'reports'],
     hoo: ['stale', 'lrn', 'famrev', 'signoffs', 'gaps', 'clients', 'learners', 'recs', 'visits', 'qcto', 'mods', 'reports', 'accs', 'att', 'poe', 'enrol', 'sync'],
     reports: ['reports'], clients: ['clients', 'dates'], pmtracker: ['stale', 'dates', 'recs', 'visits', 'reports'],

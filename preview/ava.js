@@ -272,6 +272,7 @@
     usage(); return String(j.answer || '').replace(/\{\{\w+\}\}/g, '').trim();
   };
   const PMODE = { attention: 'What needs my attention?', brief: 'Give me a brief of where things stand', page: 'Explain this page', draft: 'Draft a follow-up message about what needs attention', screen: 'Help me with what is on my screen: what can I do here and what is my next step?' };
+  setTimeout(() => { if (role() !== 'admin' || !window.__sb) return; window.__sb.from('ava_feedback').select('rating,question,answer,created_at').lte('rating', 0).gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()).order('created_at', { ascending: false }).limit(200).then(({ data }) => { window.apxAvaGaps = data || []; }, () => {}); }, 4000);
   async function ask(text, mode = 'ask', refresh) {
     if (S.busy) return; const q = String(text || '').trim(); if (!q && mode === 'ask') return;
     if (mode === 'ask') { const lf = faq(q); if (lf) { S.msgs.push({ r: 'u', t: q }); S.msgs.push({ r: 'a', t: lf, local: 1 }); save(); render(true); return; }
@@ -284,7 +285,8 @@
     try {
       const hist = S.msgs.slice(-7, -1).map(m => ({ r: m.r, t: String(m.t).slice(0, 1200) }));
       const j = await call({ type: 'ava', mode: mode === 'screen' ? 'ask' : mode, question: q || PMODE[mode], page: pageName(route()), facts: context(mode), history: hist });
-      const m = { r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers }; S.msgs.push(m);
+      const m = { r: 'a', t: j.answer || '(No answer returned)', un: (j.fact_check || {}).unverified_numbers, local: j.handbook ? 1 : 0 }; S.msgs.push(m);
+      if (/\b(don'?t|do not) know\b|not (in|covered by) the handbook/i.test(m.t)) log(q || PMODE[mode], 'Ava did not know');
       if (ck && j.answer) { const at = new Date().toTimeString().slice(0, 5); cache.set(ck, { t: m.t, un: m.un, at }); m.cached = ck; m.at = at; m.fresh = 1; }
     } catch (err) { S.msgs.push({ r: 'a', html: fallback(q || PMODE[mode], mode, err.message), local: 1 }); log(q || PMODE[mode], 'AI failed: ' + String(err.message).slice(0, 200)); }
     S.busy = false; save(); render(true); usage();
@@ -320,14 +322,12 @@
     return ids.length ? `<div class="avact">${ids.map(p => btn(`What's missing on ${pid(p)}?`, `avaMissing(${p.id})`)).join(' ')}</div>` : ''; };
   window.avaGoP = id => { location.hash = 'programmes'; setTimeout(() => { A() && A().setProg(id); window.dvProg && dvProg(id); }, 60); };
   function chips() {
-    const r = route(), c = [['What needs my attention?', "avaMode('attention')"], ['Explain this page', "avaMode('page')"], ['Ask about this screen', "avaScreen()"]];
-    if (role() === 'admin' || role() === 'qa') c.push(['Brief me', "avaMode('brief')"]);
+    const r = route(), c = [['What needs my attention?', "avaMode('attention')"], ['Explain this page', "avaMode('page')"]];
     const cp = r === 'programmes' && A() && A().cur ? progAll().find(p => p.id === A().cur()) : null;
     if (cp) { const n = pid(cp), id = cp.id; c.push([`Summarise ${n}`, `avaTool('Summarise ${n}',{type:'programme_summary',programme_id:${id}},'narrative')`], [`Attendance ${n}`, `avaTool('Attendance analysis ${n}',{type:'attendance_analysis',programme_id:${id}},'narrative')`]);
       if (!/legacy/i.test(cp.programme_type || '')) c.push([`EISA readiness ${n}`, `avaTool('EISA readiness ${n}',{type:'eisa_readiness_check',programme_id:${id}},'narrative')`]);
       c.push([`PoE gaps ${n}`, `avaTool('PoE gaps ${n}',{type:'poe_gap_analysis',programme_id:${id}},'narrative')`]); c.unshift([`What's missing on ${n}?`, `avaMissing(${id})`]); }
     if (role() === 'pm' || role() === 'admin') c.push(['Ending in 30 days', 'avaEnding()']);
-    c.push(['My flags by page', 'avaFlags()']);
     if (r === 'clients') c.unshift(['Clients missing details', 'avaClientGaps()']);
     if (['learners', 'dq', 'enrolments', 'attendance'].includes(r)) c.unshift(['Learner gaps by programme', 'avaLearnerGaps()']);
     if (r === 'fam' && (role() === 'admin' || role() === 'qa')) c.push(['FAM compliance digest', "avaTool('FAM compliance digest',{type:'fam_compliance_digest'},'narrative')"]);
@@ -385,7 +385,7 @@
 @media print{#avafab,#avapanel{display:none}}</style>`);
     document.body.insertAdjacentHTML('beforeend', `<button id="avafab" type="button" aria-controls="avapanel" aria-expanded="false" onclick="avaToggle()" title="Ask Ava (Ctrl+K: tell Ava what to do)"><span class="st">✦</span>Ava<kbd>Ctrl K</kbd></button>
 <aside id="avapanel" role="dialog" aria-label="Ava assistant"><header><span class="st">✦</span><b>Ava</b><span class="sub">ApexOne assistant</span><button type="button" onclick="avaClear()">New chat</button><button type="button" onclick="avaToggle(false)" aria-label="Close">✕</button></header>
-<div id="avatabs" role="tablist"><button type="button" role="tab" data-t="chat" onclick="avaTab('chat')">Chat</button><button type="button" role="tab" data-t="how" onclick="avaTab('how')">How to</button><button type="button" style="margin-left:auto" title="Learn and practise ApexOne" onclick="avaLearn&&avaLearn(true)">Start here</button></div><div id="avause" class="avsm" style="padding:6px 14px 0"></div><div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
+<div id="avatabs" role="tablist"><button type="button" role="tab" data-t="chat" onclick="avaTab('chat')">Chat</button><button type="button" role="tab" data-t="how" onclick="avaTab('how')">How to</button><button type="button" style="margin-left:auto;border:0!important;box-shadow:none!important;background:none!important;text-decoration:underline;font-size:.9em;opacity:.85" title="Learn and practise ApexOne" onclick="avaLearn&&avaLearn(true)">Start here</button></div><div id="avause" class="avsm" style="padding:6px 14px 0"></div><div id="avachips"></div><div id="avamsgs" aria-live="polite"></div>
 <form onsubmit="event.preventDefault();const i=document.getElementById('avain');const v=i.value;i.value='';avaAsk(v)"><textarea id="avain" rows="1" maxlength="800" placeholder="Ask Ava… (no ID numbers or personal details)" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();this.form.requestSubmit()}"></textarea><button class="btn y" id="avasend">Send</button></form></aside>`);
     document.addEventListener('keydown', ev => { if ((ev.ctrlKey || ev.metaKey) && ev.key.toLowerCase() === 'k') { ev.preventDefault(); window.avaCmd ? avaCmd() : avaToggle(); } else if (ev.key === 'Escape' && S.open) avaToggle(false); });
     window.addEventListener('hashchange', () => S.open && render());
