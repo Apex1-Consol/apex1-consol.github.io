@@ -23,7 +23,7 @@
     if (window.previewShell) try { window.previewShell(); } catch (e) {}
   }
   window.apxDeskReload = () => load();
-  let EXTRA = [], STAFF = []; (async () => { try { const { data } = await sb.rpc('apx_staff'); STAFF = (data || []).filter(x => x.email).map(x => ({ n: String(x.name || '').toLowerCase(), e: String(x.email).toLowerCase() })); EXTRA = STAFF.map(x => x.e); } catch (e) {} })();
+  let EXTRA = [], STAFF = []; (async () => { try { const { data } = await sb.rpc('apx_staff'); STAFF = (data || []).filter(x => x.email).map(x => ({ n: String(x.name || '').toLowerCase(), e: String(x.email).toLowerCase(), N: String(x.name || ''), r: x.roles })); EXTRA = STAFF.map(x => x.e); } catch (e) {} })();
   const known = () => [...new Set(ROWS.map(r => (r.owner_email || '').toLowerCase()).filter(Boolean).concat(EXTRA, me()))];
   /* name from Ava ("Kathleen") -> staff email, matched on this device only (emails never go to Ava) */
   const ownerOf = who => { const ws = String(who || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 3 && !['pms', 'all', 'team', 'the', 'and', 'staff', 'admin', 'everyone'].includes(w)); if (!ws.length) return '';
@@ -104,13 +104,14 @@
     box.innerHTML = open.length ? `<div class="card" style="padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px"><span style="flex:1">${open.length} action${open.length > 1 ? 's' : ''} still open from <b>${esc(prev.title)}</b> (${esc(String(prev.created_at).slice(0, 10))}).</span><button type="button" class="btn sm">Carry over</button></div>` : '';
     const b = box.querySelector('button'); if (b) b.onclick = () => run(() => sb.from('desk_notes').update({ parent_id: r.id, updated_at: new Date().toISOString() }).in('id', open.map(a => a.id)), `${open.length} action${open.length > 1 ? 's' : ''} carried over`);
   }
+  window.__desk = { rows: () => ROWS, staff: () => STAFF, series, pn, progs, sname, me, isAdmin, reload: () => load(), say, esc, iso };
   window.apxDeskHist = id => {
     const r = ROWS.find(x => x.id === id); if (!r) return;
     const all = [r].concat(series(r)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
     const v = document.createElement('div'); v.id = 'dkhist'; v.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(15,14,51,.5);overflow:auto;padding:24px 12px';
     v.innerHTML = `<div class="card" style="max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1;font-size:18px">History: ${esc(r.title)}</b><button class="btn sm y" type="button">Close</button></div>
       <span class="famas">${all.length} note${all.length > 1 ? 's' : ''} in this series (same programme or similar title)</span>
-      ${all.map(n => { const acts = ROWS.filter(a => a.parent_id === n.id), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + n.title);
+      ${all.map(n => { const acts = ROWS.filter(a => a.parent_id === n.id && a.kind !== 'minutes'), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + n.title);
         return `<div style="border-top:1px solid var(--line);padding-top:10px"><b>${esc(n.title)}</b> <span class="famas">${esc(String(n.created_at).slice(0, 10))}${n.person ? ' · ' + esc(n.person) : ''}</span>
           ${n.body ? `<div style="white-space:pre-wrap;font-size:13px;max-height:9em;overflow:hidden">${esc(n.body)}</div>` : ''}
           ${dec.map(d => `<div style="font-size:13px">◆ Decision: ${esc(d.title)}</div>`).join('')}
@@ -119,7 +120,7 @@
   };
   window.apxDeskCopy = id => {
     const r = ROWS.find(x => x.id === id); if (!r) return;
-    const acts = ROWS.filter(a => a.parent_id === id), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + r.title);
+    const acts = ROWS.filter(a => a.parent_id === id && a.kind !== 'minutes'), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + r.title);
     const t = [`*${r.title}*`, [String(r.created_at).slice(0, 10), r.person, pn(r.programme_id)].filter(Boolean).join(' · '), '', r.body || '',
       dec.length ? '\nDecisions:\n' + dec.map(d => '- ' + d.title).join('\n') : '',
       acts.length ? '\nActions:\n' + acts.map(a => `- ${a.status === 'done' ? '[done] ' : ''}${a.title}${a.owner_email ? ' (' + (sname(a.owner_email) || a.owner_email) + ')' : ''}${a.due_date ? ' by ' + a.due_date : ''}`).join('\n') : ''].join('\n').replace(/\n{3,}/g, '\n\n').trim();
@@ -166,7 +167,7 @@
   window.apxDeskDone = id => run(() => sb.from('desk_notes').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', id), 'Marked done');
 
   // ---------- page ----------
-  const TABS = [['note', 'Notes & meetings'], ['escalation', 'Escalations'], ['decision', 'Decisions'], ['watch', 'Watch items'], ['comp', 'Compliance watch']];
+  const TABS = [['note', 'Notes & meetings'], ['escalation', 'Escalations'], ['decision', 'Decisions'], ['watch', 'Watch items'], ['minutes', 'Minutes register'], ['comp', 'Compliance watch']];
   const inKind = r => TAB === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === TAB;
   const progOpts = () => `<datalist id="dkprogs">${progs().filter(p => !p.deleted_at).map(p => `<option value="#${p.id} ${esc(p.programme_name || '')}">`).join('')}</datalist>`;
   const ownerOpts = () => `<datalist id="dkowners">${known().map(e => `<option value="${esc(e)}">${esc((STAFF.find(s => s.e === e) || {}).n || '')}</option>`).join('')}</datalist>`;
@@ -189,7 +190,7 @@
       <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button></div></form>`;
   }
   function actionsOf(n) {
-    const a = ROWS.filter(r => r.parent_id === n.id);
+    const a = ROWS.filter(r => r.parent_id === n.id && r.kind !== 'minutes');
     return `<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${a.map(r => `<div style="display:flex;gap:8px;align-items:center;font-size:13px">
       <input type="checkbox" ${r.status === 'done' ? 'checked' : ''} onchange="apxDeskSet(${r.id},this.checked)" aria-label="Done">
       <span style="${r.status === 'done' ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(r.title)}</span>
@@ -209,7 +210,7 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="flex:1">${esc(r.title)}</b>
         ${late ? `<span style="color:var(--bad,#c00);font-size:12px">${r.kind === 'watch' ? 'check now' : 'overdue'}</span>` : ''}
         ${r.kind !== 'decision' ? `<button class="btn sm" onclick="apxDeskSet(${r.id},${r.status === 'open'})">${r.status === 'open' ? ({ escalation: 'Resolve', watch: 'Done' }[r.kind] || 'Close') : 'Reopen'}</button>` : ''}
-        ${r.kind === 'note' || r.kind === 'meeting' ? `<button class="btn sm" onclick="apxDeskHist(${r.id})" title="Past notes, decisions and actions of this meeting">History</button><button class="btn sm" onclick="apxDeskCopy(${r.id})" title="Copy a text summary to paste into WhatsApp or Teams">📋 Copy</button><button class="btn sm" onclick="apxDeskEdit(${r.id},this)">Edit</button>` : ''}
+        ${r.kind === 'note' || r.kind === 'meeting' ? `${window.apxMinBtns ? apxMinBtns(r) : ''}<button class="btn sm" onclick="apxDeskHist(${r.id})" title="Past notes, decisions and actions of this meeting">History</button><button class="btn sm" onclick="apxDeskCopy(${r.id})" title="Copy a text summary to paste into WhatsApp or Teams">📋 Copy</button><button class="btn sm" onclick="apxDeskEdit(${r.id},this)">Edit</button>` : ''}
         <button class="btn sm" onclick="apxDeskDel(${r.id})" aria-label="Delete">Delete</button></div>
       <span class="famas">${esc(meta)}</span>
       ${window.apxInkSvg ? (((r.pages || []).filter(p => p.t === 'ink').map(p => p.ink).length ? (r.pages || []).filter(p => p.t === 'ink').map(p => p.ink) : r.ink ? [r.ink] : []).map(k => apxInkSvg(k)).join('')) : ''}
@@ -235,7 +236,7 @@
     if (!isAdmin()) { v.innerHTML = '<div class="empty"><b>My desk</b><span>Admin only.</span></div>'; return; }
     const q = Q.toLowerCase(), all = ROWS.filter(r => !r.parent_id && inKind(r));
     const list = all.filter(r => (TAB === 'decision' || SHOW === 'all' || r.status === SHOW) && (!q || hay(r).includes(q)));
-    const n = k => k === 'comp' ? COMP.reduce((s, [r]) => s + compItems(r).filter(x => x.warn).length, 0) : ROWS.filter(r => !r.parent_id && (k === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === k) && (k === 'decision' || r.status === 'open')).length;
+    const n = k => k === 'minutes' ? (window.apxMinCount ? apxMinCount() : 0) : k === 'comp' ? COMP.reduce((s, [r]) => s + compItems(r).filter(x => x.warn).length, 0) : ROWS.filter(r => !r.parent_id && (k === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === k) && (k === 'decision' || r.status === 'open')).length;
     const openActs = ROWS.filter(r => r.kind === 'action' && r.status === 'open').length;
     v.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
       <div><h1 style="font-size:26px">My desk</h1><span class="famas">${loaded ? `${openActs} open action${openActs === 1 ? '' : 's'} · actions and escalations with an owner show on that person's My work` : 'Loading…'}</span></div>
@@ -243,7 +244,7 @@
         ${DRAFTS.slice(0, 5).map(r => `<button class="btn sm" onclick="apxCapture(${r.id})" title="Carry on with this unfinished capture">Unfinished: ${esc(String(r.title || 'capture').slice(0, 40))} · ${esc(String(r.updated_at || r.created_at || '').slice(5, 10))}</button>`).join('')}
         ${DRAFTS.length ? `<span class="famas">Unfinished (${DRAFTS.length}) · deleted after 7 days</span>` : ''}</div>` : ''}
       <div class="seg" style="flex-wrap:wrap">${TABS.map(([k, l]) => `<button class="${k === TAB ? 'on' : ''}" onclick="apxDeskTab('${k}')">${l} (${n(k)})</button>`).join('')}</div>
-      ${TAB === 'comp' ? `<span class="famas">Live from the Overview flags. Click an item to open it.</span>${comp()}</div>` : `${form()}${progOpts()}${ownerOpts()}
+      ${TAB === 'minutes' ? (window.apxMinReg ? apxMinReg() : '') + '</div>' : TAB === 'comp' ? `<span class="famas">Live from the Overview flags. Click an item to open it.</span>${comp()}</div>` : `${form()}${progOpts()}${ownerOpts()}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
         <input class="cellin" placeholder="Search" value="${esc(Q)}" oninput="apxDeskQ(this.value)" style="height:36px;flex:1 1 220px">
         ${TAB !== 'decision' ? `<select class="cellin" style="height:36px" onchange="apxDeskShow(this.value)">${[['open', 'Open'], ['done', 'Closed'], ['all', 'All']].map(([k, l]) => `<option value="${k}"${k === SHOW ? ' selected' : ''}>${l}</option>`).join('')}</select>` : ''}
