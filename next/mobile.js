@@ -5,6 +5,16 @@
   const DESK = H.classList.contains('deskapp');
   if (DESK) { if (location.hash !== '#login') history.replaceState(null, '', location.search + '#desk');
     addEventListener('hashchange', () => { if (!/^#(desk|login)$/.test(location.hash)) location.replace('#desk'); }); return; }
+  /* phones / home-screen app: if a newer /next/ version is online, load it (GitHub caches the page ~10 min) */
+  async function fresh() {
+    if (!mq.matches) return;
+    try { const t = await fetch('index.html?x' + Date.now(), { cache: 'no-store' }).then(r => r.text()), m = t.match(/mobile\.js\?v=([\w]+)/), me = document.querySelector('script[src*="mobile.js?v="]');
+      const mine = me && (me.getAttribute('src').match(/v=([\w]+)/) || [])[1], t2 = t.match(/desk\.js\?v=([\w]+)/), d2 = document.querySelector('script[src*="desk.js?v="]');
+      const old = (m && mine && m[1] !== mine) || (t2 && d2 && !d2.getAttribute('src').includes(t2[1]));
+      if (old && !sessionStorage.getItem('apxfresh' + (t2 && t2[1]))) { sessionStorage.setItem('apxfresh' + (t2 && t2[1]), '1');
+        const u = new URL(location.href); u.searchParams.set('r', Date.now()); location.replace(u.toString()); } } catch (e) {}
+  }
+  setTimeout(fresh, 3000); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fresh(); });
   const close = () => H.classList.remove('drawer');
   window.apxDrawer = f => H.classList.toggle('drawer', f === undefined ? !H.classList.contains('drawer') : !!f);
   const tr = window.toggleRail;
