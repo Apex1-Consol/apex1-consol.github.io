@@ -13,7 +13,18 @@
   }
   setTimeout(fresh, 3000); document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') fresh(); });
   const DESK = H.classList.contains('deskapp');
-  if (DESK) { if (location.hash !== '#login') history.replaceState(null, '', location.search + '#desk');
+  if (DESK) {
+    /* shared from another app (Gallery T -> Share -> My desk): keep the text, then put it in a new note */
+    const sp = new URLSearchParams(location.search), st = [sp.get('text'), sp.get('url')].filter(Boolean).join('\n').trim();
+    if (st || sp.get('title')) { try { sessionStorage.setItem('apxshare', JSON.stringify({ t: sp.get('title') || '', x: st })); } catch (e) {} }
+    if (sp.has('text') || sp.has('title') || sp.has('url')) history.replaceState(null, '', '?app=desk' + (location.hash || '#desk'));
+    let tries = 0; const sh = setInterval(() => { let v = null; try { v = JSON.parse(sessionStorage.getItem('apxshare') || 'null'); } catch (e) {}
+      if (!v || ++tries > 240) { clearInterval(sh); return; }
+      const f = document.getElementById('dkform'); if (!f || !document.getElementById('dklist') || !f.elements.body) return;
+      clearInterval(sh); sessionStorage.removeItem('apxshare');
+      if (v.t && !f.elements.title.value) f.elements.title.value = v.t.slice(0, 140);
+      f.elements.body.value = v.x; f.scrollIntoView({ block: 'start' }); window.toast && toast('Shared text added. Tap ✨ Fill with Ava or Save.'); }, 500);
+    if (location.hash !== '#login') history.replaceState(null, '', location.search + '#desk');
     addEventListener('hashchange', () => { if (!/^#(desk|login)$/.test(location.hash)) location.replace('#desk'); }); return; }
   const close = () => H.classList.remove('drawer');
   window.apxDrawer = f => H.classList.toggle('drawer', f === undefined ? !H.classList.contains('drawer') : !!f);

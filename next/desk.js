@@ -64,6 +64,14 @@
     f.onsubmit = e => { e.preventDefault(); run(() => sb.from('desk_notes').update({ owner_email: f.o.value.trim().toLowerCase() || null, due_date: f.d.value || null, updated_at: new Date().toISOString() }).eq('id', id), 'Saved'); };
     b.parentElement.style.flexWrap = 'wrap'; b.after(f); f.o.focus();
   };
+  /* new note: save it, then open Edit and run Fill with Ava there */
+  window.apxDeskAddFill = async () => {
+    const f = $('dkform').elements, b = f.body.value.trim(); if (!b) { say('Paste or type the note text first.'); return; }
+    const { data, error } = await sb.from('desk_notes').insert({ kind: f.kind.value, title: f.title.value.trim() || 'Note ' + new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), body: b, person: f.person.value.trim() || null, programme_id: pid(f.prog.value) }).select('id').single();
+    if (error) { say('Not saved: ' + error.message); return; }
+    await load(); const btn = document.querySelector(`#view-desk button[onclick^="apxDeskEdit(${data.id},"]`); if (!btn) return;
+    btn.closest('.card').scrollIntoView({ block: 'start' }); btn.click(); const ef = btn.closest('.card').querySelector('.dkedit'); if (ef) fillAva(ef);
+  };
   /* Fill with Ava: typed/pasted text only (never the scan image), emails/phones/ID numbers removed. Ava proposes; you check and Save. */
   const scrubT = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/\b\d{13}\b/g, '[ID number]').replace(/(\+?\d[\d ()-]{7,}\d)/g, '[number]').slice(0, 4000);
   async function fillAva(f) {
@@ -121,7 +129,7 @@
       </div>
       ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><label class="btn sm" style="cursor:pointer">📷 Scan page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label></div>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
-      <div><button class="btn y" type="submit">Save</button></div></form>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
   }
   function actionsOf(n) {
     const a = ROWS.filter(r => r.parent_id === n.id);
