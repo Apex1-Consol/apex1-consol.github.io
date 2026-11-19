@@ -11,13 +11,14 @@
   const isAdmin = () => (P.roles || []).some(r => r === 'admin' || r === 'demo');
   const progs = () => (P.data && P.data.progs) || [];
   const pn = id => { const p = progs().find(x => x.id === id); return p ? `#${p.id} ${p.programme_name || ''}` : ''; };
-  let ROWS = [], TAB = 'note', SHOW = 'open', Q = '', loaded = false;
+  let DRAFTS = [], ROWS = [], TAB = 'note', SHOW = 'open', Q = '', loaded = false;
 
   async function load() {
     if (!P.user) return;
     const { data, error } = await sb.from('desk_notes').select('*').order('created_at', { ascending: false }).limit(2000);
     if (error) { console.warn('desk_notes', error.message); return; }
-    ROWS = data || []; loaded = true;
+    const all = data || []; DRAFTS = all.filter(r => r.status === 'draft'); ROWS = all.filter(r => r.status !== 'draft'); loaded = true; window.apxDeskDrafts = DRAFTS;
+    if (window.apxCapCleanup) try { window.apxCapCleanup(DRAFTS); } catch (e) {}
     if (location.hash.slice(1) === 'desk') render();
     if (window.previewShell) try { window.previewShell(); } catch (e) {}
   }
@@ -31,10 +32,14 @@
   async function run(fn, ok) { const { error } = await fn(); if (error) { say('Not saved: ' + error.message); return false; } if (ok) say(ok); await load(); return true; }
 
   // ---------- My work hook ----------
-  window.apxDeskTasks = () => ROWS.filter(r => r.status === 'open' && (r.kind === 'action' || r.kind === 'escalation' || (r.kind === 'watch' && r.due_date && r.due_date <= iso())) && (r.owner_email || '').toLowerCase() === me())
+  const monday = () => { if (new Date().getDay() !== 1 || !isAdmin()) return [];
+    const od = ROWS.filter(r => r.status === 'open' && (r.kind === 'action' || r.kind === 'escalation') && r.due_date && r.due_date < iso()); if (!od.length) return [];
+    const by = {}; od.forEach(r => { const k = sname(r.owner_email) || (r.owner_email ? r.owner_email.split('@')[0] : 'no owner'); by[k] = (by[k] || 0) + 1; });
+    return [{ id: 'dkmon' + iso(), t: `Monday desk check: ${od.length} overdue desk action${od.length > 1 ? 's' : ''}`, s: Object.entries(by).sort((a, b) => b[1] - a[1]).map(([k, n]) => `${k} ${n}`).join(' · '), k: 'Desk', c: 'Open', on: "location.hash='desk'", bad: 1 }]; };
+  window.apxDeskTasks = () => monday().concat(ROWS.filter(r => r.status === 'open' && (r.kind === 'action' || r.kind === 'escalation' || (r.kind === 'watch' && r.due_date && r.due_date <= iso())) && (r.owner_email || '').toLowerCase() === me())
     .map(r => ({ id: 'dk' + r.id, t: ({ escalation: 'Escalation: ', watch: 'Check: ' }[r.kind] || '') + r.title,
       s: [r.person, pn(r.programme_id), r.due_date ? 'due ' + r.due_date : ''].filter(Boolean).join(' · '),
-      k: 'Desk', c: 'Done', on: `apxDeskDone(${r.id})`, bad: r.due_date && r.due_date < iso() ? 1 : 0 }));
+      k: 'Desk', c: 'Done', on: `apxDeskDone(${r.id})`, bad: r.due_date && r.due_date < iso() ? 1 : 0 })));
   window.apxDeskEdit = (id, b) => {
     const r = ROWS.find(x => x.id === id), c = b.closest('.card'); if (!r || !c || c.querySelector('.dkedit')) return;
     const f = document.createElement('form'); f.className = 'dkedit'; f.style.cssText = 'display:flex;flex-direction:column;gap:6px';
@@ -43,7 +48,7 @@
       <input name="p" class="cellin" style="height:36px;flex:1;min-width:150px" value="${esc(r.person || '')}" placeholder="Attendees / person">
       <input name="g" class="cellin" style="height:36px;flex:1;min-width:150px" list="dkprogs" value="${esc(pn(r.programme_id))}" placeholder="Programme (optional)"></div>
       <textarea name="b" class="cellin" rows="8" style="padding:8px;font:inherit" placeholder="Paste the text from your scan here (Gallery → T Extract text → Copy all), then tap Fill with Ava">${esc(r.body || '')}</textarea>
-      <div class="dkacts" style="display:flex;flex-direction:column;gap:4px"></div>
+      <div class="dkcarry"></div><div class="dkacts" style="display:flex;flex-direction:column;gap:4px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn y sm" type="submit">Save</button><button class="btn sm" type="button" data-x="fill">✨ Fill with Ava</button><button class="btn sm" type="button" data-x="cancel">Cancel</button><span class="dkmsg" style="font-size:12px"></span></div>`;
     f.querySelector('[data-x=cancel]').onclick = () => f.remove();
     f.querySelector('[data-x=fill]').onclick = () => fillAva(f);
@@ -54,7 +59,7 @@
           : { kind: ty, parent_id: ty === 'action' ? id : null, title: tt, owner_email: o, due_date: dd, programme_id: prog, person: t }; }).filter(x => x.title);
       if (acts.length) { const { error } = await sb.from('desk_notes').insert(acts); if (error) { say('Not saved: ' + error.message); return; } }
       run(() => sb.from('desk_notes').update({ kind: f.k.value, title: t, person: f.p.value.trim() || null, programme_id: pid(f.g.value), body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), acts.length ? `Saved with ${acts.length} item${acts.length > 1 ? 's' : ''} (actions here, decisions and watch items in their tabs)` : 'Saved'); };
-    c.querySelector('.famas').after(f); f.b.focus();
+    f.dataset.id = id; c.querySelector('.famas').after(f); carry(f); f.b.focus();
   };
   window.apxDeskOwn = (id, b) => {
     const r = ROWS.find(x => x.id === id); if (!r || b.nextElementSibling && b.nextElementSibling.classList.contains('dkown')) return;
@@ -79,11 +84,47 @@
     const f = $('dkform').elements, b = f.body.value.trim(); if (!b) { say('Paste or type the note text first.'); return; }
     const { data, error } = await sb.from('desk_notes').insert({ kind: f.kind.value, title: f.title.value.trim() || 'Note ' + new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), body: b, person: f.person.value.trim() || null, programme_id: pid(f.prog.value) }).select('id').single();
     if (error) { say('Not saved: ' + error.message); return; }
-    await load(); const btn = document.querySelector(`#view-desk button[onclick^="apxDeskEdit(${data.id},"]`); if (!btn) return;
-    btn.closest('.card').scrollIntoView({ block: 'start' }); btn.click(); const ef = btn.closest('.card').querySelector('.dkedit'); if (ef) fillAva(ef);
+    await load(); apxDeskFill(data.id);
+  };
+  /* open a note in Edit and run Fill with Ava (used by Capture) */
+  window.apxDeskFill = id => { if (TAB !== 'note') { TAB = 'note'; render(); }
+    if (SHOW !== 'open' && SHOW !== 'all') { SHOW = 'all'; render(); }
+    const btn = document.querySelector(`#view-desk button[onclick^="apxDeskEdit(${id},"]`); if (!btn) return;
+    btn.closest('.card').scrollIntoView({ block: 'start' }); btn.click(); const ef = btn.closest('.card').querySelector('.dkedit'); if (ef) fillAva(ef); };
+  /* meeting series: same programme, or same first two title words (dates, numbers and filler words ignored) */
+  const key = t => String(t || '').toLowerCase().replace(/\d+|[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length > 1 && !['meeting', 'meetings', 'notes', 'note', 'scanned', 'the', 'and', 'with', 'of', 'for', 'nov', 'dec', 'jan'].includes(w)).slice(0, 2).join(' ');
+  const series = r => { const k = key(r.title); return ROWS.filter(x => (x.kind === 'note' || x.kind === 'meeting') && !x.parent_id && x.id !== r.id && ((r.programme_id && x.programme_id === r.programme_id) || (k && key(x.title) === k))).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))); };
+  function carry(f) {
+    const r = ROWS.find(x => x.id === Number(f.dataset.id)), box = f.querySelector('.dkcarry'); if (!r || !box) return;
+    const probe = { ...r, title: f.t.value, programme_id: pid(f.g.value) || r.programme_id };
+    const prev = series(probe).filter(x => String(x.created_at) < String(r.created_at || '9'))[0];
+    const open = prev ? ROWS.filter(a => a.parent_id === prev.id && a.kind === 'action' && a.status === 'open') : [];
+    box.innerHTML = open.length ? `<div class="card" style="padding:8px 10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:14px"><span style="flex:1">${open.length} action${open.length > 1 ? 's' : ''} still open from <b>${esc(prev.title)}</b> (${esc(String(prev.created_at).slice(0, 10))}).</span><button type="button" class="btn sm">Carry over</button></div>` : '';
+    const b = box.querySelector('button'); if (b) b.onclick = () => run(() => sb.from('desk_notes').update({ parent_id: r.id, updated_at: new Date().toISOString() }).in('id', open.map(a => a.id)), `${open.length} action${open.length > 1 ? 's' : ''} carried over`);
+  }
+  window.apxDeskHist = id => {
+    const r = ROWS.find(x => x.id === id); if (!r) return;
+    const all = [r].concat(series(r)).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+    const v = document.createElement('div'); v.id = 'dkhist'; v.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(15,14,51,.5);overflow:auto;padding:24px 12px';
+    v.innerHTML = `<div class="card" style="max-width:820px;margin:0 auto;display:flex;flex-direction:column;gap:12px"><div style="display:flex;gap:8px;align-items:center"><b style="flex:1;font-size:18px">History: ${esc(r.title)}</b><button class="btn sm y" type="button">Close</button></div>
+      <span class="famas">${all.length} note${all.length > 1 ? 's' : ''} in this series (same programme or similar title)</span>
+      ${all.map(n => { const acts = ROWS.filter(a => a.parent_id === n.id), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + n.title);
+        return `<div style="border-top:1px solid var(--line);padding-top:10px"><b>${esc(n.title)}</b> <span class="famas">${esc(String(n.created_at).slice(0, 10))}${n.person ? ' · ' + esc(n.person) : ''}</span>
+          ${n.body ? `<div style="white-space:pre-wrap;font-size:13px;max-height:9em;overflow:hidden">${esc(n.body)}</div>` : ''}
+          ${dec.map(d => `<div style="font-size:13px">◆ Decision: ${esc(d.title)}</div>`).join('')}
+          ${acts.map(a => `<div style="font-size:13px">${a.status === 'done' ? '☑' : '☐'} ${esc(a.title)} <span class="famas">${esc(sname(a.owner_email) || a.owner_email || 'no owner')}${a.due_date ? ' · due ' + a.due_date : ''}</span></div>`).join('')}</div>`; }).join('')}</div>`;
+    v.querySelector('button').onclick = () => v.remove(); v.onclick = e => { if (e.target === v) v.remove(); }; document.body.appendChild(v);
+  };
+  window.apxDeskCopy = id => {
+    const r = ROWS.find(x => x.id === id); if (!r) return;
+    const acts = ROWS.filter(a => a.parent_id === id), dec = ROWS.filter(d => d.kind === 'decision' && (d.body || '') === 'From: ' + r.title);
+    const t = [`*${r.title}*`, [String(r.created_at).slice(0, 10), r.person, pn(r.programme_id)].filter(Boolean).join(' · '), '', r.body || '',
+      dec.length ? '\nDecisions:\n' + dec.map(d => '- ' + d.title).join('\n') : '',
+      acts.length ? '\nActions:\n' + acts.map(a => `- ${a.status === 'done' ? '[done] ' : ''}${a.title}${a.owner_email ? ' (' + (sname(a.owner_email) || a.owner_email) + ')' : ''}${a.due_date ? ' by ' + a.due_date : ''}`).join('\n') : ''].join('\n').replace(/\n{3,}/g, '\n\n').trim();
+    navigator.clipboard.writeText(t).then(() => say('Summary copied. Paste it into WhatsApp or Teams.'), () => say('Could not copy.'));
   };
   /* Fill with Ava: typed/pasted text only (never the scan image), emails/phones/ID numbers removed. Ava proposes; you check and Save. */
-  const scrubT = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/\b\d{13}\b/g, '[ID number]').replace(/(\+?\d[\d ()-]{7,}\d)/g, '[number]').slice(0, 4000);
+  const scrubT = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/\b\d{13}\b/g, '[ID number]').replace(/(\+?\d[\d ()-]{7,}\d)/g, '[number]').slice(0, 8000);
   async function fillAva(f) {
     const msg = f.querySelector('.dkmsg'), txt = scrubT(f.b.value);
     if (!txt.trim()) { msg.textContent = 'Paste or type the note text first.'; return; }
@@ -113,6 +154,7 @@
           <select class="cellin py" style="height:34px"><option value="action"${ty === 'action' ? ' selected' : ''}>Action</option><option value="decision"${ty === 'decision' ? ' selected' : ''}>Decision</option><option value="watch"${ty === 'watch' ? ' selected' : ''}>Watch item</option></select>
           <input class="cellin po" list="dkowners" placeholder="Owner email${x.who ? ' (' + esc(x.who) + ')' : ''}" value="${esc(ownerOf(x.who))}" style="height:34px;flex:1 1 170px"><input class="cellin pd" type="date" value="${dd}" style="height:34px">`;
         box.appendChild(row); });
+      carry(f);
       msg.innerHTML = 'Check the fields, then Save.' + (f.dataset.orig ? ' <a href="#" onclick="event.preventDefault();const f=this.closest(\'form\');f.b.value=f.dataset.orig">Undo text</a>' : '');
     } catch (e) { msg.textContent = 'Sorry: ' + e.message; }
   }
@@ -139,7 +181,7 @@
       </div>
       ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap"><button type="button" class="btn sm" onclick="apxInk()">✎ Ink note (S Pen)</button><label class="btn sm" style="cursor:pointer">📷 Scan page<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this)"></label></div>` : ''}
       <textarea name="body" class="cellin" rows="${TAB === 'note' ? 6 : 3}" placeholder="${TAB === 'note' ? 'Paste meeting notes (e.g. Read AI summary). Add actions after saving.' : 'Details'}" style="padding:8px;font:inherit"></textarea>
-      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button>${TAB === 'note' ? '<button class="btn" type="button" onclick="apxDeskPaste()">📋 Paste page</button><button class="btn" type="button" onclick="apxDeskAddFill()">✨ Fill with Ava</button>' : ''}</div></form>`;
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn y" type="submit">Save</button></div></form>`;
   }
   function actionsOf(n) {
     const a = ROWS.filter(r => r.parent_id === n.id);
@@ -162,10 +204,10 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="flex:1">${esc(r.title)}</b>
         ${late ? `<span style="color:var(--bad,#c00);font-size:12px">${r.kind === 'watch' ? 'check now' : 'overdue'}</span>` : ''}
         ${r.kind !== 'decision' ? `<button class="btn sm" onclick="apxDeskSet(${r.id},${r.status === 'open'})">${r.status === 'open' ? ({ escalation: 'Resolve', watch: 'Done' }[r.kind] || 'Close') : 'Reopen'}</button>` : ''}
-        ${r.kind === 'note' || r.kind === 'meeting' ? `<button class="btn sm" onclick="apxDeskEdit(${r.id},this)">Edit</button>` : ''}
+        ${r.kind === 'note' || r.kind === 'meeting' ? `<button class="btn sm" onclick="apxDeskHist(${r.id})" title="Past notes, decisions and actions of this meeting">History</button><button class="btn sm" onclick="apxDeskCopy(${r.id})" title="Copy a text summary to paste into WhatsApp or Teams">📋 Copy</button><button class="btn sm" onclick="apxDeskEdit(${r.id},this)">Edit</button>` : ''}
         <button class="btn sm" onclick="apxDeskDel(${r.id})" aria-label="Delete">Delete</button></div>
       <span class="famas">${esc(meta)}</span>
-      ${r.ink && window.apxInkSvg ? apxInkSvg(r.ink) : ''}
+      ${window.apxInkSvg ? (((r.pages || []).filter(p => p.t === 'ink').map(p => p.ink).length ? (r.pages || []).filter(p => p.t === 'ink').map(p => p.ink) : r.ink ? [r.ink] : []).map(k => apxInkSvg(k)).join('')) : ''}
       ${r.scan && window.apxScanHtml ? apxScanHtml(r) : ''}
       ${r.body ? `<div style="white-space:pre-wrap;font-size:14px">${esc(r.body)}</div>` : ''}
       ${TAB === 'note' ? actionsOf(r) : ''}</div>`;
@@ -181,15 +223,20 @@
           <span aria-hidden="true" style="color:${x.warn ? 'var(--bad,#c00)' : 'var(--warn,#b70)'}">●</span><span><b>${x.t}</b> <span class="famas">${x.s || ''}</span></span></div>`).join('')
           + (xs.length > 25 ? `<span class="famas">+ ${xs.length - 25} more on the page</span>` : '') : '<span class="famas">All clear</span>'}</div>`; }).join('');
   }
+  const sname = e => (STAFF.find(s => s.e === String(e || '').toLowerCase()) || {}).n || '';
+  const hay = r => [r.title, r.body, r.person, pn(r.programme_id), r.owner_email, sname(r.owner_email)].concat(ROWS.filter(a => a.parent_id === r.id).flatMap(a => [a.title, a.owner_email, sname(a.owner_email)])).join(' ').toLowerCase();
   function render() {
     const v = $('view-desk'); if (!v) return;
     if (!isAdmin()) { v.innerHTML = '<div class="empty"><b>My desk</b><span>Admin only.</span></div>'; return; }
     const q = Q.toLowerCase(), all = ROWS.filter(r => !r.parent_id && inKind(r));
-    const list = all.filter(r => (TAB === 'decision' || SHOW === 'all' || r.status === SHOW) && (!q || [r.title, r.body, r.person, pn(r.programme_id)].join(' ').toLowerCase().includes(q)));
+    const list = all.filter(r => (TAB === 'decision' || SHOW === 'all' || r.status === SHOW) && (!q || hay(r).includes(q)));
     const n = k => k === 'comp' ? COMP.reduce((s, [r]) => s + compItems(r).filter(x => x.warn).length, 0) : ROWS.filter(r => !r.parent_id && (k === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === k) && (k === 'decision' || r.status === 'open')).length;
     const openActs = ROWS.filter(r => r.kind === 'action' && r.status === 'open').length;
     v.innerHTML = `<div style="display:flex;flex-direction:column;gap:14px;padding:4px 0">
       <div><h1 style="font-size:26px">My desk</h1><span class="famas">${loaded ? `${openActs} open action${openActs === 1 ? '' : 's'} · actions and escalations with an owner show on that person's My work` : 'Loading…'}</span></div>
+      ${TAB === 'note' ? `<div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn y" style="font-size:16px;padding:10px 18px" onclick="apxCapture()">＋ Capture</button>
+        ${DRAFTS.slice(0, 5).map(r => `<button class="btn sm" onclick="apxCapture(${r.id})" title="Carry on with this unfinished capture">Unfinished: ${esc(String(r.title || 'capture').slice(0, 40))} · ${esc(String(r.updated_at || r.created_at || '').slice(5, 10))}</button>`).join('')}
+        ${DRAFTS.length ? `<span class="famas">Unfinished (${DRAFTS.length}) · deleted after 7 days</span>` : ''}</div>` : ''}
       <div class="seg" style="flex-wrap:wrap">${TABS.map(([k, l]) => `<button class="${k === TAB ? 'on' : ''}" onclick="apxDeskTab('${k}')">${l} (${n(k)})</button>`).join('')}</div>
       ${TAB === 'comp' ? `<span class="famas">Live from the Overview flags. Click an item to open it.</span>${comp()}</div>` : `${form()}${progOpts()}${ownerOpts()}
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">

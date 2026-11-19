@@ -47,13 +47,13 @@
     S.cur = S.pages.length - 1; say(''); draw(); strip();
   }
   /* tapped directly on a real <input type=file> (most reliable on Android) */
-  window.apxScanFiles = inp => { const f = [...(inp.files || [])]; inp.value = ''; if (!f.length) return; if (S && document.getElementById('scanpad')) add(f); else start(f); };
+  window.apxScanFiles = (inp, cb) => { const f = [...(inp.files || [])]; inp.value = ''; if (!f.length) return; if (S && document.getElementById('scanpad')) add(f); else start(f, cb); };
   window.apxScan = () => pick(start);
-  async function start(files) {
+  async function start(files, cb) {
     if (!files.length) return;
     css();
     const f = document.getElementById('dkform'), t = f && f.elements.title ? f.elements.title.value.trim() : '';
-    S = { pages: [], cur: 0 };
+    S = { pages: [], cur: 0, cb: typeof cb === 'function' ? cb : null };
     const d = document.createElement('div'); d.id = 'scanpad';
     d.innerHTML = `<div class="sb"><input id="sct" placeholder="Title (optional)" value="${esc(t)}">
       <button class="btn sm" type="button" onclick="apxScanRot()">⟳ Rotate</button>
@@ -161,6 +161,7 @@
         const { error } = await sb.storage.from(B).upload(path, blob, { contentType: 'image/jpeg', upsert: false }); if (error) throw error;
         done.push({ p: path, w: c.width, h: c.height });
       }
+      if (S.cb) { const cb = S.cb, tt = document.getElementById('sct').value.trim(); apxScanClose(true); cb(done, tt); return; }
       const f = document.getElementById('dkform'), fe = f ? f.elements : {}, t = document.getElementById('sct').value.trim();
       const row = { kind: 'note', title: t || 'Scanned note ' + new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }),
         body: fe.body && fe.body.value.trim() || null, person: fe.person && fe.person.value.trim() || null, scan: { pages: done } };

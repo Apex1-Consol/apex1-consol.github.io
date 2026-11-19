@@ -46,7 +46,7 @@
     if (S.strokes.length !== n) redraw();
   }
 
-  window.apxInk = () => {
+  window.apxInk = cb => {
     css(); if (document.getElementById('inkpad')) return;
     const d = document.createElement('div'); d.id = 'inkpad';
     d.innerHTML = `<div class="ib"><input id="inkt" placeholder="Title (optional)" aria-label="Ink note title">
@@ -56,7 +56,7 @@
       <div class="ih" id="inkh">Write with the S Pen. Your palm is ignored once the pen has touched the screen.</div><canvas id="inkcv"></canvas>`;
     document.body.appendChild(d);
     const cv = d.querySelector('canvas'), dpr = window.devicePixelRatio || 1;
-    S = { cv, ctx: cv.getContext('2d'), dpr, strokes: [], cur: null, col: COLS[0], er: false, pen: false };
+    S = { cv, ctx: cv.getContext('2d'), dpr, strokes: [], cur: null, col: COLS[0], er: false, pen: false, cb: typeof cb === 'function' ? cb : null };
     const size = () => { const r = cv.getBoundingClientRect(); cv.width = r.width * dpr; cv.height = r.height * dpr; redraw(); };
     size(); S.rs = () => size(); addEventListener('resize', S.rs);
     d.querySelectorAll('.sw').forEach(b => b.onclick = () => { S.col = b.dataset.c; S.er = false; d.querySelectorAll('.sw').forEach(x => x.classList.toggle('on', x === b)); d.querySelector('#inke').classList.remove('on'); });
@@ -87,6 +87,7 @@
     if (!S.strokes.length) { say('Nothing written yet.'); return; }
     const r = S.cv.getBoundingClientRect(), t = (document.getElementById('inkt').value || '').trim();
     const ink = { w: Math.round(r.width), h: Math.round(r.height), s: S.strokes.map(([c, z, p]) => [c, z, p]) };
+    if (S.cb) { const cb = S.cb; close(); cb(ink, t); return; }
     say('Saving…');
     const sb = window.__sb; if (!sb) { say('Not signed in. Your ink is still here; sign in in another tab and tap Save again.'); return; }
     const { error } = await sb.from('desk_notes').insert({ kind: 'note', title: t || 'Ink note ' + new Date().toLocaleString('en-ZA', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }), ink });
