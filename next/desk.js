@@ -22,6 +22,11 @@
     if (window.previewShell) try { window.previewShell(); } catch (e) {}
   }
   window.apxDeskReload = () => load();
+  let EXTRA = []; (async () => { try { const { data } = await sb.from('handoff_default_signers').select('email'); EXTRA = (data || []).map(x => String(x.email || '').toLowerCase()).filter(Boolean); } catch (e) {} })();
+  const known = () => [...new Set(ROWS.map(r => (r.owner_email || '').toLowerCase()).filter(Boolean).concat(EXTRA, me()))];
+  /* name from Ava ("Kathleen") -> staff email, matched on this device only (emails never go to Ava) */
+  const ownerOf = who => { const ws = String(who || '').toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 3 && !['pms', 'all', 'team', 'the', 'and', 'staff', 'admin', 'everyone'].includes(w)); if (!ws.length) return '';
+    for (const w of ws) { const h = known().filter(e => e.split('@')[0].split(/[^a-z]+/).some(p => p === w || (w.length >= 4 && p.startsWith(w)))); if (h.length === 1) return h[0]; } return ''; };
   async function run(fn, ok) { const { error } = await fn(); if (error) { say('Not saved: ' + error.message); return false; } if (ok) say(ok); await load(); return true; }
 
   // ---------- My work hook ----------
@@ -42,10 +47,21 @@
     f.querySelector('[data-x=cancel]').onclick = () => f.remove();
     f.querySelector('[data-x=fill]').onclick = () => fillAva(f);
     f.onsubmit = async e => { e.preventDefault(); const t = f.t.value.trim(); if (!t) return;
-      const acts = [...f.querySelectorAll('.dkacts input:checked')].map(x => JSON.parse(x.value));
-      if (acts.length) { const { error } = await sb.from('desk_notes').insert(acts.map(a => ({ kind: 'action', parent_id: id, title: a.t, due_date: a.d || null, programme_id: pid(f.g.value) || r.programme_id || null, person: t }))); if (error) { say('Actions not saved: ' + error.message); return; } }
-      run(() => sb.from('desk_notes').update({ kind: f.k.value, title: t, person: f.p.value.trim() || null, programme_id: pid(f.g.value), body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), acts.length ? `Saved with ${acts.length} action${acts.length > 1 ? 's' : ''}` : 'Saved'); };
+      const prog = pid(f.g.value) || r.programme_id || null;
+      const acts = [...f.querySelectorAll('.dkprop')].filter(x => x.querySelector('input[type=checkbox]').checked).map(x => { const ty = x.querySelector('.py').value, o = x.querySelector('.po').value.trim().toLowerCase() || null, dd = x.querySelector('.pd').value || null, tt = x.querySelector('.pt').value.trim();
+        return ty === 'decision' ? { kind: 'decision', title: tt, programme_id: prog, person: f.p.value.trim() || null, body: 'From: ' + t }
+          : { kind: ty, parent_id: ty === 'action' ? id : null, title: tt, owner_email: o, due_date: dd, programme_id: prog, person: t }; }).filter(x => x.title);
+      if (acts.length) { const { error } = await sb.from('desk_notes').insert(acts); if (error) { say('Not saved: ' + error.message); return; } }
+      run(() => sb.from('desk_notes').update({ kind: f.k.value, title: t, person: f.p.value.trim() || null, programme_id: pid(f.g.value), body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), acts.length ? `Saved with ${acts.length} item${acts.length > 1 ? 's' : ''} (actions here, decisions and watch items in their tabs)` : 'Saved'); };
     c.querySelector('.famas').after(f); f.b.focus();
+  };
+  window.apxDeskOwn = (id, b) => {
+    const r = ROWS.find(x => x.id === id); if (!r || b.nextElementSibling && b.nextElementSibling.classList.contains('dkown')) return;
+    const f = document.createElement('form'); f.className = 'dkown'; f.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;width:100%';
+    f.innerHTML = `<input name="o" class="cellin" list="dkowners" placeholder="Owner email" value="${esc(r.owner_email || '')}" style="height:36px;flex:1 1 180px"><input name="d" type="date" class="cellin" value="${esc(r.due_date || '')}" style="height:36px"><button class="btn y sm">Save</button><button class="btn sm" type="button">Cancel</button>`;
+    f.querySelector('button[type=button]').onclick = () => f.remove();
+    f.onsubmit = e => { e.preventDefault(); run(() => sb.from('desk_notes').update({ owner_email: f.o.value.trim().toLowerCase() || null, due_date: f.d.value || null, updated_at: new Date().toISOString() }).eq('id', id), 'Saved'); };
+    b.parentElement.style.flexWrap = 'wrap'; b.after(f); f.o.focus();
   };
   /* Fill with Ava: typed/pasted text only (never the scan image), emails/phones/ID numbers removed. Ava proposes; you check and Save. */
   const scrubT = t => String(t || '').replace(/[\w.+-]+@[\w-]+\.[\w.-]+/g, '[email]').replace(/\b\d{13}\b/g, '[ID number]').replace(/(\+?\d[\d ()-]{7,}\d)/g, '[number]').slice(0, 4000);
@@ -56,7 +72,7 @@
     msg.textContent = 'Ava is reading…';
     try {
       const { data } = await sb.auth.getSession(), tok = data.session && data.session.access_token; if (!tok) throw new Error('Please sign in again.');
-      const q = 'Turn the NOTES in the facts into structured meeting notes. Reply with ONLY one JSON object, no other text: {"title":"short title","kind":"meeting or note","attendees":"comma separated names or empty","programme":"programme or client name if mentioned, else empty","summary":"well structured notes in plain text: short headings and - bullet points, keep every fact, fix spelling, do not invent anything","actions":[{"what":"action, include who if known","due":"YYYY-MM-DD or empty"}]}. Today is ' + iso() + '.';
+      const q = 'Turn the NOTES in the facts into structured meeting notes. Reply with ONLY one JSON object, no other text: {"title":"short title","kind":"meeting or note","attendees":"comma separated names or empty","programme":"programme or client name if mentioned, else empty","summary":"well structured notes in plain text: short headings and - bullet points, keep every fact, fix spelling, do not invent anything","items":[{"what":"short item text","who":"person name if stated, else empty","due":"YYYY-MM-DD if a date is stated or clearly implied, else empty","type":"action (a task someone must do) or decision (an agreed rule or decision) or watch (a recurring or ongoing thing to check)"}]}. Today is ' + iso() + '.';
       const res = await fetch(sb.supabaseUrl + '/functions/v1/ava', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + tok }, body: JSON.stringify({ type: 'ava', mode: 'ask', question: q, page: 'My desk', facts: 'NOTES:\n' + txt, history: [] }) });
       const j = await res.json().catch(() => null);
       if (res.status === 429) throw new Error('Ava is busy (free AI limit). Try again in a minute.');
@@ -70,9 +86,14 @@
         const hit = progs().filter(p => !p.deleted_at && (n ? String(p.id) === n : (p.programme_name || '').toLowerCase().includes(g)));
         if (hit.length === 1) f.g.value = `#${hit[0].id} ${hit[0].programme_name || ''}`; }
       if (o.summary) { f.dataset.orig = f.dataset.orig || f.b.value; f.b.value = String(o.summary); }
-      const acts = (Array.isArray(o.actions) ? o.actions : []).filter(x => x && x.what).slice(0, 15);
-      f.querySelector('.dkacts').innerHTML = acts.length ? '<b style="font-size:13px">Proposed actions (tick to add):</b>' + acts.map(x => { const d = /^\d{4}-\d{2}-\d{2}$/.test(x.due || '') ? x.due : '';
-        return `<label style="display:flex;gap:8px;align-items:flex-start;font-size:14px"><input type="checkbox" checked value="${esc(JSON.stringify({ t: String(x.what).slice(0, 300), d }))}" style="width:20px;height:20px;flex:none"><span>${esc(x.what)}${d ? ' · due ' + d : ''}</span></label>`; }).join('') : '';
+      const its = (Array.isArray(o.items) ? o.items : Array.isArray(o.actions) ? o.actions : []).filter(x => x && x.what).slice(0, 20);
+      const box = f.querySelector('.dkacts'); box.innerHTML = its.length ? '<b style="font-size:13px">Proposed (tick to add; change type, owner or date):</b>' : '';
+      its.forEach(x => { const ty = /decision/i.test(x.type || '') ? 'decision' : /watch/i.test(x.type || '') ? 'watch' : 'action', dd = /^\d{4}-\d{2}-\d{2}$/.test(x.due || '') ? x.due : '';
+        const row = document.createElement('div'); row.className = 'dkprop'; row.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:14px;padding:6px 0;border-top:1px solid var(--line)';
+        row.innerHTML = `<input type="checkbox" checked style="width:20px;height:20px;flex:none"><input class="cellin pt" value="${esc(String(x.what).slice(0, 300))}" style="height:34px;flex:3 1 220px">
+          <select class="cellin py" style="height:34px"><option value="action"${ty === 'action' ? ' selected' : ''}>Action</option><option value="decision"${ty === 'decision' ? ' selected' : ''}>Decision</option><option value="watch"${ty === 'watch' ? ' selected' : ''}>Watch item</option></select>
+          <input class="cellin po" list="dkowners" placeholder="Owner email${x.who ? ' (' + esc(x.who) + ')' : ''}" value="${esc(ownerOf(x.who))}" style="height:34px;flex:1 1 170px"><input class="cellin pd" type="date" value="${dd}" style="height:34px">`;
+        box.appendChild(row); });
       msg.innerHTML = 'Check the fields, then Save.' + (f.dataset.orig ? ' <a href="#" onclick="event.preventDefault();const f=this.closest(\'form\');f.b.value=f.dataset.orig">Undo text</a>' : '');
     } catch (e) { msg.textContent = 'Sorry: ' + e.message; }
   }
@@ -82,7 +103,7 @@
   const TABS = [['note', 'Notes & meetings'], ['escalation', 'Escalations'], ['decision', 'Decisions'], ['watch', 'Watch items'], ['comp', 'Compliance watch']];
   const inKind = r => TAB === 'note' ? (r.kind === 'note' || r.kind === 'meeting') : r.kind === TAB;
   const progOpts = () => `<datalist id="dkprogs">${progs().filter(p => !p.deleted_at).map(p => `<option value="#${p.id} ${esc(p.programme_name || '')}">`).join('')}</datalist>`;
-  const ownerOpts = () => `<datalist id="dkowners">${[...new Set(ROWS.map(r => r.owner_email).filter(Boolean).concat(me()))].map(e => `<option value="${esc(e)}">`).join('')}</datalist>`;
+  const ownerOpts = () => `<datalist id="dkowners">${known().map(e => `<option value="${esc(e)}">`).join('')}</datalist>`;
   const pid = v => { const m = String(v || '').match(/^#(\d+)/); return m ? Number(m[1]) : null; };
   const inp = (n, ph, extra = '') => `<input name="${n}" class="cellin" placeholder="${ph}" style="height:36px;flex:1 1 180px" ${extra}>`;
 
@@ -106,7 +127,7 @@
     return `<div style="display:flex;flex-direction:column;gap:4px;margin-top:6px">${a.map(r => `<div style="display:flex;gap:8px;align-items:center;font-size:13px">
       <input type="checkbox" ${r.status === 'done' ? 'checked' : ''} onchange="apxDeskSet(${r.id},this.checked)" aria-label="Done">
       <span style="${r.status === 'done' ? 'text-decoration:line-through;color:var(--muted)' : ''}">${esc(r.title)}</span>
-      <span class="famas">${esc(r.owner_email || 'no owner')}${r.due_date ? ' · due ' + r.due_date : ''}</span>
+      <button type="button" class="famas" style="cursor:pointer;border:0" title="Set owner and due date" onclick="apxDeskOwn(${r.id},this)">${esc(r.owner_email || 'no owner')}${r.due_date ? ' · due ' + r.due_date : ''} ✎</button>
       ${r.status === 'open' && r.due_date && r.due_date < iso() ? '<span style="color:var(--bad,#c00);font-size:12px">overdue</span>' : ''}</div>`).join('')}
       <form style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px" onsubmit="event.preventDefault();apxDeskAct(${n.id},this)">
         <input name="t" class="cellin" placeholder="New action" required style="height:32px;flex:2 1 200px">
