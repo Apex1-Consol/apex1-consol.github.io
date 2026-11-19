@@ -47,8 +47,7 @@
         ['Preparing', 'Pack started, nobody signed', packs.filter(p => pack.get(p.id) !== 'handed_over' && !sigs.get(p.id)), p => [link(p), when(p)]],
         ['Signing', '1 or 2 of 3 signatures', packs.filter(p => pack.get(p.id) !== 'handed_over' && sigs.get(p.id)), p => [link(p), sigs.get(p.id) + ' of 3 signed · ' + when(p)]],
         ['Handed over', 'All signed, waiting to go live', packs.filter(p => pack.get(p.id) === 'handed_over' && st(p) !== 'active' && st(p) !== 'closed'), p => [link(p), when(p)]],
-        ['Activated', 'Live after hand-over', packs.filter(p => st(p) === 'active'), p => [progLink(p), when(p)]],
-        ['Other sign-offs', 'Queue items waiting below', (D().signoffs || []).filter(s => s.status === 'waiting'), s => [esc(s.title || s.kind || 'Item'), esc(s.kind || '')]]];
+        ['Activated', 'Live after hand-over', packs.filter(p => st(p) === 'active'), p => [progLink(p), when(p)]]];
     }
     // recruitment: programmes with an intake request or placements
     const req = new Set(L.RQ.map(r => r.programme_id)), pl = new Map();
