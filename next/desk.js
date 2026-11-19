@@ -47,7 +47,7 @@
       <input name="t" class="cellin" style="height:36px;flex:2;min-width:180px" value="${esc(r.title)}" placeholder="Title" required>
       <input name="p" class="cellin" style="height:36px;flex:1;min-width:150px" value="${esc(r.person || '')}" placeholder="Attendees / person">
       <input name="g" class="cellin" style="height:36px;flex:1;min-width:150px" list="dkprogs" value="${esc(pn(r.programme_id))}" placeholder="Programme (optional)"></div>
-      <textarea name="b" class="cellin" rows="8" style="padding:8px;font:inherit" placeholder="Paste the text from your scan here (Gallery → T Extract text → Copy all), then tap Fill with Ava">${esc(r.body || '')}</textarea>
+      <textarea name="b" class="cellin" rows="8" style="padding:8px;font:inherit;height:auto;min-height:200px;resize:vertical" placeholder="Paste the text from your scan here (Gallery → T Extract text → Copy all), then tap Fill with Ava">${esc(r.body || '')}</textarea>
       <div class="dkcarry"></div><div class="dkacts" style="display:flex;flex-direction:column;gap:4px"></div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><button class="btn y sm" type="submit">Save</button><button class="btn sm" type="button" data-x="fill">✨ Fill with Ava</button><button class="btn sm" type="button" data-x="cancel">Cancel</button><span class="dkmsg" style="font-size:12px"></span></div>`;
     f.querySelector('[data-x=cancel]').onclick = () => f.remove();
