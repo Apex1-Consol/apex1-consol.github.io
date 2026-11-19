@@ -39,7 +39,7 @@
       <b style="font-size:14px">Add a page</b>
       <div class="add"><button class="btn" type="button" onclick="apxCapPaste()">📋 Copied text</button>
         <label class="btn" style="cursor:pointer">📷 Scan photo<input type="file" accept="image/*" multiple hidden onchange="apxScanFiles(this, apxCapScan)"></label>
-        <button class="btn" type="button" onclick="apxInk(apxCapInk)">✎ S Pen ink</button><button class="btn" type="button" onclick="apxCapType()">⌨ Type</button></div>
+        <button class="btn" type="button" onclick="apxInk(apxCapInk)">✍️ Handwrite / sketch</button><button class="btn" type="button" onclick="apxCapType()">⌨ Type</button></div><div style="font-size:12px;opacity:.7;margin-top:6px">Tip: tap the 🎤 on your keyboard to dictate instead of typing.</div>
       <span class="st">Tip: in Gallery tap T → Copy all, then come back here and tap Add. Nothing is kept on your phone; this is saved in ApexOne as you go.</span></div>
       <div class="ft"><button class="btn y" type="button" style="min-height:48px" onclick="apxCapFinish(1)">✨ Fill with Ava</button><button class="btn" type="button" style="min-height:48px" onclick="apxCapFinish(0)">Save without Ava</button></div>`;
     document.body.appendChild(o); document.documentElement.style.overflow = 'hidden'; draw();

@@ -53,7 +53,7 @@
       ${COLS.map((c, i) => `<button class="sw${i ? '' : ' on'}" data-c="${c}" style="background:${c}" aria-label="Pen colour ${i + 1}"></button>`).join('')}
       <button class="btn sm tb" id="inke" type="button">Eraser</button><button class="btn sm" id="inku" type="button">Undo</button><button class="btn sm" id="inkc" type="button">Clear</button>
       <button class="btn sm" id="inkx" type="button">Cancel</button><button class="btn sm" id="inks" type="button" style="font-weight:700">Save</button></div>
-      <div class="ih" id="inkh">Write with the S Pen. Your palm is ignored once the pen has touched the screen.</div><canvas id="inkcv"></canvas>`;
+      <div class="ih" id="inkh">Write or sketch with your finger, a stylus or a mouse. With a pen, your palm is ignored once the pen has touched the screen.</div><canvas id="inkcv"></canvas>`;
     document.body.appendChild(d);
     const cv = d.querySelector('canvas'), dpr = window.devicePixelRatio || 1;
     S = { cv, ctx: cv.getContext('2d'), dpr, strokes: [], cur: null, col: COLS[0], er: false, pen: false, cb: typeof cb === 'function' ? cb : null };
