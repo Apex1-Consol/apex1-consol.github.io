@@ -93,7 +93,9 @@
     btn.closest('.card').scrollIntoView({ block: 'start' }); btn.click(); const ef = btn.closest('.card').querySelector('.dkedit'); if (ef) fillAva(ef); };
   /* meeting series: same programme, or same first two title words (dates, numbers and filler words ignored) */
   const key = t => String(t || '').toLowerCase().replace(/\d+|[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length > 1 && !['meeting', 'meetings', 'notes', 'note', 'scanned', 'the', 'and', 'with', 'of', 'for', 'nov', 'dec', 'jan'].includes(w)).slice(0, 2).join(' ');
-  const series = r => { const k = key(r.title); return ROWS.filter(x => (x.kind === 'note' || x.kind === 'meeting') && !x.parent_id && x.id !== r.id && ((r.programme_id && x.programme_id === r.programme_id) || (k && key(x.title) === k))).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))); };
+  const kw = t => new Set(String(t || '').toLowerCase().replace(/[^a-z ]/g, ' ').split(/\s+/).map(w => w.replace(/s$/, '')).filter(w => w.length > 3 && !['meeting', 'note', 'scanned', 'review', 'with', 'from', 'update', 'discussion'].includes(w)));
+  const same = (a, b) => { const x = kw(a), y = kw(b); let n = 0; x.forEach(w => { if (y.has(w)) n++; }); return n >= 2 || (n >= 1 && Math.min(x.size, y.size) === 1); };
+  const series = r => { const k = key(r.title); return ROWS.filter(x => (x.kind === 'note' || x.kind === 'meeting') && !x.parent_id && x.id !== r.id && ((r.programme_id && x.programme_id === r.programme_id) || (k && key(x.title) === k) || same(r.title, x.title))).sort((a, b) => String(b.created_at).localeCompare(String(a.created_at))); };
   function carry(f) {
     const r = ROWS.find(x => x.id === Number(f.dataset.id)), box = f.querySelector('.dkcarry'); if (!r || !box) return;
     const probe = { ...r, title: f.t.value, programme_id: pid(f.g.value) || r.programme_id };
