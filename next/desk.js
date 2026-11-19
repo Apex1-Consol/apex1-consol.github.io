@@ -29,6 +29,17 @@
     .map(r => ({ id: 'dk' + r.id, t: ({ escalation: 'Escalation: ', watch: 'Check: ' }[r.kind] || '') + r.title,
       s: [r.person, pn(r.programme_id), r.due_date ? 'due ' + r.due_date : ''].filter(Boolean).join(' · '),
       k: 'Desk', c: 'Done', on: `apxDeskDone(${r.id})`, bad: r.due_date && r.due_date < iso() ? 1 : 0 }));
+  window.apxDeskEdit = (id, b) => {
+    const r = ROWS.find(x => x.id === id), c = b.closest('.card'); if (!r || !c || c.querySelector('.dkedit')) return;
+    const f = document.createElement('form'); f.className = 'dkedit'; f.style.cssText = 'display:flex;flex-direction:column;gap:6px';
+    f.innerHTML = `<input name="t" class="cellin" style="height:36px" value="${esc(r.title)}" required>
+      <textarea name="b" class="cellin" rows="6" style="padding:8px;font:inherit" placeholder="Typed notes / summary (Ava can tidy this)">${esc(r.body || '')}</textarea>
+      <div style="display:flex;gap:8px"><button class="btn y sm" type="submit">Save</button><button class="btn sm" type="button">Cancel</button></div>`;
+    f.querySelector('button[type=button]').onclick = () => f.remove();
+    f.onsubmit = e => { e.preventDefault(); const t = f.t.value.trim(); if (!t) return;
+      run(() => sb.from('desk_notes').update({ title: t, body: f.b.value.trim() || null, updated_at: new Date().toISOString() }).eq('id', id), 'Saved'); };
+    c.querySelector('.famas').after(f); f.b.focus();
+  };
   window.apxDeskDone = id => run(() => sb.from('desk_notes').update({ status: 'done', updated_at: new Date().toISOString() }).eq('id', id), 'Marked done');
 
   // ---------- page ----------
@@ -75,6 +86,7 @@
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><b style="flex:1">${esc(r.title)}</b>
         ${late ? `<span style="color:var(--bad,#c00);font-size:12px">${r.kind === 'watch' ? 'check now' : 'overdue'}</span>` : ''}
         ${r.kind !== 'decision' ? `<button class="btn sm" onclick="apxDeskSet(${r.id},${r.status === 'open'})">${r.status === 'open' ? ({ escalation: 'Resolve', watch: 'Done' }[r.kind] || 'Close') : 'Reopen'}</button>` : ''}
+        ${r.kind === 'note' || r.kind === 'meeting' ? `<button class="btn sm" onclick="apxDeskEdit(${r.id},this)">Edit</button>` : ''}
         <button class="btn sm" onclick="apxDeskDel(${r.id})" aria-label="Delete">Delete</button></div>
       <span class="famas">${esc(meta)}</span>
       ${r.ink && window.apxInkSvg ? apxInkSvg(r.ink) : ''}
