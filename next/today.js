@@ -20,6 +20,8 @@
   const rstate = p => window.dvApi?.runState ? dvApi.runState(p) : p.status === 'active' ? 'Active'
     : !(p.start_date && new Date(p.start_date) <= T00()) ? 'Planned' : p.end_date && new Date(p.end_date) < T00() ? 'Completed' : 'Active';
   const live = p => rstate(p) === 'Active';
+  // /next/: delivery checks only for programmes really in delivery (handed over or active); stale 'initiated' ones show on the lifecycle strip instead
+  const real = p => p.status === 'handed_over' || p.status === 'active';
   const ymd = s => String(s || '').slice(0, 10);
   const pname = p => esc((p?.programme_name || '').replace('[TEST] ', '') || 'Programme');
   const goP = id => `location.hash='programmes';setTimeout(()=>window.dvProg&&dvProg(${+id}),60)`;
@@ -66,7 +68,7 @@
       // Only the next date from a programme's latest visit counts; a later visit replaces an earlier visit's next date.
       for (let i = next.length - 1; i >= 0; i--) { const o = next[i], L = last.get(String(o.x.programme_id)); if (L && (!o.vd || o.vd < L)) next.splice(i, 1); }
       const due = byN(next.filter(o => o.n != null && o.n <= 14)).map(o => it(pname(m.get(String(o.x.programme_id))), `Next visit ${fmt(o.d)} · ${when(o.n)}`, goH('visits'), o.n < 0, 'pm', o.x.programme_id));
-      const none = [...m.values()].filter(p => live(p) && (dd(p.start_date) ?? 1) <= -30 && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -90))
+      const none = [...m.values()].filter(p => live(p) && real(p) && (dd(p.start_date) ?? 1) <= -30 && !(last.get(String(p.id)) && dd(last.get(String(p.id))) > -90))
         .map(p => it(pname(p), last.get(String(p.id)) ? `Last visit ${fmt(last.get(String(p.id)))}: book a visit` : 'No visit recorded: book or capture a visit', goP(p.id), true, 'pm', p.id));
       return { h: 'Visits due', link: 'visits', items: due.concat(none) }; },
     eisa(m) { const t = (D().tracker || []).filter(x => m.has(String(x.programme_id)) && x.eisa_date && !x.eisa_outcome).map(x => ({ x, n: dd(x.eisa_date) })).filter(o => o.n != null && o.n <= 30);
@@ -128,7 +130,7 @@
        registers outside the programme dates; learners with 3+ absences in 30 days. */
     att(m) { const A = window.dvApi, items = [], ab = new Map(); if (!A || !A.regDates) return { h: 'Attendance', link: 'attendance', items };
       const reg = id => `window.dvProg&&dvProg(${id});window.dvGo?dvGo('attendance','Register'):${goH('attendance')}`;
-      [...m.values()].filter(p => p.status !== 'closed').forEach(p => { const r = A.regDates(p.id).filter(d => dd(d) <= 0), first = r[0], last = r[r.length - 1];
+      [...m.values()].filter(real).forEach(p => { const r = A.regDates(p.id).filter(d => dd(d) <= 0), first = r[0], last = r[r.length - 1];
         if (last && p.end_date && last > ymd(p.end_date)) items.push(it(pname(p), `Register on ${fmt(last)} is after the end date ${fmt(p.end_date)}: check the end date`, goP(p.id), true, 'pm', p.id));
         if (first && p.start_date && first < ymd(p.start_date)) items.push(it(pname(p), `Register on ${fmt(first)} is before the start date ${fmt(p.start_date)}: check the start date`, goP(p.id), false, 'pm', p.id));
         if (!live(p) || !A.learnersOf(p.id).length || (dd(p.start_date || first) ?? 1) > -14 || (last && dd(last) > -14)) return;
@@ -140,7 +142,7 @@
        Missing; amber when required documents are not yet checked, or nothing has been captured for the programme. */
     poe(m) { const A = window.dvApi, items = []; if (!A || !A.docGaps) return { h: 'Learner documents', link: 'attendance', items };
       const doc = id => `window.dvProg&&dvProg(${id});window.dvGo?dvGo('attendance','Documents'):${goH('attendance')}`, pl = n => n === 1 ? '' : 's';
-      [...m.values()].filter(live).forEach(p => { const g = A.docGaps(p.id); if (!g.learners) return;
+      [...m.values()].filter(p => live(p) && real(p)).forEach(p => { const g = A.docGaps(p.id); if (!g.learners) return;
         if (!g.captured) return items.push(it(pname(p), `Documents not captured for ${g.learners} learner${pl(g.learners)}`, doc(p.id), false, 'pm', p.id));
         if (g.missing) items.push(it(pname(p), `${g.missing} learner${pl(g.missing)} with a required document missing`, doc(p.id), true, 'pm', p.id));
         if (g.open) items.push(it(pname(p), `${g.open} learner${pl(g.open)} with required documents not checked`, doc(p.id), false, 'pm', p.id)); });
