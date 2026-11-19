@@ -67,7 +67,7 @@
     d.querySelector('#inks').onclick = save;
     cv.addEventListener('pointerdown', e => {
       if (e.pointerType === 'pen') S.pen = true; else if (e.pointerType === 'touch' && S.pen) return; // palm rejection
-      cv.setPointerCapture(e.pointerId); S.pid = e.pointerId; const p = pos(e);
+      try { cv.setPointerCapture(e.pointerId); } catch (_) {} S.pid = e.pointerId; const p = pos(e);
       if (S.er || e.button === 5 || (e.buttons & 32)) { S.erasing = true; erase(p[0], p[1]); return; }
       S.cur = [S.col, 3, p]; S.strokes.push(S.cur); seg(S.cur, 0); S.sure = 0;
     });
