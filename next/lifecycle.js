@@ -23,7 +23,7 @@
       q(s.from('fam_bookings').select('id,assessor_id,role,title,client_name,start_date,end_date,status').neq('status', 'Cancelled')),
       q(s.from('fam_quality').select('assessor_id,created_at')),
       q(s.from('assessors').select('id,full_name'))]);
-    window.apxLJ = L.LJ; window.shRefresh && shRefresh();
+    window.apxLJ = L.LJ; window.apxFamDue = L.BK.filter(b => b.end_date && b.end_date < t0 && !L.FQ.some(q => q.assessor_id === b.assessor_id && String(q.created_at).slice(0, 10) >= String(b.end_date))); window.shRefresh && shRefresh();
     L.at = Date.now(); L.busy = false;
   }
 
@@ -63,7 +63,7 @@
         ['No data', 'No attendance or results in the report generator', J('No data'), row],
         ['Active', 'Attending, no results outstanding', J('Active'), row],
         ['At risk', 'Attendance under 80% or NYC/NS/RW', J('At risk'), row],
-        ['Left', 'Terminated or resigned', J('Left'), row],
+        ['Left', 'Terminated or resigned (incl. attendance R)', J('Left'), row],
         ['Completed', 'Competent', J('Completed, competent'), row],
         ['Not yet competent', 'Programme ended, results outstanding', J('Completed, not yet competent'), row],
         ['No results', 'Programme ended, no results captured', J('Completed, no results'), row]];
