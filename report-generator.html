@@ -3463,7 +3463,7 @@ async function init(){
       (cached.clients||[]).forEach(cc=>{if(isTempId(cc.id)&&!c.find(x=>x.id===cc.id))c.push(cc);});
       (cached.programmes||[]).forEach(pp=>{if(isTempId(pp.id)&&!p.find(x=>x.id===pp.id))p.push(pp);});
     }
-    clients=c; programmes=p; assessors=a;
+    {const _s=await _pmScope(c,p);clients=_s.c;programmes=_s.p;} assessors=a;
     if(t&&t[0]){
       applyTenantBranding(t[0]);
       if(t[0].id!==undefined)TENANT_DB_ID=t[0].id;
@@ -12114,8 +12114,9 @@ async function renderDashboard(){
       // discard them from the in-memory arrays even though nothing failed.
       const localOnlyClients=clients.filter(x=>isTempId(x.id));
       const localOnlyProgrammes=programmes.filter(x=>isTempId(x.id));
-      clients=[...c,...localOnlyClients];
-      programmes=[...p,...localOnlyProgrammes];
+      const _s=await _pmScope(c,p);
+      clients=[..._s.c,...localOnlyClients];
+      programmes=[..._s.p,...localOnlyProgrammes];
       populateClients();
       saveSnapshot({clients,programmes,assessors,learners,enrolments,attendance,eisa});
     }catch(e){console.warn('Dashboard client/programme refresh failed:',e.message);}
@@ -13919,7 +13920,7 @@ async function _ghostRestore(record){
         sb('clients',`select=*&tenant_id=eq.${TENANT_DB_ID}&deleted_at=is.null&order=client_name`),
         sb('programmes',`select=*&tenant_id=eq.${TENANT_DB_ID}&deleted_at=is.null&order=programme_name`),
       ]);
-      clients=c;programmes=p;
+      {const _s=await _pmScope(c,p);clients=_s.c;programmes=_s.p;}
       populateClients();
       _historyFetchedAt=0; // bust history cache
       document.getElementById('ghost-cleanup-banner')?.remove();
@@ -14108,6 +14109,28 @@ async function softDeleteProgramme(programmeId){
   programmes=programmes.filter(p=>p.id!==programmeId);
 }
 
+
+// PMs see only the clients/programmes they have started a report for (Stavros, 25 Nov 2026).
+// The shared programme list holds every ApexOne programme; admins still see all of it.
+// A programme the PM created in the last 2 days stays visible so they can start its first report.
+async function _pmScope(c,p){
+  if(IS_ADMIN)return{c,p};
+  const me=((typeof _authUser!=='undefined'&&_authUser?.email)||'').toLowerCase();
+  if(!me||!TENANT_DB_ID)return{c,p};
+  try{
+    const [d,r]=await Promise.all([
+      sb('drafts',`select=programme_id&tenant_id=eq.${TENANT_DB_ID}&pm_email=eq.${encodeURIComponent(me)}&limit=5000`),
+      sb('reports',`select=programme_id&tenant_id=eq.${TENANT_DB_ID}&submitted_by_email=eq.${encodeURIComponent(me)}&limit=5000`)
+    ]);
+    const ids=new Set([...(d||[]),...(r||[])].map(x=>Number(x.programme_id)));
+    const tmp=id=>typeof id==='number'&&id>1e12;
+    const fresh=x=>(x.owner_email||'').toLowerCase()===me&&x.created_at&&(Date.now()-new Date(x.created_at).getTime())<2*864e5;
+    const p2=p.filter(x=>ids.has(Number(x.id))||tmp(x.id)||fresh(x));
+    const cids=new Set(p2.map(x=>x.client_id));
+    const c2=c.filter(x=>cids.has(x.id)||tmp(x.id)||fresh(x));
+    return{c:c2,p:p2};
+  }catch(e){console.warn('PM scope failed, showing all:',e?.message||e);return{c,p};}
+}
 // sbDelete helper (if not already present)
 async function sbDelete(table,id){
   const r=await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`,{
