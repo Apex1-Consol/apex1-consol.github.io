@@ -12587,6 +12587,8 @@ function dashJumpToClient(clientId){
   el.scrollIntoView({behavior:'smooth',block:'start'});
 }
 function dashGoTo(clientId,progId,month){
+  // Clients get merged/renamed in the shared platform: trust the programme's current client.
+  {const _pg=progId&&programmes.find(p=>p.id===Number(progId));if(_pg&&_pg.client_id&&clients.find(c=>c.id===_pg.client_id))clientId=_pg.client_id;}
   // Navigate to the client + programme (+ optional month) selection and generate
   hideDashboard();
   const selC=document.getElementById('sel-client');
@@ -13276,7 +13278,7 @@ async function openHistoryPanel(){
     if(IS_ADMIN){
       _historyRows=rows.map(r=>({
         ...r,
-        client_missing:r.client_id&&!clients.find(c=>c.id===r.client_id),
+        client_missing:r.client_id&&!clients.find(c=>c.id===r.client_id)&&!(r.programme_id&&programmes.find(p=>p.id===r.programme_id&&clients.find(c=>c.id===p.client_id))),
         programme_missing:r.programme_id&&!programmes.find(p=>p.id===r.programme_id),
       }));
     }
@@ -13516,6 +13518,8 @@ async function adminLoadReport(reportRecord){
   }
 
   // Graceful degraded display — show warning but don't block
+  // Old reports may point at a client that was merged away; use the programme's current client.
+  if(prog){const _cur=clients.find(c=>c.id===prog.client_id&&!c.deleted_at);if(_cur)client=_cur;}
   if(!client||!prog){
     const missingClient=!client;
     const missingProg=!prog;
@@ -13585,6 +13589,8 @@ async function pmLoadReport(reportRecord){
   }
 
   // Graceful degraded display — show warning but don't block entirely
+  // Old reports may point at a client that was merged away; use the programme's current client.
+  if(prog){const _cur=clients.find(c=>c.id===prog.client_id&&!c.deleted_at);if(_cur)client=_cur;}
   if(!client||!prog){
     const missingClient=!client;
     const missingProg=!prog;
@@ -15182,7 +15188,7 @@ async function _loadMoreHistory(){
     if(IS_ADMIN){
       const flagged=next.map(r=>({
         ...r,
-        client_missing:r.client_id&&!clients.find(c=>c.id===r.client_id),
+        client_missing:r.client_id&&!clients.find(c=>c.id===r.client_id)&&!(r.programme_id&&programmes.find(p=>p.id===r.programme_id&&clients.find(c=>c.id===p.client_id))),
         programme_missing:r.programme_id&&!programmes.find(p=>p.id===r.programme_id),
       }));
       _historyRows=[..._historyRows,...flagged];
